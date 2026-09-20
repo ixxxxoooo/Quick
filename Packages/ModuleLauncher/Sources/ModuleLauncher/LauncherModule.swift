@@ -57,7 +57,7 @@ public final class LauncherModule: QuickModule {
             let sortedOther = otherApps.sorted {
                 rankingStore.score(for: $0.bundleID) > rankingStore.score(for: $1.bundleID)
             }
-            let source = Array((favApps + sortedOther).prefix(20))
+            let source = Array((favApps + sortedOther).prefix(50))
             return source.map { entry in
                 SearchableItem(
                     id: "launcher.\(entry.id)",

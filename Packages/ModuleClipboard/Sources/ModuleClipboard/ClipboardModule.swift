@@ -58,8 +58,9 @@ public final class ClipboardModule: QuickModule {
                 }
             ))
 
-        // 最近的几条剪贴板记录，点击直接复制
-        results += matches.prefix(5).map { entry in
+        // 最近的几条文本记录，点击直接复制（图片需进入面板操作）
+        let textMatches = matches.filter { $0.type != .image }
+        results += textMatches.prefix(5).map { entry in
             SearchableItem(
                 id: "clipboard.\(entry.id)",
                 moduleID: Self.id,

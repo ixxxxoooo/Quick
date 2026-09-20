@@ -44,8 +44,13 @@ final class ClipboardStore {
     /// 添加新条目
     /// - Parameter entry: 剪贴板条目
     func add(_ entry: ClipboardEntry) {
-        // 去重：相同内容不重复记录（更新时间戳）
-        entries.removeAll { $0.text == entry.text }
+        // 去重：相同内容不重复记录
+        if entry.type == .image {
+            // 图片按数据内容去重
+            entries.removeAll { $0.type == .image && $0.imageData == entry.imageData }
+        } else {
+            entries.removeAll { $0.text == entry.text }
+        }
         entries.insert(entry, at: 0)
 
         // 限制数量（保留置顶和收藏）
@@ -79,13 +84,31 @@ final class ClipboardStore {
         scheduleSave()
     }
 
+    /// 收藏的条目
+    var favorites: [ClipboardEntry] {
+        entries.filter(\.isFavorite)
+    }
+
+    /// 按类型筛选
+    func entries(ofType type: ClipboardEntry.ContentType) -> [ClipboardEntry] {
+        entries.filter { $0.type == type }
+    }
+
+    /// 图片条目
+    var imageEntries: [ClipboardEntry] {
+        entries.filter { $0.type == .image }
+    }
+
     /// 搜索条目
     /// - Parameter query: 搜索关键词
     /// - Returns: 匹配的条目
     func search(_ query: String) -> [ClipboardEntry] {
         guard !query.isEmpty else { return entries }
         let lower = query.lowercased()
-        return entries.filter { $0.text.lowercased().contains(lower) }
+        return entries.filter {
+            $0.text.lowercased().contains(lower)
+                || $0.preview.lowercased().contains(lower)
+        }
     }
 
     // MARK: - 持久化
