@@ -10,7 +10,8 @@ import Vision
 /// 使用 Vision 框架的 VNRecognizeTextRequest 进行文字识别。
 /// 支持中文、英文及多语言混合识别。
 @MainActor
-final class OCREngine: Observable {
+@Observable
+final class OCREngine {
 
     /// 最近一次识别结果
     private(set) var lastResult: String = ""

@@ -7,7 +7,8 @@ import QuickPlatform
 
 /// 文本片段存储
 @MainActor
-final class SnippetStore: Observable {
+@Observable
+final class SnippetStore {
 
     private(set) var snippets: [Snippet] = []
 

@@ -9,7 +9,8 @@ import Foundation
 ///
 /// 封装 EventKit 操作，提供日历事件查询。
 @MainActor
-final class CalendarService: Observable {
+@Observable
+final class CalendarService {
 
     /// 日历事件
     struct CalendarEvent: Identifiable, Sendable {

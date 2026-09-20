@@ -7,7 +7,8 @@ import QuickPlatform
 
 /// 笔记存储
 @MainActor
-final class NoteStore: Observable {
+@Observable
+final class NoteStore {
 
     private(set) var notes: [NoteItem] = []
     private(set) var todos: [TodoItem] = []

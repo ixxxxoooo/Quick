@@ -9,7 +9,8 @@ import Foundation
 /// 管理对话历史和 AI 请求。
 /// 预留多模型 Provider 接口，可扩展 OpenAI / Claude 等。
 @MainActor
-final class ChatSession: Observable {
+@Observable
+final class ChatSession {
 
     private(set) var messages: [ChatMessage] = []
     private(set) var isStreaming = false

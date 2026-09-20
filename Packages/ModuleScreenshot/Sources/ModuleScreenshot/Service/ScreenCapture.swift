@@ -9,7 +9,8 @@ import Foundation
 ///
 /// 调用 macOS 系统截图工具进行屏幕捕获。
 @MainActor
-final class ScreenCapture: Observable {
+@Observable
+final class ScreenCapture {
 
     /// 最近一次截图路径
     private(set) var lastCapturePath: String?

@@ -10,7 +10,8 @@ import QuickPlatform
 /// 管理剪贴板历史条目的内存缓存和磁盘持久化。
 /// 自动去重、限制条目数量。
 @MainActor
-final class ClipboardStore: Observable {
+@Observable
+final class ClipboardStore {
 
     /// 所有条目（按时间倒序）
     private(set) var entries: [ClipboardEntry] = []

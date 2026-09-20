@@ -10,7 +10,8 @@ import NaturalLanguage
 /// 使用 NLLanguageRecognizer 检测语言，根据语言自动选择翻译方向。
 /// 默认行为：中文 → 英文，其他语言 → 中文。
 @MainActor
-final class TranslationService: Observable {
+@Observable
+final class TranslationService {
 
     /// 最近一次翻译结果
     private(set) var lastResult: String?

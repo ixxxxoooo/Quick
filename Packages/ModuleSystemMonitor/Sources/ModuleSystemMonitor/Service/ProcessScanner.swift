@@ -9,7 +9,8 @@ import Foundation
 ///
 /// 获取正在运行的进程列表和系统信息。
 @MainActor
-final class ProcessScanner: Observable {
+@Observable
+final class ProcessScanner {
 
     /// 进程信息
     struct ProcessInfo: Identifiable, Sendable {

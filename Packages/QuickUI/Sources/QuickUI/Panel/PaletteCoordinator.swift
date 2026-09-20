@@ -11,7 +11,8 @@ import SwiftUI
 /// 管理面板的显隐、定位、模式切换。
 /// 不持有任何业务逻辑，只负责面板的生命周期和路由。
 @MainActor
-public final class PaletteCoordinator: Observable {
+@Observable
+public final class PaletteCoordinator {
 
     /// 当前活跃的模块 ID（nil 表示主搜索模式）
     public private(set) var activeModuleID: String?

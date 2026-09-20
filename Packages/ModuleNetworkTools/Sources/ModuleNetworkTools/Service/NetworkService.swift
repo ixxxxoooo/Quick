@@ -9,7 +9,8 @@ import Network
 ///
 /// 提供 IP 查询、DNS 信息和网络连接测试。
 @MainActor
-final class NetworkService: Observable {
+@Observable
+final class NetworkService {
 
     /// 网络信息
     struct NetworkInfo: Sendable {
