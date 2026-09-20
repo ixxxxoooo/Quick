@@ -62,6 +62,9 @@ final class AppCore {
     /// HUD 控制器
     let hudController = HUDController()
 
+    /// 分离窗口控制器
+    let modulePanelController = ModulePanelController()
+
     /// 开机自启管理
     let launchAtLogin = LaunchAtLogin()
 
@@ -114,7 +117,12 @@ final class AppCore {
         wireEventBus()
         log.notice("事件总线接线完成，订阅 \(self.subscriptions.count, privacy: .public) 条")
 
-        // 4. 启动基础设施服务
+        // 4. 设置协调器的分离回调
+        paletteCoordinator.onDetach = { [weak self] moduleID in
+            self?.detachModule(moduleID)
+        }
+
+        // 5. 启动基础设施服务
         hotKeyService.onTogglePalette = { [weak self] in
             self?.paletteCoordinator.toggle()
         }
@@ -199,11 +207,41 @@ final class AppCore {
         log.notice("开始退出清理")
         hotKeyService.stop()
         statusItemController.remove()
+        modulePanelController.closeAll()
         for module in modules {
             module.deactivate()
         }
         EventBus.shared.removeAll()
         log.notice("退出清理完成")
+    }
+
+    // MARK: - 模块分离
+
+    /// 将指定模块分离为独立窗口
+    ///
+    /// 查找模块实例 → 获取视图 → 创建独立窗口 → 主面板返回搜索模式。
+    private func detachModule(_ moduleID: String) {
+        guard let module = modules.first(where: { type(of: $0).id == moduleID }),
+            module.isEnabled
+        else {
+            log.warning("分离失败：找不到模块 \(moduleID, privacy: .public) 或模块已禁用")
+            return
+        }
+
+        let view = module.makeView()
+        let name = type(of: module).name
+        let icon = type(of: module).icon
+
+        modulePanelController.detach(
+            moduleID: moduleID,
+            moduleName: name,
+            icon: icon,
+            view: view,
+            sourceWindow: nil
+        )
+
+        paletteCoordinator.popToRoot()
+        paletteCoordinator.hide(restoreFocus: false)
     }
 
     // MARK: - 模块注册
@@ -302,6 +340,14 @@ final class AppCore {
                     self?.paletteCoordinator.hide(restoreFocus: false)
                     self?.settingsWindowController.show()
                 }
+            }
+        )
+
+        // 分离面板事件 → 创建独立模块窗口
+        subscriptions.append(
+            bus.on(DetachPanelEvent.self) { [weak self] event in
+                guard let self else { return }
+                self.detachModule(event.moduleID)
             }
         )
 

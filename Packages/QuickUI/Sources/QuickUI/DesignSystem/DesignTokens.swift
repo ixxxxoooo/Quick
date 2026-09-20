@@ -131,6 +131,28 @@ public enum DesignTokens {
         public static let settingsDetailMinimum: CGFloat = 420
         /// 设置搜索框高度
         public static let settingsSearchField: CGFloat = 28
+
+        // MARK: 模块模式
+
+        /// 模块模式头部高度（与搜索栏高度一致，保持视觉平衡）
+        public static let moduleHeaderHeight = scaled(44)
+        /// 模块模式头部返回按钮尺寸
+        public static let moduleBackButton = scaled(28)
+        /// 模块模式头部图标尺寸
+        public static let moduleHeaderIcon = scaled(20)
+
+        // MARK: 分离窗口
+
+        /// 分离窗口默认宽度
+        public static let detachedPanelDefaultWidth = scaled(750)
+        /// 分离窗口默认高度
+        public static let detachedPanelDefaultHeight = scaled(475)
+        /// 分离窗口最小宽度
+        public static let detachedPanelMinWidth: CGFloat = 400
+        /// 分离窗口最小高度
+        public static let detachedPanelMinHeight: CGFloat = 300
+        /// 分离窗口标题栏高度
+        public static let detachedTitleBarHeight = scaled(36)
     }
 
     // MARK: - 阴影

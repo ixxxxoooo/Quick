@@ -120,6 +120,21 @@ public struct ShowPaletteSettingsEvent: ModuleEvent {
     public init() {}
 }
 
+/// 请求将当前模块面板分离为独立窗口
+///
+/// 模块模式下用户按 ⌘D 或点击分离按钮时发布。
+/// AppCore 路由到 ModulePanelController 创建独立窗口。
+public struct DetachPanelEvent: ModuleEvent {
+    public static let name = "quick.panel.detach"
+
+    /// 要分离的模块 ID
+    public let moduleID: String
+
+    public init(moduleID: String) {
+        self.moduleID = moduleID
+    }
+}
+
 // MARK: - 应用索引事件
 
 /// 应用索引刷新完成事件

@@ -37,6 +37,9 @@ public final class PalettePanel: NSPanel {
     /// 解除悬停激活回调（按键或滚轮触发）
     var onDisarmHover: ((CGPoint) -> Void)?
 
+    /// 分离面板回调（⌘D 触发），返回 `true` 表示已消费
+    var onDetach: (() -> Bool)?
+
     /// 初始化面板
     /// - Parameter rootView: SwiftUI 根视图
     init<Content: View>(rootView: Content) {
@@ -136,6 +139,12 @@ public final class PalettePanel: NSPanel {
                 }
                 if characters.lowercased() == "w" {
                     _ = onEscape?()
+                    return
+                }
+                // ⌘D：分离当前模块到独立窗口
+                if characters.lowercased() == "d",
+                    onDetach?() == true
+                {
                     return
                 }
             }

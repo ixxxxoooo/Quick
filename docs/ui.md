@@ -308,15 +308,18 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 
 | 组件 | 职责 |
 | --- | --- |
-| `PalettePanel` | 无边框非激活 `NSPanel`，拦截 Esc / 裸退格 / ⌘ 快捷键 |
+| `PalettePanel` | 无边框非激活 `NSPanel`，拦截 Esc / 裸退格 / ⌘D / ⌘ 快捷键 |
 | `PaletteCoordinator` | 面板生命周期、定位、聚合搜索。**不要加 `@Observable`** |
-| `PaletteRootView` | 面板外壳：header / content / bottom bar 三段 |
+| `PaletteMode` | 面板模式状态桥接（`@Observable`）：搜索模式 vs 模块模式。不持有 NSPanel，安全观察 |
+| `PaletteRootView` | 面板外壳：搜索模式（header / content / bottom bar 三段）或模块模式（模块头部 + makeView） |
+| `ModuleHeaderView` | 模块模式头部：返回按钮 + 模块图标/名称 + 分离按钮（⌘D） |
 
 ### Windows/
 
 | 组件 | 职责 |
 | --- | --- |
 | `HUDController` | 屏幕底部轻量提示，`show(message:tone:duration:)` |
+| `ModulePanelController` | 分离窗口管理：创建独立 NSWindow、单例策略、尺寸记忆、关闭 |
 
 ---
 

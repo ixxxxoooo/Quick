@@ -117,6 +117,9 @@ public final class DevToolsModule: QuickModule {
 }
 
 /// DevTools 根视图（工具列表 + 内容区）
+///
+/// 视图创建时从模块的 `selectedToolID` 读取初始选中工具，
+/// 确保从搜索结果点击某个子工具后能直接打开对应内容。
 struct DevToolsRootView: View {
     let module: DevToolsModule
     let tools: [any DevTool]
@@ -168,6 +171,11 @@ struct DevToolsRootView: View {
                         .foregroundStyle(DesignTokens.Colors.textSecondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .onAppear {
+            if selectedID == nil, let toolID = module.selectedToolID {
+                selectedID = toolID
             }
         }
     }

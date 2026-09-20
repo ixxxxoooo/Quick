@@ -24,6 +24,12 @@ public final class PaletteCoordinator {
     /// 搜索文本（双向绑定到搜索框）
     public var query: String = ""
 
+    /// 面板模式状态（供 SwiftUI 观察的桥接对象）
+    ///
+    /// 协调器本身不能被 SwiftUI 观察（会死循环），但视图需要知道
+    /// 当前是搜索模式还是模块模式。这个对象只持有纯状态，安全观察。
+    public let paletteMode = PaletteMode()
+
     private let log = QuickLog.palette
 
     /// 被面板遮挡前的前台应用（用于恢复焦点）
@@ -46,6 +52,9 @@ public final class PaletteCoordinator {
     ///
     /// 与协调器同生命周期（进程级），所以不主动摘除 —— 面板一旦创建就一直存在。
     private var outsideClickMonitor: Any?
+
+    /// 分离面板回调（由 AppCore 注入，协调器不直接持有 ModulePanelController）
+    public var onDetach: ((String) -> Void)?
 
     public init() {}
 
@@ -77,6 +86,7 @@ public final class PaletteCoordinator {
 
         if let moduleID {
             activeModuleID = moduleID
+            syncPaletteMode(moduleID: moduleID)
         }
 
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
@@ -135,6 +145,7 @@ public final class PaletteCoordinator {
     public func navigate(to moduleID: String, context: [String: String] = [:]) {
         activeModuleID = moduleID
         query = context["query"] ?? ""
+        syncPaletteMode(moduleID: moduleID, context: context)
 
         if !isVisible {
             show()
@@ -145,6 +156,17 @@ public final class PaletteCoordinator {
     public func popToRoot() {
         activeModuleID = nil
         query = ""
+        paletteMode.popToRoot()
+    }
+
+    /// 将协调器的模块状态同步到 PaletteMode
+    ///
+    /// 从 modules 中查找对应模块的元信息（名称、图标），一并写入 PaletteMode。
+    private func syncPaletteMode(moduleID: String, context: [String: String] = [:]) {
+        let module = modules.first { type(of: $0).id == moduleID }
+        let name = module.map { type(of: $0).name } ?? moduleID
+        let icon = module.map { type(of: $0).icon } ?? "questionmark"
+        paletteMode.navigate(to: moduleID, name: name, icon: icon, context: context)
     }
 
     // MARK: - 搜索
@@ -242,9 +264,14 @@ public final class PaletteCoordinator {
         log.debug("首次创建面板实例")
         let rootView = PaletteRootView(
             selection: selection,
+            paletteMode: paletteMode,
             searchHandler: { [weak self] query in
                 guard let self else { return [] }
                 return await self.search(query: query)
+            },
+            moduleViewProvider: { [weak self] moduleID, context in
+                guard let self else { return nil }
+                return self.makeModuleView(moduleID: moduleID, context: context)
             }
         )
         let newPanel = PalettePanel(rootView: rootView)
@@ -256,6 +283,12 @@ public final class PaletteCoordinator {
             } else {
                 self.hide()
             }
+            return true
+        }
+
+        newPanel.onDetach = { [weak self] in
+            guard let self, let moduleID = self.activeModuleID else { return false }
+            self.onDetach?(moduleID)
             return true
         }
 
@@ -305,6 +338,19 @@ public final class PaletteCoordinator {
         // 而 debug 不落盘、事后查不到。
         log.notice("检测到面板外的点击，收起面板")
         hide()
+    }
+
+    /// 根据模块 ID 构建模块视图
+    ///
+    /// 通过闭包注入给 PaletteRootView，避免视图层直接依赖模块。
+    private func makeModuleView(moduleID: String, context: [String: String]) -> AnyView? {
+        guard let module = modules.first(where: { type(of: $0).id == moduleID }),
+            module.isEnabled
+        else {
+            log.warning("找不到模块 \(moduleID, privacy: .public) 或模块已禁用")
+            return nil
+        }
+        return module.makeView()
     }
 
     /// 将面板定位到光标所在屏幕的中上方

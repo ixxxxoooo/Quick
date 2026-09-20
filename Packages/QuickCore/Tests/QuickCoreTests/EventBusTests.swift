@@ -43,4 +43,19 @@ struct EventBusTests {
         bus.post(ShowHUDEvent(message: "再次"))
         #expect(count == 1)
     }
+
+    /// 测试分离面板事件发布与接收
+    @Test("DetachPanelEvent 正确传递模块 ID")
+    func detachPanelEvent() {
+        let bus = EventBus.shared
+        defer { bus.removeAll() }
+
+        var receivedModuleID: String?
+        bus.on(DetachPanelEvent.self) { event in
+            receivedModuleID = event.moduleID
+        }
+
+        bus.post(DetachPanelEvent(moduleID: "clipboard"))
+        #expect(receivedModuleID == "clipboard")
+    }
 }

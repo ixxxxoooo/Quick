@@ -56,6 +56,7 @@
 | `pasteboardService` | `PasteboardService` | 剪贴板读写 |
 | `appIndex` | `AppIndex` | 应用清单与模糊搜索 |
 | `hud` | `HUDController` | 底部轻量提示 |
+| `modulePanelController` | `ModulePanelController` | 分离窗口管理（创建、单例、尺寸记忆） |
 | `launchAtLogin` | `LaunchAtLogin` | 登录项（`SMAppService`） |
 | `statusItemController` | `StatusItemController` | 菜单栏图标与菜单 |
 | `modules` | `[any QuickModule]` | 全部 17 个模块实例 |
@@ -160,6 +161,7 @@ public protocol QuickModule: AnyObject, Sendable {
 | `ShowPaletteEvent` / `HidePaletteEvent` | 显隐面板 |
 | `CopyToClipboardEvent` | 请求写剪贴板 |
 | `ShowHUDEvent`（+ `HUDTone`） | 请求弹一条提示 |
+| `DetachPanelEvent` | 请求将当前模块分离为独立窗口 |
 
 ### 不变量
 
@@ -249,6 +251,29 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 
 显隐要走 `PaletteCoordinator.toggle()` / `show()` / `hide()`。`show()` 会记下当前前台应用，
 `hide(restoreFocus: true)` 会把焦点还回去 —— 这是它体感好的关键，别绕过去直接操作 panel。
+
+### 面板的两种模式
+
+面板支持**搜索模式**和**模块模式**，通过 `PaletteMode`（`@Observable`）桥接状态：
+
+- **搜索模式**（默认）：搜索框 + 结果列表，用户输入关键词查找模块功能。
+- **模块模式**：用户选中一个模块后，面板切换为该模块的完整视图（`makeView()`）。
+  头部变为返回按钮 + 模块名称 + 分离按钮。Esc 返回搜索模式。
+
+`PaletteMode` 不持有 `NSPanel`，只持有纯状态（`activeModuleID`、`context`、模块元信息），
+所以被 SwiftUI 观察是安全的。协调器在 `navigate` / `popToRoot` 时同步更新它。
+
+### 分离窗口
+
+模块面板可以通过 ⌘D 或头部分离按钮分离为独立 `NSWindow`。
+`ModulePanelController` 管理分离窗口，策略如下：
+
+- **单例**：同一模块只允许一个分离窗口，再次分离时聚焦已有窗口。
+- **尺寸记忆**：关闭时保存到 `UserDefaults`，下次打开恢复。
+- **主面板行为**：分离后主面板 `popToRoot()` 回到搜索模式并隐藏。
+
+分离事件通过 `DetachPanelEvent` → `EventBus` → `AppCore.detachModule()` 路由，
+`AppCore` 从模块实例获取视图并交给 `ModulePanelController` 创建窗口。
 
 ### 不要给协调器加 `@Observable`
 
