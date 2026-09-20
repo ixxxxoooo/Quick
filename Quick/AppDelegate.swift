@@ -12,9 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 应用完成启动
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 设置为 accessory 模式（不在 Dock 显示图标，仅菜单栏）
-        NSApp.setActivationPolicy(.accessory)
-        // 启动核心组装
+        // accessory 模式已在 QuickMain 中设置；此处仅启动核心
         AppCore.shared.start()
     }
 

@@ -23,6 +23,7 @@
 		99C17420548B0EF4F181ECCA /* QuickCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */; };
 		9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1701F76E22B29388E212E6DA /* QuickApp.swift */; };
 		A3F5185C4E5024554087DADF /* ModuleOCR in Frameworks */ = {isa = PBXBuildFile; productRef = 4332CA4B074D3CF1E9C8030C /* ModuleOCR */; };
+		A5F5BA05FBA565DA840A590D /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */; };
 		BA5058D145F68F4B1230A9D6 /* ModuleSystemMonitor in Frameworks */ = {isa = PBXBuildFile; productRef = A1F6A1277F3F2C2E948ABA6D /* ModuleSystemMonitor */; };
 		C168ED1A3E5CA36E9E363842 /* ModuleNetworkTools in Frameworks */ = {isa = PBXBuildFile; productRef = 24193F54E61A6C98582B1EB3 /* ModuleNetworkTools */; };
 		CDCBFE06CE05C92920350DC7 /* ModuleCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 6A3F51B8236D217DE92BA22A /* ModuleCalendar */; };
@@ -58,6 +59,7 @@
 		B9DFF8686185548AD6527BBD /* ModuleSnippets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleSnippets; path = Packages/ModuleSnippets; sourceTree = SOURCE_ROOT; };
 		D7E1C071B2C6C0C8B12D5975 /* ModuleSystemMonitor */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleSystemMonitor; path = Packages/ModuleSystemMonitor; sourceTree = SOURCE_ROOT; };
 		DB23378333DC3A355BE14940 /* ModuleAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleAI; path = Packages/ModuleAI; sourceTree = SOURCE_ROOT; };
+		E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
 		EA6E44BF4814BE2EB25CF030 /* ModuleCalculator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleCalculator; path = Packages/ModuleCalculator; sourceTree = SOURCE_ROOT; };
 		EB3CC32F59D3B99133680908 /* ModuleWindowManager */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleWindowManager; path = Packages/ModuleWindowManager; sourceTree = SOURCE_ROOT; };
 		FE2289C2B74C6E51D568A553 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -111,6 +113,7 @@
 				4AD2A44C727483F56A0A316D /* Assets.xcassets */,
 				29D3223EB25304FC1C719BA9 /* Quick.entitlements */,
 				1701F76E22B29388E212E6DA /* QuickApp.swift */,
+				E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */,
 				7BB92E5F9C0104DB071DFF81 /* Resources */,
 			);
 			path = Quick;
@@ -272,6 +275,7 @@
 				3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */,
 				F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */,
 				9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */,
+				A5F5BA05FBA565DA840A590D /* StatusItemController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
