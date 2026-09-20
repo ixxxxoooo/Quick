@@ -14,6 +14,9 @@ import SwiftUI
 /// 每个卡片展示 Provider 名称、URL、在线状态、操作按钮
 struct AIPortalView: View {
 
+    /// AI 窗口管理器（由插件注入，视图不去够全局单例）
+    let manager: AIWebViewWindowManager
+
     @State private var activeProviders: Set<String> = []
     @State private var feedbackMessage: String?
     @State private var reloadingID: String?
@@ -156,7 +159,7 @@ struct AIPortalView: View {
             HStack(spacing: 6) {
                 // 主操作：打开/聚焦
                 Button {
-                    AIWebViewWindowManager.shared.openOrFocus(providerId: provider.id)
+                    manager.openOrFocus(providerId: provider.id)
                     showFeedback("已打开 \(provider.name)")
                     refreshActive()
                 } label: {
@@ -177,7 +180,7 @@ struct AIPortalView: View {
                 // 刷新
                 Button {
                     reloadingID = provider.id
-                    AIWebViewWindowManager.shared.reloadWindow(for: provider.id)
+                    manager.reloadWindow(for: provider.id)
                     showFeedback("正在刷新…")
                     Task { @MainActor in
                         try? await Task.sleep(for: .seconds(0.8))
@@ -200,7 +203,7 @@ struct AIPortalView: View {
 
                 // 外部浏览器
                 Button {
-                    AIWebViewWindowManager.shared.openInBrowser(providerId: provider.id)
+                    manager.openInBrowser(providerId: provider.id)
                     showFeedback("已在浏览器中打开")
                 } label: {
                     Image(systemName: "arrow.up.right.square")
@@ -212,7 +215,7 @@ struct AIPortalView: View {
 
                 // 关闭窗口
                 Button {
-                    AIWebViewWindowManager.shared.destroyWindow(for: provider.id)
+                    manager.destroyWindow(for: provider.id)
                     refreshActive()
                     showFeedback("已关闭 \(provider.name)")
                 } label: {
@@ -269,7 +272,7 @@ struct AIPortalView: View {
     // MARK: - 辅助
 
     private func refreshActive() {
-        activeProviders = AIWebViewWindowManager.shared.activeProviderIDs()
+        activeProviders = manager.activeProviderIDs()
     }
 
     private func showFeedback(_ message: String) {

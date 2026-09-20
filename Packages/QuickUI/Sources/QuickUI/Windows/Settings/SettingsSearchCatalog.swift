@@ -42,7 +42,38 @@ enum SettingsSearchCatalog {
         .init(id: "features.ai", tab: .ai, title: "AI Assistant / AI 助手", subtitle: "Features"),
         .init(id: "features.translator", tab: .translator, title: "Translator / 划词翻译", subtitle: "Features"),
         .init(
-            id: "features.devtools", tab: .devTools, title: "Developer Tools / 开发工具箱", subtitle: "Features"),
+            id: "features.jsonformatter", tab: .jsonFormatter, title: "JSON Formatter / JSON 格式化",
+            subtitle: "Developer Tools"),
+        .init(
+            id: "features.sqlformatter", tab: .sqlFormatter, title: "SQL Formatter / SQL 格式化",
+            subtitle: "Developer Tools"),
+        .init(
+            id: "features.base64codec", tab: .base64Codec, title: "Base64 Codec / Base64 编解码",
+            subtitle: "Developer Tools"),
+        .init(
+            id: "features.urlcodec", tab: .urlCodec, title: "URL Codec / URL 编解码",
+            subtitle: "Developer Tools"),
+        .init(
+            id: "features.uuidgenerator", tab: .uuidGenerator, title: "UUID Generator / UUID 生成器",
+            subtitle: "Developer Tools"),
+        .init(
+            id: "features.hashcalculator", tab: .hashCalculator, title: "Hash Calculator / Hash 计算器",
+            subtitle: "Developer Tools"),
+        .init(
+            id: "features.timestampconverter", tab: .timestampConverter,
+            title: "Timestamp Converter / 时间戳转换", subtitle: "Developer Tools"),
+        .init(
+            id: "features.wordcounter", tab: .wordCounter, title: "Word Counter / 字数统计",
+            subtitle: "Developer Tools"),
+        .init(
+            id: "features.textdiff", tab: .textDiff, title: "Text Diff / 文本对比",
+            subtitle: "Developer Tools"),
+        .init(
+            id: "features.markdownpreview", tab: .markdownPreview, title: "Markdown Preview / Markdown 预览",
+            subtitle: "Developer Tools"),
+        .init(
+            id: "features.colorcompare", tab: .colorCompare, title: "Color Compare / 颜色工具",
+            subtitle: "Developer Tools"),
         .init(
             id: "features.sysmonitor", tab: .systemMonitor, title: "System Monitor / 系统监控",
             subtitle: "Features"),

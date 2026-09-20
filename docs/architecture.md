@@ -17,7 +17,7 @@
         ┌───────────────┼───────────────┐
         ▼               ▼               ▼
   ┌──────────┐   ┌───────────┐   ┌──────────────┐
-  │ Plugin*  │   │  QuickUI  │   │ QuickPlatform│   （17 个 / 1 个 / 1 个）
+  │ Plugin*  │   │  QuickUI  │   │ QuickPlatform│   （27 个 / 1 个 / 1 个）
   └────┬─────┘   └─────┬─────┘   └──────┬───────┘
        │               │                │
        └───────────────┴────────────────┘
@@ -36,7 +36,7 @@
   **插件之间永不互相依赖。**
 - `Quick/` 依赖全部。只有它能 import 各插件。
 
-**为什么插件间不能互相依赖：** 20 个插件两两依赖会变成一张网，任何改动都会波及全仓，
+**为什么插件间不能互相依赖：** 27 个插件两两依赖会变成一张网，任何改动都会波及全仓，
 且没法单独测试。需要协作时走 `EventBus`。
 
 ---
@@ -59,7 +59,7 @@
 | `pluginPanelController` | `PluginPanelController` | 分离窗口管理（创建、单例、尺寸记忆） |
 | `launchAtLogin` | `LaunchAtLogin` | 登录项（`SMAppService`） |
 | `statusItemController` | `StatusItemController` | 菜单栏图标与菜单 |
-| `plugins` | `[any QuickPlugin]` | 全部 17 个插件实例 |
+| `plugins` | `[any QuickPlugin]` | 全部 27 个插件实例 |
 | `subscriptions` | `[EventSubscription]` | 事件订阅句柄（不持有就会被释放） |
 
 ### `start()` 的固定顺序
@@ -82,8 +82,10 @@
 ### 新增状态的规矩
 
 - 新的长生命周期状态**挂到 `AppCore` 上**，在 `start()` 里接线。
-- **绝不**另起一个 `static let shared` 单例来放状态。目前只有两个单例：
-  `AppCore.shared` 和 `EventBus.shared`，两者都是有意的，不要加第三个。
+- **绝不**另起一个 `static let shared` 单例来放状态。目前只有两个有意的单例：
+  `AppCore.shared` 和 `EventBus.shared`，不要加第三个。跨窗口的控件（例如
+  `IconCache`、`ShortcutRecorderCoordinator`）也是单例，但它们是无状态的工具，
+  不是状态的所有者 —— 新增长生命周期状态时不要照着它们抄。
 - 视图**不要**直接拿 `AppCore`。视图通过 `@Environment` 拿协调器，或通过构造参数注入
   依赖（例如 `LauncherPlugin(appIndex:)`）。
 
@@ -135,6 +137,20 @@ public protocol QuickPlugin: AnyObject, Sendable {
 4. 在 `docs/features/<id>.md` 写下这个插件的不变量。
 
 第 2 步是唯一实例化点。如果你发现自己在别处 `new` 一个插件，那就是错了。
+
+### Quick 只支持内置插件
+
+"插件"在这里指的是**编译期插件**，不是可以装第三方代码的扩展系统：
+
+- 所有插件与宿主一起编译、一起签名。`project.yml` 的依赖列表就是全部插件清单，
+  没有扫描目录、没有动态加载、没有安装入口 —— 设置页里也这么写。
+- 因此插件的边界靠**契约**保证（`QuickPlugin` 协议 + 单向依赖 + 编译期检查），
+  而不是靠运行时沙箱。插件的代码权限和宿主一样，写插件时按这个前提思考。
+- 想做第三方生态，就需要动态加载、版本化的宿主 API、签名与沙箱策略，
+  以及去改这份文档里的自注册禁令 —— 那是一次架构变更，不要顺手做。
+
+一个插件应该大到什么程度才值得单独存在？`parse`/`format` 这类纯逻辑抽到 `Model/` 里
+能独立测，就够一格了 —— 11 个开发者工具就是这么从 `devtools` 容器里拆出来的。
 
 ---
 
@@ -224,8 +240,7 @@ public struct SearchableItem: Identifiable, Sendable {
 所以用 `SettingsDataSource` 协议把两边隔开 —— **`QuickUI` 因此既不认识插件，
 也不认识 `QuickPlatform`**，依赖方向保持不变。由 `AppCore` 实现协议。
 
-`SettingsStore`（持久化）由 `AppCore` 持有并注入，**不是单例**：现有单例仍然只有
-`AppCore.shared` 与 `EventBus.shared` 两个。
+`SettingsStore`（持久化）由 `AppCore` 持有并注入，**不是单例**。
 
 ### 键盘输入归属
 
@@ -274,6 +289,37 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 
 分离事件通过 `DetachPanelEvent` → `EventBus` → `AppCore.detachPlugin()` 路由，
 `AppCore` 从插件实例获取视图并交给 `PluginPanelController` 创建窗口。
+
+### 分离窗口与主面板是两个互不相干的窗口
+
+这一条是行为契约，不是实现细节：
+
+- 唤出主面板（⌥Space）**不会**把分离窗口或 AI 窗口带到前台。用户按快捷键是想找东西，
+  不是想切回某个已经开着的页面。实现上靠 `.nonactivatingPanel`：非激活面板不参与
+  应用激活时的窗口排序，所以 `NSApp.activate` 不会把它们一起抬起来。
+- 关掉主面板不影响分离窗口；反之亦然。
+- 也正因为两者独立，**窗口控制必须留在窗口自己身上**（下一小节的悬浮胶囊），
+  不能只挂在主面板的头部 —— 用户不看主面板时那些按钮就够不着了。
+
+`AppCore` 在退出时统一收掉它们（`closeAll()`）；插件停用时由插件自己收掉，
+`AIPlugin.deactivate()` 就是这样做的。
+
+### 悬浮胶囊：分离窗口唯一的常驻控件
+
+[`FloatingCapsuleView`](../Packages/QuickUI/Sources/QuickUI/Windows/FloatingCapsuleView.swift)
+是分离窗口右上角的悬浮操作条，参考 Fasty 的 `capsuleInjectionScript`：
+
+- **收起态**只显示抓手与展开箭头（22px 圆钮、2px 内边距、全圆角），展开后是
+  置顶 / 刷新 / 关闭（关闭前有一条分组线）。默认收起是为了不挡插件内容。
+- **可拖拽**：位移超过 3px 才算拖拽，落点夹在窗口内（优先保证左下不出界），
+  松手把位置写进 `UserDefaults`，同一个插件的窗口下次回到原处。
+- **叠在内容之上**，不参与插件视图的布局 —— 否则「每个插件都能拿到窗口控制」
+  就只在插件自己留了白的情况下成立。
+- **刷新是真的重建**：`PluginPanelController` 存的是视图工厂（`viewProvider`）而不是
+  建好的视图，所以刷新会重新走一遍插件的 `makeView()`，而不是重画一份旧状态。
+
+几何与配色全部来自 `DesignTokens.Size.Capsule` / `DesignTokens.Colors.capsule*`。
+插件窗口与 AI 窗口共用同一个实现 —— 想改胶囊的样子，只改一处。
 
 ### 不要给协调器加 `@Observable`
 

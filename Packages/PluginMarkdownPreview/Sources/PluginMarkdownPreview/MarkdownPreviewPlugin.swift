@@ -1,0 +1,53 @@
+// MarkdownPreviewPlugin.swift
+// Quick — 原生 macOS 效率启动器
+// @author ygw
+
+import QuickCore
+import QuickUI
+import SwiftUI
+
+/// Markdown 预览插件
+///
+/// 参考 Fasty markdown-preview 布局：
+/// 工具栏（复制/清空）→ 左右双栏（编辑 + 预览）
+@MainActor
+public final class MarkdownPreviewPlugin: QuickPlugin {
+
+    public static let id = "markdown-preview"
+    public static let name = "Markdown 预览"
+    public static let icon = "text.badge.checkmark"
+    public static let triggerWords = ["markdown", "md", "预览", "标记"]
+
+    public var isEnabled = true
+
+    private let log = QuickLog.plugin(MarkdownPreviewPlugin.id)
+
+    public init() {}
+
+    public func searchItems(query: String) async -> [SearchableItem] {
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
+        return [
+            SearchableItem(
+                id: "markdown-preview.open",
+                pluginID: Self.id,
+                title: Self.name,
+                subtitle: "实时 Markdown 编辑与预览",
+                icon: Self.icon,
+                relevance: 0.7,
+                action: { EventBus.shared.post(NavigateEvent(pluginID: Self.id)) }
+            )
+        ]
+    }
+
+    public func makeView() -> AnyView {
+        AnyView(MarkdownPreviewView())
+    }
+
+    public func activate() {
+        log.notice("插件已激活")
+    }
+
+    public func deactivate() {
+        log.notice("插件已停用")
+    }
+}

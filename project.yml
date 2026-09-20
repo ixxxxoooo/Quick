@@ -37,8 +37,6 @@ packages:
     path: Packages/PluginOCR
   PluginTranslator:
     path: Packages/PluginTranslator
-  PluginDevTools:
-    path: Packages/PluginDevTools
   PluginCalendar:
     path: Packages/PluginCalendar
   PluginWeather:
@@ -55,6 +53,28 @@ packages:
     path: Packages/PluginNetworkTools
   PluginScreenshot:
     path: Packages/PluginScreenshot
+  PluginJSONFormatter:
+    path: Packages/PluginJSONFormatter
+  PluginSQLFormatter:
+    path: Packages/PluginSQLFormatter
+  PluginBase64Codec:
+    path: Packages/PluginBase64Codec
+  PluginURLCodec:
+    path: Packages/PluginURLCodec
+  PluginUUIDGenerator:
+    path: Packages/PluginUUIDGenerator
+  PluginHashCalculator:
+    path: Packages/PluginHashCalculator
+  PluginTimestampConverter:
+    path: Packages/PluginTimestampConverter
+  PluginWordCounter:
+    path: Packages/PluginWordCounter
+  PluginTextDiff:
+    path: Packages/PluginTextDiff
+  PluginColorCompare:
+    path: Packages/PluginColorCompare
+  PluginMarkdownPreview:
+    path: Packages/PluginMarkdownPreview
 
 targets:
   Quick:
@@ -102,7 +122,6 @@ targets:
       - package: PluginSnippets
       - package: PluginOCR
       - package: PluginTranslator
-      - package: PluginDevTools
       - package: PluginCalendar
       - package: PluginWeather
       - package: PluginNotes
@@ -111,3 +130,14 @@ targets:
       - package: PluginSystemMonitor
       - package: PluginNetworkTools
       - package: PluginScreenshot
+      - package: PluginJSONFormatter
+      - package: PluginSQLFormatter
+      - package: PluginBase64Codec
+      - package: PluginURLCodec
+      - package: PluginUUIDGenerator
+      - package: PluginHashCalculator
+      - package: PluginTimestampConverter
+      - package: PluginWordCounter
+      - package: PluginTextDiff
+      - package: PluginColorCompare
+      - package: PluginMarkdownPreview

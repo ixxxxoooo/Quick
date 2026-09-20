@@ -1,0 +1,83 @@
+// Base64CodecPluginTests.swift
+// Quick — 原生 macOS 效率启动器
+// @author ygw
+
+import Testing
+@testable import PluginBase64Codec
+
+@Suite("Base64 编解码逻辑")
+struct Base64CodecLogicTests {
+
+    @Test("编码结果符合标准 Base64")
+    func encodesToStandardBase64() throws {
+        #expect(try Base64CodecLogic.encode("hello") == "aGVsbG8=")
+        #expect(try Base64CodecLogic.encode("") == "")
+        #expect(try Base64CodecLogic.encode("你好") == "5L2g5aW9")
+    }
+
+    @Test("编码解码往返一致")
+    func roundTrips() throws {
+        for original in ["hello", "", "你好，世界", "line1\nline2", "a+b/c="] {
+            let encoded = try Base64CodecLogic.encode(original)
+            #expect(try Base64CodecLogic.decode(encoded) == original)
+        }
+    }
+
+    /// 用户从网页或接口里复制来的 Base64 常常没有补位，这类输入必须报错而不是产出乱码
+    @Test("非法 Base64 抛出 invalidBase64")
+    func invalidBase64Throws() throws {
+        #expect(throws: Base64CodecLogic.Failure.invalidBase64) {
+            _ = try Base64CodecLogic.decode("!!!")
+        }
+        #expect(throws: Base64CodecLogic.Failure.invalidBase64) {
+            _ = try Base64CodecLogic.decode("aGVsbG8")
+        }
+        // 空串是合法 Base64（解出空文本），视图在输入为空时提前 return，走不到这里
+        #expect(try Base64CodecLogic.decode("") == "")
+    }
+
+    /// `//4=` 是合法 Base64，但解出来是 0xFF 0xFE —— 不是文本，
+    /// 视图不能再往下走，否则会把二进制塞进 TextEditor
+    @Test("解码结果不是 UTF-8 文本时同样失败")
+    func nonUTF8PayloadThrows() {
+        #expect(throws: Base64CodecLogic.Failure.invalidBase64) {
+            _ = try Base64CodecLogic.decode("//4=")
+        }
+    }
+
+    @Test("模式原始值是中文标签且覆盖编解码")
+    func modeLabels() {
+        #expect(Base64CodecLogic.Mode.allCases.count == 2)
+        #expect(Base64CodecLogic.Mode.encode.rawValue == "编码")
+        #expect(Base64CodecLogic.Mode.decode.rawValue == "解码")
+    }
+}
+
+@MainActor
+@Suite("Base64 编解码插件契约")
+struct Base64CodecPluginTests {
+
+    @Test("元数据符合插件约定")
+    func metadata() {
+        #expect(Base64CodecPlugin.id == "base64-codec")
+        #expect(Base64CodecPlugin.id.allSatisfy { $0.isLowercase || $0.isNumber || $0 == "-" })
+        #expect(!Base64CodecPlugin.name.isEmpty)
+        #expect(!Base64CodecPlugin.icon.isEmpty)
+        #expect(!Base64CodecPlugin.triggerWords.isEmpty)
+    }
+
+    @Test("命中触发词时返回唯一入口")
+    func searchItemsReturnsSingleEntry() async {
+        let plugin = Base64CodecPlugin()
+        let items = await plugin.searchItems(query: "base64")
+        #expect(items.count == 1)
+        #expect(items.first?.pluginID == Base64CodecPlugin.id)
+    }
+
+    @Test("未命中触发词时不返回结果")
+    func searchItemsIgnoresUnrelatedQuery() async {
+        let plugin = Base64CodecPlugin()
+        let items = await plugin.searchItems(query: "天气")
+        #expect(items.isEmpty)
+    }
+}

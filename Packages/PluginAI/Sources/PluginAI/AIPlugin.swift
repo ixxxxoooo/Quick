@@ -31,6 +31,11 @@ public final class AIPlugin: QuickPlugin {
 
     private let log = QuickLog.plugin(AIPlugin.id)
 
+    /// 各 Provider 的独立 WebView 窗口
+    ///
+    /// 由插件自己持有：插件停用时窗口跟着收掉，生命周期只有一个负责人。
+    private let windowManager = AIWebViewWindowManager()
+
     public init() {}
 
     // MARK: - 搜索
@@ -57,6 +62,7 @@ public final class AIPlugin: QuickPlugin {
 
         // 每个 Provider 独立搜索入口
         let keyword = query.removingTrigger(["ai", "AI", "chat", "聊天", "对话", "ai portal", "ai聚合"])
+        let windows = windowManager
 
         for provider in AIProviderRegistry.all {
             let matchScore =
@@ -78,7 +84,7 @@ public final class AIPlugin: QuickPlugin {
                     icon: provider.icon,
                     relevance: relevance,
                     action: {
-                        AIWebViewWindowManager.shared.openOrFocus(providerId: provider.id)
+                        windows.openOrFocus(providerId: provider.id)
                     }
                 )
             )
@@ -90,7 +96,7 @@ public final class AIPlugin: QuickPlugin {
     // MARK: - 视图
 
     public func makeView() -> AnyView {
-        AnyView(AIPortalView())
+        AnyView(AIPortalView(manager: windowManager))
     }
 
     public func makeSettingsView() -> AnyView? {
@@ -104,6 +110,8 @@ public final class AIPlugin: QuickPlugin {
     }
 
     public func deactivate() {
+        // 窗口是插件的一部分：停用就把它们收掉，不留在屏幕上没人管
+        windowManager.closeAll()
         log.notice("AI 聚合插件已停用")
     }
 }

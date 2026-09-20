@@ -150,18 +150,24 @@ struct ResultRowView: View {
                     .lineLimit(1)
             }
 
-            // 来源插件标注
+            // 来源插件标注：告诉用户这一条命令是哪个插件给的
             if let name = item.pluginName {
                 Text(name)
-                    .font(.system(size: 10))
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.primary.opacity(0.05))
-                    )
+                    .font(.system(size: DesignTokens.Size.SourceBadge.fontSize))
+                    .foregroundStyle(DesignTokens.Colors.sourceBadgeText)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, DesignTokens.Size.SourceBadge.horizontalPadding)
+                    .padding(.vertical, DesignTokens.Size.SourceBadge.verticalPadding)
+                    .background(
+                        RoundedRectangle(
+                            cornerRadius: DesignTokens.Size.SourceBadge.radius,
+                            style: .continuous
+                        )
+                        .fill(DesignTokens.Colors.sourceBadgeFill)
+                    )
+                    .frame(maxWidth: DesignTokens.Size.SourceBadge.maxWidth, alignment: .trailing)
+                    .help("来自插件：\(name)")
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)

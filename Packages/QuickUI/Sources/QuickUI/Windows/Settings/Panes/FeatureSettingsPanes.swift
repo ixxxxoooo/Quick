@@ -8,17 +8,17 @@ import SwiftUI
 /// 功能插件独立设置页容器
 ///
 /// 每个功能插件的设置页结构：
-/// 1. 启用开关 + 在启动器中显示
+/// 1. 启用开关
 /// 2. 触发词列表（展示中英双语唤醒命令）
 /// 3. 全局快捷键绑定（快速打开插件面板）
-/// 4. 插件专属配置项
+/// 4. 插件身份的说明（内置插件、日志分类）
+/// 5. 插件专属配置项
 struct FeatureSettingsPane: View {
 
     let tab: SettingsTab
     let dataSource: any SettingsDataSource
 
     @State private var isEnabled: Bool
-    @State private var showInLauncher = true
 
     init(tab: SettingsTab, dataSource: any SettingsDataSource) {
         self.tab = tab
@@ -49,13 +49,6 @@ struct FeatureSettingsPane: View {
                         dataSource.setPluginEnabled(modID, enabled: newValue)
                     }
                 }
-                Toggle(isOn: $showInLauncher) {
-                    SettingsRow(
-                        title: "在启动器中显示",
-                        subtitle: "搜索时展示该插件的结果项。"
-                    )
-                }
-                .settingsEnabled(isEnabled)
             } header: {
                 Text(tab.title)
             }
@@ -76,6 +69,9 @@ struct FeatureSettingsPane: View {
                 }
             }
             .settingsEnabled(isEnabled)
+
+            // 第四部分：身份说明
+            pluginIdentitySection
         }
         .formStyle(.grouped)
     }
@@ -157,6 +153,49 @@ struct FeatureSettingsPane: View {
         }
     }
 
+    /// 插件身份说明
+    ///
+    /// Quick 目前只支持内置插件 —— 它们和宿主一起编译、一起签名，不加载任何外部代码。
+    /// 把这件事写在每个插件的设置页里，是因为「插件」这个词会让人以为能装第三方的：
+    /// 与其让用户去别处找安装入口，不如在这里说清楚。
+    @ViewBuilder
+    private var pluginIdentitySection: some View {
+        if let pluginID = tab.pluginID {
+            Section {
+                SettingsRow(
+                    title: "内置插件",
+                    subtitle: "与 Quick 一同编译分发，不需要也无法单独安装。",
+                    icon: { SettingsRowIcon(systemImage: "shippingbox") }
+                ) {
+                    Text("内置")
+                        .font(DesignTokens.Typography.keyCap)
+                        .padding(.horizontal, DesignTokens.Spacing.sm)
+                        .padding(.vertical, DesignTokens.Spacing.xxs)
+                        .background(
+                            RoundedRectangle(
+                                cornerRadius: DesignTokens.Radius.barControl, style: .continuous
+                            )
+                            .fill(Color.accentColor.opacity(0.12))
+                        )
+                        .foregroundStyle(Color.accentColor)
+                }
+
+                SettingsRow(
+                    title: "标识",
+                    subtitle: "设置存储与日志都用它做键，发布后不会变。",
+                    icon: { SettingsRowIcon(systemImage: "number") }
+                ) {
+                    Text(pluginID)
+                        .font(DesignTokens.Typography.code)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        .textSelection(.enabled)
+                }
+            } header: {
+                Text("关于")
+            }
+        }
+    }
+
     @ViewBuilder
     private var defaultFeatureContent: some View {
         switch tab {
@@ -180,8 +219,10 @@ struct FeatureSettingsPane: View {
             AIFeatureSection()
         case .translator:
             TranslatorFeatureSection()
-        case .devTools:
-            DevToolsFeatureSection()
+        case .jsonFormatter:
+            JSONFormatterFeatureSection()
+        case .uuidGenerator:
+            UUIDGeneratorFeatureSection()
         case .systemMonitor:
             SystemMonitorFeatureSection()
         case .networkTools:
@@ -190,6 +231,21 @@ struct FeatureSettingsPane: View {
             OCRFeatureSection()
         case .screenshot:
             ScreenshotFeatureSection()
+
+        // 还没有专属选项的插件：说清楚，而不是留一片空白让人以为页没加载完
+        case .sqlFormatter, .base64Codec, .urlCodec, .hashCalculator,
+            .timestampConverter, .wordCounter, .textDiff,
+            .markdownPreview, .colorCompare:
+            Section {
+                SettingsRow(
+                    title: "暂无专属设置",
+                    subtitle: "这个插件的参数都在它的面板里直接调整，例如模式切换与缩进。",
+                    icon: { SettingsRowIcon(systemImage: "slider.horizontal.3") }
+                )
+            } header: {
+                Text("插件设置")
+            }
+
         default:
             EmptyView()
         }
@@ -640,40 +696,58 @@ private struct TranslatorFeatureSection: View {
     }
 }
 
-private struct DevToolsFeatureSection: View {
-    @AppStorage("devTools.jsonIndent") private var jsonIndent = 2
-    @AppStorage("devTools.autoFormat") private var autoFormat = true
-    @AppStorage("devTools.uppercaseUUID") private var uppercaseUUID = true
+/// JSON 格式化的专属选项
+///
+/// 键与 `JSONFormatterView` 里的 `@AppStorage` 是同一个 —— 这里改的就是工具面板里那一项，
+/// 两边读写同一份值，不存在「设置里能调但工具不理会」的假开关。
+private struct JSONFormatterFeatureSection: View {
+    @AppStorage("jsonFormatter.indent") private var indent = 2
 
     var body: some View {
         Section {
-            Picker(selection: $jsonIndent) {
+            Picker(selection: $indent) {
                 Text("2 个空格").tag(2)
                 Text("4 个空格").tag(4)
-                Text("Tab").tag(0)
             } label: {
                 SettingsRow(
-                    title: "JSON 缩进",
-                    subtitle: "格式化 JSON 时使用的缩进风格。",
+                    title: "缩进风格",
+                    subtitle: "格式化 JSON 时的缩进宽度。",
                     icon: { SettingsRowIcon(systemImage: "curlybraces") }
-                )
-            }
-
-            Toggle(isOn: $autoFormat) {
-                SettingsRow(
-                    title: "粘贴时自动格式化",
-                    subtitle: "粘贴 JSON/SQL 等内容时自动美化输出。"
-                )
-            }
-
-            Toggle(isOn: $uppercaseUUID) {
-                SettingsRow(
-                    title: "UUID 大写",
-                    subtitle: "生成 UUID 时使用大写字母（A-F 而非 a-f）。"
                 )
             }
         } header: {
             Text("格式化选项")
+        } footer: {
+            Text("「压缩」不受此设置影响，它总是输出单行。")
+        }
+    }
+}
+
+/// UUID 生成器的专属选项
+private struct UUIDGeneratorFeatureSection: View {
+    @AppStorage("uuidGenerator.uppercase") private var uppercase = true
+    @AppStorage("uuidGenerator.removeDashes") private var removeDashes = false
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $uppercase) {
+                SettingsRow(
+                    title: "大写字母",
+                    subtitle: "生成 A-F 而不是 a-f。",
+                    icon: { SettingsRowIcon(systemImage: "textformat") }
+                )
+            }
+
+            Toggle(isOn: $removeDashes) {
+                SettingsRow(
+                    title: "去掉连字符",
+                    subtitle: "输出 32 位连续字符串，适合直接当数据库主键。"
+                )
+            }
+        } header: {
+            Text("生成格式")
+        } footer: {
+            Text("数量在插件面板里按次选择，不在这里固定。")
         }
     }
 }

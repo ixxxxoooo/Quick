@@ -65,21 +65,43 @@ struct PluginsPane: View {
                                         isEnabled: enabledPlugins[plugin.id] ?? true
                                     )
                                 }
-                            )
+                            ) {
+                                builtInBadge
+                            }
                         }
                     }
                 }
             } header: {
                 Text("插件")
             } footer: {
-                if disabledCount > 0 {
-                    Text("已停用 \(disabledCount) 个插件。停用的插件不会被搜索到，也不会在启动时加载。")
-                } else {
-                    Text("停用的插件不会被搜索到，也不会在启动时加载。")
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                    if disabledCount > 0 {
+                        Text("已停用 \(disabledCount) 个插件。停用的插件不会被搜索到，也不会在启动时加载。")
+                    } else {
+                        Text("停用的插件不会被搜索到，也不会在启动时加载。")
+                    }
+                    // 说清楚边界：这里没有安装入口，因为当前版本不加载外部代码
+                    Text(
+                        "Quick 目前只支持内置插件：它们与宿主一同编译、一同签名，"
+                            + "因此不会出现来源不明的代码在后台运行。"
+                    )
                 }
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// 每行的「内置」徽章
+    private var builtInBadge: some View {
+        Text("内置")
+            .font(DesignTokens.Typography.keyCap)
+            .foregroundStyle(DesignTokens.Colors.textTertiary)
+            .padding(.horizontal, DesignTokens.Spacing.sm)
+            .padding(.vertical, DesignTokens.Spacing.xxs)
+            .background(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                    .fill(DesignTokens.Colors.controlSurface)
+            )
     }
 
     /// 单个插件的开关绑定

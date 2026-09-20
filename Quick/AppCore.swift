@@ -3,22 +3,67 @@
 // @author ygw
 
 import PluginAI
+import PluginBase64Codec
+
 import PluginCalculator
 import PluginCalendar
 import PluginClipboard
-import PluginDevTools
+import PluginColorCompare
+
 import PluginFileSearch
+import PluginFileSearch
+
+import PluginHashCalculator
+
+import PluginJSONFormatter
+
 import PluginLauncher
+import PluginLauncher
+
+import PluginMarkdownPreview
+
 import PluginNetworkTools
+import PluginNetworkTools
+
 import PluginNotes
+import PluginNotes
+
 import PluginOCR
+import PluginOCR
+
+import PluginSQLFormatter
+
 import PluginScreenshot
+import PluginScreenshot
+
 import PluginSnippets
+import PluginSnippets
+
 import PluginSystemControl
+import PluginSystemControl
+
 import PluginSystemMonitor
+import PluginSystemMonitor
+
+import PluginTextDiff
+
+import PluginTimestampConverter
+
 import PluginTranslator
+import PluginTranslator
+
+import PluginURLCodec
+
+import PluginUUIDGenerator
+
 import PluginWeather
+import PluginWeather
+
 import PluginWindowManager
+import PluginWindowManager
+
+import PluginWordCounter
+
 import Carbon.HIToolbox
 import Foundation
 import QuickCore
@@ -241,7 +286,7 @@ final class AppCore {
             return
         }
 
-        let view = plugin.makeView()
+        let viewProvider = { plugin.makeView() }
         let name = type(of: plugin).name
         let icon = type(of: plugin).icon
 
@@ -249,7 +294,7 @@ final class AppCore {
             pluginID: pluginID,
             pluginName: name,
             icon: icon,
-            view: view,
+            viewProvider: viewProvider,
             sourceWindow: nil
         )
 
@@ -275,7 +320,19 @@ final class AppCore {
         register(SnippetsPlugin())
         register(OCRPlugin())
         register(TranslatorPlugin())
-        register(DevToolsPlugin())
+
+        // Phase 3.5: 开发者工具插件（原先是一个 devtools 容器，现在每个工具都是独立插件）
+        register(JSONFormatterPlugin())
+        register(SQLFormatterPlugin())
+        register(Base64CodecPlugin())
+        register(URLCodecPlugin())
+        register(UUIDGeneratorPlugin())
+        register(HashCalculatorPlugin())
+        register(TimestampConverterPlugin())
+        register(WordCounterPlugin())
+        register(TextDiffPlugin())
+        register(MarkdownPreviewPlugin())
+        register(ColorComparePlugin())
 
         // Phase 4: 扩展插件
         register(CalendarPlugin())

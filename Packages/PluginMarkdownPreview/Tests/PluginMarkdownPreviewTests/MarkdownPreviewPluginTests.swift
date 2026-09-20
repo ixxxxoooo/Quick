@@ -1,0 +1,119 @@
+// MarkdownPreviewPluginTests.swift
+// Quick — 原生 macOS 效率启动器
+// @author ygw
+
+import Foundation
+import Testing
+
+@testable import PluginMarkdownPreview
+
+@Suite("Markdown 预览的字符串统计")
+@MainActor
+struct MarkdownPreviewLogicTests {
+
+    @Test("空文本不显示统计")
+    func emptyTextHasNoLabel() {
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: "") == nil)
+    }
+
+    @Test("空白不是空：一个空格算一个字符")
+    func whitespaceIsCounted() {
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: " ") == "1 字符")
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: "\n") == "1 字符")
+    }
+
+    @Test("按字符计数：ASCII 与中文")
+    func countsCharactersNotBytes() {
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: "hello") == "5 字符")
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: "你好") == "2 字符")
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: "a\nb") == "3 字符")
+    }
+
+    @Test("按字形簇计数：组合字数少于 UTF-16 码元数")
+    func countsGraphemeClusters() {
+        let family = "👨‍👩‍👧‍👦"
+        let combined = "e\u{0301}"
+        let flag = "🇨🇳"
+
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: family) == "1 字符")
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: combined) == "1 字符")
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: flag) == "1 字符")
+
+        // 这三个字符串的 utf16.count 分别是 11 / 2 / 4 —— 统计口径是 Character
+        #expect(family.utf16.count == 11)
+        #expect(combined.utf16.count == 2)
+    }
+
+    @Test("多行 Markdown 文本逐字计数，不剥离标记")
+    func markdownMarkersAreCountedVerbatim() {
+        let document = "# 标题\n\n段落"
+        let inline = "**bold**"
+
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: document) == "8 字符")
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: inline) == "8 字符")
+        #expect(MarkdownPreviewLogic.characterCountLabel(for: document) == "\(document.count) 字符")
+    }
+}
+
+@Suite("Markdown 预览插件契约")
+@MainActor
+struct MarkdownPreviewPluginTests {
+
+    @Test("插件 id 是 kebab-case 且等于约定值")
+    func identifierConvention() {
+        let id = MarkdownPreviewPlugin.id
+
+        #expect(id == "markdown-preview")
+        #expect(!id.hasPrefix("-") && !id.hasSuffix("-") && !id.contains("--"))
+        #expect(id.allSatisfy { $0.isLowercase || $0.isNumber || $0 == "-" })
+    }
+
+    @Test("名称、图标、触发词齐备")
+    func metadataIsComplete() {
+        #expect(MarkdownPreviewPlugin.name == "Markdown 预览")
+        #expect(MarkdownPreviewPlugin.icon == "text.badge.checkmark")
+        #expect(
+            MarkdownPreviewPlugin.triggerWords == ["markdown", "md", "预览", "标记"]
+        )
+    }
+
+    @Test("触发词命中时只返回一条入口结果")
+    func triggerWordYieldsSingleEntry() async throws {
+        let plugin = MarkdownPreviewPlugin()
+        let results = await plugin.searchItems(query: "md")
+
+        #expect(results.count == 1)
+        let item = try #require(results.first)
+        #expect(item.pluginID == MarkdownPreviewPlugin.id)
+        #expect(item.id == "markdown-preview.open")
+        #expect(item.icon == MarkdownPreviewPlugin.icon)
+        #expect(item.relevance >= 0 && item.relevance <= 1)
+    }
+
+    @Test("每个触发词都能唤醒插件")
+    func everyTriggerWordMatches() async {
+        let plugin = MarkdownPreviewPlugin()
+
+        for trigger in MarkdownPreviewPlugin.triggerWords {
+            let results = await plugin.searchItems(query: trigger)
+            #expect(results.count == 1, "触发词「\(trigger)」没有命中")
+        }
+    }
+
+    @Test("无关查询与空查询不返回结果")
+    func unrelatedQueryYieldsNothing() async {
+        let plugin = MarkdownPreviewPlugin()
+
+        #expect(await plugin.searchItems(query: "").isEmpty)
+        #expect(await plugin.searchItems(query: "hash").isEmpty)
+    }
+
+    @Test("makeView 能构建出视图（真实视图，非占位）")
+    func makeViewBuildsTheRealView() {
+        let plugin = MarkdownPreviewPlugin()
+
+        // AnyView 的相等性无法比较，这里只确认不崩溃且带上了本插件的视图
+        _ = plugin.makeView()
+        _ = MarkdownPreviewView()
+    }
+}

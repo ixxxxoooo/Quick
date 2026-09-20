@@ -132,6 +132,20 @@ public enum DesignTokens {
         /// 设置搜索框高度
         public static let settingsSearchField: CGFloat = 28
 
+        // MARK: 搜索结果行
+
+        /// 结果行右侧「来自哪个插件」徽章的规格
+        ///
+        /// 取自 Fasty `SearchResults.css` 的 `.result-type`：11px 字、2×8 内边距、
+        /// 4px 圆角、最宽 120px 后省略 —— 插件名再长也不能把标题挤没。
+        public enum SourceBadge {
+            public static let fontSize = scaled(11)
+            public static let horizontalPadding = scaled(8)
+            public static let verticalPadding = scaled(2)
+            public static let radius = scaled(4)
+            public static let maxWidth = scaled(120)
+        }
+
         // MARK: 插件模式
 
         /// 插件模式头部高度（与搜索栏高度一致，保持视觉平衡）
@@ -153,6 +167,54 @@ public enum DesignTokens {
         public static let detachedPanelMinHeight: CGFloat = 300
         /// 分离窗口标题栏高度
         public static let detachedTitleBarHeight = scaled(36)
+
+        // MARK: 悬浮胶囊
+
+        /// 分离窗口标题栏为悬浮胶囊让出的宽度
+        ///
+        /// 就是胶囊收起时的宽度（边缘内缩 + 抓手 + 展开箭头 + 内边距）。
+        /// 展开后的宽度不预留：那时用户正在操作胶囊，标题被压一点不影响阅读。
+        public static let capsuleReservedWidth =
+            Capsule.edgeInset + Capsule.padding * 2 + Capsule.gripWidth
+            + Capsule.itemSpacing * 2 + Capsule.buttonSize
+
+        /// 悬浮胶囊的几何与间距
+        ///
+        /// 胶囊叠在窗口内容之上，是插件窗口唯一的常驻控件（关闭 / 刷新 / 置顶）。
+        /// 数值取自 Fasty 的 `capsuleInjectionScript`：22px 圆钮、2px 内边距、
+        /// 全圆角（`border-radius: 9999px`）。
+        public enum Capsule {
+            /// 单个功能按钮尺寸
+            public static let buttonSize = scaled(22)
+            /// 按钮图标尺寸
+            public static let iconSize = scaled(12)
+            /// 抓手宽度
+            public static let gripWidth = scaled(14)
+            /// 抓手高度
+            public static let gripHeight = scaled(22)
+            /// 抓手圆点直径
+            public static let gripDotSize = scaled(2)
+            /// 抓手圆点间距
+            public static let gripDotSpacing = scaled(4)
+            /// 按钮之间的间隔
+            public static let itemSpacing = scaled(2)
+            /// 胶囊内边距
+            public static let padding = scaled(2)
+            /// 分组分隔线宽度（不缩放，物理像素级）
+            public static let dividerWidth: CGFloat = 1
+            /// 分组分隔线高度
+            public static let dividerHeight = scaled(12)
+            /// 胶囊距窗口边缘的默认内缩
+            public static let edgeInset = scaled(10)
+            /// 拖拽判定阈值：小于它就当成点击，避免手抖把胶囊挪走
+            public static let dragThreshold = scaled(3)
+            /// 展开 / 收起动画时长
+            public static let animationDuration: TimeInterval = 0.18
+            /// 投影模糊半径
+            public static let shadowRadius = scaled(10)
+            /// 投影垂直偏移
+            public static let shadowOffsetY = scaled(2)
+        }
     }
 
     // MARK: - 阴影
@@ -346,6 +408,67 @@ public enum DesignTokens {
 
         /// 进度色
         public static let progress = Color.blue
+
+        /// 结果行来源徽章的底色
+        public static let sourceBadgeFill = ramp(dark: 0.10, light: 0.06)
+
+        /// 结果行来源徽章的文字色
+        public static let sourceBadgeText = ramp(dark: 0.45, light: 0.48)
+
+        // MARK: 悬浮胶囊
+
+        /// 胶囊底色（近不透明，让它在任意网页/内容上都读得清）
+        public static let capsuleFill = adaptive(
+            dark: NSColor(srgbRed: 28 / 255, green: 28 / 255, blue: 32 / 255, alpha: 0.78),
+            light: .srgbInk(1, alpha: 0.82)
+        )
+
+        /// 胶囊描边
+        public static let capsuleStroke = adaptive(
+            dark: .srgbInk(1, alpha: 0.12),
+            light: .srgbInk(0, alpha: 0.08)
+        )
+
+        /// 按钮悬停底色
+        public static let capsuleHover = adaptive(
+            dark: .srgbInk(1, alpha: 0.12),
+            light: .srgbInk(0, alpha: 0.06)
+        )
+
+        /// 胶囊图标（未激活）
+        public static let capsuleGlyph = adaptive(
+            dark: .srgbInk(1, alpha: 0.62),
+            light: .srgbInk(0, alpha: 0.55)
+        )
+
+        /// 胶囊图标（悬停、激活）
+        public static let capsuleGlyphStrong = adaptive(
+            dark: .srgbInk(1, alpha: 0.95),
+            light: .srgbInk(0, alpha: 0.88)
+        )
+
+        /// 置顶等开关型按钮的激活底色
+        public static let capsuleToggleFill = adaptive(
+            dark: NSColor(srgbRed: 59 / 255, green: 130 / 255, blue: 246 / 255, alpha: 0.28),
+            light: NSColor(srgbRed: 59 / 255, green: 130 / 255, blue: 246 / 255, alpha: 0.18)
+        )
+
+        /// 开关型按钮激活时的图标色
+        public static let capsuleToggleGlyph = adaptive(
+            dark: NSColor(srgbRed: 96 / 255, green: 165 / 255, blue: 250 / 255, alpha: 1),
+            light: NSColor(srgbRed: 37 / 255, green: 99 / 255, blue: 235 / 255, alpha: 1)
+        )
+
+        /// 关闭按钮悬停时的底色与图标色
+        public static let capsuleCloseFill = adaptive(
+            dark: NSColor(srgbRed: 239 / 255, green: 68 / 255, blue: 68 / 255, alpha: 0.28),
+            light: NSColor(srgbRed: 239 / 255, green: 68 / 255, blue: 68 / 255, alpha: 0.18)
+        )
+
+        public static let capsuleCloseGlyph = adaptive(
+            dark: NSColor(srgbRed: 248 / 255, green: 113 / 255, blue: 113 / 255, alpha: 1),
+            light: NSColor(srgbRed: 239 / 255, green: 68 / 255, blue: 68 / 255, alpha: 1)
+        )
     }
 }
 

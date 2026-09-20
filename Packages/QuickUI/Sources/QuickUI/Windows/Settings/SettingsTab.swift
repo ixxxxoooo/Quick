@@ -32,8 +32,12 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
             return [
                 .clipboard, .calculator, .fileSearch, .snippets,
                 .windowManagement, .notes, .calendar, .weather,
-                .ai, .translator, .devTools, .systemMonitor,
-                .networkTools, .ocr, .screenshot
+                .ai, .translator, .systemMonitor,
+                .networkTools, .ocr, .screenshot,
+                // 开发者工具：原先是一个 devtools 容器，现在每个工具都是独立插件
+                .jsonFormatter, .sqlFormatter, .base64Codec, .urlCodec,
+                .uuidGenerator, .hashCalculator, .timestampConverter,
+                .wordCounter, .textDiff, .markdownPreview, .colorCompare
             ]
         case .advanced:
             return [.about]
@@ -65,7 +69,17 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case weather
     case ai
     case translator
-    case devTools
+    case jsonFormatter
+    case sqlFormatter
+    case base64Codec
+    case urlCodec
+    case uuidGenerator
+    case hashCalculator
+    case timestampConverter
+    case wordCounter
+    case textDiff
+    case markdownPreview
+    case colorCompare
     case systemMonitor
     case networkTools
     case ocr
@@ -97,7 +111,17 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .weather: "天气"
         case .ai: "AI 聚合"
         case .translator: "翻译"
-        case .devTools: "开发工具"
+        case .jsonFormatter: "JSON 格式化"
+        case .sqlFormatter: "SQL 格式化"
+        case .base64Codec: "Base64 编解码"
+        case .urlCodec: "URL 编解码"
+        case .uuidGenerator: "UUID 生成器"
+        case .hashCalculator: "Hash 计算器"
+        case .timestampConverter: "时间戳转换"
+        case .wordCounter: "字数统计"
+        case .textDiff: "文本对比"
+        case .markdownPreview: "Markdown 预览"
+        case .colorCompare: "颜色工具"
         case .systemMonitor: "系统监控"
         case .networkTools: "网络工具"
         case .ocr: "文字识别"
@@ -128,7 +152,17 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .weather: "cloud.sun"
         case .ai: "sparkles"
         case .translator: "character.book.closed"
-        case .devTools: "wrench.and.screwdriver"
+        case .jsonFormatter: "curlybraces"
+        case .sqlFormatter: "cylinder"
+        case .base64Codec: "lock.rectangle"
+        case .urlCodec: "link"
+        case .uuidGenerator: "number"
+        case .hashCalculator: "number.square"
+        case .timestampConverter: "clock"
+        case .wordCounter: "textformat.123"
+        case .textDiff: "doc.on.doc"
+        case .markdownPreview: "text.badge.checkmark"
+        case .colorCompare: "paintpalette"
         case .systemMonitor: "cpu"
         case .networkTools: "network"
         case .ocr: "text.viewfinder"
@@ -153,7 +187,17 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .weather: "weather"
         case .ai: "ai"
         case .translator: "translator"
-        case .devTools: "devtools"
+        case .jsonFormatter: "json-formatter"
+        case .sqlFormatter: "sql-formatter"
+        case .base64Codec: "base64-codec"
+        case .urlCodec: "url-codec"
+        case .uuidGenerator: "uuid-generator"
+        case .hashCalculator: "hash-calculator"
+        case .timestampConverter: "timestamp-converter"
+        case .wordCounter: "word-counter"
+        case .textDiff: "text-diff"
+        case .markdownPreview: "markdown-preview"
+        case .colorCompare: "color-compare"
         case .systemMonitor: "sysmonitor"
         case .networkTools: "networktools"
         case .ocr: "ocr"
