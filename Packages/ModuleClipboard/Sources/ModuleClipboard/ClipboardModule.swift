@@ -41,8 +41,25 @@ public final class ClipboardModule: QuickModule {
         let keyword = query.removingTrigger(triggers)
         let matches = keyword.isEmpty ? store.entries : store.search(keyword)
 
-        // 返回最相关或最近的几条剪贴板记录
-        return matches.prefix(5).map { entry in
+        var results: [SearchableItem] = []
+
+        // 第一项：打开剪贴板管理器面板（导航到模块模式）
+        results.append(
+            SearchableItem(
+                id: "clipboard.open-panel",
+                moduleID: Self.id,
+                title: "打开剪贴板管理器",
+                subtitle: "查看全部 \(store.entries.count) 条剪贴板历史",
+                icon: Self.icon,
+                relevance: 0.9,
+                action: {
+                    EventBus.shared.post(
+                        NavigateEvent(moduleID: ClipboardModule.id))
+                }
+            ))
+
+        // 最近的几条剪贴板记录，点击直接复制
+        results += matches.prefix(5).map { entry in
             SearchableItem(
                 id: "clipboard.\(entry.id)",
                 moduleID: Self.id,
@@ -56,6 +73,8 @@ public final class ClipboardModule: QuickModule {
                 }
             )
         }
+
+        return results
     }
 
     public func makeView() -> AnyView {
