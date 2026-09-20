@@ -28,6 +28,9 @@ public final class SnippetsModule: QuickModule {
     /// 模板引擎
     private let templateEngine = TemplateEngine()
 
+    /// 空查询列出全部片段时的基础相关度，避免整屏结果都是 0 分
+    private static let defaultRelevance = 0.5
+
     public init() {}
 
     // MARK: - QuickModule 协议
@@ -36,12 +39,12 @@ public final class SnippetsModule: QuickModule {
         let matches = store.search(query)
         return matches.prefix(10).map { snippet in
             SearchableItem(
-                id: "snippet.\(snippet.id)",
+                id: "snippets.\(snippet.id)",
                 moduleID: Self.id,
                 title: snippet.title,
                 subtitle: snippet.preview,
                 icon: "text.quote",
-                relevance: snippet.title.fuzzyScore(query) * 0.8,
+                relevance: query.isEmpty ? Self.defaultRelevance : snippet.title.fuzzyScore(query) * 0.8,
                 shortcutHint: snippet.keyword.flatMap { ":\($0)" },
                 action: { [weak self] in
                     guard let self else { return }

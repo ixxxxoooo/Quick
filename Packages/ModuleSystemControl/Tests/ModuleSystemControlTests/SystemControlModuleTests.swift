@@ -50,7 +50,7 @@ struct SystemControlModuleTests {
         let results = await module.searchItems(query: "锁屏")
 
         let ids = results.map(\.id)
-        #expect(ids.contains("syscontrol.lock"), "「锁屏」应命中锁定屏幕操作，实际命中 \(ids)")
+        #expect(ids.contains("systemcontrol.lock"), "「锁屏」应命中锁定屏幕操作，实际命中 \(ids)")
     }
 
     @Test("结果带模块前缀且互不重复")
@@ -60,7 +60,7 @@ struct SystemControlModuleTests {
 
         let ids = results.map(\.id)
         #expect(Set(ids).count == ids.count, "同一模块内的 SearchableItem.id 必须唯一")
-        #expect(ids.allSatisfy { $0.hasPrefix("syscontrol.") })
+        #expect(ids.allSatisfy { $0.hasPrefix("systemcontrol.") })
         #expect(results.allSatisfy { $0.moduleID == SystemControlModule.id })
     }
 

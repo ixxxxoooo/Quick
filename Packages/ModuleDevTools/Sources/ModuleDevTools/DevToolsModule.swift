@@ -27,6 +27,14 @@ public final class DevToolsModule: QuickModule {
     /// 当前选中的子工具 ID
     var selectedToolID: String?
 
+    /// 全部子工具关键词的并集
+    ///
+    /// 闸门与逐个工具的打分必须同源，否则会出现「过了闸门却没有一行」。
+    private var allKeywords: [String] { tools.flatMap(\.keywords) }
+
+    /// 只打了触发词、没有剩余查询词时的基础相关度
+    private static let defaultRelevance = 0.5
+
     public init() {
         tools = [
             JSONFormatterTool(),
@@ -46,34 +54,41 @@ public final class DevToolsModule: QuickModule {
     // MARK: - QuickModule 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
+        guard query.matchesAnyTrigger(allKeywords) else { return [] }
+
+        // 用剥离触发词后的词打分：整段查询（如 `json 格式化`）永远匹配不上任何单个关键词
+        let keyword = query.removingTrigger(allKeywords)
+
         var results: [SearchableItem] = []
 
         for tool in tools {
             let matchScore =
-                tool.keywords.compactMap { keyword -> Double? in
-                    let score = keyword.fuzzyScore(query)
+                tool.keywords.compactMap { word -> Double? in
+                    let score = word.fuzzyScore(keyword)
                     return score > 0 ? score : nil
                 }.max() ?? 0
 
-            if matchScore > 0 {
-                results.append(
-                    SearchableItem(
-                        id: "devtools.\(tool.id)",
-                        moduleID: Self.id,
-                        title: tool.name,
-                        subtitle: tool.description,
-                        icon: tool.icon,
-                        relevance: matchScore * 0.75,
-                        action: { [weak self] in
-                            self?.selectedToolID = tool.id
-                            EventBus.shared.post(
-                                NavigateEvent(
-                                    moduleID: "devtools",
-                                    context: ["tool": tool.id]
-                                ))
-                        }
-                    ))
-            }
+            // 只剩触发词时列出全部工具，给基础分而不是 0
+            let relevance = keyword.isEmpty ? Self.defaultRelevance : matchScore * 0.75
+            guard keyword.isEmpty || matchScore > 0 else { continue }
+
+            results.append(
+                SearchableItem(
+                    id: "devtools.\(tool.id)",
+                    moduleID: Self.id,
+                    title: tool.name,
+                    subtitle: tool.description,
+                    icon: tool.icon,
+                    relevance: relevance,
+                    action: { [weak self] in
+                        self?.selectedToolID = tool.id
+                        EventBus.shared.post(
+                            NavigateEvent(
+                                moduleID: "devtools",
+                                context: ["tool": tool.id]
+                            ))
+                    }
+                ))
         }
         return results
     }

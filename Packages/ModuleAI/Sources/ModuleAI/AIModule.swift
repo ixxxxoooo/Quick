@@ -26,7 +26,8 @@ public final class AIModule: QuickModule {
 
     public func searchItems(query: String) async -> [SearchableItem] {
         let triggers = ["ai", "聊天", "chat", "问", "ask", "gpt", "claude"]
-        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        // 用整词匹配而不是 contains：否则 email / wait / task 都会误触发本模块
+        guard query.matchesAnyTrigger(triggers) else { return [] }
 
         return [
             SearchableItem(

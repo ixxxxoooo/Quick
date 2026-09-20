@@ -27,11 +27,12 @@ public final class NetworkToolsModule: QuickModule {
 
     public func searchItems(query: String) async -> [SearchableItem] {
         let triggers = ["ip", "网络", "network", "dns", "测速", "speed"]
-        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        // 用整词匹配而不是 contains：否则 clipboard / multiply / description 都会误触发本模块
+        guard query.matchesAnyTrigger(triggers) else { return [] }
 
         return [
             SearchableItem(
-                id: "net.tools",
+                id: "networktools.tools",
                 moduleID: Self.id,
                 title: "网络工具",
                 subtitle: "IP 查询 / DNS / 测速",

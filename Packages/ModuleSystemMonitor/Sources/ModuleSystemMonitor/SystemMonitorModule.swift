@@ -27,7 +27,8 @@ public final class SystemMonitorModule: QuickModule {
 
     public func searchItems(query: String) async -> [SearchableItem] {
         let triggers = ["进程", "系统信息", "系统监控", "process", "monitor", "端口", "port", "cpu", "内存"]
-        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        // 用整词匹配而不是 contains：否则 export / support / report / import 都会误触发本模块
+        guard query.matchesAnyTrigger(triggers) else { return [] }
 
         return [
             SearchableItem(

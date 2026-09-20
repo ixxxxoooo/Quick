@@ -33,7 +33,7 @@ public final class CalculatorModule: QuickModule {
 
         return [
             SearchableItem(
-                id: "calc.result",
+                id: "calculator.result",
                 moduleID: Self.id,
                 title: result.formatted,
                 subtitle: query,

@@ -33,16 +33,16 @@ public final class ClipboardModule: QuickModule {
     // MARK: - QuickModule 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        let keyword = query.lowercased()
-
         // 仅当搜索词与剪贴板相关时才返回入口
         let triggers = ["剪贴板", "clipboard", "粘贴", "复制", "历史", "cb"]
-        guard triggers.contains(where: { keyword.contains($0) }) || keyword.isEmpty else {
-            return []
-        }
+        guard query.matchesAnyTrigger(triggers) else { return [] }
 
-        // 返回最近的几条剪贴板记录
-        return store.entries.prefix(5).map { entry in
+        // 剥离触发词后的词才是真正的筛选条件；为空表示列出最近几条
+        let keyword = query.removingTrigger(triggers)
+        let matches = keyword.isEmpty ? store.entries : store.search(keyword)
+
+        // 返回最相关或最近的几条剪贴板记录
+        return matches.prefix(5).map { entry in
             SearchableItem(
                 id: "clipboard.\(entry.id)",
                 moduleID: Self.id,

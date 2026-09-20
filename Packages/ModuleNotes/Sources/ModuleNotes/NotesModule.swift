@@ -28,9 +28,12 @@ public final class NotesModule: QuickModule {
 
     public func searchItems(query: String) async -> [SearchableItem] {
         let triggers = ["笔记", "备忘", "note", "memo", "便签", "待办", "todo"]
-        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        // 用整词匹配而不是 contains：否则 memory 会误命中 memo
+        guard query.matchesAnyTrigger(triggers) else { return [] }
 
-        let notes = store.search(query)
+        // 拿剥离触发词后的词去搜；只剩触发词时为空串，表示列出全部笔记
+        let keyword = query.removingTrigger(triggers)
+        let notes = store.search(keyword)
         return notes.prefix(5).map { note in
             SearchableItem(
                 id: "notes.\(note.id)",

@@ -23,22 +23,28 @@ public final class WindowManagerModule: QuickModule {
 
     private let mover = WindowMover()
 
+    /// 只打了触发词、没有剩余查询词时的基础相关度
+    private static let defaultRelevance = 0.5
+
     public init() {}
 
     public func searchItems(query: String) async -> [SearchableItem] {
         let triggers = ["窗口", "window", "平铺", "布局", "半屏", "全屏"]
-        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        guard query.matchesAnyTrigger(triggers) else { return [] }
+
+        // 剥离触发词后再看布局关键词：`窗口` 只剩空串时应当列出全部布局，而不是一行都没有
+        let keyword = query.removingTrigger(triggers)
 
         return WindowLayout.allCases.compactMap { layout in
-            let score = layout.keywords.map { $0.fuzzyScore(query) }.max() ?? 0
-            guard score > 0 else { return nil }
+            let score = keyword.isEmpty ? 0 : layout.keywords.map { $0.fuzzyScore(keyword) }.max() ?? 0
+            guard keyword.isEmpty || score > 0 else { return nil }
             return SearchableItem(
-                id: "wm.\(layout.rawValue)",
+                id: "windowmanager.\(layout.rawValue)",
                 moduleID: Self.id,
                 title: layout.title,
                 subtitle: layout.description,
                 icon: layout.icon,
-                relevance: score * 0.7,
+                relevance: keyword.isEmpty ? Self.defaultRelevance : score * 0.7,
                 action: { [weak self] in
                     self?.mover.apply(layout)
                     EventBus.shared.post(HidePaletteEvent())
