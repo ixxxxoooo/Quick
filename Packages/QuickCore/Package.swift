@@ -6,10 +6,10 @@ let package = Package(
     name: "QuickCore",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "QuickCore", targets: ["QuickCore"]),
+        .library(name: "QuickCore", targets: ["QuickCore"])
     ],
     targets: [
         .target(name: "QuickCore"),
-        .testTarget(name: "QuickCoreTests", dependencies: ["QuickCore"]),
+        .testTarget(name: "QuickCoreTests", dependencies: ["QuickCore"])
     ]
 )

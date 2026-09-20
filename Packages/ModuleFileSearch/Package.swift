@@ -6,13 +6,13 @@ let package = Package(
     name: "ModuleFileSearch",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "ModuleFileSearch", targets: ["ModuleFileSearch"]),
+        .library(name: "ModuleFileSearch", targets: ["ModuleFileSearch"])
     ],
     dependencies: [
         .package(path: "../QuickCore"),
-        .package(path: "../QuickUI"),
+        .package(path: "../QuickUI")
     ],
     targets: [
-        .target(name: "ModuleFileSearch", dependencies: ["QuickCore", "QuickUI"]),
+        .target(name: "ModuleFileSearch", dependencies: ["QuickCore", "QuickUI"])
     ]
 )

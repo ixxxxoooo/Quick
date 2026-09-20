@@ -6,13 +6,13 @@ let package = Package(
     name: "ModuleDevTools",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "ModuleDevTools", targets: ["ModuleDevTools"]),
+        .library(name: "ModuleDevTools", targets: ["ModuleDevTools"])
     ],
     dependencies: [
         .package(path: "../QuickCore"),
-        .package(path: "../QuickUI"),
+        .package(path: "../QuickUI")
     ],
     targets: [
-        .target(name: "ModuleDevTools", dependencies: ["QuickCore", "QuickUI"]),
+        .target(name: "ModuleDevTools", dependencies: ["QuickCore", "QuickUI"])
     ]
 )

@@ -6,14 +6,14 @@ let package = Package(
     name: "ModuleCalculator",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "ModuleCalculator", targets: ["ModuleCalculator"]),
+        .library(name: "ModuleCalculator", targets: ["ModuleCalculator"])
     ],
     dependencies: [
         .package(path: "../QuickCore"),
-        .package(path: "../QuickUI"),
+        .package(path: "../QuickUI")
     ],
     targets: [
         .target(name: "ModuleCalculator", dependencies: ["QuickCore", "QuickUI"]),
-        .testTarget(name: "ModuleCalculatorTests", dependencies: ["ModuleCalculator"]),
+        .testTarget(name: "ModuleCalculatorTests", dependencies: ["ModuleCalculator"])
     ]
 )

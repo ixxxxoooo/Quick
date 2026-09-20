@@ -6,13 +6,13 @@ let package = Package(
     name: "ModuleTranslator",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "ModuleTranslator", targets: ["ModuleTranslator"]),
+        .library(name: "ModuleTranslator", targets: ["ModuleTranslator"])
     ],
     dependencies: [
         .package(path: "../QuickCore"),
-        .package(path: "../QuickUI"),
+        .package(path: "../QuickUI")
     ],
     targets: [
-        .target(name: "ModuleTranslator", dependencies: ["QuickCore", "QuickUI"]),
+        .target(name: "ModuleTranslator", dependencies: ["QuickCore", "QuickUI"])
     ]
 )

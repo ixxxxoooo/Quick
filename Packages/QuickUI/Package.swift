@@ -6,16 +6,16 @@ let package = Package(
     name: "QuickUI",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "QuickUI", targets: ["QuickUI"]),
+        .library(name: "QuickUI", targets: ["QuickUI"])
     ],
     dependencies: [
-        .package(path: "../QuickCore"),
+        .package(path: "../QuickCore")
     ],
     targets: [
         .target(
             name: "QuickUI",
             dependencies: ["QuickCore"]
         ),
-        .testTarget(name: "QuickUITests", dependencies: ["QuickUI"]),
+        .testTarget(name: "QuickUITests", dependencies: ["QuickUI"])
     ]
 )

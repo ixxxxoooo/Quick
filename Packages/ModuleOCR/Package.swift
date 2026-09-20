@@ -6,13 +6,13 @@ let package = Package(
     name: "ModuleOCR",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "ModuleOCR", targets: ["ModuleOCR"]),
+        .library(name: "ModuleOCR", targets: ["ModuleOCR"])
     ],
     dependencies: [
         .package(path: "../QuickCore"),
-        .package(path: "../QuickUI"),
+        .package(path: "../QuickUI")
     ],
     targets: [
-        .target(name: "ModuleOCR", dependencies: ["QuickCore", "QuickUI"]),
+        .target(name: "ModuleOCR", dependencies: ["QuickCore", "QuickUI"])
     ]
 )

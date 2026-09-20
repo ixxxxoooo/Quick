@@ -6,14 +6,14 @@ let package = Package(
     name: "ModuleSnippets",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "ModuleSnippets", targets: ["ModuleSnippets"]),
+        .library(name: "ModuleSnippets", targets: ["ModuleSnippets"])
     ],
     dependencies: [
         .package(path: "../QuickCore"),
         .package(path: "../QuickUI"),
-        .package(path: "../QuickPlatform"),
+        .package(path: "../QuickPlatform")
     ],
     targets: [
-        .target(name: "ModuleSnippets", dependencies: ["QuickCore", "QuickUI", "QuickPlatform"]),
+        .target(name: "ModuleSnippets", dependencies: ["QuickCore", "QuickUI", "QuickPlatform"])
     ]
 )
