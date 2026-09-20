@@ -35,7 +35,8 @@ struct SystemMonitorView: View {
     private var processTab: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("进程名").font(DesignTokens.Typography.sectionHeader).frame(maxWidth: .infinity, alignment: .leading)
+                Text("进程名").font(DesignTokens.Typography.sectionHeader).frame(
+                    maxWidth: .infinity, alignment: .leading)
                 Text("CPU").font(DesignTokens.Typography.sectionHeader).frame(width: 60)
                 Text("内存").font(DesignTokens.Typography.sectionHeader).frame(width: 60)
             }
@@ -48,7 +49,8 @@ struct SystemMonitorView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(scanner.processes) { proc in
                         HStack {
-                            Text(proc.name).font(DesignTokens.Typography.code).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                            Text(proc.name).font(DesignTokens.Typography.code).lineLimit(1).frame(
+                                maxWidth: .infinity, alignment: .leading)
                             Text(proc.cpuUsage).font(DesignTokens.Typography.code).frame(width: 60)
                             Text(proc.memoryUsage).font(DesignTokens.Typography.code).frame(width: 60)
                         }

@@ -4,6 +4,7 @@
 
 import EventKit
 import Foundation
+import QuickCore
 
 /// 日历服务
 ///
@@ -32,13 +33,15 @@ final class CalendarService {
     private let eventStore = EKEventStore()
     private var hasAccess = false
 
+    private let log = QuickLog.module("calendar")
+
     /// 请求日历访问权限
     func requestAccess() {
         Task {
             do {
                 hasAccess = try await eventStore.requestFullAccessToEvents()
             } catch {
-                print("[CalendarService] 请求日历权限失败: \(error)")
+                log.error("请求日历权限失败: \(error.localizedDescription, privacy: .public)")
             }
         }
     }

@@ -19,6 +19,8 @@ public final class FileSearchModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(FileSearchModule.id)
+
     /// Spotlight 搜索引擎
     private let searchSession = FileSearchSession()
 
@@ -54,5 +56,13 @@ public final class FileSearchModule: QuickModule {
 
     public func makeView() -> AnyView {
         AnyView(FileSearchView(session: searchSession))
+    }
+
+    public func activate() {
+        log.notice("模块已激活，文件搜索使用 Spotlight 索引")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

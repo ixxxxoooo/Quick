@@ -19,6 +19,8 @@ public final class SystemMonitorModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(SystemMonitorModule.id)
+
     private let scanner = ProcessScanner()
 
     public init() {}
@@ -44,5 +46,13 @@ public final class SystemMonitorModule: QuickModule {
 
     public func makeView() -> AnyView {
         AnyView(SystemMonitorView(scanner: scanner))
+    }
+
+    public func activate() {
+        log.notice("模块已激活，进程列表在打开视图时刷新")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

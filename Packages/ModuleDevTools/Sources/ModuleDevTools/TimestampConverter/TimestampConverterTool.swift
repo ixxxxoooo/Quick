@@ -72,7 +72,10 @@ struct TimestampConverterView: View {
 
                 Text(dateOutput.isEmpty ? "日期结果" : dateOutput)
                     .font(DesignTokens.Typography.code)
-                    .foregroundStyle(dateOutput.isEmpty ? DesignTokens.Colors.textTertiary : DesignTokens.Colors.textPrimary)
+                    .foregroundStyle(
+                        dateOutput.isEmpty
+                            ? DesignTokens.Colors.textTertiary : DesignTokens.Colors.textPrimary
+                    )
                     .textSelection(.enabled)
                     .padding(DesignTokens.Spacing.md)
                     .background(DesignTokens.Colors.cardFill)

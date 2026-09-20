@@ -20,6 +20,8 @@ public final class CalendarModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(CalendarModule.id)
+
     /// EventKit 事件存储
     private let eventStore = EKEventStore()
 
@@ -70,5 +72,10 @@ public final class CalendarModule: QuickModule {
 
     public func activate() {
         calendarService.requestAccess()
+        log.notice("模块已激活，已发起日历权限申请")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

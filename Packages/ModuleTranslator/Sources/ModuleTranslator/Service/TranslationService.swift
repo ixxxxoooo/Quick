@@ -59,7 +59,7 @@ final class TranslationService {
             "再见": "Goodbye",
             "hello": "你好",
             "thank you": "谢谢",
-            "goodbye": "再见",
+            "goodbye": "再见"
         ]
 
         if let simple = simpleDict[text.lowercased()] {

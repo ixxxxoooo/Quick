@@ -41,8 +41,10 @@ struct URLCodecView: View {
             }
 
             HSplitView {
-                TextEditor(text: $input).font(DesignTokens.Typography.code).scrollContentBackground(.hidden).frame(minWidth: 200)
-                TextEditor(text: .constant(output)).font(DesignTokens.Typography.code).scrollContentBackground(.hidden).frame(minWidth: 200)
+                TextEditor(text: $input).font(DesignTokens.Typography.code).scrollContentBackground(.hidden)
+                    .frame(minWidth: 200)
+                TextEditor(text: .constant(output)).font(DesignTokens.Typography.code)
+                    .scrollContentBackground(.hidden).frame(minWidth: 200)
             }
         }
         .padding(DesignTokens.Spacing.xl)

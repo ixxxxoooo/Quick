@@ -20,6 +20,8 @@ public final class NotesModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(NotesModule.id)
+
     private let store = NoteStore()
 
     public init() {}
@@ -48,9 +50,15 @@ public final class NotesModule: QuickModule {
 
     public func activate() {
         store.load()
+        log.notice(
+            """
+            模块已激活：加载 \(self.store.notes.count, privacy: .public) 条笔记、\
+            \(self.store.todos.count, privacy: .public) 条待办
+            """)
     }
 
     public func deactivate() {
         store.save()
+        log.notice("模块已停用，笔记与待办已落盘")
     }
 }

@@ -57,7 +57,9 @@ struct NotesView: View {
                         ForEach(store.notes) { note in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(note.title).font(DesignTokens.Typography.rowTitle).lineLimit(1)
-                                Text(note.preview).font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary).lineLimit(1)
+                                Text(note.preview).font(.caption).foregroundStyle(
+                                    DesignTokens.Colors.textTertiary
+                                ).lineLimit(1)
                             }
                             .padding(DesignTokens.Spacing.md)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -136,11 +138,16 @@ struct NotesView: View {
                     ForEach(store.todos) { todo in
                         HStack(spacing: DesignTokens.Spacing.md) {
                             Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(todo.isCompleted ? DesignTokens.Colors.success : DesignTokens.Colors.textTertiary)
+                                .foregroundStyle(
+                                    todo.isCompleted
+                                        ? DesignTokens.Colors.success : DesignTokens.Colors.textTertiary
+                                )
                                 .onTapGesture { store.toggleTodo(todo.id) }
                             Text(todo.text)
                                 .strikethrough(todo.isCompleted)
-                                .foregroundStyle(todo.isCompleted ? DesignTokens.Colors.textTertiary : DesignTokens.Colors.textPrimary)
+                                .foregroundStyle(
+                                    todo.isCompleted
+                                        ? DesignTokens.Colors.textTertiary : DesignTokens.Colors.textPrimary)
                             Spacer()
                         }
                         .padding(.horizontal, DesignTokens.Spacing.xl)

@@ -19,6 +19,8 @@ public final class TranslatorModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(TranslatorModule.id)
+
     /// 翻译服务
     private let service = TranslationService()
 
@@ -32,7 +34,7 @@ public final class TranslatorModule: QuickModule {
             ("翻译 ", "翻译"),
             ("tr ", "tr"),
             ("translate ", "translate"),
-            ("fy ", "fy"),
+            ("fy ", "fy")
         ]
 
         guard let match = triggers.first(where: { query.lowercased().hasPrefix($0.0) }) else {
@@ -63,5 +65,13 @@ public final class TranslatorModule: QuickModule {
 
     public func makeView() -> AnyView {
         AnyView(TranslatorView(service: service))
+    }
+
+    public func activate() {
+        log.notice("模块已激活")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

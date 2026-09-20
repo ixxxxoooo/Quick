@@ -144,19 +144,20 @@ final class CalcEngine {
         let lengthUnits: [String: UnitLength] = [
             "km": .kilometers, "m": .meters, "cm": .centimeters, "mm": .millimeters,
             "mi": .miles, "yd": .yards, "ft": .feet, "in": .inches,
-            "千米": .kilometers, "米": .meters, "厘米": .centimeters, "英里": .miles,
+            "千米": .kilometers, "米": .meters, "厘米": .centimeters, "英里": .miles
         ]
 
         // 重量单位映射
         let massUnits: [String: UnitMass] = [
             "kg": .kilograms, "g": .grams, "mg": .milligrams,
             "lb": .pounds, "oz": .ounces,
-            "千克": .kilograms, "克": .grams, "磅": .pounds,
+            "千克": .kilograms, "克": .grams, "磅": .pounds
         ]
 
         // 尝试长度换算
         if let fromUnit = lengthUnits[from.lowercased()],
-           let toUnit = lengthUnits[to.lowercased()] {
+            let toUnit = lengthUnits[to.lowercased()]
+        {
             let measurement = Measurement(value: value, unit: fromUnit)
             let converted = measurement.converted(to: toUnit)
             return CalcResult(
@@ -167,7 +168,8 @@ final class CalcEngine {
 
         // 尝试重量换算
         if let fromUnit = massUnits[from.lowercased()],
-           let toUnit = massUnits[to.lowercased()] {
+            let toUnit = massUnits[to.lowercased()]
+        {
             let measurement = Measurement(value: value, unit: fromUnit)
             let converted = measurement.converted(to: toUnit)
             return CalcResult(

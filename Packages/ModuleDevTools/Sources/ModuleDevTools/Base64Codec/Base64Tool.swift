@@ -57,7 +57,7 @@ struct Base64View: View {
 
     private func decode() {
         guard let data = Data(base64Encoded: input),
-              let decoded = String(data: data, encoding: .utf8)
+            let decoded = String(data: data, encoding: .utf8)
         else {
             output = "无效的 Base64 字符串"
             return

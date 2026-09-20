@@ -54,8 +54,9 @@ final class NetworkService {
             guard name == "en0" || name == "en1" else { continue }
 
             var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            getnameinfo(interface.ifa_addr, socklen_t(interface.ifa_addr.pointee.sa_len),
-                       &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
+            getnameinfo(
+                interface.ifa_addr, socklen_t(interface.ifa_addr.pointee.sa_len),
+                &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
             address = String(cString: hostname)
             break
         }

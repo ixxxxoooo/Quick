@@ -29,13 +29,14 @@ final class OCREngine {
         return await withCheckedContinuation { continuation in
             let request = VNRecognizeTextRequest { request, error in
                 guard error == nil,
-                      let observations = request.results as? [VNRecognizedTextObservation]
+                    let observations = request.results as? [VNRecognizedTextObservation]
                 else {
                     continuation.resume(returning: "")
                     return
                 }
 
-                let text = observations
+                let text =
+                    observations
                     .compactMap { $0.topCandidates(1).first?.string }
                     .joined(separator: "\n")
 

@@ -19,6 +19,8 @@ public final class WeatherModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(WeatherModule.id)
+
     private let service = WeatherService()
 
     public init() {}
@@ -49,5 +51,10 @@ public final class WeatherModule: QuickModule {
 
     public func activate() {
         Task { await service.refresh() }
+        log.notice("模块已激活，已发起天气刷新任务")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

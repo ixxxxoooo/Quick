@@ -18,6 +18,8 @@ public final class ScreenshotModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(ScreenshotModule.id)
+
     private let capture = ScreenCapture()
 
     public init() {}
@@ -48,12 +50,20 @@ public final class ScreenshotModule: QuickModule {
                 action: { [weak self] in
                     Task { await self?.captureFullScreen() }
                 }
-            ),
+            )
         ]
     }
 
     public func makeView() -> AnyView {
         AnyView(ScreenshotView(capture: capture))
+    }
+
+    public func activate() {
+        log.notice("模块已激活")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 
     /// 区域截图

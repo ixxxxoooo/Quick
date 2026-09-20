@@ -53,10 +53,12 @@ struct SQLFormatterView: View {
     }
 
     private func formatSQL() {
-        let keywords = ["SELECT", "FROM", "WHERE", "AND", "OR", "JOIN", "LEFT JOIN",
-                       "RIGHT JOIN", "INNER JOIN", "ON", "GROUP BY", "ORDER BY",
-                       "HAVING", "INSERT INTO", "VALUES", "UPDATE", "SET", "DELETE FROM",
-                       "CREATE TABLE", "ALTER TABLE", "DROP TABLE", "LIMIT", "OFFSET", "UNION"]
+        let keywords = [
+            "SELECT", "FROM", "WHERE", "AND", "OR", "JOIN", "LEFT JOIN",
+            "RIGHT JOIN", "INNER JOIN", "ON", "GROUP BY", "ORDER BY",
+            "HAVING", "INSERT INTO", "VALUES", "UPDATE", "SET", "DELETE FROM",
+            "CREATE TABLE", "ALTER TABLE", "DROP TABLE", "LIMIT", "OFFSET", "UNION"
+        ]
 
         var result = input
         for keyword in keywords {

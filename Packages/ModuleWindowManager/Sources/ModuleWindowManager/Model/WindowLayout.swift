@@ -80,16 +80,16 @@ enum WindowLayout: String, CaseIterable, Sendable {
     /// 计算布局在屏幕中的比例（x, y, w, h 相对于屏幕）
     var rect: (x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) {
         switch self {
-        case .leftHalf:     (0, 0, 0.5, 1.0)
-        case .rightHalf:    (0.5, 0, 0.5, 1.0)
-        case .topHalf:      (0, 0, 1.0, 0.5)
-        case .bottomHalf:   (0, 0.5, 1.0, 0.5)
-        case .maximize:     (0, 0, 1.0, 1.0)
-        case .center:       (0.15, 0.1, 0.7, 0.8)
-        case .topLeft:      (0, 0, 0.5, 0.5)
-        case .topRight:     (0.5, 0, 0.5, 0.5)
-        case .bottomLeft:   (0, 0.5, 0.5, 0.5)
-        case .bottomRight:  (0.5, 0.5, 0.5, 0.5)
+        case .leftHalf: (0, 0, 0.5, 1.0)
+        case .rightHalf: (0.5, 0, 0.5, 1.0)
+        case .topHalf: (0, 0, 1.0, 0.5)
+        case .bottomHalf: (0, 0.5, 1.0, 0.5)
+        case .maximize: (0, 0, 1.0, 1.0)
+        case .center: (0.15, 0.1, 0.7, 0.8)
+        case .topLeft: (0, 0, 0.5, 0.5)
+        case .topRight: (0.5, 0, 0.5, 0.5)
+        case .bottomLeft: (0, 0.5, 0.5, 0.5)
+        case .bottomRight: (0.5, 0.5, 0.5, 0.5)
         }
     }
 }

@@ -29,7 +29,9 @@ struct ChatView: View {
                                     .padding(DesignTokens.Spacing.lg)
                                     .background {
                                         RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                                            .fill(msg.role == .user ? Color.blue.opacity(0.15) : DesignTokens.Colors.cardFill)
+                                            .fill(
+                                                msg.role == .user
+                                                    ? Color.blue.opacity(0.15) : DesignTokens.Colors.cardFill)
                                     }
                                     .textSelection(.enabled)
                             }

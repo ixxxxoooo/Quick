@@ -19,6 +19,8 @@ public final class NetworkToolsModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(NetworkToolsModule.id)
+
     private let service = NetworkService()
 
     public init() {}
@@ -44,5 +46,13 @@ public final class NetworkToolsModule: QuickModule {
 
     public func makeView() -> AnyView {
         AnyView(NetworkToolsView(service: service))
+    }
+
+    public func activate() {
+        log.notice("模块已激活")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

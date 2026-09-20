@@ -17,10 +17,12 @@ struct WindowManagerView: View {
                 .font(DesignTokens.Typography.panelTitle)
 
             // 布局网格
-            LazyVGrid(columns: [
-                GridItem(.flexible()), GridItem(.flexible()),
-                GridItem(.flexible()), GridItem(.flexible())
-            ], spacing: DesignTokens.Spacing.md) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible()), GridItem(.flexible()),
+                    GridItem(.flexible()), GridItem(.flexible())
+                ], spacing: DesignTokens.Spacing.md
+            ) {
                 ForEach(WindowLayout.allCases, id: \.rawValue) { layout in
                     Button {
                         mover.apply(layout)

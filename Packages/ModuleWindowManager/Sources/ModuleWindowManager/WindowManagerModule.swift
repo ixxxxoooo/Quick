@@ -19,6 +19,8 @@ public final class WindowManagerModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(WindowManagerModule.id)
+
     private let mover = WindowMover()
 
     public init() {}
@@ -47,5 +49,13 @@ public final class WindowManagerModule: QuickModule {
 
     public func makeView() -> AnyView {
         AnyView(WindowManagerView(mover: mover))
+    }
+
+    public func activate() {
+        log.notice("模块已激活")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

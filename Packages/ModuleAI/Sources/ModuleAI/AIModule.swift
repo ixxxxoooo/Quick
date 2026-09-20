@@ -18,6 +18,8 @@ public final class AIModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(AIModule.id)
+
     private let chatSession = ChatSession()
 
     public init() {}
@@ -47,5 +49,13 @@ public final class AIModule: QuickModule {
 
     public func makeSettingsView() -> AnyView? {
         AnyView(AISettingsView())
+    }
+
+    public func activate() {
+        log.notice("模块已激活，当前会话 \(self.chatSession.messages.count, privacy: .public) 条消息")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

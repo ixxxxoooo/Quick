@@ -49,7 +49,7 @@ final class FileSearchSession {
             ]
             metadataQuery.valueListAttributes = [
                 NSMetadataItemFSSizeKey,
-                NSMetadataItemFSContentChangeDateKey,
+                NSMetadataItemFSContentChangeDateKey
             ]
 
             NotificationCenter.default.addObserver(
@@ -85,24 +85,26 @@ final class FileSearchSession {
         for i in 0..<min(query.resultCount, 20) {
             guard let item = query.result(at: i) as? NSMetadataItem else { continue }
             guard let name = item.value(forAttribute: NSMetadataItemFSNameKey) as? String,
-                  let path = item.value(forAttribute: NSMetadataItemPathKey) as? String
+                let path = item.value(forAttribute: NSMetadataItemPathKey) as? String
             else { continue }
 
             let size = item.value(forAttribute: NSMetadataItemFSSizeKey) as? Int64 ?? 0
             let modified = item.value(forAttribute: NSMetadataItemFSContentChangeDateKey) as? Date
 
             let icon = iconForFile(name)
-            results.append(FileResult(
-                id: path,
-                name: name,
-                path: path,
-                icon: icon,
-                size: size,
-                modifiedDate: modified
-            ))
+            results.append(
+                FileResult(
+                    id: path,
+                    name: name,
+                    path: path,
+                    icon: icon,
+                    size: size,
+                    modifiedDate: modified
+                ))
         }
 
-        NotificationCenter.default.removeObserver(self, name: .NSMetadataQueryDidFinishGathering, object: query)
+        NotificationCenter.default.removeObserver(
+            self, name: .NSMetadataQueryDidFinishGathering, object: query)
         self.query = nil
         continuation.resume(returning: results)
     }
@@ -126,7 +128,8 @@ final class FileSearchSession {
         case "mp4", "mov", "avi": return "film"
         case "mp3", "wav", "aac", "m4a": return "music.note"
         case "zip", "rar", "7z", "tar", "gz": return "archivebox"
-        case "swift", "py", "js", "ts", "java", "c", "cpp", "rs": return "chevron.left.forwardslash.chevron.right"
+        case "swift", "py", "js", "ts", "java", "c", "cpp", "rs":
+            return "chevron.left.forwardslash.chevron.right"
         case "md", "txt": return "doc.text"
         case "html", "css": return "globe"
         default: return "doc"

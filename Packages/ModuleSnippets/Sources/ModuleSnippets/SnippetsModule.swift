@@ -20,6 +20,8 @@ public final class SnippetsModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(SnippetsModule.id)
+
     /// 片段存储
     private let store = SnippetStore()
 
@@ -57,9 +59,11 @@ public final class SnippetsModule: QuickModule {
 
     public func activate() {
         store.load()
+        log.notice("模块已激活：加载 \(self.store.snippets.count, privacy: .public) 个片段")
     }
 
     public func deactivate() {
         store.save()
+        log.notice("模块已停用，片段已落盘")
     }
 }

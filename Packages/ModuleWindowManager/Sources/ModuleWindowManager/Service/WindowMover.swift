@@ -4,6 +4,7 @@
 
 import AppKit
 import ApplicationServices
+import QuickCore
 
 /// 窗口移动器
 ///
@@ -12,11 +13,14 @@ import ApplicationServices
 @MainActor
 final class WindowMover {
 
+    private let log = QuickLog.module("windowmanager")
+
     /// 应用布局到前台窗口
     /// - Parameter layout: 窗口布局
     func apply(_ layout: WindowLayout) {
         guard AXIsProcessTrusted() else {
-            print("[WindowMover] 需要辅助功能权限")
+            // 常见原因：未在「系统设置 → 隐私与安全性 → 辅助功能」中勾选 Quick。
+            log.error("缺少辅助功能权限，窗口布局未应用")
             return
         }
 
@@ -26,7 +30,7 @@ final class WindowMover {
 
         let newFrame = CGRect(
             x: screenFrame.origin.x + screenFrame.width * r.x,
-            y: screenFrame.origin.y + screenFrame.height * (1.0 - r.y - r.h), // AppKit 坐标系
+            y: screenFrame.origin.y + screenFrame.height * (1.0 - r.y - r.h),  // AppKit 坐标系
             width: screenFrame.width * r.w,
             height: screenFrame.height * r.h
         )

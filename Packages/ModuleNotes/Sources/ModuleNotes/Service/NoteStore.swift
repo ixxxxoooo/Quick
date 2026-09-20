@@ -61,8 +61,16 @@ final class NoteStore {
     }
 
     func load() {
-        if let d = try? Data(contentsOf: notesURL), let n = try? JSONDecoder().decode([NoteItem].self, from: d) { notes = n }
-        if let d = try? Data(contentsOf: todosURL), let t = try? JSONDecoder().decode([TodoItem].self, from: d) { todos = t }
+        if let d = try? Data(contentsOf: notesURL),
+            let n = try? JSONDecoder().decode([NoteItem].self, from: d)
+        {
+            notes = n
+        }
+        if let d = try? Data(contentsOf: todosURL),
+            let t = try? JSONDecoder().decode([TodoItem].self, from: d)
+        {
+            todos = t
+        }
     }
 
     func save() {

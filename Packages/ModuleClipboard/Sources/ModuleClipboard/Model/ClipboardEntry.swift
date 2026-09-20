@@ -27,11 +27,20 @@ public struct ClipboardEntry: Identifiable, Codable, Sendable {
     /// 是否置顶
     public var isPinned: Bool
 
-    /// 预览文本（截取前 80 个字符）
+    /// 预览文本（单行，最多 80 个字符）
+    ///
+    /// 三种换行都要处理：从 Windows/网页复制来的文本常带 `\r\n`，
+    /// 只替换 `\n` 会留下一个游离的 `\r`，让预览在列表里显示成断行。
     public var preview: String {
-        let clean = text.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
-        if clean.count <= 80 { return clean }
-        return String(clean.prefix(80)) + "…"
+        let flattened =
+            text
+            .replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+            .trimmingCharacters(in: .whitespaces)
+        if flattened.count <= 80 { return flattened }
+        return String(flattened.prefix(80)) + "…"
     }
 
     /// 内容类型

@@ -19,6 +19,8 @@ public final class SystemControlModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(SystemControlModule.id)
+
     /// 系统操作运行器
     private let runner = SystemActionRunner()
 
@@ -30,7 +32,8 @@ public final class SystemControlModule: QuickModule {
         let actions = SystemAction.allCases
         guard !query.isEmpty else { return [] }
 
-        return actions
+        return
+            actions
             .filter { action in
                 action.keywords.contains { $0.fuzzyMatch(query) }
             }
@@ -52,5 +55,13 @@ public final class SystemControlModule: QuickModule {
 
     public func makeView() -> AnyView {
         AnyView(SystemControlView(runner: runner))
+    }
+
+    public func activate() {
+        log.notice("模块已激活，可用系统操作 \(SystemAction.allCases.count, privacy: .public) 项")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

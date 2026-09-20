@@ -16,6 +16,8 @@ public final class HotKeyService {
     /// 面板切换回调
     public var onTogglePalette: (() -> Void)?
 
+    private let log = QuickLog.hotKey
+
     /// 已注册的快捷键引用
     private var hotKeyRef: EventHotKeyRef?
 
@@ -46,6 +48,7 @@ public final class HotKeyService {
             RemoveEventHandler(handler)
             eventHandlerRef = nil
         }
+        log.info("已注销全局快捷键")
     }
 
     /// Carbon 回调触发时调用
@@ -53,11 +56,16 @@ public final class HotKeyService {
         onTogglePalette?()
     }
 
+    /// 测试用：模拟热键按下
+    func handleHotKeyPressedForTesting() {
+        handleHotKeyPressed()
+    }
+
     // MARK: - 注册默认快捷键（⌥Space）
 
     private func registerDefaultHotKey() {
         let hotKeyID = EventHotKeyID(
-            signature: OSType(0x5155434B), // "QUCK"
+            signature: OSType(0x5155434B),  // "QUCK"
             id: 1
         )
 
@@ -82,7 +90,7 @@ public final class HotKeyService {
         )
 
         guard status == noErr else {
-            print("[HotKeyService] 安装事件处理器失败: \(status)")
+            log.error("安装 Carbon 事件处理器失败，OSStatus=\(status, privacy: .public)")
             return
         }
 
@@ -97,7 +105,11 @@ public final class HotKeyService {
         )
 
         if registerStatus != noErr {
-            print("[HotKeyService] 注册快捷键失败: \(registerStatus)")
+            // 最常见的原因是组合键已被别的应用占用。用户报「快捷键没反应」先看这条。
+            log.error("注册全局快捷键 ⌥Space 失败，OSStatus=\(registerStatus, privacy: .public)")
+        } else {
+            // notice 而不是 info：info 不落盘，事后查不到，而这条正是排障的第一现场。
+            log.notice("已注册全局快捷键 ⌥Space")
         }
     }
 }

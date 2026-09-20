@@ -11,6 +11,8 @@ import QuickCore
 @MainActor
 final class SystemActionRunner {
 
+    private let log = QuickLog.module("systemcontrol")
+
     /// 执行系统操作
     /// - Parameter action: 要执行的操作
     func execute(_ action: SystemAction) {
@@ -58,31 +60,34 @@ final class SystemActionRunner {
     }
 
     private func emptyTrash() {
-        runAppleScript("""
-            tell application "Finder"
-                empty the trash
-            end tell
-        """)
+        runAppleScript(
+            """
+                tell application "Finder"
+                    empty the trash
+                end tell
+            """)
         EventBus.shared.post(ShowHUDEvent(message: "废纸篓已清空", tone: .success))
     }
 
     private func ejectAll() {
-        runAppleScript("""
-            tell application "Finder"
-                eject (every disk whose ejectable is true)
-            end tell
-        """)
+        runAppleScript(
+            """
+                tell application "Finder"
+                    eject (every disk whose ejectable is true)
+                end tell
+            """)
         EventBus.shared.post(ShowHUDEvent(message: "已推出所有磁盘", tone: .success))
     }
 
     private func toggleDarkMode() {
-        runAppleScript("""
-            tell application "System Events"
-                tell appearance preferences
-                    set dark mode to not dark mode
+        runAppleScript(
+            """
+                tell application "System Events"
+                    tell appearance preferences
+                        set dark mode to not dark mode
+                    end tell
                 end tell
-            end tell
-        """)
+            """)
         EventBus.shared.post(ShowHUDEvent(message: "已切换外观模式", tone: .success))
     }
 
@@ -94,7 +99,8 @@ final class SystemActionRunner {
         var error: NSDictionary?
         script.executeAndReturnError(&error)
         if let error {
-            print("[SystemActionRunner] AppleScript 错误: \(error)")
+            // 常见原因：未授予「自动化」权限，或目标应用（System Events / Finder）未响应。
+            log.error("AppleScript 执行失败: \(error, privacy: .public)")
         }
     }
 }

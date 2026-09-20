@@ -77,7 +77,7 @@ struct HashCalculatorView: View {
             ("MD5", Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()),
             ("SHA1", Insecure.SHA1.hash(data: data).map { String(format: "%02x", $0) }.joined()),
             ("SHA256", SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()),
-            ("SHA512", SHA512.hash(data: data).map { String(format: "%02x", $0) }.joined()),
+            ("SHA512", SHA512.hash(data: data).map { String(format: "%02x", $0) }.joined())
         ]
     }
 }

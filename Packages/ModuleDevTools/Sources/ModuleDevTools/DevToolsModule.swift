@@ -19,6 +19,8 @@ public final class DevToolsModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(DevToolsModule.id)
+
     /// 所有已注册的子工具
     private let tools: [any DevTool]
 
@@ -37,7 +39,7 @@ public final class DevToolsModule: QuickModule {
             WordCounterTool(),
             TextDiffTool(),
             MarkdownPreviewTool(),
-            ColorCompareTool(),
+            ColorCompareTool()
         ]
     }
 
@@ -47,27 +49,30 @@ public final class DevToolsModule: QuickModule {
         var results: [SearchableItem] = []
 
         for tool in tools {
-            let matchScore = tool.keywords.compactMap { keyword -> Double? in
-                let score = keyword.fuzzyScore(query)
-                return score > 0 ? score : nil
-            }.max() ?? 0
+            let matchScore =
+                tool.keywords.compactMap { keyword -> Double? in
+                    let score = keyword.fuzzyScore(query)
+                    return score > 0 ? score : nil
+                }.max() ?? 0
 
             if matchScore > 0 {
-                results.append(SearchableItem(
-                    id: "devtools.\(tool.id)",
-                    moduleID: Self.id,
-                    title: tool.name,
-                    subtitle: tool.description,
-                    icon: tool.icon,
-                    relevance: matchScore * 0.75,
-                    action: { [weak self] in
-                        self?.selectedToolID = tool.id
-                        EventBus.shared.post(NavigateEvent(
-                            moduleID: "devtools",
-                            context: ["tool": tool.id]
-                        ))
-                    }
-                ))
+                results.append(
+                    SearchableItem(
+                        id: "devtools.\(tool.id)",
+                        moduleID: Self.id,
+                        title: tool.name,
+                        subtitle: tool.description,
+                        icon: tool.icon,
+                        relevance: matchScore * 0.75,
+                        action: { [weak self] in
+                            self?.selectedToolID = tool.id
+                            EventBus.shared.post(
+                                NavigateEvent(
+                                    moduleID: "devtools",
+                                    context: ["tool": tool.id]
+                                ))
+                        }
+                    ))
             }
         }
         return results
@@ -75,6 +80,14 @@ public final class DevToolsModule: QuickModule {
 
     public func makeView() -> AnyView {
         AnyView(DevToolsRootView(module: self, tools: tools))
+    }
+
+    public func activate() {
+        log.notice("模块已激活，已注册 \(self.tools.count, privacy: .public) 个子工具")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 
     /// 获取指定 ID 的子工具

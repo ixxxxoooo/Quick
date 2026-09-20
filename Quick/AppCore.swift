@@ -19,6 +19,7 @@ import ModuleSystemMonitor
 import ModuleTranslator
 import ModuleWeather
 import ModuleWindowManager
+import Foundation
 import QuickCore
 import QuickPlatform
 import QuickUI
@@ -37,6 +38,8 @@ final class AppCore {
 
     /// 全局单例
     static let shared = AppCore()
+
+    private let log = QuickLog.app
 
     // MARK: - 基础设施（不是 Module）
 
@@ -61,6 +64,9 @@ final class AppCore {
     /// 开机自启管理
     let launchAtLogin = LaunchAtLogin()
 
+    /// 菜单栏状态项
+    let statusItemController = StatusItemController()
+
     // MARK: - Feature Modules
 
     /// 所有已注册模块
@@ -68,6 +74,9 @@ final class AppCore {
 
     /// 事件订阅凭证（防止被释放）
     private var subscriptions: [EventSubscription] = []
+
+    /// 调试唤醒通知观察者（必须强引用，否则立即失效）
+    private var debugWakeObserver: NSObjectProtocol?
 
     private init() {}
 
@@ -78,27 +87,56 @@ final class AppCore {
     /// 由 AppDelegate.applicationDidFinishLaunching 调用一次。
     /// 按顺序完成：创建模块 → 注册事件 → 启动服务 → 激活模块。
     func start() {
+        log.notice("AppCore 启动，bundle id=\(Bundle.main.bundleIdentifier ?? "-", privacy: .public)")
+
         // 1. 创建并注册所有 Feature Module
         registerModules()
+        log.notice("模块注册完成，共 \(self.modules.count, privacy: .public) 个")
 
         // 2. 将模块注入到面板协调器
         paletteCoordinator.setModules(modules)
 
         // 3. 连接事件总线
         wireEventBus()
+        log.notice("事件总线接线完成，订阅 \(self.subscriptions.count, privacy: .public) 条")
 
         // 4. 启动基础设施服务
         hotKeyService.onTogglePalette = { [weak self] in
             self?.paletteCoordinator.toggle()
         }
         hotKeyService.start()
+        statusItemController.install()
+        observeDebugWakeSignals()
 
-        // 5. 后台刷新应用索引
+        // 5. 后台刷新应用索引（不阻塞启动）
         Task { await appIndex.refresh() }
 
         // 6. 激活所有已启用的模块
         for module in modules where module.isEnabled {
             module.activate()
+        }
+
+        // 7. 开发启动参数：立即显示面板（验收用）
+        if ProcessInfo.processInfo.arguments.contains("-showPalette") {
+            log.notice("命中启动参数 -showPalette，立即显示面板")
+            paletteCoordinator.show()
+        }
+
+        log.notice("AppCore 启动完成")
+    }
+
+    /// 监听开发调试唤醒信号（分布式通知）
+    ///
+    /// 用法：`notifyutil -p com.ygw.quick.togglePalette`
+    private func observeDebugWakeSignals() {
+        debugWakeObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.ygw.quick.togglePalette"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.paletteCoordinator.toggle()
+            }
         }
     }
 
@@ -106,11 +144,14 @@ final class AppCore {
 
     /// 准备退出（释放系统资源）
     func prepareForTermination() {
+        log.notice("开始退出清理")
         hotKeyService.stop()
+        statusItemController.remove()
         for module in modules {
             module.deactivate()
         }
         EventBus.shared.removeAll()
+        log.notice("退出清理完成")
     }
 
     // MARK: - 模块注册

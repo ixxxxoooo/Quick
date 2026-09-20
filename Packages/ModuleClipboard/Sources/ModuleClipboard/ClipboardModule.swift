@@ -20,6 +20,8 @@ public final class ClipboardModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(ClipboardModule.id)
+
     /// 剪贴板监听器
     private let monitor = ClipboardMonitor()
 
@@ -70,10 +72,16 @@ public final class ClipboardModule: QuickModule {
             self?.store.add(entry)
         }
         monitor.start()
+        log.notice(
+            """
+            模块已激活：加载 \(self.store.entries.count, privacy: .public) 条历史，\
+            剪贴板监听已启动
+            """)
     }
 
     public func deactivate() {
         monitor.stop()
         store.save()
+        log.notice("模块已停用，剪贴板监听已停止，历史已落盘")
     }
 }

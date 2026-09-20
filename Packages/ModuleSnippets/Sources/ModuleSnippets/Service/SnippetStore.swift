@@ -21,9 +21,8 @@ final class SnippetStore {
         guard !query.isEmpty else { return snippets }
         let lower = query.lowercased()
         return snippets.filter {
-            $0.title.lowercased().contains(lower) ||
-            ($0.keyword?.lowercased().contains(lower) ?? false) ||
-            $0.content.lowercased().contains(lower)
+            $0.title.lowercased().contains(lower) || ($0.keyword?.lowercased().contains(lower) ?? false)
+                || $0.content.lowercased().contains(lower)
         }
     }
 
@@ -50,7 +49,7 @@ final class SnippetStore {
 
     func load() {
         guard let data = try? Data(contentsOf: storageURL),
-              let decoded = try? JSONDecoder().decode([Snippet].self, from: data)
+            let decoded = try? JSONDecoder().decode([Snippet].self, from: data)
         else { return }
         snippets = decoded
     }

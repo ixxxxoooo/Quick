@@ -63,8 +63,9 @@ struct JSONFormatterView: View {
 
     private func format() {
         guard let data = input.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data),
-              let formatted = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+            let json = try? JSONSerialization.jsonObject(with: data),
+            let formatted = try? JSONSerialization.data(
+                withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
         else {
             errorMessage = "无效的 JSON"
             return
@@ -75,8 +76,8 @@ struct JSONFormatterView: View {
 
     private func compact() {
         guard let data = input.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data),
-              let compacted = try? JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])
+            let json = try? JSONSerialization.jsonObject(with: data),
+            let compacted = try? JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])
         else {
             errorMessage = "无效的 JSON"
             return

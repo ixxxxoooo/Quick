@@ -4,6 +4,7 @@
 
 import CoreLocation
 import Foundation
+import QuickCore
 
 /// 天气服务
 ///
@@ -56,7 +57,8 @@ final class WeatherService: NSObject, Observable, CLLocationManagerDelegate {
         // 这里提供框架接口
         currentInfo = WeatherInfo(
             summary: "天气服务就绪",
-            detail: "位置: \(String(format: "%.2f", location.coordinate.latitude)), \(String(format: "%.2f", location.coordinate.longitude))",
+            detail:
+                "位置: \(String(format: "%.2f", location.coordinate.latitude)), \(String(format: "%.2f", location.coordinate.longitude))",
             icon: "cloud.sun",
             temperature: 0
         )
@@ -70,13 +72,15 @@ final class WeatherService: NSObject, Observable, CLLocationManagerDelegate {
 
     // MARK: - CLLocationManagerDelegate
 
-    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation])
+    {
         Task { @MainActor in
             currentLocation = locations.last
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("[WeatherService] 定位失败: \(error.localizedDescription)")
+        // 常见原因：未授予位置权限，或系统「定位服务」被关闭。
+        QuickLog.module("weather").error("定位失败: \(error.localizedDescription, privacy: .public)")
     }
 }

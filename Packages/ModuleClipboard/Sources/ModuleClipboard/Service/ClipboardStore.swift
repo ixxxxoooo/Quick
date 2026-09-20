@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import QuickCore
 import QuickPlatform
 
 /// 剪贴板历史存储
@@ -19,9 +20,25 @@ final class ClipboardStore {
     /// 最大保存条目数
     private let maxEntries = 500
 
+    private let log = QuickLog.module(ClipboardModule.id)
+
+    /// 落盘防抖任务
+    private var saveTask: Task<Void, Never>?
+
+    /// 落盘防抖间隔
+    ///
+    /// 剪贴板可能连续变化多次，每次都写盘既浪费又会互相打断。
+    private static let saveDebounce = Duration.seconds(2)
+
     /// 存储文件路径
-    private var storageURL: URL {
-        AppPaths.moduleData("clipboard").appendingPathComponent("history.json")
+    private let storageURL: URL
+
+    /// 初始化
+    /// - Parameter storageURL: 存储路径。传 nil 用默认位置；测试传临时目录以获得无副作用的行为。
+    init(storageURL: URL? = nil) {
+        self.storageURL =
+            storageURL
+            ?? AppPaths.moduleData("clipboard").appendingPathComponent("history.json")
     }
 
     /// 添加新条目
@@ -33,7 +50,8 @@ final class ClipboardStore {
 
         // 限制数量（保留置顶和收藏）
         if entries.count > maxEntries {
-            entries = entries.filter { $0.isPinned || $0.isFavorite }
+            entries =
+                entries.filter { $0.isPinned || $0.isFavorite }
                 + entries.filter { !$0.isPinned && !$0.isFavorite }.prefix(maxEntries)
         }
 
@@ -73,23 +91,35 @@ final class ClipboardStore {
     // MARK: - 持久化
 
     func load() {
-        guard let data = try? Data(contentsOf: storageURL),
-              let decoded = try? JSONDecoder().decode([ClipboardEntry].self, from: data)
-        else { return }
-        entries = decoded
+        guard let data = try? Data(contentsOf: storageURL) else {
+            log.debug("没有剪贴板历史文件，按空历史启动")
+            return
+        }
+        do {
+            entries = try JSONDecoder().decode([ClipboardEntry].self, from: data)
+            log.info("剪贴板历史已加载，\(self.entries.count, privacy: .public) 条")
+        } catch {
+            // 数据损坏时不能让整个模块起不来：记一条 error，按空历史继续。
+            log.error("剪贴板历史解码失败，已按空历史继续：\(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func save() {
-        guard let data = try? JSONEncoder().encode(entries) else { return }
-        try? data.write(to: storageURL)
+        do {
+            let data = try JSONEncoder().encode(entries)
+            try data.write(to: storageURL)
+            log.debug("剪贴板历史已写入，\(self.entries.count, privacy: .public) 条")
+        } catch {
+            log.error("剪贴板历史写入失败：\(error.localizedDescription, privacy: .public)")
+        }
     }
 
-    private var saveTimer: Timer?
-
     private func scheduleSave() {
-        saveTimer?.invalidate()
-        saveTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
-            Task { @MainActor in self?.save() }
+        saveTask?.cancel()
+        saveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.saveDebounce)
+            guard !Task.isCancelled else { return }
+            self?.save()
         }
     }
 }

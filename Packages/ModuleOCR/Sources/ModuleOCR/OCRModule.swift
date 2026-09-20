@@ -19,6 +19,8 @@ public final class OCRModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(OCRModule.id)
+
     /// OCR 引擎
     private let engine = OCREngine()
 
@@ -47,6 +49,14 @@ public final class OCRModule: QuickModule {
 
     public func makeView() -> AnyView {
         AnyView(OCRResultView(engine: engine))
+    }
+
+    public func activate() {
+        log.notice("模块已激活")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 
     /// 开始截图识别
@@ -83,8 +93,10 @@ public final class OCRModule: QuickModule {
         return await withCheckedContinuation { continuation in
             task.terminationHandler = { _ in
                 guard FileManager.default.fileExists(atPath: tempPath),
-                      let dataProvider = CGDataProvider(url: URL(fileURLWithPath: tempPath) as CFURL),
-                      let image = CGImage(pngDataProviderSource: dataProvider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+                    let dataProvider = CGDataProvider(url: URL(fileURLWithPath: tempPath) as CFURL),
+                    let image = CGImage(
+                        pngDataProviderSource: dataProvider, decode: nil, shouldInterpolate: true,
+                        intent: .defaultIntent)
                 else {
                     continuation.resume(returning: nil)
                     return

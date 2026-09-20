@@ -19,6 +19,8 @@ public final class CalculatorModule: QuickModule {
 
     public var isEnabled = true
 
+    private let log = QuickLog.module(CalculatorModule.id)
+
     /// 计算引擎
     private let engine = CalcEngine()
 
@@ -36,7 +38,7 @@ public final class CalculatorModule: QuickModule {
                 title: result.formatted,
                 subtitle: query,
                 icon: "equal.circle.fill",
-                relevance: 0.95, // 计算结果优先级高
+                relevance: 0.95,  // 计算结果优先级高
                 shortcutHint: "⏎ 复制",
                 action: {
                     EventBus.shared.post(CopyToClipboardEvent(text: result.formatted))
@@ -47,5 +49,13 @@ public final class CalculatorModule: QuickModule {
 
     public func makeView() -> AnyView {
         AnyView(CalculatorView(engine: engine))
+    }
+
+    public func activate() {
+        log.notice("模块已激活")
+    }
+
+    public func deactivate() {
+        log.notice("模块已停用")
     }
 }

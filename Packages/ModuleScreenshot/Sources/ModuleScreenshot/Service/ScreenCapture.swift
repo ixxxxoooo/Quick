@@ -20,7 +20,8 @@ final class ScreenCapture {
 
     /// 截图保存目录
     private var saveDirectory: String {
-        NSSearchPathForDirectoriesInDomains(.desktopDirectory, .userDomainMask, true).first ?? NSTemporaryDirectory()
+        NSSearchPathForDirectoriesInDomains(.desktopDirectory, .userDomainMask, true).first
+            ?? NSTemporaryDirectory()
     }
 
     /// 区域截图

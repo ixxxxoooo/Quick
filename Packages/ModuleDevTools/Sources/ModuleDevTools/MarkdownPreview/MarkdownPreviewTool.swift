@@ -20,15 +20,15 @@ struct MarkdownPreviewTool: DevTool {
 
 struct MarkdownPreviewView: View {
     @State private var input = """
-    # 标题
-    
-    这是一段 **Markdown** 文本。
-    
-    - 列表项 1
-    - 列表项 2
-    
-    `代码` 和 [链接](https://example.com)
-    """
+        # 标题
+
+        这是一段 **Markdown** 文本。
+
+        - 列表项 1
+        - 列表项 2
+
+        `代码` 和 [链接](https://example.com)
+        """
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.md) {

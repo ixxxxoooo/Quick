@@ -94,7 +94,7 @@ struct ClipboardRowView: View {
         .contentShape(Rectangle())
         .contextMenu {
             Button("收藏") { onToggleFavorite() }
-            Button("删除") { /* TODO */ }
+            Button("删除") { /* TODO */  }
         }
     }
 }
