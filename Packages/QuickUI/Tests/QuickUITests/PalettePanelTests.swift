@@ -28,6 +28,31 @@ struct PalettePanelTests {
         #expect(DesignTokens.Size.panelHeight > 0)
     }
 
+    /// 面板几何与设计基准一致
+    ///
+    /// 这几个数字是**从基准截图反推出来的**：截图 1650×1046 物理像素，macOS 截图是 2x，
+    /// 所以逻辑尺寸 825×523；两个维度都精确等于基础令牌 ×1.1，对应参考实现的
+    /// 「Large」档。推导过程见 `DesignTokens.panelScale` 的文档注释。
+    ///
+    /// 正因为它是推出来的、不是拍出来的，必须有测试守着 —— 否则下次有人改尺寸，
+    /// 就再也没人说得清基准到底是什么了。
+    @Test("面板几何与设计基准一致")
+    func panelGeometryMatchesDesignReference() {
+        #expect(DesignTokens.panelScale == 1.1)
+        #expect(DesignTokens.Size.panelWidth == 825)
+        #expect(DesignTokens.Size.panelHeight == 523)
+        #expect(DesignTokens.Radius.panel == 29)
+    }
+
+    /// 细线不随面板缩放
+    ///
+    /// 它是物理像素级的东西：跟着放大只会变成一条粗边。
+    @Test("细线不随面板缩放")
+    func hairlineDoesNotScale() {
+        #expect(DesignTokens.Size.hairline == 1)
+        #expect(DesignTokens.panelScale != 1)
+    }
+
     /// 协调器显隐状态在 show/hide 后应一致
     @Test("协调器 show/hide 状态")
     func coordinatorShowHide() {

@@ -10,6 +10,9 @@ import SwiftUI
 ///
 /// 面板中部的搜索结果列表，支持键盘导航和鼠标交互。
 /// 所有模块的搜索结果都通过此组件展示。
+///
+/// 列表会从 header 与底栏下面**穿过**（由外壳用 `safeAreaInset` 留出栏位），
+/// 靠 `edgeDissolve()` 淡出，而不是被硬切。
 public struct ResultListView: View {
 
     /// 搜索结果项
@@ -54,6 +57,9 @@ public struct ResultListView: View {
                 .padding(.horizontal, DesignTokens.Spacing.md)
                 .padding(.vertical, DesignTokens.Spacing.sm)
             }
+            // 系统滚动条和面板的玻璃语言冲突：它是为带标题栏的窗口设计的。
+            // 面板高度固定、条目数有限，滚动位置靠键盘导航已经足够可感知。
+            .scrollIndicators(.never)
             .onChange(of: selectedIndex) { _, newIndex in
                 guard newIndex >= 0, newIndex < items.count else { return }
                 withAnimation(.easeOut(duration: DesignTokens.Duration.scrollReveal)) {
@@ -61,6 +67,7 @@ public struct ResultListView: View {
                 }
             }
         }
+        .edgeDissolve()
         .onKeyPress(.upArrow) {
             if selectedIndex > 0 { selectedIndex -= 1 }
             return .handled
@@ -80,6 +87,9 @@ public struct ResultListView: View {
 // MARK: - 搜索结果行视图
 
 /// 单行搜索结果
+///
+/// 单行布局：图标 · 标题 ·（弹性）· 右侧类型标签。参考实现也是这个形状 ——
+/// 副标题放在标题下方会把行高翻倍，一屏能看到的条目就少了一半。
 struct ResultRowView: View {
     let item: SearchableItem
     let isSelected: Bool
@@ -87,45 +97,37 @@ struct ResultRowView: View {
 
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.lg) {
-            // 图标
             resultIcon
                 .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
 
-            // 标题和副标题
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                Text(item.title)
-                    .font(DesignTokens.Typography.rowTitle)
-                    .foregroundStyle(DesignTokens.Colors.textPrimary)
-                    .lineLimit(1)
+            Text(item.title)
+                .font(DesignTokens.Typography.rowTitle)
+                .foregroundStyle(DesignTokens.Colors.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.middle)
 
-                if let subtitle = item.subtitle {
-                    Text(subtitle)
-                        .font(DesignTokens.Typography.rowTrailing)
-                        .foregroundStyle(DesignTokens.Colors.textSecondary)
-                        .lineLimit(1)
-                }
+            Spacer(minLength: DesignTokens.Spacing.md)
+
+            if let hint = item.shortcutHint {
+                KeyCapChip(text: hint, style: .outline, scale: .compact)
             }
 
-            Spacer()
-
-            // 快捷键提示
-            if let hint = item.shortcutHint {
-                Text(hint)
-                    .font(DesignTokens.Typography.keyCap)
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-                    .padding(.horizontal, DesignTokens.Spacing.sm)
-                    .padding(.vertical, DesignTokens.Spacing.xxs)
-                    .background(DesignTokens.Colors.controlSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap))
+            if let subtitle = item.subtitle {
+                Text(subtitle)
+                    .font(DesignTokens.Typography.rowTrailing)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    .lineLimit(1)
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .padding(.vertical, DesignTokens.Spacing.md)
         .background {
-            RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
                 .fill(
                     isSelected
-                        ? DesignTokens.Colors.selection : isHovered ? DesignTokens.Colors.rowHover : .clear)
+                        ? DesignTokens.Colors.selection
+                        : isHovered ? DesignTokens.Colors.rowHover : .clear
+                )
         }
         .contentShape(Rectangle())
     }

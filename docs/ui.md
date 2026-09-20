@@ -35,47 +35,84 @@ withAnimation(.easeOut(duration: DesignTokens.Duration.hover)) { ... }
 
 ---
 
-## 2. 面板几何（与 Tinycast 对齐）
+## 2. 面板几何（与设计基准对齐）
 
-这些数值是刻意的，改动前必须确认视觉无回归：
+**尺寸是从基准截图反推出来的，不是拍脑袋定的。** 基准截图 1650×1046 物理像素，
+macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都精确等于基础令牌
+（750×475）× 1.1，对应参考实现的「Large」档。
 
-| 令牌 | 值 | 说明 |
+`DesignTokens.panelScale` 是唯一的缩放开关：
+
+- `1.0` = 基础令牌：面板 750×475，圆角 26
+- **`1.1` = 当前采用**：面板 825×523，圆角 29
+
+面板与它的浮动兄弟（HUD、对话框）按此缩放；设置窗口这类系统窗口不缩放。
+`Size.hairline` **刻意不缩放** —— 它是物理像素级的东西，跟着放大只会变成粗边。
+
+| 令牌 | 基础值 | 当前实际值 |
 | --- | --- | --- |
-| `Size.panelWidth` | **750** | 面板宽度，与 Tinycast 一致 |
-| `Size.panelHeight` | **475** | 面板高度，与 Tinycast 一致 |
-| `Radius.panel` | **26** | 面板圆角。**这个值不能随意调小**，它是「系统组件感」的主要来源 |
-| `Size.headerHeight` | 44 | 搜索栏高度 |
-| `Size.headerIconSlot` | 22 | 搜索图标固定槽位宽（保证不同模式下输入起点在同一 x） |
-| `Size.headerPadding` | 10 | 搜索栏上方留白，恒定 —— 输入时栏位不能跳动 |
-| `Size.bottomBarHeight` | 52 | 底栏高度 |
-| `Size.barButtonHeight` | 28 | 底栏按钮 / 快捷键胶囊高度 |
-| `Size.rowIcon` | 24 | 列表行图标 |
-| `Size.keyCap` | 18 | 快捷键帽边长 |
-| `Size.paletteTopMarginFraction` | 0.18 | 面板顶边距屏幕可见区顶部的比例 |
-| `Radius.row` | 10 | 列表行圆角 |
-| `Radius.keyCap` | 6 | 快捷键帽圆角 |
-| `Radius.barControl` | 8 | 底栏控件圆角 |
+| `Size.panelWidth` | 750 | **825** |
+| `Size.panelHeight` | 475 | **523** |
+| `Radius.panel` | 26 | **29** |
+| `Size.headerHeight` | 44 | 48 |
+| `Size.headerIconSlot` | 22 | 24 |
+| `Size.headerPadding` | 10 | 11 |
+| `Size.bottomBarHeight` | 52 | 57 |
+| `Size.barButtonHeight` | 28 | 31 |
+| `Size.rowIcon` | 24 | 26 |
+| `Size.keyCap` / `compactKeyCap` | 18 / 15 | 20 / 17 |
+| `Size.edgeFadeHeight` | 22 | 24 |
+| `Radius.row` / `barControl` / `keyCap` | 10 / 8 / 6 | 11 / 9 / 7 |
+| `Typography.searchFieldSize` | 20 | 22 |
 
-### 面板的三段式结构
+`Radius.panel` 是「系统组件感」的主要来源，不要随意调小。
+
+### 面板结构：内容从浮动栏下面穿过
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  [icon 22]  搜索框 20pt                              [模式徽章] │  header 44
-│  ──────────────────────────────────────────────────────────  │  hairline
-│                                                              │
-│   结果行 ×N（icon 24 · 标题 .body · 副标题 .callout）           │  content（弹性）
-│   选中行：Radius.row 圆角填充 Colors.selection                  │
-│                                                              │
-│  ──────────────────────────────────────────────────────────  │  hairline
-│  [⌘K 次要动作]              [↑↓ 选择] [↵ 打开] [esc 关闭]        │  bottom bar 52
-└──────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│  [icon] 搜索框                          [状态]  │  header（无背景、无分隔线）
+│                                                  │
+│   结果行从 header 下面穿过并淡出                  │
+│                                                  │
+│  计数                              ( 打开  ↵ )   │  浮动胶囊，无通栏
+└────────────────────────────────────────────────┘
 ```
 
-- **header 高度恒定**，搜索栏不因输入内容变化而位移（`headerPadding` 恒定就是为此）。
-- **底栏是快捷键的教学位**：左侧是当前上下文的主动作，右侧是全局导航键。
-  底栏文案用 `Typography.bar`，键位用 `KeyCapChip`。
-- **列表行高度**由内容 + `Spacing.md` 上下内边距决定，不写死；选中/悬停态用
-  `Colors.selection` / `Colors.rowHover` 填充，两者视觉上要可区分（悬停更淡）。
+- **没有分隔线。** 搜索框下面没有、底栏上面也没有。栏位与内容之间靠**渐隐**分界，
+  不是靠线。
+- **没有通栏底栏。** 底栏只有两个浮动的元素：左侧状态文本、右侧一枚玻璃胶囊
+  （`View.frosted(in: Capsule())`）。它没有背景色，行的内容从它下面穿过。
+- **栏位用 `safeAreaInset` 挂在滚动内容上，不是兄弟节点。** 兄弟节点会把滚动区
+  **硬切**在栏位边缘，滚动时能看到行被齐刷刷切断。`safeAreaInset` 让内容从栏位下面
+  穿过去：静止时贴边、滚动时渐隐。这是参考实现的做法，也是「看起来像一个系统组件」
+  而不是「一个被裁掉一块的列表」的关键。
+- **不要给 header 加背景。** 加了就变成通栏，穿过与渐隐的层次感会消失。
+- 列表必须挂 `edgeDissolve()`；它由滚动几何驱动，**贴边时完全不淡**
+  （否则第一行会莫名变浅），滚出越多越淡。实现见
+  `DesignSystem/Scrolling/EdgeDissolve.swift`，注意其中的渐变断点必须包含
+  **带外的两个全不透明点**，少了它们会把整片列表冲淡。
+- **隐藏系统滚动条**（`.scrollIndicators(.never)`）：它是为带标题栏的窗口设计的，
+  和面板的玻璃语言冲突。面板高度固定、条目数有限，滚动位置靠键盘导航足够可感。
+
+### 列表行：单行 + 右侧类型标签
+
+```
+[icon 26]  标题 ······················  类型标签 / 键位提示
+```
+
+- 行高由内容 + `Spacing.md` 上下内边距决定，不写死。
+- **副标题放在右侧，不放标题下方。** 放标题下方会把行高翻倍，一屏能看到的条目少一半。
+- 选中/悬停用 `Colors.selection` / `Colors.rowHover` 填充，悬停更淡，
+  两者视觉上必须可区分。
+
+### 尚未对齐基准的两处（有意为之，不是漏掉）
+
+| 基准有 | 我们没有 | 原因 |
+| --- | --- | --- |
+| 分组标题（`Applications`） | 无 | 我们的结果按**跨模块相关度**全局排序；按模块分组会打断这个排序，而启动器的主路径是「打几个字就打开」，全局排序更重要 |
+| 左下角的圆形菜单钮 | 无 | 面板内还没有「应用菜单」这件事可开。放一个点了没反应的按钮比不放更糟；等有了真实菜单项再加 |
+
 
 ---
 
@@ -207,12 +244,13 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 
 | 组件 | 职责 |
 | --- | --- |
-| `DesignTokens` | 全部设计令牌，以及 `NSColor.srgbInk` / `NSAppearance.isDark` / `View.frosted(in:)` |
+| `DesignTokens` | 全部设计令牌 + `panelScale` 缩放，以及 `NSColor.srgbInk` / `NSAppearance.isDark` / `View.frosted(in:)` |
 | `VisualEffectView` | 原生 vibrancy 背景（`NSVisualEffectView` 的 SwiftUI 封装） |
 | `PaletteBackground` | 面板背景：vibrancy + scrim + 边缘高光，一处配置。**不含投影** |
+| `Scrolling/EdgeDissolve` | 滚动内容在浮动栏下方淡出的遮罩，`.edgeDissolve()` 挂载 |
 | `KeyCapChip` | 快捷键帽。`.filled`（底栏）/ `.outline`（列表行）两种样式 |
 | `BarButton` | 底栏按钮：悬停胶囊 + 图标/文字 |
-| `SectionHeader` | 列表分组标题 |
+| `SectionHeader` | 列表分组标题（当前未使用：我们不做分组，见 §2） |
 
 ### Components/
 

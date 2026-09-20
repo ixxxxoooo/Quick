@@ -9,85 +9,119 @@ import SwiftUI
 ///
 /// 参考 Tinycast Theme.swift，定义统一的颜色、间距、圆角、动画、字体令牌。
 /// 所有 UI 组件统一引用此处的值，确保视觉一致性。
+///
+/// 数值分两层：**基础值**（1.0 档，即 Tinycast 的原始令牌）与
+/// **实际值**（基础值 × `panelScale`）。改尺寸只动 `panelScale` 一处。
 public enum DesignTokens {
+
+    // MARK: - 缩放
+
+    /// 面板几何的整体缩放
+    ///
+    /// - `1.0` = 基础令牌：面板 750×475，圆角 26
+    /// - `1.1` = **当前采用**：面板 825×523，圆角 29
+    ///
+    /// 为什么是 1.1：设计基准截图实测 1650×1046 物理像素，而 macOS 截图是 2x，
+    /// 所以逻辑尺寸是 825×523 —— 恰好是基础值在两个维度上各乘 1.1，
+    /// 对应 Tinycast 用户可选的「Large」档（它提供 Default 1.0 / Large 1.1 / Larger 1.2）。
+    /// 换句话说：设计基准不是默认档，这里跟着基准走。
+    ///
+    /// 只缩放**面板与它的浮动兄弟**（HUD、对话框）。设置窗口这类系统窗口不缩放，
+    /// 与 Tinycast 的做法一致。想换档只改这一个数字。
+    public static let panelScale: CGFloat = 1.1
+
+    /// 按 `panelScale` 取整缩放
+    ///
+    /// 取整是必需的：小数会让行高、快捷键帽的边角落到半像素上，边缘发虚。
+    static func scaled(_ value: CGFloat) -> CGFloat {
+        panelScale == 1 ? value : (value * panelScale).rounded()
+    }
 
     // MARK: - 间距
 
     public enum Spacing {
-        public static let xxs: CGFloat = 2
-        public static let xs: CGFloat = 4
-        public static let sm: CGFloat = 6
-        public static let md: CGFloat = 8
-        public static let lg: CGFloat = 10
-        public static let xl: CGFloat = 12
-        public static let xxl: CGFloat = 20
+        public static let xxs = scaled(2)
+        public static let xs = scaled(4)
+        public static let sm = scaled(6)
+        public static let md = scaled(8)
+        public static let lg = scaled(10)
+        public static let xl = scaled(12)
+        public static let xxl = scaled(20)
         /// 分组标题下方间距
-        public static let sectionHeaderBottom: CGFloat = 4
+        public static let sectionHeaderBottom = scaled(4)
         /// 分组之间的间距
-        public static let sectionSpacing: CGFloat = 12
+        public static let sectionSpacing = scaled(12)
     }
 
     // MARK: - 圆角
 
     public enum Radius {
         /// 面板圆角
-        public static let panel: CGFloat = 26
+        public static let panel = scaled(26)
         /// 列表行圆角
-        public static let row: CGFloat = 10
+        public static let row = scaled(10)
         /// 菜单圆角
-        public static let menu: CGFloat = 6
+        public static let menu = scaled(6)
         /// 菜单面板圆角
-        public static let menuPanel: CGFloat = 16
+        public static let menuPanel = scaled(16)
         /// 对话框圆角
-        public static let dialog: CGFloat = 20
+        public static let dialog = scaled(20)
         /// 缩略图圆角
-        public static let thumbnail: CGFloat = 6
+        public static let thumbnail = scaled(6)
         /// 卡片圆角
-        public static let card: CGFloat = 10
+        public static let card = scaled(10)
         /// 快捷键帽圆角
-        public static let keyCap: CGFloat = 6
+        public static let keyCap = scaled(6)
         /// 控件按钮圆角
-        public static let barControl: CGFloat = 8
+        public static let barControl = scaled(8)
     }
 
     // MARK: - 尺寸
 
     public enum Size {
         /// 面板默认宽度
-        public static let panelWidth: CGFloat = 750
+        public static let panelWidth = scaled(750)
         /// 面板默认高度
-        public static let panelHeight: CGFloat = 475
+        public static let panelHeight = scaled(475)
         /// 搜索栏高度
-        public static let headerHeight: CGFloat = 44
+        public static let headerHeight = scaled(44)
         /// 搜索栏图标槽位宽度
-        public static let headerIconSlot: CGFloat = 22
+        public static let headerIconSlot = scaled(22)
         /// 搜索栏上方内边距
-        public static let headerPadding: CGFloat = 10
+        public static let headerPadding = scaled(10)
         /// 底栏高度
-        public static let bottomBarHeight: CGFloat = 52
+        public static let bottomBarHeight = scaled(52)
         /// 底栏按钮高度
-        public static let barButtonHeight: CGFloat = 28
+        public static let barButtonHeight = scaled(28)
         /// 列表行图标尺寸
-        public static let rowIcon: CGFloat = 24
+        public static let rowIcon = scaled(24)
         /// 快捷键帽尺寸
-        public static let keyCap: CGFloat = 18
+        public static let keyCap = scaled(18)
         /// 紧凑快捷键帽尺寸（底栏密集提示用）
-        public static let compactKeyCap: CGFloat = 15
+        public static let compactKeyCap = scaled(15)
         /// 一像素细线（分隔线、卡片描边）
+        ///
+        /// **不随 `panelScale` 缩放**：它是物理像素级的东西，放大只会变成一条粗边。
         public static let hairline: CGFloat = 1
         /// 空状态 / 英雄位图标尺寸
-        public static let emptyStateIcon: CGFloat = 32
+        public static let emptyStateIcon = scaled(32)
+        /// 列表顶部 / 底部渐隐带的高度
+        ///
+        /// 内容从 header 与底栏下面穿过，靠这条渐隐带淡出，而不是被硬切。
+        public static let edgeFadeHeight = scaled(22)
         /// HUD 最大宽度
-        public static let hudMaxWidth: CGFloat = 420
+        public static let hudMaxWidth = scaled(420)
         /// HUD 距屏幕底部距离
-        public static let hudEdgeOffset: CGFloat = 48
+        public static let hudEdgeOffset = scaled(48)
         /// 对话框宽度
-        public static let dialogWidth: CGFloat = 420
+        public static let dialogWidth = scaled(420)
         /// 对话框图标尺寸
-        public static let dialogIcon: CGFloat = 32
+        public static let dialogIcon = scaled(32)
         /// 面板顶部占屏幕可见高度的比例
+        ///
+        /// **不缩放**：它是比例，不是长度。
         public static let paletteTopMarginFraction: CGFloat = 0.18
-        /// 设置窗口尺寸
+        /// 设置窗口尺寸（系统窗口，不随面板缩放）
         public static let settingsWindow = CGSize(width: 900, height: 700)
     }
 
@@ -124,39 +158,62 @@ public enum DesignTokens {
 
     public enum Typography {
         /// 搜索框字体大小
-        public static let searchFieldSize: CGFloat = 20
-        /// 空状态图标字号（与 Size.emptyStateIcon 配套）
-        private static let emptyStateIconSize: CGFloat = 32
-        /// HUD 语义图标字号
-        private static let hudIconSize: CGFloat = 14
+        public static let searchFieldSize = scaled(20)
         /// 搜索框字体
         public static let searchField = Font.system(size: searchFieldSize, weight: .regular)
         /// 搜索栏图标字体
-        public static let headerIcon = Font.system(size: 18, weight: .medium)
+        public static let headerIcon = Font.system(size: scaled(18), weight: .medium)
         /// 列表行标题
-        public static let rowTitle = Font.body
+        public static let rowTitle = scaledStyle(.body)
         /// 列表行右侧文本
-        public static let rowTrailing = Font.callout
+        public static let rowTrailing = scaledStyle(.callout)
         /// 分组标题
-        public static let sectionHeader = Font.subheadline.weight(.medium)
+        public static let sectionHeader = scaledStyle(.subheadline, weight: .medium)
         /// 面板标题
-        public static let panelTitle = Font.headline
+        public static let panelTitle = scaledStyle(.headline)
         /// 快捷键帽字体
-        public static let keyCap = Font.caption
+        public static let keyCap = scaledStyle(.caption1)
         /// 紧凑快捷键帽字体
-        public static let compactKeyCap = Font.caption2
+        public static let compactKeyCap = scaledStyle(.caption2)
         /// 列表行 / 底栏图标字体（固定尺寸，图标需要与 rowIcon 槽位对齐）
-        public static let iconGlyph = Font.system(size: 16, weight: .medium)
+        public static let iconGlyph = Font.system(size: scaled(16), weight: .medium)
         /// 空状态图标字体
-        public static let emptyStateIcon = Font.system(size: emptyStateIconSize, weight: .light)
+        public static let emptyStateIcon = Font.system(size: scaled(32), weight: .light)
         /// HUD 提示的语义图标字体
-        public static let hudIcon = Font.system(size: hudIconSize, weight: .semibold)
+        public static let hudIcon = Font.system(size: scaled(14), weight: .semibold)
         /// 底栏按钮字体
-        public static let bar = Font.callout.weight(.medium)
+        public static let bar = scaledStyle(.callout, weight: .medium)
         /// 代码字体
-        public static let code = Font.system(.callout, design: .monospaced)
+        public static let code = Font.system(size: nsPointSize(.callout), design: .monospaced)
         /// 行内代码
-        public static let inlineCode = Font.body.monospaced()
+        public static let inlineCode = scaledStyle(.body).monospaced()
+    }
+
+    /// 按 `panelScale` 缩放一个系统文本样式
+    ///
+    /// 系统文本样式不能直接乘系数 —— 只能取出它的点大小，用同一个字体描述符重建。
+    /// 这样 `.headline` 保持粗体、`.caption2` 保持中等字重，只是整体变大；
+    /// 若改成 `.system(size:)` 现造，字重会全部丢失。
+    ///
+    /// - Parameters:
+    ///   - style: 系统文本样式
+    ///   - weight: 需要覆盖的字重；不传则保留样式自带的字重
+    /// - Returns: 缩放后的字体
+    static func scaledStyle(_ style: NSFont.TextStyle, weight: Font.Weight? = nil) -> Font {
+        let font = Font(nsFont(style))
+        return weight.map(font.weight) ?? font
+    }
+
+    /// 取某个系统文本样式缩放后的 `NSFont`
+    static func nsFont(_ style: NSFont.TextStyle) -> NSFont {
+        let base = NSFont.preferredFont(forTextStyle: style)
+        guard panelScale != 1 else { return base }
+        return NSFont(descriptor: base.fontDescriptor, size: scaled(base.pointSize)) ?? base
+    }
+
+    /// 取某个系统文本样式缩放后的点大小
+    static func nsPointSize(_ style: NSFont.TextStyle) -> CGFloat {
+        nsFont(style).pointSize
     }
 
     // MARK: - 颜色

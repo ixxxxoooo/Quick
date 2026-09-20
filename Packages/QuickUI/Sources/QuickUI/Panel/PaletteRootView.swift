@@ -7,19 +7,23 @@ import SwiftUI
 
 /// 面板根视图
 ///
-/// 面板外壳，固定三段式结构（几何与 Tinycast 的调色板对齐，见 docs/ui.md）：
+/// 面板外壳。结构与参考实现一致：**没有分隔线，也没有通栏底栏** ——
+/// header 和底栏都是用 `safeAreaInset` 挂在滚动内容上的，内容从它们下面穿过，
+/// 靠 `edgeDissolve()` 淡出。
 ///
 /// ```
 /// ┌────────────────────────────────────────────────┐
-/// │  [icon 22] 搜索框 20pt              [状态槽位]  │  header 44 + padding 10
-/// ├────────────────────────────────────────────────┤
+/// │  [icon] 搜索框                          [状态]  │  header（无背景、无分隔线）
 /// │                                                  │
-/// │   结果列表 / 空状态                               │  content（弹性）
+/// │   结果行从 header 下面穿过并淡出                  │
 /// │                                                  │
-/// ├────────────────────────────────────────────────┤
-/// │  计数 / 提示        [↑↓]选择 [↵]打开 [esc]关闭    │  bottom bar 52
+/// │  计数                              ( 打开  ↵ )   │  浮动胶囊，无通栏
 /// └────────────────────────────────────────────────┘
 /// ```
+///
+/// 为什么用 `safeAreaInset` 而不是把栏位当兄弟节点：兄弟节点会把滚动区**硬切**在栏位边缘，
+/// 滚动时能看到行被齐刷刷切断；`safeAreaInset` 让内容从栏位下面穿过去，
+/// 静止时贴边、滚动时渐隐，这是参考实现的做法。
 ///
 /// 查询状态放在本视图的 `@State` 中，**不观察持有 `NSPanel` 的协调器** ——
 /// 观察它会让 SwiftUI 与 AttributeGraph 进入重建死循环，CPU 打满。
@@ -46,32 +50,32 @@ struct PaletteRootView: View {
     private static let searchDebounce = Duration.milliseconds(80)
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            hairline
-            content
-            hairline
-            bottomBar
-        }
-        .frame(
-            width: DesignTokens.Size.panelWidth,
-            height: DesignTokens.Size.panelHeight
-        )
-        .background(PaletteBackground())
-        // 不要在这里加 .shadow：面板投影由 AppKit 的窗口阴影负责，见 PaletteBackground 的说明。
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
-        .onAppear {
-            if !initialQuery.isEmpty { query = initialQuery }
-            log.debug("面板视图已出现，开始首次搜索")
-            runSearch(query)
-        }
-        .onChange(of: query) { _, newValue in
-            runSearch(newValue)
-        }
+        content
+            .safeAreaInset(edge: .top, spacing: 0) { header }
+            .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+            .frame(
+                width: DesignTokens.Size.panelWidth,
+                height: DesignTokens.Size.panelHeight
+            )
+            .background(PaletteBackground())
+            // 不要在这里加 .shadow：面板投影由 AppKit 的窗口阴影负责，见 PaletteBackground 的说明。
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
+            .onAppear {
+                if !initialQuery.isEmpty { query = initialQuery }
+                log.debug("面板视图已出现，开始首次搜索")
+                runSearch(query)
+            }
+            .onChange(of: query) { _, newValue in
+                runSearch(newValue)
+            }
     }
 
     // MARK: - 头部
 
+    /// 搜索栏
+    ///
+    /// 没有背景、没有下分隔线：它只是浮在内容上方，内容从它下面穿过。
+    /// 高度恒定，所以输入时搜索栏不会位移。
     private var header: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
             SearchFieldView(
@@ -82,8 +86,11 @@ struct PaletteRootView: View {
 
             trailingAccessory
         }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
-        .padding(.vertical, DesignTokens.Size.headerPadding)
+        .padding(.leading, DesignTokens.Spacing.md + DesignTokens.Spacing.lg)
+        .padding(.trailing, DesignTokens.Spacing.xl)
+        .padding(.top, DesignTokens.Size.headerPadding)
+        .frame(height: DesignTokens.Size.headerHeight + DesignTokens.Size.headerPadding)
+        .frame(maxWidth: .infinity)
     }
 
     /// 搜索栏右侧的状态槽位
@@ -154,8 +161,12 @@ struct PaletteRootView: View {
 
     // MARK: - 底栏
 
+    /// 底栏
+    ///
+    /// 没有通栏背景、没有上分隔线：左侧是结果计数，右侧是一枚浮起的玻璃胶囊。
+    /// 行的内容从这一带下面穿过，由 `edgeDissolve()` 淡出。
     private var bottomBar: some View {
-        HStack(spacing: DesignTokens.Spacing.lg) {
+        HStack(spacing: 0) {
             Text(statusText)
                 .font(DesignTokens.Typography.bar)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
@@ -163,12 +174,26 @@ struct PaletteRootView: View {
 
             Spacer(minLength: DesignTokens.Spacing.md)
 
-            shortcutHint(keys: ["↑", "↓"], label: "选择")
-            shortcutHint(keys: ["↵"], label: "打开")
-            shortcutHint(keys: ["esc"], label: "关闭")
+            if !results.isEmpty {
+                primaryActionPill
+            }
         }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
+        .padding(.horizontal, DesignTokens.Spacing.md)
         .frame(height: DesignTokens.Size.bottomBarHeight)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// 主操作胶囊：动作名 + 键位
+    private var primaryActionPill: some View {
+        HStack(spacing: DesignTokens.Spacing.xs) {
+            Text("打开")
+                .font(DesignTokens.Typography.bar)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            KeyCapChip(text: "↵", style: .outline, scale: .compact)
+        }
+        .padding(.horizontal, DesignTokens.Spacing.md)
+        .frame(height: DesignTokens.Size.barButtonHeight)
+        .frosted(in: Capsule())
     }
 
     /// 底栏左侧的状态文本
@@ -176,26 +201,6 @@ struct PaletteRootView: View {
         if isSearching { return "搜索中…" }
         if results.isEmpty { return "无结果" }
         return "\(selectedIndex + 1) / \(results.count)"
-    }
-
-    /// 一组「键位 + 说明」
-    private func shortcutHint(keys: [String], label: String) -> some View {
-        HStack(spacing: DesignTokens.Spacing.xs) {
-            ForEach(keys, id: \.self) { key in
-                KeyCapChip(text: key, scale: .compact)
-            }
-            Text(label)
-                .font(DesignTokens.Typography.bar)
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-        }
-    }
-
-    // MARK: - 结构细线
-
-    private var hairline: some View {
-        Rectangle()
-            .fill(DesignTokens.Colors.hairline)
-            .frame(height: DesignTokens.Size.hairline)
     }
 
     // MARK: - 搜索
