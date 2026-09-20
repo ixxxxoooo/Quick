@@ -46,7 +46,6 @@ public final class PaletteCoordinator {
     ///
     /// 与协调器同生命周期（进程级），所以不主动摘除 —— 面板一旦创建就一直存在。
     private var outsideClickMonitor: Any?
-    private var localClickMonitor: Any?
 
     public init() {}
 
@@ -279,29 +278,26 @@ public final class PaletteCoordinator {
     /// 于是面板会在启动几秒后自己消失。用户要的只是「点空白处关掉」，
     /// 那就精确地只对「点击」作出反应。
     ///
-    /// 两个监视器分工：
-    /// - **全局**：只收到发往其他应用的事件，也就是「点到别的应用去了」。
-    ///   鼠标事件不需要辅助功能权限（键盘事件才需要）。
-    /// - **本地**：本应用内的点击，目标窗口不是面板就收起（例如点了设置窗口）。
+    /// **只装全局监视器。** 它收到的是发往其他应用的事件，也就是「点到别的应用去了」，
+    /// 这正好是用户说的「空白处」。曾经还装过一个本地监视器来处理「点了本应用的其他
+    /// 窗口」，但它会收到启动阶段某些非用户发起的事件，导致面板刚显示就被收起 ——
+    /// 与其猜哪些本地事件算数，不如不做：点设置窗口时面板不收，代价小得多。
+    ///
+    /// 鼠标事件不需要辅助功能权限（键盘事件才需要）。
     private func observeOutsideClicks(on panel: PalettePanel) {
-        let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-
-        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
             Task { @MainActor in self?.hideIfVisible() }
-        }
-
-        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            if event.window !== panel {
-                Task { @MainActor in self?.hideIfVisible() }
-            }
-            return event
         }
     }
 
     /// 面板可见时收起（监视器可能在没有面板时被触发）
     private func hideIfVisible() {
         guard isVisible else { return }
-        log.debug("检测到面板外的点击，收起")
+        // notice 而不是 debug：用户报「面板自己消失了」时，这一条就是答案，
+        // 而 debug 不落盘、事后查不到。
+        log.notice("检测到面板外的点击，收起面板")
         hide()
     }
 
