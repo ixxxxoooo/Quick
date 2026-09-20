@@ -20,10 +20,17 @@ final class StatusItemController {
     func install() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(
-                systemSymbolName: "macwindow.on.rectangle",
-                accessibilityDescription: "Quick"
-            )
+            // 资产目录里的 MenuBarIcon 已标为 template，深浅菜单栏自动反色。
+            // 取不到时退回 SF Symbol，保证菜单栏不会空着。
+            if let icon = NSImage(named: "MenuBarIcon") {
+                icon.isTemplate = true
+                button.image = icon
+            } else {
+                button.image = NSImage(
+                    systemSymbolName: "macwindow.on.rectangle",
+                    accessibilityDescription: "Quick"
+                )
+            }
             button.toolTip = "Quick"
         }
 

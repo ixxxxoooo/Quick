@@ -124,6 +124,24 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
 提交时 `pre-commit` 钩子会自动再跑一遍，失败即拒绝提交。见
 [docs/development.md#提交](docs/development.md)。
 
+### 每次改动的收尾（强制）
+
+**每完成一次改动，都要当场收尾这两件事 —— 不要攒着。**
+
+1. **提交。** 改动一完成就 `git add` 相关文件并提交，信息遵循
+   [提交规范](#提交规范)（英文、Conventional Commits）。不允许留一堆未提交的改动跨到下一个任务：
+   攒批会让「这次改了什么」和「哪次改坏了」变得无法追溯。
+2. **重启新实例。** 构建完**先杀旧进程，再启动新的**，确保跑的就是刚构建的产物：
+
+   ```bash
+   ./Scripts/build.sh
+   pkill -f "Quick Dev"; sleep 1
+   open -n "build/DerivedData/Build/Products/Debug/Quick Dev.app"
+   ```
+
+   `pkill` 必须在 `open -n` 之前：旧进程不退，⌥Space 仍被它占着，新实例注册热键会失败
+   （见 `StatusItemController.restart()` 的说明），表现就是「改了却没生效」。
+
 ### 新增一个功能模块
 
 1. 生成骨架：`./Scripts/new-module.sh ModuleFoo`（同时建好 `Package.swift`、模块类、

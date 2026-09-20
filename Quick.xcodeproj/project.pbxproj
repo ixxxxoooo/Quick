@@ -19,6 +19,7 @@
 		53A985DAB5B69501293E3EC9 /* ModuleLauncher in Frameworks */ = {isa = PBXBuildFile; productRef = 078DDB7169BD3EDB9596F40A /* ModuleLauncher */; };
 		76B868B658D790B18C10FC2C /* ModuleScreenshot in Frameworks */ = {isa = PBXBuildFile; productRef = DD34C1E5DE14D029BD0899A3 /* ModuleScreenshot */; };
 		86A89A47B2880D49A08EBBBC /* ModuleTranslator in Frameworks */ = {isa = PBXBuildFile; productRef = 0F5C306BBE664AB40FB396D9 /* ModuleTranslator */; };
+		947ED1B4A3109AF5B63E3E83 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5894ED469482915CE3F1ED6A /* AppIcon.icon */; };
 		95C2CAFCA62640B6BB7D9474 /* ModuleWeather in Frameworks */ = {isa = PBXBuildFile; productRef = 6B137BD2BEC5376E06CC89A5 /* ModuleWeather */; };
 		99C17420548B0EF4F181ECCA /* QuickCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */; };
 		9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1701F76E22B29388E212E6DA /* QuickApp.swift */; };
@@ -46,6 +47,7 @@
 		397129CFFDF99AC13B43D998 /* ModuleNotes */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleNotes; path = Packages/ModuleNotes; sourceTree = SOURCE_ROOT; };
 		46F2160BD290AE8B2066F0F7 /* ModuleFileSearch */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleFileSearch; path = Packages/ModuleFileSearch; sourceTree = SOURCE_ROOT; };
 		4AD2A44C727483F56A0A316D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		5894ED469482915CE3F1ED6A /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		6253BE55917823E5C48BF0A6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7939DC1691ADB7A9291C4669 /* ModuleClipboard */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleClipboard; path = Packages/ModuleClipboard; sourceTree = SOURCE_ROOT; };
 		815E7C080A517F26BC34F2F7 /* QuickUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickUI; path = Packages/QuickUI; sourceTree = SOURCE_ROOT; };
@@ -110,6 +112,7 @@
 			children = (
 				A7873A36EB616CB4FE27F295 /* AppCore.swift */,
 				6253BE55917823E5C48BF0A6 /* AppDelegate.swift */,
+				5894ED469482915CE3F1ED6A /* AppIcon.icon */,
 				4AD2A44C727483F56A0A316D /* Assets.xcassets */,
 				29D3223EB25304FC1C719BA9 /* Quick.entitlements */,
 				1701F76E22B29388E212E6DA /* QuickApp.swift */,
@@ -265,6 +268,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				947ED1B4A3109AF5B63E3E83 /* AppIcon.icon in Resources */,
 				4B431AEF9D4BE531431145DB /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
