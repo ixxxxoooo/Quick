@@ -1,0 +1,59 @@
+// PermissionService.swift
+// Quick — 原生 macOS 效率启动器
+// @author ygw
+
+import AppKit
+import ApplicationServices
+
+/// 系统权限管理服务
+///
+/// 封装 macOS 各项系统权限的检查和申请。
+/// 模块通过此服务检查所需权限状态，引导用户授权。
+@MainActor
+public final class PermissionService {
+
+    public init() {}
+
+    // MARK: - 辅助功能权限
+
+    /// 检查辅助功能权限是否已授予
+    /// - Returns: 是否已授权
+    public func isAccessibilityGranted() -> Bool {
+        AXIsProcessTrusted()
+    }
+
+    /// 请求辅助功能权限（弹出系统授权对话框）
+    public func requestAccessibility() {
+        // kAXTrustedCheckOptionPrompt 是全局可变状态，需要在非隔离上下文中访问
+        let prompt: CFString = "AXTrustedCheckOptionPrompt" as CFString
+        let options = [prompt: true] as CFDictionary
+        AXIsProcessTrustedWithOptions(options)
+    }
+
+    // MARK: - 屏幕录制权限（截图/窗口捕获需要）
+
+    /// 检查屏幕录制权限
+    /// - Returns: 是否已授权
+    public func isScreenCaptureGranted() -> Bool {
+        CGPreflightScreenCaptureAccess()
+    }
+
+    /// 请求屏幕录制权限
+    public func requestScreenCapture() {
+        CGRequestScreenCaptureAccess()
+    }
+
+    // MARK: - 打开系统偏好设置
+
+    /// 打开辅助功能设置面板
+    public func openAccessibilitySettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    }
+
+    /// 打开屏幕录制设置面板
+    public func openScreenCaptureSettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
+        NSWorkspace.shared.open(url)
+    }
+}

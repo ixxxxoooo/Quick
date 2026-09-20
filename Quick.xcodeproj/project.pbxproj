@@ -1,0 +1,624 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		03D030042B8C230428E13BF8 /* QuickPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = EB1FAFFF92FB2D709E88377F /* QuickPlatform */; };
+		277B92A1F7D8BA105B19055E /* ModuleCalculator in Frameworks */ = {isa = PBXBuildFile; productRef = 3E2B64891828AAE6DFA2C296 /* ModuleCalculator */; };
+		3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7873A36EB616CB4FE27F295 /* AppCore.swift */; };
+		39BF304AD2D01B87D3F7834C /* ModuleFileSearch in Frameworks */ = {isa = PBXBuildFile; productRef = AB89B21D37E90F6E000F1492 /* ModuleFileSearch */; };
+		417799EEF90D61AF8F7AF754 /* ModuleAI in Frameworks */ = {isa = PBXBuildFile; productRef = 0EF70A56F6C3F9A76897D3AF /* ModuleAI */; };
+		43E6D248378B141C8E7591D4 /* ModuleWindowManager in Frameworks */ = {isa = PBXBuildFile; productRef = E422B47D6EBF13ABF58021B9 /* ModuleWindowManager */; };
+		4B431AEF9D4BE531431145DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4AD2A44C727483F56A0A316D /* Assets.xcassets */; };
+		4FB5C899DD337B31D55F59DE /* ModuleClipboard in Frameworks */ = {isa = PBXBuildFile; productRef = 6D044E1B050753A6FBE6ADE3 /* ModuleClipboard */; };
+		52363DE2F513149A6038375A /* QuickUI in Frameworks */ = {isa = PBXBuildFile; productRef = 783AEBF3F1FAE829DCAFC004 /* QuickUI */; };
+		53A985DAB5B69501293E3EC9 /* ModuleLauncher in Frameworks */ = {isa = PBXBuildFile; productRef = 078DDB7169BD3EDB9596F40A /* ModuleLauncher */; };
+		76B868B658D790B18C10FC2C /* ModuleScreenshot in Frameworks */ = {isa = PBXBuildFile; productRef = DD34C1E5DE14D029BD0899A3 /* ModuleScreenshot */; };
+		86A89A47B2880D49A08EBBBC /* ModuleTranslator in Frameworks */ = {isa = PBXBuildFile; productRef = 0F5C306BBE664AB40FB396D9 /* ModuleTranslator */; };
+		95C2CAFCA62640B6BB7D9474 /* ModuleWeather in Frameworks */ = {isa = PBXBuildFile; productRef = 6B137BD2BEC5376E06CC89A5 /* ModuleWeather */; };
+		99C17420548B0EF4F181ECCA /* QuickCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */; };
+		9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1701F76E22B29388E212E6DA /* QuickApp.swift */; };
+		A3F5185C4E5024554087DADF /* ModuleOCR in Frameworks */ = {isa = PBXBuildFile; productRef = 4332CA4B074D3CF1E9C8030C /* ModuleOCR */; };
+		BA5058D145F68F4B1230A9D6 /* ModuleSystemMonitor in Frameworks */ = {isa = PBXBuildFile; productRef = A1F6A1277F3F2C2E948ABA6D /* ModuleSystemMonitor */; };
+		C168ED1A3E5CA36E9E363842 /* ModuleNetworkTools in Frameworks */ = {isa = PBXBuildFile; productRef = 24193F54E61A6C98582B1EB3 /* ModuleNetworkTools */; };
+		CDCBFE06CE05C92920350DC7 /* ModuleCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 6A3F51B8236D217DE92BA22A /* ModuleCalendar */; };
+		D94821D4837449038E038DB6 /* ModuleNotes in Frameworks */ = {isa = PBXBuildFile; productRef = 6B3D3CF78E634C873291F720 /* ModuleNotes */; };
+		DB8A9B8692F4BE8F23B18966 /* ModuleSnippets in Frameworks */ = {isa = PBXBuildFile; productRef = 59BCF4B7D262EAE2464533FD /* ModuleSnippets */; };
+		DE7F122FCEC7A48CA773BCBD /* ModuleDevTools in Frameworks */ = {isa = PBXBuildFile; productRef = E20228E59CDDFE81B3082CE5 /* ModuleDevTools */; };
+		F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6253BE55917823E5C48BF0A6 /* AppDelegate.swift */; };
+		F1453649AD3331E4B9612090 /* ModuleSystemControl in Frameworks */ = {isa = PBXBuildFile; productRef = BD5BD83022332B19E9A03E60 /* ModuleSystemControl */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		09526C0009FCB6C64F053D41 /* QuickCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickCore; path = Packages/QuickCore; sourceTree = SOURCE_ROOT; };
+		0F710D4884AA7298F9845059 /* ModuleLauncher */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleLauncher; path = Packages/ModuleLauncher; sourceTree = SOURCE_ROOT; };
+		1701F76E22B29388E212E6DA /* QuickApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickApp.swift; sourceTree = "<group>"; };
+		1D6320D78F22C62395E64797 /* ModuleOCR */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleOCR; path = Packages/ModuleOCR; sourceTree = SOURCE_ROOT; };
+		29D3223EB25304FC1C719BA9 /* Quick.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Quick.entitlements; sourceTree = "<group>"; };
+		2B93E5D07123815A53EFAE07 /* ModuleScreenshot */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleScreenshot; path = Packages/ModuleScreenshot; sourceTree = SOURCE_ROOT; };
+		37FDDDFD8909B2E7EE8D5536 /* ModuleTranslator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleTranslator; path = Packages/ModuleTranslator; sourceTree = SOURCE_ROOT; };
+		3815383C76E204F3EE8BF353 /* ModuleDevTools */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleDevTools; path = Packages/ModuleDevTools; sourceTree = SOURCE_ROOT; };
+		397129CFFDF99AC13B43D998 /* ModuleNotes */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleNotes; path = Packages/ModuleNotes; sourceTree = SOURCE_ROOT; };
+		46F2160BD290AE8B2066F0F7 /* ModuleFileSearch */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleFileSearch; path = Packages/ModuleFileSearch; sourceTree = SOURCE_ROOT; };
+		4AD2A44C727483F56A0A316D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		6253BE55917823E5C48BF0A6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		7939DC1691ADB7A9291C4669 /* ModuleClipboard */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleClipboard; path = Packages/ModuleClipboard; sourceTree = SOURCE_ROOT; };
+		815E7C080A517F26BC34F2F7 /* QuickUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickUI; path = Packages/QuickUI; sourceTree = SOURCE_ROOT; };
+		82333CE06AA3D77586B6FE55 /* ModuleSystemControl */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleSystemControl; path = Packages/ModuleSystemControl; sourceTree = SOURCE_ROOT; };
+		84C6DDB5084BAABFA569E71D /* Quick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Quick.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		859C9D9B672D640CC22809EF /* QuickPlatform */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickPlatform; path = Packages/QuickPlatform; sourceTree = SOURCE_ROOT; };
+		8949CBD20474E3159BB470CA /* ModuleWeather */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleWeather; path = Packages/ModuleWeather; sourceTree = SOURCE_ROOT; };
+		A7873A36EB616CB4FE27F295 /* AppCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCore.swift; sourceTree = "<group>"; };
+		AC9F4F94144C7ABB8EB16FB6 /* ModuleNetworkTools */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleNetworkTools; path = Packages/ModuleNetworkTools; sourceTree = SOURCE_ROOT; };
+		B79DFBDF60041ED35FF7A9F2 /* ModuleCalendar */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleCalendar; path = Packages/ModuleCalendar; sourceTree = SOURCE_ROOT; };
+		B9DFF8686185548AD6527BBD /* ModuleSnippets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleSnippets; path = Packages/ModuleSnippets; sourceTree = SOURCE_ROOT; };
+		D7E1C071B2C6C0C8B12D5975 /* ModuleSystemMonitor */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleSystemMonitor; path = Packages/ModuleSystemMonitor; sourceTree = SOURCE_ROOT; };
+		DB23378333DC3A355BE14940 /* ModuleAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleAI; path = Packages/ModuleAI; sourceTree = SOURCE_ROOT; };
+		EA6E44BF4814BE2EB25CF030 /* ModuleCalculator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleCalculator; path = Packages/ModuleCalculator; sourceTree = SOURCE_ROOT; };
+		EB3CC32F59D3B99133680908 /* ModuleWindowManager */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleWindowManager; path = Packages/ModuleWindowManager; sourceTree = SOURCE_ROOT; };
+		FE2289C2B74C6E51D568A553 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BB1DCF24B1C08A12461CAABB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				99C17420548B0EF4F181ECCA /* QuickCore in Frameworks */,
+				52363DE2F513149A6038375A /* QuickUI in Frameworks */,
+				03D030042B8C230428E13BF8 /* QuickPlatform in Frameworks */,
+				53A985DAB5B69501293E3EC9 /* ModuleLauncher in Frameworks */,
+				4FB5C899DD337B31D55F59DE /* ModuleClipboard in Frameworks */,
+				277B92A1F7D8BA105B19055E /* ModuleCalculator in Frameworks */,
+				F1453649AD3331E4B9612090 /* ModuleSystemControl in Frameworks */,
+				39BF304AD2D01B87D3F7834C /* ModuleFileSearch in Frameworks */,
+				DB8A9B8692F4BE8F23B18966 /* ModuleSnippets in Frameworks */,
+				A3F5185C4E5024554087DADF /* ModuleOCR in Frameworks */,
+				86A89A47B2880D49A08EBBBC /* ModuleTranslator in Frameworks */,
+				DE7F122FCEC7A48CA773BCBD /* ModuleDevTools in Frameworks */,
+				CDCBFE06CE05C92920350DC7 /* ModuleCalendar in Frameworks */,
+				95C2CAFCA62640B6BB7D9474 /* ModuleWeather in Frameworks */,
+				D94821D4837449038E038DB6 /* ModuleNotes in Frameworks */,
+				417799EEF90D61AF8F7AF754 /* ModuleAI in Frameworks */,
+				43E6D248378B141C8E7591D4 /* ModuleWindowManager in Frameworks */,
+				BA5058D145F68F4B1230A9D6 /* ModuleSystemMonitor in Frameworks */,
+				C168ED1A3E5CA36E9E363842 /* ModuleNetworkTools in Frameworks */,
+				76B868B658D790B18C10FC2C /* ModuleScreenshot in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		00A5C497509B3E074CC64DB5 = {
+			isa = PBXGroup;
+			children = (
+				5DC7B04B4CE032600AA9A8FD /* Packages */,
+				2F2019CD313A798A4396E4EA /* Quick */,
+				E313DDD0BA3E2D05E0F56BDE /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		2F2019CD313A798A4396E4EA /* Quick */ = {
+			isa = PBXGroup;
+			children = (
+				A7873A36EB616CB4FE27F295 /* AppCore.swift */,
+				6253BE55917823E5C48BF0A6 /* AppDelegate.swift */,
+				4AD2A44C727483F56A0A316D /* Assets.xcassets */,
+				29D3223EB25304FC1C719BA9 /* Quick.entitlements */,
+				1701F76E22B29388E212E6DA /* QuickApp.swift */,
+				7BB92E5F9C0104DB071DFF81 /* Resources */,
+			);
+			path = Quick;
+			sourceTree = "<group>";
+		};
+		5DC7B04B4CE032600AA9A8FD /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				DB23378333DC3A355BE14940 /* ModuleAI */,
+				EA6E44BF4814BE2EB25CF030 /* ModuleCalculator */,
+				B79DFBDF60041ED35FF7A9F2 /* ModuleCalendar */,
+				7939DC1691ADB7A9291C4669 /* ModuleClipboard */,
+				3815383C76E204F3EE8BF353 /* ModuleDevTools */,
+				46F2160BD290AE8B2066F0F7 /* ModuleFileSearch */,
+				0F710D4884AA7298F9845059 /* ModuleLauncher */,
+				AC9F4F94144C7ABB8EB16FB6 /* ModuleNetworkTools */,
+				397129CFFDF99AC13B43D998 /* ModuleNotes */,
+				1D6320D78F22C62395E64797 /* ModuleOCR */,
+				2B93E5D07123815A53EFAE07 /* ModuleScreenshot */,
+				B9DFF8686185548AD6527BBD /* ModuleSnippets */,
+				82333CE06AA3D77586B6FE55 /* ModuleSystemControl */,
+				D7E1C071B2C6C0C8B12D5975 /* ModuleSystemMonitor */,
+				37FDDDFD8909B2E7EE8D5536 /* ModuleTranslator */,
+				8949CBD20474E3159BB470CA /* ModuleWeather */,
+				EB3CC32F59D3B99133680908 /* ModuleWindowManager */,
+				09526C0009FCB6C64F053D41 /* QuickCore */,
+				859C9D9B672D640CC22809EF /* QuickPlatform */,
+				815E7C080A517F26BC34F2F7 /* QuickUI */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		7BB92E5F9C0104DB071DFF81 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				FE2289C2B74C6E51D568A553 /* Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		E313DDD0BA3E2D05E0F56BDE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				84C6DDB5084BAABFA569E71D /* Quick.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B237EB8A317339159C2A6828 /* Quick */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1FD9BE09A8168EA5577BF574 /* Build configuration list for PBXNativeTarget "Quick" */;
+			buildPhases = (
+				4D962CAFE1FF329EFCA45B3E /* Sources */,
+				EA1EA76BF94768F60DFAEBD0 /* Resources */,
+				BB1DCF24B1C08A12461CAABB /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Quick;
+			packageProductDependencies = (
+				5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */,
+				783AEBF3F1FAE829DCAFC004 /* QuickUI */,
+				EB1FAFFF92FB2D709E88377F /* QuickPlatform */,
+				078DDB7169BD3EDB9596F40A /* ModuleLauncher */,
+				6D044E1B050753A6FBE6ADE3 /* ModuleClipboard */,
+				3E2B64891828AAE6DFA2C296 /* ModuleCalculator */,
+				BD5BD83022332B19E9A03E60 /* ModuleSystemControl */,
+				AB89B21D37E90F6E000F1492 /* ModuleFileSearch */,
+				59BCF4B7D262EAE2464533FD /* ModuleSnippets */,
+				4332CA4B074D3CF1E9C8030C /* ModuleOCR */,
+				0F5C306BBE664AB40FB396D9 /* ModuleTranslator */,
+				E20228E59CDDFE81B3082CE5 /* ModuleDevTools */,
+				6A3F51B8236D217DE92BA22A /* ModuleCalendar */,
+				6B137BD2BEC5376E06CC89A5 /* ModuleWeather */,
+				6B3D3CF78E634C873291F720 /* ModuleNotes */,
+				0EF70A56F6C3F9A76897D3AF /* ModuleAI */,
+				E422B47D6EBF13ABF58021B9 /* ModuleWindowManager */,
+				A1F6A1277F3F2C2E948ABA6D /* ModuleSystemMonitor */,
+				24193F54E61A6C98582B1EB3 /* ModuleNetworkTools */,
+				DD34C1E5DE14D029BD0899A3 /* ModuleScreenshot */,
+			);
+			productName = Quick;
+			productReference = 84C6DDB5084BAABFA569E71D /* Quick.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		035C940917D197A3E5C17191 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = BC4D1AE671EE6602A019D6BE /* Build configuration list for PBXProject "Quick" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 00A5C497509B3E074CC64DB5;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D3DE13F4C36DC042792AA231 /* XCLocalSwiftPackageReference "Packages/ModuleAI" */,
+				1AE3E6DCBD017AB4245974AA /* XCLocalSwiftPackageReference "Packages/ModuleCalculator" */,
+				3F319671EC5A507C47EAC52C /* XCLocalSwiftPackageReference "Packages/ModuleCalendar" */,
+				6AAB2BC91244A1D236334373 /* XCLocalSwiftPackageReference "Packages/ModuleClipboard" */,
+				8FBD3D723EA7D1D0707C3B10 /* XCLocalSwiftPackageReference "Packages/ModuleDevTools" */,
+				68E3BB62C19CAB5E69010F31 /* XCLocalSwiftPackageReference "Packages/ModuleFileSearch" */,
+				E3CFDE976BBA6E973331BED6 /* XCLocalSwiftPackageReference "Packages/ModuleLauncher" */,
+				BEBE1221A9DB6B1A8EC11BB8 /* XCLocalSwiftPackageReference "Packages/ModuleNetworkTools" */,
+				B83D957017EA0A44B1D53694 /* XCLocalSwiftPackageReference "Packages/ModuleNotes" */,
+				686B53E4C8841E4683D406F8 /* XCLocalSwiftPackageReference "Packages/ModuleOCR" */,
+				54DB2181CE0C08276F3D0AA8 /* XCLocalSwiftPackageReference "Packages/ModuleScreenshot" */,
+				F92DC0B83E7A6E67E96C1553 /* XCLocalSwiftPackageReference "Packages/ModuleSnippets" */,
+				B075C3D8DECE94B399F5C510 /* XCLocalSwiftPackageReference "Packages/ModuleSystemControl" */,
+				005FE9CE92A53EEED98C5ADD /* XCLocalSwiftPackageReference "Packages/ModuleSystemMonitor" */,
+				99289B11FBC159CA0ECA3021 /* XCLocalSwiftPackageReference "Packages/ModuleTranslator" */,
+				FF78591D895E92696E5450D8 /* XCLocalSwiftPackageReference "Packages/ModuleWeather" */,
+				8B1FDA8D3E2FC559D1AF557C /* XCLocalSwiftPackageReference "Packages/ModuleWindowManager" */,
+				75D35DB3831942F6E0B178F1 /* XCLocalSwiftPackageReference "Packages/QuickCore" */,
+				7B06A941256B96B3AE256285 /* XCLocalSwiftPackageReference "Packages/QuickPlatform" */,
+				6A9170B1C6D924E06C1B6DAE /* XCLocalSwiftPackageReference "Packages/QuickUI" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E313DDD0BA3E2D05E0F56BDE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B237EB8A317339159C2A6828 /* Quick */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		EA1EA76BF94768F60DFAEBD0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4B431AEF9D4BE531431145DB /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4D962CAFE1FF329EFCA45B3E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */,
+				F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */,
+				9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		097A619506C1F80CB5CC99D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		60D3ED9BC20160BB819484F9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		BDD73C42543A23CB21B9B704 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Quick/Quick.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Quick/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ygw.quick;
+				PRODUCT_NAME = Quick;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		FE2A03174207B9098CED1597 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Quick/Quick.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Quick/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ygw.quick;
+				PRODUCT_NAME = Quick;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1FD9BE09A8168EA5577BF574 /* Build configuration list for PBXNativeTarget "Quick" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BDD73C42543A23CB21B9B704 /* Debug */,
+				FE2A03174207B9098CED1597 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BC4D1AE671EE6602A019D6BE /* Build configuration list for PBXProject "Quick" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				097A619506C1F80CB5CC99D0 /* Debug */,
+				60D3ED9BC20160BB819484F9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		005FE9CE92A53EEED98C5ADD /* XCLocalSwiftPackageReference "Packages/ModuleSystemMonitor" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleSystemMonitor;
+		};
+		1AE3E6DCBD017AB4245974AA /* XCLocalSwiftPackageReference "Packages/ModuleCalculator" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleCalculator;
+		};
+		3F319671EC5A507C47EAC52C /* XCLocalSwiftPackageReference "Packages/ModuleCalendar" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleCalendar;
+		};
+		54DB2181CE0C08276F3D0AA8 /* XCLocalSwiftPackageReference "Packages/ModuleScreenshot" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleScreenshot;
+		};
+		686B53E4C8841E4683D406F8 /* XCLocalSwiftPackageReference "Packages/ModuleOCR" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleOCR;
+		};
+		68E3BB62C19CAB5E69010F31 /* XCLocalSwiftPackageReference "Packages/ModuleFileSearch" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleFileSearch;
+		};
+		6A9170B1C6D924E06C1B6DAE /* XCLocalSwiftPackageReference "Packages/QuickUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/QuickUI;
+		};
+		6AAB2BC91244A1D236334373 /* XCLocalSwiftPackageReference "Packages/ModuleClipboard" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleClipboard;
+		};
+		75D35DB3831942F6E0B178F1 /* XCLocalSwiftPackageReference "Packages/QuickCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/QuickCore;
+		};
+		7B06A941256B96B3AE256285 /* XCLocalSwiftPackageReference "Packages/QuickPlatform" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/QuickPlatform;
+		};
+		8B1FDA8D3E2FC559D1AF557C /* XCLocalSwiftPackageReference "Packages/ModuleWindowManager" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleWindowManager;
+		};
+		8FBD3D723EA7D1D0707C3B10 /* XCLocalSwiftPackageReference "Packages/ModuleDevTools" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleDevTools;
+		};
+		99289B11FBC159CA0ECA3021 /* XCLocalSwiftPackageReference "Packages/ModuleTranslator" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleTranslator;
+		};
+		B075C3D8DECE94B399F5C510 /* XCLocalSwiftPackageReference "Packages/ModuleSystemControl" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleSystemControl;
+		};
+		B83D957017EA0A44B1D53694 /* XCLocalSwiftPackageReference "Packages/ModuleNotes" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleNotes;
+		};
+		BEBE1221A9DB6B1A8EC11BB8 /* XCLocalSwiftPackageReference "Packages/ModuleNetworkTools" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleNetworkTools;
+		};
+		D3DE13F4C36DC042792AA231 /* XCLocalSwiftPackageReference "Packages/ModuleAI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleAI;
+		};
+		E3CFDE976BBA6E973331BED6 /* XCLocalSwiftPackageReference "Packages/ModuleLauncher" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleLauncher;
+		};
+		F92DC0B83E7A6E67E96C1553 /* XCLocalSwiftPackageReference "Packages/ModuleSnippets" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleSnippets;
+		};
+		FF78591D895E92696E5450D8 /* XCLocalSwiftPackageReference "Packages/ModuleWeather" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ModuleWeather;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		078DDB7169BD3EDB9596F40A /* ModuleLauncher */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleLauncher;
+		};
+		0EF70A56F6C3F9A76897D3AF /* ModuleAI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleAI;
+		};
+		0F5C306BBE664AB40FB396D9 /* ModuleTranslator */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleTranslator;
+		};
+		24193F54E61A6C98582B1EB3 /* ModuleNetworkTools */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleNetworkTools;
+		};
+		3E2B64891828AAE6DFA2C296 /* ModuleCalculator */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleCalculator;
+		};
+		4332CA4B074D3CF1E9C8030C /* ModuleOCR */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleOCR;
+		};
+		59BCF4B7D262EAE2464533FD /* ModuleSnippets */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleSnippets;
+		};
+		5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = QuickCore;
+		};
+		6A3F51B8236D217DE92BA22A /* ModuleCalendar */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleCalendar;
+		};
+		6B137BD2BEC5376E06CC89A5 /* ModuleWeather */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleWeather;
+		};
+		6B3D3CF78E634C873291F720 /* ModuleNotes */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleNotes;
+		};
+		6D044E1B050753A6FBE6ADE3 /* ModuleClipboard */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleClipboard;
+		};
+		783AEBF3F1FAE829DCAFC004 /* QuickUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = QuickUI;
+		};
+		A1F6A1277F3F2C2E948ABA6D /* ModuleSystemMonitor */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleSystemMonitor;
+		};
+		AB89B21D37E90F6E000F1492 /* ModuleFileSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleFileSearch;
+		};
+		BD5BD83022332B19E9A03E60 /* ModuleSystemControl */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleSystemControl;
+		};
+		DD34C1E5DE14D029BD0899A3 /* ModuleScreenshot */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleScreenshot;
+		};
+		E20228E59CDDFE81B3082CE5 /* ModuleDevTools */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleDevTools;
+		};
+		E422B47D6EBF13ABF58021B9 /* ModuleWindowManager */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModuleWindowManager;
+		};
+		EB1FAFFF92FB2D709E88377F /* QuickPlatform */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = QuickPlatform;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 035C940917D197A3E5C17191 /* Project object */;
+}

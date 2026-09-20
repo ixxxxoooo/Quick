@@ -1,0 +1,51 @@
+// AIModule.swift
+// Quick — 原生 macOS 效率启动器
+// @author ygw
+
+import QuickCore
+import QuickUI
+import SwiftUI
+
+/// AI 对话模块
+///
+/// 多模型流式对话。支持 OpenAI / Claude 等多种 AI 服务。
+@MainActor
+public final class AIModule: QuickModule {
+
+    public static let id = "ai"
+    public static let name = "AI 对话"
+    public static let icon = "brain"
+
+    public var isEnabled = true
+
+    private let chatSession = ChatSession()
+
+    public init() {}
+
+    public func searchItems(query: String) async -> [SearchableItem] {
+        let triggers = ["ai", "聊天", "chat", "问", "ask", "gpt", "claude"]
+        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
+
+        return [
+            SearchableItem(
+                id: "ai.chat",
+                moduleID: Self.id,
+                title: "AI 对话",
+                subtitle: "与 AI 助手对话",
+                icon: "brain",
+                relevance: 0.7,
+                action: {
+                    EventBus.shared.post(NavigateEvent(moduleID: "ai"))
+                }
+            )
+        ]
+    }
+
+    public func makeView() -> AnyView {
+        AnyView(ChatView(session: chatSession))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(AISettingsView())
+    }
+}

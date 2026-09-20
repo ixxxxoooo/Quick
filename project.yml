@@ -1,0 +1,95 @@
+name: Quick
+options:
+  bundleIdPrefix: com.ygw
+  deploymentTarget:
+    macOS: "26.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+
+packages:
+  QuickCore:
+    path: Packages/QuickCore
+  QuickUI:
+    path: Packages/QuickUI
+  QuickPlatform:
+    path: Packages/QuickPlatform
+  ModuleLauncher:
+    path: Packages/ModuleLauncher
+  ModuleClipboard:
+    path: Packages/ModuleClipboard
+  ModuleCalculator:
+    path: Packages/ModuleCalculator
+  ModuleSystemControl:
+    path: Packages/ModuleSystemControl
+  ModuleFileSearch:
+    path: Packages/ModuleFileSearch
+  ModuleSnippets:
+    path: Packages/ModuleSnippets
+  ModuleOCR:
+    path: Packages/ModuleOCR
+  ModuleTranslator:
+    path: Packages/ModuleTranslator
+  ModuleDevTools:
+    path: Packages/ModuleDevTools
+  ModuleCalendar:
+    path: Packages/ModuleCalendar
+  ModuleWeather:
+    path: Packages/ModuleWeather
+  ModuleNotes:
+    path: Packages/ModuleNotes
+  ModuleAI:
+    path: Packages/ModuleAI
+  ModuleWindowManager:
+    path: Packages/ModuleWindowManager
+  ModuleSystemMonitor:
+    path: Packages/ModuleSystemMonitor
+  ModuleNetworkTools:
+    path: Packages/ModuleNetworkTools
+  ModuleScreenshot:
+    path: Packages/ModuleScreenshot
+
+targets:
+  Quick:
+    type: application
+    platform: macOS
+    sources:
+      - Quick
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ygw.quick
+        INFOPLIST_FILE: Quick/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Quick/Quick.entitlements
+        PRODUCT_NAME: Quick
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: false
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+        COMBINE_HIDPI_IMAGES: true
+    dependencies:
+      - package: QuickCore
+      - package: QuickUI
+      - package: QuickPlatform
+      - package: ModuleLauncher
+      - package: ModuleClipboard
+      - package: ModuleCalculator
+      - package: ModuleSystemControl
+      - package: ModuleFileSearch
+      - package: ModuleSnippets
+      - package: ModuleOCR
+      - package: ModuleTranslator
+      - package: ModuleDevTools
+      - package: ModuleCalendar
+      - package: ModuleWeather
+      - package: ModuleNotes
+      - package: ModuleAI
+      - package: ModuleWindowManager
+      - package: ModuleSystemMonitor
+      - package: ModuleNetworkTools
+      - package: ModuleScreenshot
