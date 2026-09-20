@@ -1,0 +1,79 @@
+---
+description: UI 与设计系统规范：面板几何、DesignTokens、组件复用
+globs: Packages/QuickUI/**,Packages/Module*/Sources/**/UI/**,Packages/Module*/Sources/**/*View.swift,Packages/Module*/Sources/**/*Module.swift
+alwaysApply: false
+---
+
+# UI 与设计系统规范
+
+完整版见 [`docs/ui.md`](../../docs/ui.md)。
+视觉基准是 **Tinycast 的调色板**，面板几何与令牌都与它对齐。
+
+## 唯一令牌来源：`DesignTokens`
+
+**硬性规则：视图里不允许出现裸的间距、圆角、尺寸、颜色、字号、动画时长字面量。**
+
+```swift
+// ❌
+.padding(.horizontal, 12)
+.frame(width: 24, height: 24)
+.font(.system(size: 16, weight: .medium))
+.background(Color.orange)
+withAnimation(.easeOut(duration: 0.1)) { ... }
+
+// ✅
+.padding(.horizontal, DesignTokens.Spacing.xl)
+.frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
+.font(DesignTokens.Typography.iconGlyph)
+.background(DesignTokens.Colors.warning)
+withAnimation(.easeOut(duration: DesignTokens.Duration.hover)) { ... }
+```
+
+需要新数值时，**先往 `DesignTokens` 加一个有名字、有注释的令牌**，再引用它。
+不允许「就这一次先写死」。
+
+## 面板几何（改动前必须确认视觉无回归）
+
+| 令牌 | 值 |
+| --- | --- |
+| `Size.panelWidth` / `panelHeight` | **750 × 475**（与 Tinycast 一致） |
+| `Radius.panel` | **26**（「系统组件感」的主要来源，不要随意调小） |
+| `Size.headerHeight` / `headerIconSlot` / `headerPadding` | 44 / 22 / 10 |
+| `Size.bottomBarHeight` / `barButtonHeight` | 52 / 28 |
+| `Size.rowIcon` / `keyCap` / `hairline` | 24 / 18 / 1 |
+| `Size.paletteTopMarginFraction` | 0.18 |
+| `Radius.row` / `keyCap` / `barControl` | 10 / 6 / 8 |
+
+面板是三段式：**header（搜索栏，高度恒定，输入时不许位移）/ content（弹性）/
+bottom bar（快捷键教学位）**。
+
+## 间距阶梯
+
+**只用这七档，不要发明中间值**：`xxs`2 · `xs`4 · `sm`6 · `md`8 · `lg`10 · `xl`12 · `xxl`20。
+
+## 颜色
+
+- **`ramp(dark:light:)`** —— 深色白墨、浅色黑墨，用于所有文本/前景/叠加层。
+- **`adaptive(dark:light:)`** —— 有色彩倾向的颜色用这个。
+- 语义色用 `Colors.destructive` / `success` / `warning` / `progress`，
+  **不要直接写 `Color.orange`**。
+- **深色是基准**：深色分支的值是刻意定的，不要顺手改（那是视觉回归）；浅色分支可以调。
+  两个模式都要亲眼确认。
+
+## 其他
+
+- **优先系统文本样式**（`.body` / `.callout` / `.headline`），固定字号只用于令牌规定的
+  搜索框与图标位置。不要用 `.system(size:)` 现造字号。
+- **动画**：退出比进入快（`enter` 0.18 / `exit` 0.12）；时长用途要对，不要混用。
+- **玻璃**：需要浮起的玻璃控件用现成的 `View.frosted(in:)`，不要重复写 `.glassEffect` 配置。
+  不要堆叠多层玻璃。
+- **组件复用**：面板内一切复用 `QuickUI` 的组件（`SearchFieldView`、`ResultListView`、
+  `KeyCapChip`、`BarButton`、`SectionHeader`、`PaletteBackground`）。
+  模块自己的视图**只管内容区**，不要设外层尺寸、圆角、背景 —— 外壳负责。
+  **不要复制粘贴组件**，需要变体就给现有组件加参数或样式枚举。
+- **不要用 `NSAlert`**（与无边框玻璃面板的视觉语言冲突）。确认用自定义对话框面板，
+  轻量反馈走 `HUDController`（`HUDTone`：`.success` / `.info` / `.warning` / `.danger`）。
+- **空状态必须有**：一个图标 + 一句说明。留一片空白是最糟的处理 —— 用户分不清是没结果还是坏了。
+- **无障碍**：纯图标按钮必须有 `.accessibilityLabel`；点击区域不小于 28×28；
+  不要只靠颜色传达状态；正文不要比 `textTertiary` 更淡。
+- 新增共享组件必须：全部数值取自令牌、支持明暗两模式、在 `docs/ui.md` 登记。

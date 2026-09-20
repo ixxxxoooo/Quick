@@ -1,0 +1,70 @@
+---
+description: Git 工作流：提交前必跑测试、提交信息一律英文 Conventional Commits
+alwaysApply: true
+---
+
+# Git 工作流
+
+## 铁律
+
+### 1. 提交前必须跑完测试
+
+这是本项目的硬性要求，由 `pre-commit` 钩子强制执行：
+
+```bash
+./Scripts/format.sh          # 先格式化，避免被钩子打回
+./Scripts/run-tests.sh       # 全量测试，必须全绿
+```
+
+- 任一个包失败 → **不提交**。去修，不要调低断言。
+- **不要 `git commit --no-verify`。** 万不得已用了，推送前必须补跑 `./Scripts/run-tests.sh`。
+- 钩子运行时若报「声明了 testTarget 但没有任何测试文件」，就补一个非空测试文件 ——
+  空的 `testTarget` 会让 `swift test` 直接失败。
+
+### 2. 提交信息一律英文
+
+`commit-msg` 钩子会校验格式，并拒绝含非 ASCII 字符的主题行（等价于强制英文）。
+
+```
+<type>(<scope>): <祈使语气的小写英文描述>
+
+<正文：为什么这么改，而不是改了什么>
+```
+
+- **type**：`feat` `fix` `refactor` `perf` `docs` `test` `chore` `build` `ci` `style` `revert`
+- **scope**：模块 id 或区域，如 `launcher` `palette` `quickui` `core` `hotkey` `tooling` `docs`
+- 小写开头、祈使语气、**句末不加句号**、不超过 72 字符。
+- 正文写**为什么**，不写「改了什么」—— 改动 `git diff` 已经说了。
+
+```
+feat(clipboard): add pinning with a 30-entry history cap
+fix(palette): keep the panel on screen when the app deactivates
+perf(launcher): score app names once per refresh instead of per keystroke
+docs(standards): state the logging contract for modules
+refactor(quickui): move every hardcoded literal into DesignTokens
+test(launcher): cover ranking normalisation and favorites persistence
+chore(tooling): add a pre-commit gate that runs the full test suite
+```
+
+## 提交粒度
+
+- **一个提交只做一件事。** 不要在一次提交里混入格式化、重构与功能改动。
+- **该改的文档在同一个提交里改掉** —— 代码与规范不允许脱节。
+- 代码、测试、文档属于同一个逻辑改动时放在同一个提交。
+
+## 分支
+
+- `main` 始终可构建、可运行、测试全绿。
+- 功能开发用短生命周期分支：`<type>/<简短描述>`，如 `feat/clipboard-pinning`、
+  `fix/palette-focus-restore`。
+- 合并前 rebase 到最新 `main`，保持线性历史。
+
+## 提交前自检清单
+
+- [ ] `./Scripts/run-tests.sh` 全绿
+- [ ] `./Scripts/build.sh` 成功且无新增警告
+- [ ] `./Scripts/lint.sh` 干净
+- [ ] 新增/修改功能带了测试
+- [ ] 新增功能打了 `QuickLog` 日志（生命周期用 `.notice`）
+- [ ] 没有裸 `print`、没有裸设计数值字面量
+- [ ] 受影响的文档已同步更新

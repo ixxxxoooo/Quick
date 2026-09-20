@@ -1,0 +1,173 @@
+# 测试
+
+**测试是提交的硬门禁。** 每次提交前 `./Scripts/run-tests.sh` 必须全绿，
+`pre-commit` 钩子会强制执行。
+
+---
+
+## 1. 框架：Swift Testing
+
+统一使用 [Swift Testing](https://developer.apple.com/documentation/testing)
+（`import Testing`），不用 XCTest —— 新代码里出现 `import XCTest` 或 `func testXxx()`
+就是不符合规范。
+
+```swift
+import Testing
+@testable import ModuleCalculator
+
+@Suite("计算器引擎")
+struct CalcEngineTests {
+
+    @Test("四则运算")
+    func arithmetic() {
+        #expect(CalcEngine.evaluate("1+2*3")?.display == "7")
+    }
+
+    @Test("非法表达式")
+    func invalidExpression() {
+        #expect(CalcEngine.evaluate("1++") == nil)
+    }
+}
+```
+
+- `@Suite("中文描述")` 标在 `struct` 上，描述用中文（和注释一致）。
+- `@Test("中文描述")` 标在每个用例上，一个用例只断言一件事。
+- `#expect(...)` 优于 `#require(...)`；只有「后面所有断言都依赖这个前置条件」时才用
+  `#require`。
+- 需要主 actor 的用 `@MainActor @Suite` / `@MainActor @Test`，不要用
+  `await MainActor.run { }` 包断言。
+
+---
+
+## 2. 测试放在哪
+
+**测试跟着包走**，不是集中在根目录的 `Tests/`：
+
+```
+Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
+```
+
+单元测试必须能脱离 App 目标独立跑通 —— 这正是模型层禁止 `import SwiftUI`/`AppKit`
+的原因（见 [standards.md](standards.md)）。
+
+### 当前测试分布
+
+| 包 | 测试文件 | 状态 |
+| --- | --- | --- |
+| `QuickCore` | `EventBusTests`、`FuzzyMatchTests` | 有覆盖 |
+| `QuickUI` | `PalettePanelTests` | 有覆盖 |
+| `QuickPlatform` | `HotKeyServiceTests` | 有覆盖 |
+| `ModuleCalculator` | `CalcEngineTests` | 有覆盖 |
+| `ModuleLauncher` | — | 需要补 |
+| `ModuleClipboard` | — | 需要补 |
+| `ModuleSystemControl` | — | 需要补 |
+| 其余 10 个模块 | 未声明测试目标 | 需要补 |
+
+**注意：声明了 testTarget 却没有测试文件，会让 `swift test` 直接失败**
+（`error: no tests found`）。所以「加测试」和「声明目标」必须同时发生，
+不能先声明后补。给模块加 testTarget 时，同一个提交里必须有至少一个非空测试文件。
+
+---
+
+## 3. 该测什么
+
+按优先级从高到低。**优先测纯逻辑** —— 它们最容易测、最不容易误报、价值最高。
+
+**必测（纯逻辑层）**
+- 解析、匹配、评分：模糊匹配、计算器表达式、模板变量替换、文本 diff。
+- 持久化：`Store` 的读写往返、损坏数据时的降级、上限裁剪（例如历史只留 N 条）。
+- 状态机：面板显隐与模式切换、模块启停的幂等性。
+- `EventBus`：订阅/取消订阅/`removeAll` 的语义。
+
+**应测（契约层）**
+- 每个 `QuickModule`：`searchItems` 对空查询与正常查询的行为、
+  `id` 的唯一性、`deactivate()` 是否落盘。
+- 关键不变量：`hidesOnDeactivate == false`、面板尺寸有效、
+  `SearchableItem.id` 在同一模块内不重复。
+
+**不测（除非另有理由）**
+- SwiftUI 视图的像素级外观 —— 那靠人工验收与 `docs/ui.md` 的规范约束。
+- 私有方法的实现细节 —— 测公开行为。
+- 系统 API 的封装本身（`NSWorkspace` 会不会返回图标不是我们的责任）；
+  测的是**我们对返回值的处理**。
+
+**UI / 面板至少覆盖**（这是本项目已有的约定）：显隐状态、快捷键注册结果、
+关键路径不崩溃。
+
+---
+
+## 4. 测试纪律
+
+- **不要为了通过测试而改测试的期望值。** 先判断是代码错了还是期望错了。
+- **测试必须可重复。** 不依赖真实剪贴板内容、不依赖网络、不依赖用户机器上装了什么应用。
+  需要外部输入就注入：把路径、时钟、数据源做成参数。
+- **不要依赖执行顺序。** 每个用例自己准备状态、自己清理。
+- **测试里不要 `try!` 或 `fatalError`** —— 用 `#require` 表达前置条件。
+- **用例名与断言消息写清楚失败时说明了什么。** `#expect(results.count == 3, "前缀匹配应命中 3 条")`
+  比裸断言强得多。
+- **新增功能必须带测试**（AGENTS.md 的红线）。「只改代码不写测试然后说做完了」
+  在本项目里是不允许的。
+
+---
+
+## 5. 怎么跑
+
+```bash
+./Scripts/run-tests.sh                    # 全部包
+./Scripts/run-tests.sh QuickCore          # 单个包
+./Scripts/run-tests.sh ModuleCalculator QuickCore   # 多个包
+```
+
+脚本会对每个声明了测试的包执行 `swift test`，汇总结果，**任何一个包失败就整体退出非零**
+—— 这正是 `pre-commit` 钩子依赖的信号。
+
+底层等价于：
+
+```bash
+swift test --package-path Packages/QuickCore
+```
+
+---
+
+## 6. 手工验收（自动化测试覆盖不到的部分）
+
+单元测试不能证明「app 真的能用」。声称完成前，在 App 层面手工过一遍：
+
+```bash
+./Scripts/build.sh --run     # 构建并启动
+```
+
+逐项确认：
+
+1. **进程存活**：启动后没有立刻退出，没有崩溃报告。
+2. **CPU 正常**：面板显示后 CPU 接近空闲。**持续 > 20% 就是 bug**
+   （历史故障：`@Observable` 引起的 AttributeGraph 死循环）。
+3. **唤醒**：⌥Space 能唤出面板；菜单栏图标的「显示 Quick」也能。
+4. **窗口真的可见**：用 `CGWindowListCopyWindowInfo` 或肉眼确认面板出现且尺寸正常
+   —— 不要只看 `isVisible == true`，那不能证明窗口在屏幕上。
+5. **冒烟**：搜索框能输入、上下键能选、回车能执行、Esc 能关闭。
+6. **焦点归还**：关闭面板后，之前的前台应用重新获得焦点。
+
+### 自检手段
+
+- **启动参数 `-showPalette`**：启动后立即显示面板，省掉手按快捷键。
+- **分布式通知**：应用内用 `DistributedNotificationCenter` 监听
+  `com.ygw.quick.togglePalette` 来切换面板。**不要用 `notifyutil -p`** ——
+  那是另一套 notify API，不互通。
+- **窗口可见性**：`CGWindowListCopyWindowInfo` 确认存在名为 `Quick` 的窗口且尺寸正常。
+- **日志**：`./Scripts/logs.sh` 实时跟踪，看面板显隐耗时与搜索耗时是否在预算内。
+
+---
+
+## 7. 性能回归
+
+性能预算见 [standards.md#性能预算](standards.md)。以下改动必须在提交信息里附上改前改后的
+测量数据，否则视为未验证：
+
+- 改动搜索路径（模糊匹配、排序、聚合）。
+- 改动应用扫描或文件索引。
+- 改动面板显隐路径。
+- 引入新的缓存或并发。
+
+测量方式：`./Scripts/logs.sh` 看 signpost 输出的耗时，或用 Instruments 的
+Points of Interest 轨道。

@@ -1,0 +1,83 @@
+---
+description: Quick 项目的质量门禁：测试先行、不跑测试不交付、提交一律英文
+alwaysApply: true
+---
+
+# Quick — 质量门禁（最高优先级）
+
+**本项目所有规则的权威来源是仓库根目录的 [`AGENTS.md`](../../AGENTS.md)。**
+本文件只挑出「违反了会立刻出问题」的几条，避免被忽略。细节以 `AGENTS.md` 与
+`docs/` 下的文档为准，冲突时以 `AGENTS.md` 为准。
+
+适用于本仓库所有原生 macOS（Swift / SwiftUI / AppKit）开发。
+
+## 1. 每次改动必须有测试
+
+- 新增或修改功能时，**同一个改动里**补充/更新对应测试。
+- 用 [Swift Testing](https://developer.apple.com/documentation/testing)：
+  `import Testing`、`@Suite`、`@Test`、`#expect`。**不要用 XCTest。**
+- 纯逻辑（解析、匹配、存储、事件总线）放在各 SPM 包的 `Tests/` 下，必须能脱离 App 独立跑通。
+- **声明了 `.testTarget` 却没有任何测试文件会让 `swift test` 直接失败**
+  （`error: no tests found`）。加测试目标必须同时加非空测试文件。
+- 严禁「只改代码不写测试」后声称完成。
+
+## 2. 提交前必须跑完测试
+
+`pre-commit` 钩子会自动执行，失败即拒绝提交：
+
+```bash
+./Scripts/format.sh          # 先格式化
+./Scripts/run-tests.sh       # 全量测试，必须全绿
+./Scripts/lint.sh            # 排版 + 语义
+```
+
+**不要用 `git commit --no-verify` 绕过。** 万一绕过了，推送前必须补跑一次。
+
+## 3. 提交信息一律英文
+
+格式遵循 Conventional Commits，`commit-msg` 钩子会拒绝非 ASCII 主题行：
+
+```
+<type>(<scope>): <祈使语气的小写英文描述>
+```
+
+```
+feat(clipboard): add pinning with a 30-entry history cap
+fix(palette): keep the panel on screen when the app deactivates
+```
+
+**中文写在代码注释、文档和 PR 描述里，不写在提交主题里。**
+
+## 4. 交付前必须验收，不允许「应该能打开」
+
+声称完成前逐项确认：
+
+1. `./Scripts/run-tests.sh` 全绿。
+2. `./Scripts/build.sh` 成功，且**没有新增警告**。
+3. **实际启动过** `.app`，进程存活、CPU 接近空闲（**持续 > 20% 就是 bug**）。
+4. 面板能被 ⌥Space 或菜单「显示 Quick」唤出，窗口**真的可见**
+   （用 `CGWindowListCopyWindowInfo` 或肉眼确认，`isVisible == true` 不算证明）。
+5. 冒烟：搜索框可输入、上下键可选、回车可执行、Esc 可关闭。
+6. 关闭后焦点归还给之前的前台应用。
+
+## 5. 禁止事项
+
+- ❌ 未跑测试就交付
+- ❌ 只说「应该能打开」却未实际启动验证
+- ❌ `print` / `NSLog` 调试（必须走 `QuickLog`，见 `logging.mdc`）
+- ❌ 视图里写裸的尺寸/间距/颜色字面量（必须走 `DesignTokens`，见 `ui-design-system.mdc`）
+- ❌ 给 `PaletteCoordinator` 加 `@Observable`（会造成 AttributeGraph 重建死循环，CPU 打满）
+- ❌ 在 `body` 里做 IO 或创建 `NSImage`
+- ❌ 忽略面板 `hidesOnDeactivate`、`orderFrontRegardless` 等 macOS 浮窗常见坑
+- ❌ 在仅含 `MenuBarExtra` 的 SwiftUI App 上再挂面板窗口（macOS 26 会 `makeMainMenu`
+  死循环）；菜单栏必须用 `NSStatusItem`
+- ❌ 模块之间直接 `import` 或互相持有引用（只能通过 `EventBus`）
+- ❌ 引入第三方依赖
+
+## 6. 自检手段
+
+- 启动参数 `-showPalette`：启动后立即显示面板，省掉手按快捷键。
+- 分布式通知：应用内用 `DistributedNotificationCenter` 监听
+  `com.ygw.quick.togglePalette` 切换面板。**不要用 `notifyutil -p`**，那是另一套 notify API。
+- 日志：`./Scripts/logs.sh`（实时，含 debug）。
+- 窗口可见性：`CGWindowListCopyWindowInfo` 查名为 `Quick` 的窗口及其尺寸。

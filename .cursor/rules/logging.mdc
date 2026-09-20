@@ -1,0 +1,74 @@
+---
+description: 日志规范：禁止裸 print，统一 QuickLog，分级与隐私红线
+globs: **/*.swift
+alwaysApply: false
+---
+
+# 日志规范
+
+完整版见 [`docs/logging.md`](../../docs/logging.md)。
+
+本项目硬性要求：**所有代码、所有功能都要有完善的日志**，出问题时能只靠日志定位。
+
+## 统一入口
+
+**禁止 `print` / `NSLog` / `dump`。** 统一走 `QuickLog`（封装 `os.Logger`）：
+
+```swift
+import QuickCore
+
+// 模块：分类用模块自己的 id
+private let log = QuickLog.module(ClipboardModule.id)
+
+// 应用/框架层：固定区域
+private let log = QuickLog.palette   // 或 .app / .hotKey / .platform / .ui / .eventBus
+```
+
+调用形式是 `log.<级别>("中文描述 \(值, privacy: .public)")`。
+`QuickCore` 已 `@_exported import os`，所以不需要额外 `import os`。
+
+## 级别：`notice` 才落盘
+
+**关键约束：`debug` 和 `info` 不写入磁盘，`log show` 事后读不到。**
+
+- 需要**事后翻历史排查**的，一律 `.notice` 或更高。
+- `debug` / `info` 是给实时跟踪与开发期看的（面板显隐、搜索耗时）。
+- 判断标准：① 问题发生后需要读它吗？需要 → `notice`。② 生产环境每秒可能打十次吗？
+  会 → `debug`。
+
+| 级别 | 用途 | 落盘 |
+| --- | --- | --- |
+| `.debug` | 每次按键、每行渲染、循环内部 | 否 |
+| `.info` | 面板显隐耗时、搜索耗时等实时观察项 | 否 |
+| `.notice` | 应用启停、模块激活、快捷键注册结果、扫描结果、加载条数 | **是** |
+| `.warning` | 可恢复的问题、降级 | 是 |
+| `.error` | 操作失败且用户会受影响 | 是 |
+| `.fault` | 不变量被打破 | 是 |
+
+## 必须打日志的位置
+
+- 模块 `activate()` / `deactivate()`，含加载了多少条数据（`.notice`）。
+- 应用启动各阶段：模块注册完成数、事件总线接线条数（`.notice`）。
+- 全局快捷键注册成功（含组合键）/ 失败（含 `OSStatus`）、注销。
+- 权限检查与申请的结果。
+- 外部命令 / 网络请求：发起、退出码或状态码、耗时。失败必须 `.error`。
+- 持久化的读/解码/写失败 —— 全部 `.error`，带路径与错误描述。
+- **每个 `catch` 分支至少一条日志，空 `catch` 不可接受。**
+- 性能敏感路径用 `QuickLog.signposter(_:)` 打区间，不要在热路径手算耗时打 `info`。
+
+## 隐私红线（永不进日志）
+
+- 剪贴板正文、笔记正文、代码片段、AI 对话、翻译原文 → **只记长度或类型**。
+- 密码、令牌、API Key。
+- 完整用户文件路径（记最后一段或数量即可）。
+- 搜索结果的具体内容（记条数即可）。
+
+## 反例
+
+```swift
+print("[Clipboard] 已保存")                       // ❌ 不进统一日志，生产环境抓不到
+do { try store.save() } catch {}                  // ❌ 空 catch，出事什么都看不到
+log.info("搜索关键词: \(query)")                   // ❌ 高频 + 关键词不该记录
+log.info("模块已激活")                             // ❌ 生命周期必须 notice 才能事后查
+log.error("写入失败: \(error.localizedDescription, privacy: .public)")  // ✅
+```

@@ -1,0 +1,100 @@
+---
+description: Swift / SwiftUI 编码规范：并发、性能、命名、注释、错误处理
+globs: **/*.swift
+alwaysApply: false
+---
+
+# Swift / SwiftUI 编码规范
+
+完整版见 [`docs/standards.md`](../../docs/standards.md)。以下是必须遵守的硬性部分。
+
+## 技术立场：只面向最新，永远
+
+macOS 26+、Swift 6 语言模式，没有兼容下限要守。
+
+- **优先现代 Apple API**：Observation 而非 `ObservableObject`；Swift Concurrency 而非
+  `DispatchQueue` 或回调；`SMAppService` 而非登录项 shim。
+- **迁移，绝不包装。** 一个 API 有了现代替代品就删掉旧写法，不要留包装层。
+- **被废弃的 API 是缺陷**，不是可以忍着的警告。
+- **未经明确要求，绝不引入向下兼容**：不要版本开关、迁移脚手架、「以防万一」的兜底。
+
+## 并发（严格并发 complete，数据竞争是编译错误）
+
+- UI 相关类型一律 `@MainActor`；`QuickModule` 协议本身已是 `@MainActor`。
+- **不要新增 actor。** 本项目只有「主 actor」与「无隔离」两档。重活、IO 用
+  `nonisolated` 函数 + `Task.detached`。
+- **不要用 `DispatchQueue`**，尤其不要 `DispatchQueue.main.async` 来回切；用
+  `Task { @MainActor in ... }`。
+- **不要 `@unchecked Sendable`**（唯一例外是已有的 Carbon C 回调跳板）。
+- 跨 actor 传递的模型类型必须 `Sendable` —— 优先 `struct` + `let`，它自动满足。
+- 长任务持有 `Task` 句柄并在新输入到来时 `cancel()`。搜索必须防抖 + 取消。
+- 定时优先 `Task` + `Task.sleep`，不要 `Timer`；用了 `Timer` 要在退出路径 `invalidate()`。
+
+## 不要触发 AttributeGraph 死循环
+
+本项目已踩过两次，改 UI 状态时务必记住：
+
+- **不要给 `PaletteCoordinator` 加 `@Observable`**（见其顶部注释）。
+- **不要在 `body` 里创建 `NSImage`** 或调用会触发状态变更的昂贵 API；用 `@State` +
+  `.onAppear` 缓存一次（参考 `ResultListView.AppIconImage`）。
+- 视图状态用 `@State` / `@Binding` 局部化，不要为了少写绑定把状态提升到协调器。
+
+## 性能预算
+
+| 操作 | 预算 |
+| --- | --- |
+| 面板 `show()` 到可见 | < 100 ms |
+| 一次按键到结果刷新 | < 50 ms |
+| 空闲 CPU | ≈ 0 %（面板显示时也 < 5 %） |
+| 冷启动到托盘图标出现 | < 400 ms |
+
+- **不要在 `body` 里做 IO**（读文件、网络、创建 `NSImage`）。
+- **不要在循环里做模糊匹配**，规范化/小写化结果要预处理或每次刷新算一次。
+- **图标走 `IconCache`**，不要直接 `NSWorkspace.shared.icon(forFile:)` 到视图里。
+- 长列表用 `LazyVStack` / `LazyHStack`，不要用 `VStack` 铺可变长集合。
+- 排序不要放在 `body` 里。没有测量数据的优化是猜的。
+
+## 命名
+
+- 类型 `UpperCamelCase`，方法与属性 `lowerCamelCase`。
+- **后缀说明职责**：`Store`(持久化) `Service`(系统/网络封装) `Coordinator`(协调生命周期)
+  `Controller`(拥有窗口) `Engine`(纯计算) `Index`(可查询集合) `Scanner`(一次性遍历)
+  `View` `Session` `Tool`。**语义正确优先于后缀一致**，没有合适的就新增一个。
+- **避免 `Manager`** —— 它什么也没说，先想清楚它到底是哪种。
+- 布尔量读起来要是断言：`isVisible`、`hasAccessibilityPermission`。不要 `flag`。
+
+## 注释（规则从紧）
+
+- **解释「为什么」，永不解释「什么」。** 代码已经说了「什么」。
+- **只在两种情况下写**：有外部约束（系统 bug、API 反直觉、性能陷阱），或有必须保持的不变量。
+- **每个公开类型/方法写 `///` 文档注释**；私有实现不需要逐行注释。
+- **绝不连续两行注释，也不允许注释块。** 一行说不完就该提取函数、常量或类型。
+- **行宽上限 120 字符。**
+- **不要注释你刚做的改动** —— 那属于提交信息。
+- **中文注释，英文标识符。**
+
+## 错误处理
+
+- **不要 `try!`**（linter 设为 error）。不要用 `fatalError` 处理可恢复错误。
+- **`catch` 里不要空着**，至少 `QuickLog` 记一条 `.error`。静默吞错误是排查困难的头号来源。
+- **面向用户的失败要有反馈**：`EventBus` 发 `ShowHUDEvent`，不要只丢进日志。
+- 可选值优先 `guard let ... else { return }` 早返回。
+
+## SwiftUI 视图
+
+- 一个视图文件一个主体；超过约 250 行要拆子视图到同目录独立文件。
+- `body` 保持纯净：只做布局与拼装。
+- 不要用 `GeometryReader` 做布局，除非确实需要测量父容器。
+- 动画时长、颜色、间距、字体、圆角、尺寸**全部取自 `DesignTokens`**，不写裸字面量。
+- 桥接 AppKit 用 `NSViewRepresentable` / `NSHostingView`，并在 `dismantle` 里清理。
+
+## 所有权红线
+
+- `AppCore` 是唯一所有者，新状态挂它上面、在 `start()` 里接线。**不要新增单例**
+  （现有只有 `AppCore.shared` 与 `EventBus.shared`）。
+- 模块只在 `AppCore.registerModules()` 里实例化，模块**不自注册**。
+- 模块之间只通过 `EventBus` 通信，**永不互相 import 或持有引用**。
+- 订阅要保存 `EventSubscription`，丢弃返回值等于随 ARC 一起取消订阅。
+- `Model/` 下的文件**不允许 `import AppKit` 或 `import SwiftUI`**，环境事实一律注入。
+- **`project.yml` 是工程唯一真相**：改完必须 `xcodegen generate` 并一起提交，
+  永不手改 `project.pbxproj`。
