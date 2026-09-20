@@ -1,0 +1,59 @@
+name: CI
+
+# 只做「这个提交是不是好的」——测试、排版、构建。
+# 不做发布：发布链路尚未建立，见 docs/development.md#发布
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 测试 / 排版 / 构建
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 显示工具链版本
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+
+      - name: 启用 git 钩子配置
+        run: ./Scripts/setup.sh || true
+
+      # 排版与语义检查。SwiftLint 是可选依赖，CI 上装上以获得完整检查。
+      - name: 安装 SwiftLint
+        run: brew install swiftlint
+
+      - name: 检查排版与语义
+        run: ./Scripts/lint.sh
+
+      # 测试是硬门禁：任何一个包失败，整个 CI 失败。
+      - name: 跑测试
+        run: ./Scripts/run-tests.sh
+
+      # 单独生成工程，确保 project.yml 与提交的 Quick.xcodeproj 一致 ——
+      # 改了 project.yml 却忘了提交生成结果时，这一步会暴露出来。
+      - name: 校验工程文件与 project.yml 一致
+        run: |
+          xcodegen generate
+          if ! git diff --quiet -- Quick.xcodeproj; then
+            echo "✗ Quick.xcodeproj 与 project.yml 不一致。" >&2
+            echo "  修复：运行 xcodegen generate 并把结果一起提交。" >&2
+            git diff --stat -- Quick.xcodeproj
+            exit 1
+          fi
+
+      - name: 构建
+        run: ./Scripts/build.sh

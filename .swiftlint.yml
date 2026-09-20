@@ -1,0 +1,66 @@
+# ============================================================================
+# SwiftLint — 只配置「能抓到真实缺陷」的规则
+#
+# 定位：SwiftLint 负责语义与缺陷类规则，`xcrun swift-format` 负责排版。
+# 两者职责不重叠，所以这里关掉了所有格式类规则（缩进、括号位置、逗号……），
+# 那些交给 formatter，否则只是重复噪音。
+#
+# 详见 docs/standards.md
+# ============================================================================
+
+included:
+  - Quick
+  - Packages
+
+excluded:
+  - "**/.build"
+  - "**/DerivedData"
+
+# ---------------------------------------------------------------------------
+# 关掉的规则：在本项目里是噪音或判断错误
+# ---------------------------------------------------------------------------
+disabled_rules:
+  - todo                          # 待办由 issue 跟踪，不由 linter 跟踪
+  - trailing_whitespace           # 纯排版，formatter 的职责
+  - identifier_name               # 会拒绝 id / dx / x / y —— 这里都是正确命名
+  - type_body_length              # SwiftUI View 天然长
+  - function_body_length
+  - file_length                   # 设计系统与面板外壳天然长
+  - cyclomatic_complexity         # 对 QuickModule 的 switch 不算复杂
+  - nesting                       # 命名空间 enum 是本项目风格
+  - large_tuple
+  - function_parameter_count      # SwiftUI 初始化器参数本就多
+  - multiple_closures_with_trailing_closure   # 与 SwiftUI 语法冲突
+  - opening_brace                 # ─┐ 排版问题，formatter 负责
+  - trailing_comma                # ─┘
+  - empty_count                   # 会误改 HitRecord.count 这类「命中次数」字段
+
+# ---------------------------------------------------------------------------
+# 打开的规则：每一条都对应一类真实缺陷
+# ---------------------------------------------------------------------------
+opt_in_rules:
+  - first_where
+  - last_where
+  - contains_over_filter_count
+  - contains_over_first_not_nil
+  - optional_data_string_conversion
+  - implicitly_unwrapped_optional
+  - redundant_nil_coalescing
+  - toggle_bool
+  - static_over_final_class
+  - unneeded_parentheses_in_closure_argument
+  - weak_delegate
+  - unused_import
+
+# try! 永远不可接受；as!/强制转换偶有正当场景，所以只警告不阻断
+force_try: error
+force_cast: warning
+
+type_name:
+  min_length: 2                   # ID 是 Identifiable 的正确命名
+
+# 只警告：行长是判断问题，不是缺陷
+line_length:
+  warning: 130
+  ignores_urls: true
+  ignores_comments: false

@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#
+# Quick — pre-commit 钩子。
+#
+# 本项目规则：每次提交前必须跑完测试。这个钩子就是那条规则的执行者。
+#
+#   1. 暂存文件的排版检查（棘轮：只要求你碰过的文件是干净的）
+#   2. 全量测试
+#
+# 测试失败即拒绝提交。不要用 `git commit --no-verify` 绕过 ——
+# 万一绕过了，推送前必须补跑一次 ./Scripts/run-tests.sh。
+#
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# ---------------------------------------------------------------------------
+# 跳过条件：只改文档/配置时不必跑测试
+#
+# 但只要有 .swift 或 project.yml 改动，就必须跑。
+# ---------------------------------------------------------------------------
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [[ -z "$staged" ]]; then
+    exit 0
+fi
+
+needs_tests=false
+while IFS= read -r file; do
+    case "$file" in
+    *.swift | project.yml | */Package.swift) needs_tests=true ;;
+    esac
+done <<<"$staged"
+
+# ---------------------------------------------------------------------------
+# 1. 排版：只检查本次暂存的文件
+# ---------------------------------------------------------------------------
+echo "▸ pre-commit: 检查暂存文件的排版"
+if ! ./Scripts/format.sh --changed; then
+    echo
+    echo "✗ 排版检查未通过，提交已中止。" >&2
+    echo "  修复：./Scripts/format.sh --changed，然后重新 git add" >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# 2. 测试
+# ---------------------------------------------------------------------------
+if [[ "$needs_tests" == false ]]; then
+    echo "▸ pre-commit: 本次改动不含 Swift 源码，跳过测试"
+    exit 0
+fi
+
+echo
+echo "▸ pre-commit: 跑全量测试（可能需要一分钟）"
+if ! ./Scripts/run-tests.sh; then
+    echo
+    echo "✗ 测试未通过，提交已中止。" >&2
+    echo "  规则见 AGENTS.md：每次提交前必须跑完测试。" >&2
+    echo "  确实需要紧急提交时用 --no-verify，但推送前必须补跑。" >&2
+    exit 1
+fi
+
+echo
+echo "✓ pre-commit: 通过"
