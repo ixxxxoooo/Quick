@@ -16,7 +16,7 @@ public final class NotesModule: QuickModule {
 
     public static let id = "notes"
     public static let name = "笔记"
-    public static let icon = "note.text"
+    public static let icon = "text.page"
 
     public var isEnabled = true
 

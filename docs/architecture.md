@@ -207,8 +207,8 @@ public struct SearchableItem: Identifiable, Sendable {
 所有落盘路径走
 [`AppPaths`](../Packages/QuickPlatform/Sources/QuickPlatform/System/AppPaths.swift)：
 `applicationSupport()` / `caches()` / `logs()` / `moduleData(_:)`。
-**不要自己拼 `~/Library/...`** —— 路径集中在一处才能统一改动（例如将来给 Debug 配独立
-bundle id 时，只需要改 `AppPaths` 一个地方）。
+**不要自己拼 `~/Library/...`** —— 路径集中在一处。`AppPaths` 已按
+`Bundle.main.bundleIdentifier` 分目录，Debug（`.dev`）与 Release 互不污染。
 
 ---
 

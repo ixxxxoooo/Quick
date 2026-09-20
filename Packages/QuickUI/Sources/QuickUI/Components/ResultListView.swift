@@ -21,6 +21,9 @@ public struct ResultListView: View {
     /// 当前选中索引
     @Binding public var selectedIndex: Int
 
+    /// 协调选择状态（包含指针防抖与激活标记）
+    public var selection: PaletteSelection?
+
     /// 悬停的结果 ID
     @State private var hoveredID: String?
 
@@ -28,9 +31,15 @@ public struct ResultListView: View {
     /// - Parameters:
     ///   - items: 搜索结果数组
     ///   - selectedIndex: 选中索引绑定
-    public init(items: [SearchableItem], selectedIndex: Binding<Int>) {
+    ///   - selection: 协调选择状态
+    public init(
+        items: [SearchableItem],
+        selectedIndex: Binding<Int>,
+        selection: PaletteSelection? = nil
+    ) {
         self.items = items
         self._selectedIndex = selectedIndex
+        self.selection = selection
     }
 
     /// 结果集的指纹
@@ -54,8 +63,20 @@ public struct ResultListView: View {
                         )
                         .id(item.id)
                         .onHover { hovering in
-                            hoveredID = hovering ? item.id : nil
-                            if hovering { selectedIndex = index }
+                            if hovering {
+                                if let sel = selection {
+                                    if sel.hoverArmed {
+                                        selectedIndex = index
+                                        hoveredID = item.id
+                                    }
+                                } else {
+                                    hoveredID = item.id
+                                }
+                            } else {
+                                if hoveredID == item.id {
+                                    hoveredID = nil
+                                }
+                            }
                         }
                         .onTapGesture {
                             selectedIndex = index
@@ -74,10 +95,19 @@ public struct ResultListView: View {
                 // 不加动画：换一批结果时从中间滑回顶部会让人以为列表在乱动
                 proxy.scrollTo(first, anchor: .top)
             }
+            .onChange(of: selection?.hoverDisarmToken) { _, _ in
+                hoveredID = nil
+            }
             .onChange(of: selectedIndex) { _, newIndex in
                 guard newIndex >= 0, newIndex < items.count else { return }
                 withAnimation(.easeOut(duration: DesignTokens.Duration.scrollReveal)) {
-                    proxy.scrollTo(items[newIndex].id, anchor: .center)
+                    if newIndex == 0 {
+                        proxy.scrollTo(items[0].id, anchor: .top)
+                    } else if newIndex == items.count - 1 {
+                        proxy.scrollTo(items[newIndex].id, anchor: .bottom)
+                    } else {
+                        proxy.scrollTo(items[newIndex].id, anchor: nil)
+                    }
                 }
             }
         }
@@ -133,29 +163,42 @@ struct ResultRowView: View {
         .contentShape(Rectangle())
     }
 
-    /// 图标视图（根据类型决定展示方式）
+    /// 图标视图（根据类型决定展示方式，参考 Tinycast 的 squircle 风格）
     @ViewBuilder
     private var resultIcon: some View {
         switch item.iconType {
         case .symbol:
-            Image(systemName: item.icon)
-                .font(DesignTokens.Typography.iconGlyph)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(0.08))
+                Image(systemName: item.icon)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+            }
+            .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
         case .appIcon(let path):
-            // 使用稳定的路径标识，避免每次 body 重建 NSImage 触发 AttributeGraph 死循环
             AppIconImage(path: path)
+                .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
         case .image(let name):
             Image(name)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+                .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
         }
     }
 }
 
-/// 应用图标（按路径缓存，避免 SwiftUI 无限刷新）
+/// 应用图标（内存缓存，保证即开即显零白屏）
 private struct AppIconImage: View {
     let path: String
     @State private var image: NSImage?
+
+    private static let cache = NSCache<NSString, NSImage>()
+
+    init(path: String) {
+        self.path = path
+        _image = State(initialValue: Self.cache.object(forKey: path as NSString))
+    }
 
     var body: some View {
         Group {
@@ -164,14 +207,16 @@ private struct AppIconImage: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
-                Image(systemName: "app.fill")
-                    .font(DesignTokens.Typography.iconGlyph)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(0.08))
             }
         }
         .onAppear {
             guard image == nil else { return }
-            image = NSWorkspace.shared.icon(forFile: path)
+            let icon = NSWorkspace.shared.icon(forFile: path)
+            icon.size = NSSize(width: 48, height: 48)
+            Self.cache.setObject(icon, forKey: path as NSString)
+            image = icon
         }
     }
 }

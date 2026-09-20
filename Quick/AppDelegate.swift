@@ -14,6 +14,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // accessory 模式已在 QuickMain 中设置；此处仅启动核心
         AppCore.shared.start()
+
+        if CommandLine.arguments.contains("-showSettings") {
+            AppCore.shared.settingsWindowController.show(tab: .applications)
+        } else if CommandLine.arguments.contains("-showPalette") {
+            AppCore.shared.paletteCoordinator.show()
+        }
     }
 
     /// 应用即将退出

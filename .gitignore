@@ -26,6 +26,8 @@ Icon?
 # ---------------------------------------------------------------------------
 build/
 DerivedData/
+dist/
+
 xcuserdata/
 *.xcuserstate
 *.xcscmblueprint

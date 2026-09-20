@@ -27,6 +27,22 @@ public enum SettingsKey {
     /// 面板透明度（-100 ~ 100）
     public static let panelTransparency = "quick.global.panelTransparency"
 
+    // MARK: - 启动器设置
+
+    /// 应用搜索范围
+    public static let launcherSearchScopes = "quick.launcher.searchScopes"
+
+    /// 是否在启动器未命中时提供运行 Shell 命令回退
+    public static let launcherRunShellFallback = "quick.launcher.runShellFallback"
+
+    /// 自定义 Shell 命令列表数据
+    public static let launcherCustomCommands = "quick.launcher.customCommands"
+
+    /// 别名前缀
+    public static func alias(for key: String) -> String {
+        "quick.alias.\(key)"
+    }
+
     // MARK: - 模块开关前缀
 
     /// 生成模块启用状态的设置键

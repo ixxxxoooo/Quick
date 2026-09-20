@@ -151,6 +151,23 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
 
 ---
 
+## 发布（DMG / GitHub Release）
+
+对齐 Jietu：Debug 独立频道 + 稳定自签名「Quick」+ `Scripts/build-dmg.sh` + 打 `v*` tag。
+
+| | Debug | Release |
+| --- | --- | --- |
+| `PRODUCT_NAME` | `Quick Dev` | `Quick` |
+| Bundle ID | `com.ygw.quick.dev` | `com.ygw.quick` |
+
+一次性：`bash Scripts/generate-signing-cert.sh` → `bash Scripts/export-signing-cert.sh --upload`
+（写入 `QUICK_CERT_P12_BASE64` / `QUICK_CERT_P12_PASSWORD`）。
+
+每次发版：`git tag vX.Y.Z && git push origin vX.Y.Z`。细节见
+[docs/development.md#发布](docs/development.md)。
+
+---
+
 ## 提交规范
 
 **提交信息一律使用英文。** 这是硬性要求 —— 提交历史要能被任何人、任何工具读懂。

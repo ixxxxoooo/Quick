@@ -23,6 +23,8 @@ public struct SearchFieldView: View {
     /// 左侧图标（SF Symbol 名称）
     public let icon: String
 
+    @FocusState private var isFocused: Bool
+
     /// 初始化搜索输入框
     /// - Parameters:
     ///   - query: 搜索文本绑定
@@ -50,6 +52,14 @@ public struct SearchFieldView: View {
                 .textFieldStyle(.plain)
                 .font(DesignTokens.Typography.searchField)
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
+                .focused($isFocused)
+                .onAppear {
+                    isFocused = true
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) {
+                    _ in
+                    isFocused = true
+                }
         }
         .frame(height: DesignTokens.Size.headerHeight)
     }

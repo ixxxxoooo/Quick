@@ -15,7 +15,7 @@ public final class SystemControlModule: QuickModule {
 
     public static let id = "systemcontrol"
     public static let name = "系统控制"
-    public static let icon = "gearshape"
+    public static let icon = "bolt"
 
     public var isEnabled = true
 
@@ -23,6 +23,9 @@ public final class SystemControlModule: QuickModule {
 
     /// 系统操作运行器
     private let runner = SystemActionRunner()
+
+    /// 用户设置存储（用于别名）
+    private let settingsStore: SettingsStore?
 
     /// 模块级触发词：全部操作关键词的并集，外加几个更短的中文口语说法
     ///
@@ -33,37 +36,71 @@ public final class SystemControlModule: QuickModule {
     /// 只打了触发词、没有剩余查询词时的基础相关度
     private static let defaultRelevance = 0.5
 
-    public init() {}
+    public init(settingsStore: SettingsStore? = nil) {
+        self.settingsStore = settingsStore
+    }
+
+    /// 供外部直接调用执行指定系统操作（例如热键分发）
+    public func execute(_ action: SystemAction) {
+        runner.execute(action)
+    }
 
     // MARK: - QuickModule 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(Self.triggers) else { return [] }
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
 
-        // 剥离触发词后的词才是真正的筛选条件；为空表示列出全部操作
-        let keyword = query.removingTrigger(Self.triggers)
+        var results: [SearchableItem] = []
 
-        return
-            SystemAction.allCases
-            .filter { action in
-                keyword.isEmpty || action.keywords.contains { $0.fuzzyMatch(keyword) }
+        for action in SystemAction.allCases {
+            let alias = settingsStore?.alias(for: "system." + action.rawValue)
+            var score: Double = 0
+
+            if let alias, !alias.isEmpty {
+                if alias.caseInsensitiveCompare(trimmed) == .orderedSame {
+                    score = 1.0
+                } else if alias.fuzzyMatch(trimmed) {
+                    score = alias.fuzzyScore(trimmed)
+                }
             }
-            .map { action in
-                SearchableItem(
-                    id: "systemcontrol.\(action.rawValue)",
-                    moduleID: Self.id,
-                    title: action.title,
-                    subtitle: action.description,
-                    icon: action.icon,
-                    relevance: keyword.isEmpty
-                        ? Self.defaultRelevance
-                        : action.keywords.map { $0.fuzzyScore(keyword) }.max() ?? 0,
-                    action: { [weak self] in
-                        self?.runner.execute(action)
-                        EventBus.shared.post(HidePaletteEvent())
-                    }
+
+            if score == 0 && trimmed.matchesAnyTrigger(Self.triggers) {
+                let keyword = trimmed.removingTrigger(Self.triggers)
+                if keyword.isEmpty {
+                    score = Self.defaultRelevance
+                } else if action.keywords.contains(where: { $0.fuzzyMatch(keyword) }) {
+                    score = action.keywords.map { $0.fuzzyScore(keyword) }.max() ?? 0
+                }
+            } else if score == 0 && action.keywords.contains(where: { $0.fuzzyMatch(trimmed) }) {
+                score = action.keywords.map { $0.fuzzyScore(trimmed) }.max() ?? 0
+            }
+
+            if score > 0 {
+                let subtitle =
+                    (alias != nil && !alias!.isEmpty)
+                    ? "别名: \(alias!) · \(action.description)"
+                    : action.description
+
+                results.append(
+                    SearchableItem(
+                        id: "systemcontrol.\(action.rawValue)",
+                        moduleID: Self.id,
+                        title: action.title,
+                        subtitle: subtitle,
+                        icon: action.icon,
+                        relevance: score,
+                        action: { [weak self] in
+                            self?.runner.execute(action)
+                            EventBus.shared.post(HidePaletteEvent())
+                        }
+                    )
                 )
             }
+        }
+
+        results.sort { $0.relevance > $1.relevance }
+        return results
     }
 
     public func makeView() -> AnyView {

@@ -28,7 +28,35 @@ public final class PaletteSelection {
     /// 执行第 `index` 项（由视图写入：只有视图知道每一项的动作）
     public var activate: ((Int) -> Void)?
 
+    /// 是否已激活指针悬停选择（只有当光标发生实质性位移时才为 true）
+    public private(set) var hoverArmed = false
+
+    /// 光标位移判定锚点
+    private var hoverAnchor: CGPoint = .zero
+
+    /// 悬停解除令牌（按键或滚轮触发时更新，重置所有行的悬停表现）
+    public private(set) var hoverDisarmToken = UUID()
+
     public init() {}
+
+    /// 检测光标移动是否为有意操作（位移大于 3pt 时激活悬停）
+    public func notePointerMoved(to location: CGPoint) {
+        guard !hoverArmed else { return }
+        let dx = location.x - hoverAnchor.x
+        let dy = location.y - hoverAnchor.y
+        if hypot(dx, dy) > 3 {
+            hoverArmed = true
+        }
+    }
+
+    /// 键盘按键或滚轮滑动时解除悬停激活状态，避免静止光标与键盘抢选
+    public func disarmHover(at location: CGPoint) {
+        hoverAnchor = location
+        if hoverArmed {
+            hoverArmed = false
+            hoverDisarmToken = UUID()
+        }
+    }
 
     /// 上下移动选中项
     ///

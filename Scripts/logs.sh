@@ -2,8 +2,9 @@
 #
 # Quick — 查看统一日志系统里本应用的日志。
 #
-#   ./Scripts/logs.sh                 实时跟踪全部（含 debug，最有用）
-#   ./Scripts/logs.sh --errors        只看近 1 小时的 warning / error / fault
+#   ./Scripts/logs.sh                 实时跟踪正式版（com.ygw.quick，含 debug）
+#   ./Scripts/logs.sh --dev           实时跟踪 Debug 频道（com.ygw.quick.dev）
+#   ./Scripts/logs.sh --errors        只看近 1 小时的 error / fault
 #   ./Scripts/logs.sh --saved         只看已落盘的历史（notice 及以上）
 #   ./Scripts/logs.sh -c palette      只看某个 category
 #
@@ -12,19 +13,22 @@
 # 只有 notice 及以上才会持久化。排查刚发生的事用实时跟踪；查过去只能查到
 # notice / warning / error / fault。分级规则见 docs/logging.md
 #
+# @author ygw
 set -euo pipefail
 
 # 用户 shell 里可能有同名函数或别名覆盖 log，所以走绝对路径。
 readonly LOG_BIN=/usr/bin/log
 
-# 当前 Debug 与 Release 共用同一个 bundle id，所以只有一个 subsystem。
-readonly SUBSYSTEM="com.ygw.quick"
-
+SUBSYSTEM="com.ygw.quick"
 category=""
 mode="stream"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+    --dev)
+        SUBSYSTEM="com.ygw.quick.dev"
+        shift
+        ;;
     --errors)
         mode="errors"
         shift
@@ -37,9 +41,13 @@ while [[ $# -gt 0 ]]; do
         category="$2"
         shift 2
         ;;
+    -h | --help)
+        sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+        exit 0
+        ;;
     *)
         echo "未知参数: $1" >&2
-        echo "用法: $0 [--errors|--saved] [-c <category>]" >&2
+        echo "用法: $0 [--dev] [--errors|--saved] [-c <category>]" >&2
         exit 2
         ;;
     esac
@@ -57,8 +65,10 @@ stream)
     exec "$LOG_BIN" stream --predicate "$predicate" --level debug --style compact
     ;;
 errors)
-    echo "==> 近 1 小时的 warning / error / fault（subsystem=${SUBSYSTEM}）"
-    exec "$LOG_BIN" show --predicate "$predicate AND messageType >= warning" --last 1h --style compact
+    # messageType 只有 default/info/debug/error/fault，没有 warning，
+    # 所以能按级别过滤的就是 error（16）与 fault（17）。
+    echo "==> 近 1 小时的 error / fault（subsystem=${SUBSYSTEM}）"
+    exec "$LOG_BIN" show --predicate "$predicate AND messageType >= 16" --last 1h --style compact
     ;;
 saved)
     echo "==> 已落盘的历史（notice 及以上，近 1 小时）"

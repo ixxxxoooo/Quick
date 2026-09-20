@@ -15,7 +15,7 @@ public final class SystemMonitorModule: QuickModule {
 
     public static let id = "sysmonitor"
     public static let name = "系统监控"
-    public static let icon = "gauge.with.dots.needle.33percent"
+    public static let icon = "cpu"
 
     public var isEnabled = true
 
@@ -36,7 +36,7 @@ public final class SystemMonitorModule: QuickModule {
                 moduleID: Self.id,
                 title: "系统监控",
                 subtitle: "查看进程、系统信息和端口",
-                icon: "gauge.with.dots.needle.33percent",
+                icon: "cpu",
                 relevance: 0.6,
                 action: {
                     EventBus.shared.post(NavigateEvent(moduleID: "sysmonitor"))

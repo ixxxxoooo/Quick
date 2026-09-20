@@ -1,7 +1,7 @@
 name: CI
 
 # 只做「这个提交是不是好的」——测试、排版、构建。
-# 不做发布：发布链路尚未建立，见 docs/development.md#发布
+# 发布走 `.github/workflows/release.yml`（打 `v*` tag）。
 on:
   push:
     branches: [main]
@@ -56,4 +56,10 @@ jobs:
           fi
 
       - name: 构建
+        # CI runner 没有自签名证书「Quick」；build.sh 会自动退回 ad-hoc。
+        # 正式 DMG 走 release.yml，必须带 QUICK_CERT_P12_* secrets。
         run: ./Scripts/build.sh
+        env:
+          # 显式 ad-hoc，避免钥匙串里碰巧有别的身份干扰
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGN_STYLE: Automatic

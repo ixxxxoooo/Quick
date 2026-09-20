@@ -99,6 +99,8 @@ public enum DesignTokens {
         public static let keyCap = scaled(18)
         /// 紧凑快捷键帽尺寸（底栏密集提示用）
         public static let compactKeyCap = scaled(15)
+        /// 设置项别名框与快捷键录制框标准宽度（参考 Tinycast）
+        public static let shortcutRecorder: CGFloat = 120
         /// 一像素细线（分隔线、卡片描边）
         ///
         /// **不随 `panelScale` 缩放**：它是物理像素级的东西，放大只会变成一条粗边。
@@ -121,11 +123,14 @@ public enum DesignTokens {
         ///
         /// **不缩放**：它是比例，不是长度。
         public static let paletteTopMarginFraction: CGFloat = 0.18
-        /// 设置窗口尺寸（系统窗口，不随面板缩放）
-        ///
-        /// 比参考实现的 900×700 小：那是为 22 个分栏定的，我们只有 4 个。
-        /// 窗口尺寸该由内容决定，不该照抄。
-        public static let settingsWindow = CGSize(width: 820, height: 560)
+        /// 设置窗口尺寸（系统窗口，不随面板缩放，参考 Tinycast 900x700）
+        public static let settingsWindow = CGSize(width: 900, height: 700)
+        /// 设置窗口侧边栏宽度
+        public static let settingsSidebar: CGFloat = 215
+        /// 设置窗口详情列最小宽度
+        public static let settingsDetailMinimum: CGFloat = 420
+        /// 设置搜索框高度
+        public static let settingsSearchField: CGFloat = 28
     }
 
     // MARK: - 阴影

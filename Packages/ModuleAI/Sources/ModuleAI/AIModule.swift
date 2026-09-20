@@ -14,7 +14,7 @@ public final class AIModule: QuickModule {
 
     public static let id = "ai"
     public static let name = "AI 对话"
-    public static let icon = "brain"
+    public static let icon = "sparkles"
 
     public var isEnabled = true
 
@@ -35,7 +35,7 @@ public final class AIModule: QuickModule {
                 moduleID: Self.id,
                 title: "AI 对话",
                 subtitle: "与 AI 助手对话",
-                icon: "brain",
+                icon: "sparkles",
                 relevance: 0.7,
                 action: {
                     EventBus.shared.post(NavigateEvent(moduleID: "ai"))

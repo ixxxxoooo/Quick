@@ -12,56 +12,33 @@
   改动这个上限前先测一次面板显隐耗时（预算 100 ms）。
 - **空查询的候选顺序是「收藏优先，否则取索引前 8」。** 收藏为空时退化为索引顺序，
   这是刻意的 —— 没有收藏的新用户也该看到点东西，而不是一片空白。
-- **`SearchableItem.id` 必须是 `launcher.<bundleID>`。** `id` 是列表的 `Identifiable`
-  主键，重复会让 SwiftUI 的行错乱。用 bundleID 而不是应用名，因为应用名会重复
-  （两个不同路径的同名应用）。
-- **相关度是混合分：`fuzzyScore * 0.7 + ranking * 0.3`。** `AppIndex.search` 已按
-  名称相关度排过序，但最终进列表的分数必须叠加使用频率，否则常用应用永远排在
-  名称更匹配的陌生应用后面。两个权重不是一个可以随手调的比例 —— 改它等于改产品的
-  核心手感。
-- **`activate()` 必须 `load()` 两个 Store，`deactivate()` 必须 `save()` RankingStore。**
-  `FavoritesStore` 的每次增删都立即落盘（见下），所以停用时不必再存。
-- **`searchItems` 必须是纯查询。** 它会在每次按键（防抖后）被调用，不允许在里面
-  启停监听、写盘、或调用 `appIndex.refresh()`。
+- **`SearchableItem.id` 必须带有 `launcher.` 前缀。**
+  - 应用项：`launcher.<bundleID>`
+  - 直接 Shell：`launcher.shell.direct`
+  - 自定义 Shell 命令：`launcher.cmd.<UUID>`
+  - Shell 兜底：`launcher.shell.fallback`
+- **直接以 `>` 开头的查询，进入直接 Shell 执行模式。** 单独返回一个 1.0 相关度的条目，回车后异步在 `/bin/zsh -l -c` 下执行并通过 HUD 显示输出反馈。
+- **支持自定义应用别名与快捷键。** 用户在设置中配置的应用别名若完全匹配当前查询，直接以 1.0 最高相关度排在首位；模糊匹配别名亦能获得评分加权。
+- **支持自定义 Shell 命令库与 Shell 兜底。** 搜索列表底部可展示 `$ <query>` 兜底执行项（受设置开关控制）。
+- **面板快捷键与窗口操作遵循规范。** 主搜索窗口支持 `⌘,` 打开设置，`⌘W` 关闭面板；设置窗口支持 `⌘W` 关闭。搜索栏左下角不显示条目计数器。
 
 ## 内部结构
 
 | 类型 | 职责 |
 | --- | --- |
-| `LauncherModule` | 模块入口，实现 `QuickModule`；搜索与排序逻辑都在这里 |
+| `LauncherModule` | 模块入口，实现 `QuickModule`；搜索（应用、别名、Shell 与自定义命令）与排序逻辑 |
 | `RankingStore` | 使用次数记录（bundleID → 次数），归一化成 0…1 的评分 |
 | `FavoritesStore` | 收藏的 bundleID 列表，保持插入顺序 |
-| `LauncherView` | 模块在面板内的主视图（**目前面板外壳尚未接入模块视图**） |
-
-排序的输入有两个来源：`AppIndex`（名称匹配，只负责过滤与粗排）与 `RankingStore`
-（使用频率，负责个性化）。两者在 `searchItems` 里合成最终 `relevance`。
+| `AppIndex` | 应用程序索引与扫描，支持动态自定义搜索范围配置 |
+| `ShellCommandRunner` | 结构化后台异步执行 Shell 脚本并捕获 stdout/stderr/退出码 |
+| `CustomCommand` | 用户自定义 Shell 命令数据结构 |
+| `KeyShortcut` / `HotKeyService` | 全局热键与应用/操作绑定服务 |
+| `LauncherView` | 模块在面板内的主视图 |
 
 ## 持久化
 
-| 文件 | 内容 | 写入时机 |
+| 文件 / 存储键 | 内容 | 写入时机 |
 | --- | --- | --- |
 | `ranking.json` | `[bundleID: 使用次数]` | 记录使用后 **防抖 5 秒**落盘；停用时立即落盘 |
 | `favorites.json` | `[bundleID]` | 每次增删**立即**落盘 |
-
-路径走 `AppPaths.moduleData("launcher")`。
-
-- 两者的 `init(storageURL:)` 接收可选路径，默认走 `AppPaths`。
-  **测试必须传临时目录**，否则会污染用户真实数据。
-- 解码失败一律降级为空记录并记 `.error`，**不让模块起不来**。
-  用户的历史记录不该因为一个损坏的 JSON 就让整个启动器失效。
-
-## 已知限制
-
-- **不做拼音搜索。** 类文档注释里提到过拼音匹配，但当前实现只有
-  `String.fuzzyScore` 的子序列匹配 —— 对中文它是**字符**子序列，不是拼音。
-  所以输入 `wx` 不会命中「微信」，输入 `weixin` 也不会。想要拼音需要一张汉字到
-  拼音的映射表，属于未实现的功能，不是 bug。
-- **模糊匹配的漏判与误判是子序列算法的固有行为。** `fuzzyScore` 的阶梯是
-  完全 `1.0` / 前缀 `0.9` / 包含 `0.7` / 子序列 `0.4`，且 `fuzzyMatch` 是纯顺序子序列 ——
-  输入 `gc` 会命中 `Google Chrome`，也会命中 `Basic Config`。这是有意的取舍。
-- **不按使用频率衰减。** `RankingStore` 只累计次数，不做时间衰减，
-  所以几年前常用、现在不用的应用会长期占据高位。
-- **不监听应用目录变化。** `AppIndex.refresh()` 只在启动时跑一次，新装的应用要重启才出现。
-- **不索引 `~/Applications` 之外的用户目录**，也不索引已挂载磁盘上的应用。
-- `makeSettingsView()` 返回 `nil`：启动器目前没有设置页，收藏也没有 UI 入口
-  （`FavoritesStore` 已实现并有测试，但没有任何界面在调用 `add` / `remove`）。
+| `SettingsStore` (UserDefaults) | 搜索范围、别名映射、自定义命令列表、Shell 回退开关 | 设置变更时立即写入 |

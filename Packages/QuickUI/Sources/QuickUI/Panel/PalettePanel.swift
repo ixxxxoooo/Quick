@@ -31,6 +31,12 @@ public final class PalettePanel: NSPanel {
     /// 回车回调，返回 `true` 表示已消费
     var onSubmit: (() -> Bool)?
 
+    /// 指针移动回调（用于检测是否有意移动鼠标）
+    var onPointerMoved: ((CGPoint) -> Void)?
+
+    /// 解除悬停激活回调（按键或滚轮触发）
+    var onDisarmHover: ((CGPoint) -> Void)?
+
     /// 初始化面板
     /// - Parameter rootView: SwiftUI 根视图
     init<Content: View>(rootView: Content) {
@@ -69,6 +75,15 @@ public final class PalettePanel: NSPanel {
     // MARK: - 按键拦截
 
     override public func sendEvent(_ event: NSEvent) {
+        switch event.type {
+        case .mouseMoved:
+            onPointerMoved?(NSEvent.mouseLocation)
+        case .keyDown, .scrollWheel:
+            onDisarmHover?(NSEvent.mouseLocation)
+        default:
+            break
+        }
+
         // Escape 键
         if event.type == .keyDown,
             Int(event.keyCode) == kVK_Escape,
@@ -92,9 +107,9 @@ public final class PalettePanel: NSPanel {
         // **必须在这里拦，不能挂在 SwiftUI 视图上。** 面板打开时焦点在搜索框里，
         // field editor 会先把上下键拿去移动光标；而挂在结果列表（既不是焦点、
         // 也不是输入框的祖先）上的 onKeyPress 永远收不到事件。
-        // 允许 Shift：Shift+上下也该能选，没有理由禁用。
+        // 上下键（支持方向键与 Ctrl+N / Ctrl+P）
         if event.type == .keyDown,
-            event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
+            event.modifierFlags.isDisjoint(with: [.command, .option]),
             let delta = Self.verticalDelta(for: event),
             onMove?(delta) == true
         {
@@ -112,10 +127,21 @@ public final class PalettePanel: NSPanel {
 
         // ⌘ 快捷键
         if event.type == .keyDown,
-            event.modifierFlags.contains(.command),
-            onCommandShortcut?(event) == true
+            event.modifierFlags.contains(.command)
         {
-            return
+            if let characters = event.charactersIgnoringModifiers {
+                if characters == "," {
+                    EventBus.shared.post(ShowPaletteSettingsEvent())
+                    return
+                }
+                if characters.lowercased() == "w" {
+                    _ = onEscape?()
+                    return
+                }
+            }
+            if onCommandShortcut?(event) == true {
+                return
+            }
         }
 
         super.sendEvent(event)
@@ -125,6 +151,13 @@ public final class PalettePanel: NSPanel {
 
     /// 上下键对应的方向，其他键返回 `nil`
     private static func verticalDelta(for event: NSEvent) -> Int? {
+        if event.modifierFlags.contains(.control) {
+            if let chars = event.charactersIgnoringModifiers {
+                if chars.lowercased() == "n" { return 1 }
+                if chars.lowercased() == "p" { return -1 }
+            }
+            return nil
+        }
         switch Int(event.keyCode) {
         case kVK_UpArrow: return -1
         case kVK_DownArrow: return 1

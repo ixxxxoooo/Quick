@@ -20,21 +20,23 @@ public final class AppIndex {
 
     private let log = QuickLog.platform
 
-    /// 应用搜索目录
-    private let searchPaths: [String] = [
-        "/Applications",
-        "/System/Applications",
-        "/System/Applications/Utilities",
-        NSHomeDirectory() + "/Applications",
-        "/System/Library/CoreServices"
-    ]
+    /// 当前应用搜索目录
+    public private(set) var searchScopes: [String] = SearchScopes.defaults
 
-    public init() {}
+    public init(scopes: [String]? = nil) {
+        if let scopes {
+            self.searchScopes = scopes
+        }
+    }
 
     /// 扫描并刷新应用索引
     ///
     /// 磁盘枚举必须离开主线程 —— 冷启动不该被 IO 挡住，所以它跑在 `Task.detached` 上。
-    public func refresh() async {
+    /// - Parameter scopes: 可选的新搜索范围，若提供则更新并以该范围扫描
+    public func refresh(scopes: [String]? = nil) async {
+        if let scopes {
+            self.searchScopes = SearchScopes.normalize(scopes)
+        }
         guard !isScanning else {
             log.debug("扫描已在进行中，跳过本次请求")
             return
@@ -42,13 +44,13 @@ public final class AppIndex {
         isScanning = true
         defer { isScanning = false }
 
-        let paths = searchPaths
+        let expandedPaths = searchScopes.map { SearchScopes.expand($0) }
         let signpost = QuickLog.signposter(QuickLog.Category.platform)
         let interval = signpost.beginInterval("AppIndex.refresh")
         let started = Date()
 
         let entries = await Task.detached(priority: .userInitiated) {
-            AppIndex.scan(searchPaths: paths)
+            AppIndex.scan(searchPaths: expandedPaths)
         }.value
 
         // 去重（按 Bundle ID）
@@ -64,6 +66,8 @@ public final class AppIndex {
             去重后 \(self.apps.count, privacy: .public) 条，\
             耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
             """)
+
+        EventBus.shared.post(AppIndexRefreshedEvent())
     }
 
     /// 在后台枚举磁盘上的 `.app`，返回未去重的条目
@@ -78,6 +82,26 @@ public final class AppIndex {
 
         for path in searchPaths {
             let url = URL(fileURLWithPath: path)
+            if url.pathExtension == "app" {
+                if let bundle = Bundle(url: url) {
+                    let name =
+                        bundle.infoDictionary?["CFBundleName"] as? String
+                        ?? bundle.infoDictionary?["CFBundleDisplayName"] as? String
+                        ?? url.deletingPathExtension().lastPathComponent
+                    let bundleID = bundle.bundleIdentifier ?? url.path
+                    results.append(
+                        AppEntry(
+                            id: bundleID,
+                            name: name,
+                            bundleID: bundleID,
+                            path: url.path,
+                            isSystemApp: path.hasPrefix("/System")
+                        )
+                    )
+                }
+                continue
+            }
+
             guard
                 let enumerator = FileManager.default.enumerator(
                     at: url,
@@ -124,6 +148,11 @@ public final class AppIndex {
             .filter { $0.1 > 0 }
             .sorted { $0.1 > $1.1 }
             .map(\.0)
+    }
+
+    /// 根据 Bundle ID 获取已索引的应用条目
+    public func app(withBundleID bundleID: String) -> AppEntry? {
+        apps.first { $0.bundleID == bundleID }
     }
 }
 

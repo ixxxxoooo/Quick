@@ -21,13 +21,14 @@ private let log = QuickLog.module(ClipboardModule.id)
 private let log = QuickLog.palette
 ```
 
-子系统固定为 `Bundle.main.bundleIdentifier`，当前是 `com.ygw.quick`。
+子系统取自 `Bundle.main.bundleIdentifier`：
 
-> ⚠️ **Debug 与 Release 目前共用同一个 bundle id**，所以本地调试与已安装版本的日志
-> 和数据是混在一起的。要做真正的隔离（各自独立的数据目录、日志子系统、TCC 授权）需要
-> 给 Debug 配置一个独立 bundle id（例如 `com.ygw.quick.dev`）。这是建议的改进，
-> **尚未实施** —— 实施前被记在这里，不要假设它已经生效。见
-> [development.md#发布](development.md)。
+| 渠道 | Bundle ID | 看日志 |
+| --- | --- | --- |
+| Release / 已安装 | `com.ygw.quick` | `./Scripts/logs.sh` |
+| Debug（本地） | `com.ygw.quick.dev` | `./Scripts/logs.sh --dev` |
+
+详见 [development.md#发布](development.md)。
 
 ---
 

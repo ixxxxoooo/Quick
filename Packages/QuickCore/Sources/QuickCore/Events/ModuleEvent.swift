@@ -112,3 +112,19 @@ public struct ShowPaletteEvent: ModuleEvent {
         self.query = query
     }
 }
+
+/// 请求打开设置窗口
+public struct ShowPaletteSettingsEvent: ModuleEvent {
+    public static let name = "quick.settings.show"
+
+    public init() {}
+}
+
+// MARK: - 应用索引事件
+
+/// 应用索引刷新完成事件
+public struct AppIndexRefreshedEvent: ModuleEvent {
+    public static let name = "quick.appindex.refreshed"
+
+    public init() {}
+}

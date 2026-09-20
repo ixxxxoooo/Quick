@@ -104,16 +104,13 @@ swift build --package-path Packages/QuickUI
 （见 [logging.md](logging.md)），所以大部分问题应当能直接看出来。
 
 ```bash
-./Scripts/logs.sh                       # 实时全部
+./Scripts/logs.sh                       # 实时正式版（com.ygw.quick）
+./Scripts/logs.sh --dev                 # 实时 Debug 频道（com.ygw.quick.dev）
 ./Scripts/logs.sh --errors              # 近 1 小时的问题
-log stream --predicate 'subsystem == "com.ygw.quick" AND category == "palette"' --level debug
+log stream --predicate 'subsystem == "com.ygw.quick.dev" AND category == "palette"' --level debug
 ```
 
-`subsystem` 就是 bundle id：`com.ygw.quick`。
-
-**注意**：当前 Debug 与 Release 共用这一个 bundle id，所以本地调试的日志与已安装版本
-混在同一子系统里 —— 用 `Scripts/logs.sh` 看时可以按 category 区分（`app` 是应用层，
-`module.*` 是各模块）。真正的 Debug 独立频道尚未实施，见 §8。
+`subsystem` 就是 bundle id。Debug 与 Release 已隔离，见 §8。
 
 ### 启动参数
 
@@ -231,32 +228,61 @@ Packages/ModuleFoo/
 
 | 用途 | 位置 |
 | --- | --- |
-| 模块数据 | `~/Library/Application Support/<bundle id>/<module id>/` |
+| 模块数据 | `~/Library/Application Support/<bundle id>/Modules/<module id>/` |
 | 缓存 | `~/Library/Caches/<bundle id>/` |
 | 日志 | 统一日志系统（不是文件），见 [logging.md](logging.md) |
 
-**Debug 与 Release 目前共用同一个 bundle id（`com.ygw.quick`）**，所以本地跑的构建
-和已安装版本共用同一份数据、日志与 TCC 授权。给 Debug 配一个独立 bundle id
-（`com.ygw.quick.dev`）可以彻底隔离，代价是本地构建需要重新授予辅助功能权限。
-**这是建议的改进，尚未实施** —— 实施前不要假设隔离已经生效。
+**Debug 与 Release 已隔离**：Debug 用 `com.ygw.quick.dev`（产物 `Quick Dev.app`），
+Release 用 `com.ygw.quick`（产物 `Quick.app`）。各自独立的偏好、缓存、日志子系统与
+TCC 授权。本地调试日志用 `./Scripts/logs.sh --dev`。
 
 ---
 
 ## 8. 发布
 
-发布链路尚未建立（没有签名身份、没有 DMG 脚本、没有 CI 归档）。在补齐之前，
-「发布」= 用 Xcode 归档 Release 配置并手工分发。
+对齐 Jietu 的发布方案：稳定自签名 + DMG + 打 `v*` tag 触发 GitHub Release。
 
-补齐发布链路时需要做的事情（写在这里避免遗漏）：
+### 构建渠道
 
-1. **Debug 独立频道**：给 `project.yml` 的 Debug 配置一个独立
-   `PRODUCT_BUNDLE_IDENTIFIER`（如 `com.ygw.quick.dev`），让本地构建拥有自己的
-   偏好、缓存、日志子系统与 TCC 授权，不再和已安装版本互相污染。
-   同时把 `AppPaths` 从写死的 `"Quick"` 改成基于 `Bundle.main.bundleIdentifier`，
-   并恢复 `Scripts/logs.sh` 的 `--dev` 开关（目前因为只有一个 subsystem 已移除）。
-2. **稳定的自签名身份**：macOS 的 TCC 权限认签名，每次重建都换签名会导致
-   辅助功能权限反复失效。需要一个固定的自签名证书。
-3. **Release 构建设置**：`ENABLE_HARDENED_RUNTIME`、剥离符号、
-   `DEPLOYMENT_POSTPROCESSING`。
-4. **DMG 打包脚本**。
-5. **CI 归档工作流**（当前 `.github/workflows/ci.yml` 只做测试、lint 与构建校验）。
+| | Debug | Release |
+| --- | --- | --- |
+| `PRODUCT_NAME` | `Quick Dev` | `Quick` |
+| `PRODUCT_BUNDLE_IDENTIFIER` | `com.ygw.quick.dev` | `com.ygw.quick` |
+| 产物 | `…/Debug/Quick Dev.app` | `…/Release/Quick.app` |
+
+Debug 必须 `ENABLE_DEBUG_DYLIB = NO`（已写进 `project.yml`），否则主可执行只剩壳，
+TCC 认不出稳定签名身份。
+
+### 自签名（一次性）
+
+TCC 按「bundle id + certificate leaf」认 App。ad-hoc 签名的设计要求是 `cdhash`，
+**每构建一次就换身份**，升级后要重新授权。所以正式包必须用固定证书「Quick」。
+
+```bash
+# 1. 本机生成（已有「Quick」身份就跳过，千万别重跑）
+bash Scripts/generate-signing-cert.sh
+
+# 2. 导出并写入 GitHub Secrets
+bash Scripts/export-signing-cert.sh --upload
+# → QUICK_CERT_P12_BASE64 / QUICK_CERT_P12_PASSWORD
+```
+
+### 每次发版
+
+```bash
+# 本地验打包（可选）
+bash Scripts/build-dmg.sh          # 产出 dist/Quick-<version>.dmg
+
+# 打 tag 触发 .github/workflows/release.yml
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+- 打 tag 的正式发布**没有证书就失败**；手动 `workflow_dispatch` 才允许
+  `QUICK_ALLOW_ADHOC=1` 验流程（产物不适合发给用户）。
+- **禁止**：重新跑 `generate-signing-cert.sh`、换 p12、改 Release 的 bundle id。
+- 自签名未受系统信任：用户首次打开前需
+  `xattr -dr com.apple.quarantine /Applications/Quick.app`
+  （DMG 里的 `安装说明.txt` 有同款可复制命令）。
+
+公证（Notarization）与 Developer ID 是后续可选升级；当前直接分发走自签名 + 解隔离。

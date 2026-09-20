@@ -46,6 +46,7 @@ struct PaletteRootView: View {
     @State private var results: [SearchableItem] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
+    @State private var appIndexSubscription: EventSubscription?
 
     private let log = QuickLog.palette
 
@@ -69,6 +70,20 @@ struct PaletteRootView: View {
                 if !initialQuery.isEmpty { query = initialQuery }
                 log.debug("面板视图已出现，开始首次搜索")
                 runSearch(query)
+                if appIndexSubscription == nil {
+                    appIndexSubscription = EventBus.shared.on(AppIndexRefreshedEvent.self) { _ in
+                        Task { @MainActor in
+                            if query.isEmpty {
+                                runSearch("")
+                            }
+                        }
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+                if results.isEmpty {
+                    runSearch(query)
+                }
             }
             .onChange(of: query) { _, newValue in
                 runSearch(newValue)
@@ -132,14 +147,23 @@ struct PaletteRootView: View {
                 message: "没有找到结果",
                 detail: "换个关键词试试，或检查对应模块是否已启用"
             )
-        } else if results.isEmpty && query.isEmpty && !isSearching {
-            emptyState(
-                icon: "magnifyingglass",
-                message: "开始输入以搜索",
-                detail: "应用、命令、公式与工具都可以直接搜"
-            )
+        } else if results.isEmpty && query.isEmpty {
+            if isSearching {
+                ProgressView("正在加载应用程序…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                emptyState(
+                    icon: "magnifyingglass",
+                    message: "暂无应用程序",
+                    detail: "正在扫描系统应用，请稍候…"
+                )
+            }
         } else {
-            ResultListView(items: results, selectedIndex: selectionBinding)
+            ResultListView(
+                items: results,
+                selectedIndex: selectionBinding,
+                selection: selection
+            )
         }
     }
 
@@ -179,15 +203,10 @@ struct PaletteRootView: View {
 
     /// 底栏
     ///
-    /// 没有通栏背景、没有上分隔线：左侧是结果计数，右侧是一枚浮起的玻璃胶囊。
+    /// 没有通栏背景、没有上分隔线：左侧是菜单圆形胶囊（无计数），右侧是一枚浮起的玻璃操作胶囊。
     /// 行的内容从这一带下面穿过，由 `edgeDissolve()` 淡出。
     private var bottomBar: some View {
         HStack(spacing: 0) {
-            Text(statusText)
-                .font(DesignTokens.Typography.bar)
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-                .lineLimit(1)
-
             Spacer(minLength: DesignTokens.Spacing.md)
 
             if !results.isEmpty {
@@ -210,13 +229,6 @@ struct PaletteRootView: View {
         .padding(.horizontal, DesignTokens.Spacing.md)
         .frame(height: DesignTokens.Size.barButtonHeight)
         .frosted(in: Capsule())
-    }
-
-    /// 底栏左侧的状态文本
-    private var statusText: String {
-        if isSearching { return "搜索中…" }
-        if results.isEmpty { return "无结果" }
-        return "\(selection.index + 1) / \(results.count)"
     }
 
     // MARK: - 搜索

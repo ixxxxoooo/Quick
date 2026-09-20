@@ -9,7 +9,7 @@ import SwiftUI
 struct TextDiffTool: DevTool {
     let id = "diff"
     let name = "文本对比"
-    let icon = "doc.on.doc.fill"
+    let icon = "doc.on.doc"
     let keywords = ["diff", "对比", "比较", "差异", "text diff"]
     let description = "对比两段文本的差异"
 

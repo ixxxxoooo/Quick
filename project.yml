@@ -67,11 +67,29 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.ygw.quick
         INFOPLIST_FILE: Quick/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Quick/Quick.entitlements
+        # 自签名身份「Quick」：TCC 按 certificate leaf 认 App，必须稳定（见 Scripts/generate-signing-cert.sh）
+        CODE_SIGN_IDENTITY: Quick
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
         PRODUCT_NAME: Quick
+        PRODUCT_MODULE_NAME: Quick
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: false
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
         COMBINE_HIDPI_IMAGES: true
+      configs:
+        Debug:
+          # 独立开发频道：与正式版隔离 TCC / 偏好 / 日志子系统
+          PRODUCT_NAME: Quick Dev
+          PRODUCT_BUNDLE_IDENTIFIER: com.ygw.quick.dev
+          # Xcode 16+ 默认把 Debug 代码放进 .debug.dylib，主可执行只剩壳 → TCC 认不出稳定身份
+          ENABLE_DEBUG_DYLIB: NO
+        Release:
+          PRODUCT_NAME: Quick
+          PRODUCT_BUNDLE_IDENTIFIER: com.ygw.quick
+          DEPLOYMENT_POSTPROCESSING: YES
+          STRIP_INSTALLED_PRODUCT: YES
+          COPY_PHASE_STRIP: YES
     dependencies:
       - package: QuickCore
       - package: QuickUI

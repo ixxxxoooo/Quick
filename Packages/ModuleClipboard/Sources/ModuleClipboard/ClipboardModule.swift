@@ -16,7 +16,7 @@ public final class ClipboardModule: QuickModule {
 
     public static let id = "clipboard"
     public static let name = "剪贴板历史"
-    public static let icon = "doc.on.doc"
+    public static let icon = "doc.on.clipboard"
 
     public var isEnabled = true
 

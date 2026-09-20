@@ -7,7 +7,7 @@ import Foundation
 /// 系统操作枚举
 ///
 /// 定义所有支持的系统控制操作。
-enum SystemAction: String, CaseIterable, Sendable {
+public enum SystemAction: String, CaseIterable, Sendable {
     case lockScreen = "lock"
     case sleep = "sleep"
     case restart = "restart"
@@ -20,7 +20,7 @@ enum SystemAction: String, CaseIterable, Sendable {
     case toggleDoNotDisturb = "dnd"
 
     /// 显示标题
-    var title: String {
+    public var title: String {
         switch self {
         case .lockScreen: "锁定屏幕"
         case .sleep: "睡眠"
@@ -36,7 +36,7 @@ enum SystemAction: String, CaseIterable, Sendable {
     }
 
     /// 操作描述
-    var description: String {
+    public var description: String {
         switch self {
         case .lockScreen: "锁定当前会话"
         case .sleep: "将 Mac 置入睡眠状态"
@@ -51,24 +51,24 @@ enum SystemAction: String, CaseIterable, Sendable {
         }
     }
 
-    /// SF Symbol 图标
-    var icon: String {
+    /// SF Symbol 图标（参考 Tinycast SystemAction）
+    public var icon: String {
         switch self {
-        case .lockScreen: "lock.fill"
-        case .sleep: "moon.fill"
-        case .restart: "arrow.counterclockwise"
+        case .lockScreen: "lock"
+        case .sleep: "moon.zzz"
+        case .restart: "arrow.clockwise"
         case .shutdown: "power"
         case .logout: "rectangle.portrait.and.arrow.right"
-        case .screenSaver: "sparkles.tv"
-        case .emptyTrash: "trash.fill"
-        case .ejectAll: "eject.fill"
-        case .toggleDarkMode: "moon.circle.fill"
-        case .toggleDoNotDisturb: "moon.zzz.fill"
+        case .screenSaver: "rectangle.inset.filled"
+        case .emptyTrash: "trash"
+        case .ejectAll: "eject"
+        case .toggleDarkMode: "circle.lefthalf.filled"
+        case .toggleDoNotDisturb: "bell.slash"
         }
     }
 
     /// 搜索关键词（中英文）
-    var keywords: [String] {
+    public var keywords: [String] {
         switch self {
         case .lockScreen: ["锁屏", "锁定", "lock", "lock screen"]
         case .sleep: ["睡眠", "休眠", "sleep"]

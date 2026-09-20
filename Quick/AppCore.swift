@@ -23,6 +23,7 @@ import Foundation
 import QuickCore
 import QuickPlatform
 import QuickUI
+import SwiftUI
 
 /// 应用核心组装器
 ///
@@ -87,6 +88,10 @@ final class AppCore {
     /// 调试唤醒通知观察者（必须强引用，否则立即失效）
     private var debugWakeObserver: NSObjectProtocol?
 
+    /// 设置数据源缓存（避免设置面板切换时重复全量计算与反序列化）
+    private var cachedIndexedApps: [SettingsAppItem]?
+    private var cachedCustomCommands: [SettingsCustomCommandItem]?
+
     private init() {}
 
     // MARK: - 启动
@@ -113,12 +118,43 @@ final class AppCore {
         hotKeyService.onTogglePalette = { [weak self] in
             self?.paletteCoordinator.toggle()
         }
+        hotKeyService.onLaunchApp = { [weak self] bundleID in
+            self?.appIndex.app(withBundleID: bundleID)?.launch()
+        }
+        hotKeyService.onRunSystemAction = { [weak self] id in
+            if let systemModule = self?.modules.first(where: { type(of: $0).id == SystemControlModule.id })
+                as? SystemControlModule,
+                let action = SystemAction(rawValue: id)
+            {
+                systemModule.execute(action)
+            }
+        }
+        hotKeyService.onRunCustomCommand = { [weak self] id in
+            guard let self else { return }
+            let list = self.loadCustomCommands()
+            if let cmd = list.first(where: { $0.id == id && $0.isEnabled }) {
+                Task {
+                    let result = await ShellCommandRunner.run(
+                        cmd.command, workingDirectory: cmd.workingDirectory)
+                    EventBus.shared.post(
+                        ShowHUDEvent(
+                            message: String(result.summary.prefix(80)),
+                            tone: result.succeeded ? .success : .warning
+                        )
+                    )
+                }
+            }
+        }
         hotKeyService.start()
         statusItemController.install()
         observeDebugWakeSignals()
 
-        // 5. 后台刷新应用索引（不阻塞启动）
-        Task { await appIndex.refresh() }
+        // 5. 读取持久化的搜索范围并在后台刷新应用索引
+        let initialScopes = settingsStore.searchScopes(defaultScopes: SearchScopes.defaults)
+        Task {
+            await appIndex.refresh(scopes: initialScopes)
+            self.restoreSavedHotKeys()
+        }
 
         // 6. 激活所有已启用的模块
         for module in modules where module.isEnabled {
@@ -134,6 +170,7 @@ final class AppCore {
         // 8. 开发启动参数：立即显示设置窗口（验收用）
         if ProcessInfo.processInfo.arguments.contains("-showSettings") {
             log.notice("命中启动参数 -showSettings，立即显示设置窗口")
+            paletteCoordinator.hide()
             settingsWindowController.show()
         }
 
@@ -177,10 +214,10 @@ final class AppCore {
     /// 新增模块只需在此处添加一行注册。
     private func registerModules() {
         // Phase 2: 核心模块
-        register(LauncherModule(appIndex: appIndex))
+        register(LauncherModule(appIndex: appIndex, settingsStore: settingsStore))
         register(ClipboardModule())
         register(CalculatorModule())
-        register(SystemControlModule())
+        register(SystemControlModule(settingsStore: settingsStore))
 
         // Phase 3: 效率与工具模块
         register(FileSearchModule())
@@ -257,6 +294,50 @@ final class AppCore {
                 self?.paletteCoordinator.show(moduleID: event.moduleID, query: event.query)
             }
         )
+
+        // 打开设置窗口事件
+        subscriptions.append(
+            bus.on(ShowPaletteSettingsEvent.self) { [weak self] _ in
+                Task { @MainActor in
+                    self?.paletteCoordinator.hide(restoreFocus: false)
+                    self?.settingsWindowController.show()
+                }
+            }
+        )
+
+        // 应用索引刷新事件（清除设置应用缓存）
+        subscriptions.append(
+            bus.on(AppIndexRefreshedEvent.self) { [weak self] _ in
+                self?.cachedIndexedApps = nil
+            }
+        )
+    }
+
+    // MARK: - 自定义命令存储辅助
+
+    private func loadCustomCommands() -> [CustomCommand] {
+        guard let data = settingsStore.customCommandsData,
+            let list = try? JSONDecoder().decode([CustomCommand].self, from: data)
+        else {
+            return []
+        }
+        return list
+    }
+
+    private func saveCustomCommands(_ commands: [CustomCommand]) {
+        let data = try? JSONEncoder().encode(commands)
+        settingsStore.setCustomCommandsData(data)
+        cachedCustomCommands = nil
+    }
+
+    // MARK: - 快捷键恢复
+
+    private func restoreSavedHotKeys() {
+        let appIDs = appIndex.apps.map(\.bundleID)
+        let systemIDs = SystemAction.allCases.map(\.rawValue)
+        let cmdIDs = loadCustomCommands().map(\.id)
+        hotKeyService.restoreHotKeys(
+            appBundleIDs: appIDs, systemActionIDs: systemIDs, customCommandIDs: cmdIDs)
     }
 }
 
@@ -267,6 +348,189 @@ final class AppCore {
 /// 设置界面在 `QuickUI`，而模块实例与系统能力（登录项、快捷键）只有组装层看得到，
 /// 所以由这里实现协议、把两边接起来。
 extension AppCore: SettingsDataSource {
+
+    // MARK: - 通用设置
+
+    var isLaunchAtLoginEnabled: Bool { launchAtLogin.isEnabled }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        launchAtLogin.setEnabled(enabled)
+    }
+
+    var hotKeyDescription: String { HotKeyService.defaultHotKeyDescription }
+
+    // MARK: - 启动器：应用与搜索范围
+
+    var searchScopes: [String] {
+        settingsStore.searchScopes(defaultScopes: SearchScopes.defaults)
+    }
+
+    func setSearchScopes(_ scopes: [String]) {
+        settingsStore.setSearchScopes(scopes)
+        Task {
+            await appIndex.refresh(scopes: scopes)
+            self.cachedIndexedApps = nil
+            self.restoreSavedHotKeys()
+        }
+    }
+
+    func restoreDefaultSearchScopes() {
+        setSearchScopes(SearchScopes.defaults)
+    }
+
+    var indexedApplications: [SettingsAppItem] {
+        if let cached = cachedIndexedApps {
+            return cached
+        }
+        let items = appIndex.apps.map { entry in
+            let alias = settingsStore.alias(for: "app." + entry.bundleID)
+            let shortcut = hotKeyService.binding(for: .app(bundleID: entry.bundleID))
+            return SettingsAppItem(
+                id: entry.id,
+                name: entry.name,
+                bundleID: entry.bundleID,
+                path: entry.path,
+                isSystemApp: entry.isSystemApp,
+                alias: alias,
+                shortcutKeycaps: shortcut?.keycaps
+            )
+        }
+        if !items.isEmpty {
+            cachedIndexedApps = items
+        }
+        return items
+    }
+
+    func appIcon(for path: String) -> NSImage? {
+        IconCache.shared.icon(forBundlePath: path)
+    }
+
+    func setAppAlias(_ alias: String?, for bundleID: String) {
+        settingsStore.setAlias(alias, for: "app." + bundleID)
+        cachedIndexedApps = nil
+    }
+
+    func setAppShortcut(keyCode: Int, carbonModifiers: Int, for bundleID: String) {
+        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
+        hotKeyService.setBinding(shortcut, for: .app(bundleID: bundleID))
+        cachedIndexedApps = nil
+    }
+
+    func clearAppShortcut(for bundleID: String) {
+        hotKeyService.setBinding(nil, for: .app(bundleID: bundleID))
+        cachedIndexedApps = nil
+    }
+
+    // MARK: - 启动器：系统操作
+
+    var systemActions: [SettingsSystemActionItem] {
+        SystemAction.allCases.map { action in
+            let alias = settingsStore.alias(for: "system." + action.rawValue)
+            let shortcut = hotKeyService.binding(for: .systemAction(id: action.rawValue))
+            return SettingsSystemActionItem(
+                id: action.rawValue,
+                title: action.title,
+                description: action.description,
+                icon: action.icon,
+                alias: alias,
+                shortcutKeycaps: shortcut?.keycaps
+            )
+        }
+    }
+
+    func setSystemActionAlias(_ alias: String?, for id: String) {
+        settingsStore.setAlias(alias, for: "system." + id)
+    }
+
+    func setSystemActionShortcut(keyCode: Int, carbonModifiers: Int, for id: String) {
+        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
+        hotKeyService.setBinding(shortcut, for: .systemAction(id: id))
+    }
+
+    func clearSystemActionShortcut(for id: String) {
+        hotKeyService.setBinding(nil, for: .systemAction(id: id))
+    }
+
+    // MARK: - 启动器：Shell 与自定义命令
+
+    var isRunShellFallbackEnabled: Bool {
+        settingsStore.isRunShellFallbackEnabled
+    }
+
+    func setRunShellFallbackEnabled(_ enabled: Bool) {
+        settingsStore.setRunShellFallbackEnabled(enabled)
+    }
+
+    var customCommands: [SettingsCustomCommandItem] {
+        if let cached = cachedCustomCommands {
+            return cached
+        }
+        let list = loadCustomCommands()
+        let items = list.map { cmd in
+            let shortcut = hotKeyService.binding(for: .customCommand(id: cmd.id))
+            return SettingsCustomCommandItem(
+                id: cmd.id,
+                name: cmd.name,
+                command: cmd.command,
+                isEnabled: cmd.isEnabled,
+                alias: cmd.alias,
+                shortcutKeycaps: shortcut?.keycaps,
+                workingDirectory: cmd.workingDirectory
+            )
+        }
+        cachedCustomCommands = items
+        return items
+    }
+
+    func addCustomCommand(name: String, command: String, workingDirectory: String?) {
+        var list = loadCustomCommands()
+        let item = CustomCommand(
+            name: name,
+            command: command,
+            isEnabled: true,
+            workingDirectory: workingDirectory
+        )
+        list.append(item)
+        saveCustomCommands(list)
+    }
+
+    func updateCustomCommand(
+        id: UUID,
+        name: String,
+        command: String,
+        isEnabled: Bool,
+        alias: String?,
+        workingDirectory: String?
+    ) {
+        var list = loadCustomCommands()
+        guard let index = list.firstIndex(where: { $0.id == id }) else { return }
+        list[index].name = name
+        list[index].command = command
+        list[index].isEnabled = isEnabled
+        list[index].alias = alias
+        list[index].workingDirectory = workingDirectory
+        saveCustomCommands(list)
+    }
+
+    func deleteCustomCommand(id: UUID) {
+        var list = loadCustomCommands()
+        list.removeAll { $0.id == id }
+        saveCustomCommands(list)
+        clearCustomCommandShortcut(for: id)
+    }
+
+    func setCustomCommandShortcut(keyCode: Int, carbonModifiers: Int, for id: UUID) {
+        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
+        hotKeyService.setBinding(shortcut, for: .customCommand(id: id))
+        cachedCustomCommands = nil
+    }
+
+    func clearCustomCommandShortcut(for id: UUID) {
+        hotKeyService.setBinding(nil, for: .customCommand(id: id))
+        cachedCustomCommands = nil
+    }
+
+    // MARK: - 功能模块设置
 
     /// 全部模块，按显示名排序
     ///
@@ -303,13 +567,14 @@ extension AppCore: SettingsDataSource {
         log.notice("模块 \(id, privacy: .public) 已\(enabled ? "启用" : "停用", privacy: .public)并同步实例")
     }
 
-    var isLaunchAtLoginEnabled: Bool { launchAtLogin.isEnabled }
-
-    func setLaunchAtLogin(_ enabled: Bool) {
-        launchAtLogin.setEnabled(enabled)
+    func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView? {
+        guard let moduleID = tab.moduleID,
+            let module = modules.first(where: { type(of: $0).id == moduleID })
+        else {
+            return nil
+        }
+        return module.makeSettingsView()
     }
-
-    var hotKeyDescription: String { HotKeyService.defaultHotKeyDescription }
 
     // MARK: - 权限
 

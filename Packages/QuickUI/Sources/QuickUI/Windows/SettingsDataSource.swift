@@ -3,24 +3,14 @@
 // @author ygw
 
 import Foundation
+import SwiftUI
 
 /// 设置窗口里的一行模块
 public struct SettingsModule: Identifiable, Sendable {
-
-    /// 模块 ID
     public let id: String
-
-    /// 模块显示名
     public let name: String
-
-    /// 模块图标（SF Symbol 名）
     public let icon: String
 
-    /// 初始化
-    /// - Parameters:
-    ///   - id: 模块 ID
-    ///   - name: 显示名
-    ///   - icon: SF Symbol 名
     public init(id: String, name: String, icon: String) {
         self.id = id
         self.name = name
@@ -28,14 +18,96 @@ public struct SettingsModule: Identifiable, Sendable {
     }
 }
 
+/// 应用程序设置项
+public struct SettingsAppItem: Identifiable, Sendable {
+    public let id: String
+    public let name: String
+    public let bundleID: String
+    public let path: String
+    public let isSystemApp: Bool
+    public let alias: String?
+    public let shortcutKeycaps: [String]?
+
+    public init(
+        id: String,
+        name: String,
+        bundleID: String,
+        path: String,
+        isSystemApp: Bool,
+        alias: String? = nil,
+        shortcutKeycaps: [String]? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.bundleID = bundleID
+        self.path = path
+        self.isSystemApp = isSystemApp
+        self.alias = alias
+        self.shortcutKeycaps = shortcutKeycaps
+    }
+}
+
+/// 系统操作设置项
+public struct SettingsSystemActionItem: Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let description: String
+    public let icon: String
+    public let alias: String?
+    public let shortcutKeycaps: [String]?
+
+    public init(
+        id: String,
+        title: String,
+        description: String,
+        icon: String,
+        alias: String? = nil,
+        shortcutKeycaps: [String]? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.icon = icon
+        self.alias = alias
+        self.shortcutKeycaps = shortcutKeycaps
+    }
+}
+
+/// 自定义命令设置项
+public struct SettingsCustomCommandItem: Identifiable, Sendable {
+    public let id: UUID
+    public let name: String
+    public let command: String
+    public let isEnabled: Bool
+    public let alias: String?
+    public let shortcutKeycaps: [String]?
+    public let workingDirectory: String?
+
+    public init(
+        id: UUID,
+        name: String,
+        command: String,
+        isEnabled: Bool,
+        alias: String? = nil,
+        shortcutKeycaps: [String]? = nil,
+        workingDirectory: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.command = command
+        self.isEnabled = isEnabled
+        self.alias = alias
+        self.shortcutKeycaps = shortcutKeycaps
+        self.workingDirectory = workingDirectory
+    }
+}
+
 /// 设置页里的一项系统权限
 public enum SettingsPermission: String, CaseIterable, Sendable {
-
     case accessibility
     case screenCapture
     case location
 
-    /// 显示名
     public var title: String {
         switch self {
         case .accessibility: "辅助功能"
@@ -44,7 +116,6 @@ public enum SettingsPermission: String, CaseIterable, Sendable {
         }
     }
 
-    /// SF Symbol 名
     public var systemImage: String {
         switch self {
         case .accessibility: "accessibility"
@@ -53,10 +124,6 @@ public enum SettingsPermission: String, CaseIterable, Sendable {
         }
     }
 
-    /// 这个权限用来干什么
-    ///
-    /// 必须写清楚：权限页最忌讳「要求授权但不说用途」，
-    /// 用户唯一能做的判断就是看这句话。
     public var purpose: String {
         switch self {
         case .accessibility:
@@ -71,20 +138,9 @@ public enum SettingsPermission: String, CaseIterable, Sendable {
 
 /// 一项权限的当前状态
 public struct SettingsPermissionState: Sendable {
-
-    /// 是否已授权
     public let isGranted: Bool
-
-    /// 是否还能由应用主动发起申请
-    ///
-    /// 已经拒绝过的权限系统不会再弹框，只能去系统设置里手动打开 ——
-    /// 这时界面必须改成「打开系统设置」而不是给一个点了没反应的按钮。
     public let canRequest: Bool
 
-    /// 初始化
-    /// - Parameters:
-    ///   - isGranted: 是否已授权
-    ///   - canRequest: 是否还能主动申请
     public init(isGranted: Bool, canRequest: Bool) {
         self.isGranted = isGranted
         self.canRequest = canRequest
@@ -92,58 +148,54 @@ public struct SettingsPermissionState: Sendable {
 }
 
 /// 设置窗口的数据源与动作
-///
-/// 用协议把设置界面和组装层隔开：设置在 `QuickUI`，而模块清单与系统能力
-/// （登录项、快捷键、权限）只有组装层看得到。
-/// **`QuickUI` 因此既不认识模块，也不认识 `QuickPlatform`** —— 依赖方向保持不变。
-///
-/// 由 `AppCore` 实现。
 @MainActor
 public protocol SettingsDataSource: AnyObject {
 
     // MARK: - 通用
-
-    /// 是否已开启开机自启
     var isLaunchAtLoginEnabled: Bool { get }
-
-    /// 设置开机自启
     func setLaunchAtLogin(_ enabled: Bool)
-
-    /// 全局快捷键的可读描述，如 `⌥Space`
     var hotKeyDescription: String { get }
 
-    // MARK: - 模块
+    // MARK: - 启动器：应用与搜索范围
+    var searchScopes: [String] { get }
+    func setSearchScopes(_ scopes: [String])
+    func restoreDefaultSearchScopes()
+    var indexedApplications: [SettingsAppItem] { get }
+    func appIcon(for path: String) -> NSImage?
+    func setAppAlias(_ alias: String?, for bundleID: String)
+    func setAppShortcut(keyCode: Int, carbonModifiers: Int, for bundleID: String)
+    func clearAppShortcut(for bundleID: String)
 
-    /// 全部模块（按显示名排序）
-    ///
-    /// 名字不叫 `modules`：组装层已经有一个 `modules`（模块实例），同名不同型无法共存。
+    // MARK: - 启动器：系统操作
+    var systemActions: [SettingsSystemActionItem] { get }
+    func setSystemActionAlias(_ alias: String?, for id: String)
+    func setSystemActionShortcut(keyCode: Int, carbonModifiers: Int, for id: String)
+    func clearSystemActionShortcut(for id: String)
+
+    // MARK: - 启动器：Shell 与自定义命令
+    var isRunShellFallbackEnabled: Bool { get }
+    func setRunShellFallbackEnabled(_ enabled: Bool)
+    var customCommands: [SettingsCustomCommandItem] { get }
+    func addCustomCommand(name: String, command: String, workingDirectory: String?)
+    func updateCustomCommand(
+        id: UUID, name: String, command: String, isEnabled: Bool, alias: String?, workingDirectory: String?)
+    func deleteCustomCommand(id: UUID)
+    func setCustomCommandShortcut(keyCode: Int, carbonModifiers: Int, for id: UUID)
+    func clearCustomCommandShortcut(for id: UUID)
+
+    // MARK: - 功能模块设置
     var moduleEntries: [SettingsModule] { get }
-
-    /// 模块当前是否启用
     func isModuleEnabled(_ id: String) -> Bool
-
-    /// 设置模块启用状态；实现方负责持久化并同步模块实例
     func setModuleEnabled(_ id: String, enabled: Bool)
+    func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView?
 
     // MARK: - 权限
-
-    /// 某项权限的当前状态
     func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState
-
-    /// 申请某项权限（只有 `canRequest` 为真时才有意义）
     func requestPermission(_ permission: SettingsPermission)
-
-    /// 打开该项权限对应的系统设置面板
     func openPermissionSettings(_ permission: SettingsPermission)
 
     // MARK: - 关于
-
-    /// 版本信息，如 `1.0.0 (1)`
     var versionDescription: String { get }
-
-    /// Bundle ID
     var bundleIdentifier: String { get }
-
-    /// 面板几何的可读描述，如 `825 × 523 · 圆角 29`
     var panelGeometryDescription: String { get }
 }

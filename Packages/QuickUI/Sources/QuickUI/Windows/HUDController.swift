@@ -154,7 +154,7 @@ struct HUDMessageView: View {
         case .success: "checkmark.circle.fill"
         case .info: "info.circle.fill"
         case .warning: "exclamationmark.triangle.fill"
-        case .danger: "xmark.circle.fill"
+        case .danger: "exclamationmark.circle.fill"
         }
     }
 

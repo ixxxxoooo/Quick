@@ -49,16 +49,16 @@ enum WindowLayout: String, CaseIterable, Sendable {
 
     var icon: String {
         switch self {
-        case .leftHalf: "rectangle.leadinghalf.inset.filled"
-        case .rightHalf: "rectangle.trailinghalf.inset.filled"
-        case .topHalf: "rectangle.tophalf.inset.filled"
-        case .bottomHalf: "rectangle.bottomhalf.inset.filled"
+        case .leftHalf: "rectangle.lefthalf.filled"
+        case .rightHalf: "rectangle.righthalf.filled"
+        case .topHalf: "rectangle.tophalf.filled"
+        case .bottomHalf: "rectangle.bottomhalf.filled"
         case .maximize: "arrow.up.left.and.arrow.down.right"
         case .center: "rectangle.center.inset.filled"
-        case .topLeft: "rectangle.inset.topleft.filled"
-        case .topRight: "rectangle.inset.topright.filled"
-        case .bottomLeft: "rectangle.inset.bottomleft.filled"
-        case .bottomRight: "rectangle.inset.bottomright.filled"
+        case .topLeft: "rectangle.inset.topleading.filled"
+        case .topRight: "rectangle.inset.toptrailing.filled"
+        case .bottomLeft: "rectangle.inset.bottomleading.filled"
+        case .bottomRight: "rectangle.inset.bottomtrailing.filled"
         }
     }
 

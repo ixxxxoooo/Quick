@@ -25,6 +25,9 @@ public final class LauncherModule: QuickModule {
     /// 应用索引（由 AppCore 注入）
     private let appIndex: AppIndex
 
+    /// 用户设置存储（可选，用于别名、自定义命令与 Shell 兜底）
+    private let settingsStore: SettingsStore?
+
     /// 使用频率排序
     private let rankingStore = RankingStore()
 
@@ -32,9 +35,12 @@ public final class LauncherModule: QuickModule {
     private let favoritesStore = FavoritesStore()
 
     /// 初始化启动器模块
-    /// - Parameter appIndex: 应用索引服务
-    public init(appIndex: AppIndex) {
+    /// - Parameters:
+    ///   - appIndex: 应用索引服务
+    ///   - settingsStore: 用户设置存储
+    public init(appIndex: AppIndex, settingsStore: SettingsStore? = nil) {
         self.appIndex = appIndex
+        self.settingsStore = settingsStore
     }
 
     // MARK: - QuickModule 协议
@@ -43,19 +49,24 @@ public final class LauncherModule: QuickModule {
     public func searchItems(query: String) async -> [SearchableItem] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            // 空查询：仅返回收藏或高频前几项
+            // 空查询：展示应用列表（收藏置顶，其余应用按使用频率排序）
             let favorites = Set(favoritesStore.favoriteIDs)
-            let apps = appIndex.apps.filter { favorites.contains($0.bundleID) }.prefix(8)
-            let source = apps.isEmpty ? Array(appIndex.apps.prefix(8)) : Array(apps)
+            let favApps = appIndex.apps.filter { favorites.contains($0.bundleID) }
+            let otherApps = appIndex.apps.filter { !favorites.contains($0.bundleID) }
+            let sortedOther = otherApps.sorted {
+                rankingStore.score(for: $0.bundleID) > rankingStore.score(for: $1.bundleID)
+            }
+            let source = Array((favApps + sortedOther).prefix(20))
             return source.map { entry in
                 SearchableItem(
                     id: "launcher.\(entry.id)",
                     moduleID: Self.id,
                     title: entry.name,
-                    subtitle: entry.isSystemApp ? "系统应用" : "应用程序",
-                    icon: "app.fill",
+                    subtitle: favorites.contains(entry.bundleID)
+                        ? "★ 收藏应用" : (entry.isSystemApp ? "系统应用" : "应用程序"),
+                    icon: "app",
                     iconType: .appIcon(entry.path),
-                    relevance: 0.5,
+                    relevance: favorites.contains(entry.bundleID) ? 1.0 : 0.5,
                     action: { [weak self] in
                         entry.launch()
                         self?.rankingStore.recordUsage(entry.bundleID)
@@ -65,27 +76,159 @@ public final class LauncherModule: QuickModule {
             }
         }
 
-        let results = appIndex.search(query: trimmed)
-        return results.prefix(20).map { entry in
+        // 1. 如果以 '>' 开头，直接作为 Shell 命令执行
+        if trimmed.hasPrefix(">") {
+            let cmd = trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
+            if !cmd.isEmpty {
+                return [
+                    SearchableItem(
+                        id: "launcher.shell.direct",
+                        moduleID: Self.id,
+                        title: "运行 Shell: \(cmd)",
+                        subtitle: "在 /bin/zsh 中执行",
+                        icon: "terminal",
+                        relevance: 1.0,
+                        action: {
+                            EventBus.shared.post(HidePaletteEvent())
+                            Task {
+                                let result = await ShellCommandRunner.run(cmd)
+                                EventBus.shared.post(
+                                    ShowHUDEvent(
+                                        message: String(result.summary.prefix(80)),
+                                        tone: result.succeeded ? .success : .warning
+                                    )
+                                )
+                            }
+                        }
+                    )
+                ]
+            }
+        }
+
+        var items: [SearchableItem] = []
+
+        // 2. 自定义命令搜索
+        if let customCommandsData = settingsStore?.customCommandsData,
+            let customCommands = try? JSONDecoder().decode([CustomCommand].self, from: customCommandsData)
+        {
+            for cmd in customCommands where cmd.isEnabled {
+                var score: Double = 0
+                if let alias = cmd.alias, !alias.isEmpty {
+                    if alias.caseInsensitiveCompare(trimmed) == .orderedSame {
+                        score = 1.0
+                    } else if alias.fuzzyMatch(trimmed) {
+                        score = max(score, alias.fuzzyScore(trimmed))
+                    }
+                }
+                if cmd.name.caseInsensitiveCompare(trimmed) == .orderedSame {
+                    score = max(score, 0.95)
+                } else if cmd.name.fuzzyMatch(trimmed) {
+                    score = max(score, cmd.name.fuzzyScore(trimmed))
+                }
+
+                if score > 0 {
+                    items.append(
+                        SearchableItem(
+                            id: "launcher.cmd.\(cmd.id.uuidString)",
+                            moduleID: Self.id,
+                            title: cmd.name,
+                            subtitle: cmd.alias != nil ? "别名: \(cmd.alias!) · \(cmd.command)" : cmd.command,
+                            icon: "terminal",
+                            relevance: score,
+                            action: {
+                                EventBus.shared.post(HidePaletteEvent())
+                                Task {
+                                    let result = await ShellCommandRunner.run(
+                                        cmd.command,
+                                        workingDirectory: cmd.workingDirectory
+                                    )
+                                    EventBus.shared.post(
+                                        ShowHUDEvent(
+                                            message: String(result.summary.prefix(80)),
+                                            tone: result.succeeded ? .success : .warning
+                                        )
+                                    )
+                                }
+                            }
+                        )
+                    )
+                }
+            }
+        }
+
+        // 3. 应用搜索（支持自定义别名优先匹配）
+        for entry in appIndex.apps {
+            let alias = settingsStore?.alias(for: "app." + entry.bundleID)
+            var matchScore: Double = 0
+            if let alias, !alias.isEmpty {
+                if alias.caseInsensitiveCompare(trimmed) == .orderedSame {
+                    matchScore = 1.0
+                } else if alias.fuzzyMatch(trimmed) {
+                    matchScore = alias.fuzzyScore(trimmed)
+                }
+            }
+            let nameScore = entry.name.fuzzyScore(trimmed)
+            let baseScore = max(matchScore, nameScore)
+            guard baseScore > 0 else { continue }
+
             let ranking = rankingStore.score(for: entry.bundleID)
-            let baseScore = entry.name.fuzzyScore(trimmed)
             let finalScore = baseScore * 0.7 + ranking * 0.3
 
-            return SearchableItem(
-                id: "launcher.\(entry.id)",
-                moduleID: Self.id,
-                title: entry.name,
-                subtitle: entry.isSystemApp ? "系统应用" : "应用程序",
-                icon: "app.fill",
-                iconType: .appIcon(entry.path),
-                relevance: finalScore,
-                action: { [weak self] in
-                    entry.launch()
-                    self?.rankingStore.recordUsage(entry.bundleID)
-                    EventBus.shared.post(HidePaletteEvent())
-                }
+            let subtitle =
+                (alias != nil && !alias!.isEmpty)
+                ? "别名: \(alias!) · \(entry.path)"
+                : (entry.isSystemApp ? "系统应用" : "应用程序")
+
+            items.append(
+                SearchableItem(
+                    id: "launcher.\(entry.id)",
+                    moduleID: Self.id,
+                    title: entry.name,
+                    subtitle: subtitle,
+                    icon: "app",
+                    iconType: .appIcon(entry.path),
+                    relevance: finalScore,
+                    action: { [weak self] in
+                        entry.launch()
+                        self?.rankingStore.recordUsage(entry.bundleID)
+                        EventBus.shared.post(HidePaletteEvent())
+                    }
+                )
             )
         }
+
+        // 按相关度降序排列
+        items.sort { $0.relevance > $1.relevance }
+
+        var results = Array(items.prefix(19))
+
+        // 4. 如果开启了 Shell 兜底，追加一个兜底执行项
+        if settingsStore?.isRunShellFallbackEnabled ?? true {
+            results.append(
+                SearchableItem(
+                    id: "launcher.shell.fallback",
+                    moduleID: Self.id,
+                    title: "运行 Shell 命令",
+                    subtitle: "$ \(trimmed)",
+                    icon: "terminal",
+                    relevance: 0.01,
+                    action: {
+                        EventBus.shared.post(HidePaletteEvent())
+                        Task {
+                            let result = await ShellCommandRunner.run(trimmed)
+                            EventBus.shared.post(
+                                ShowHUDEvent(
+                                    message: String(result.summary.prefix(80)),
+                                    tone: result.succeeded ? .success : .warning
+                                )
+                            )
+                        }
+                    }
+                )
+            )
+        }
+
+        return Array(results.prefix(20))
     }
 
     public func makeView() -> AnyView {

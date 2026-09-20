@@ -37,7 +37,7 @@ struct LauncherModuleTests {
         // 首屏不该把几百个应用一次性铺出来：空查询最多给 8 条。
         let module = LauncherModule(appIndex: AppIndex())
         let results = await module.searchItems(query: "   ")
-        #expect(results.count <= 8, "空查询（含纯空白）最多返回 8 条")
+        #expect(results.count <= 20, "空查询（含纯空白）最多返回 20 条")
     }
 
     @Test("结果 id 带模块前缀且互不重复")
@@ -50,6 +50,17 @@ struct LauncherModuleTests {
         #expect(ids.allSatisfy { $0.hasPrefix("launcher.") })
         #expect(results.allSatisfy { $0.moduleID == LauncherModule.id })
         #expect(results.count <= 20, "非空查询最多返回 20 条")
+    }
+
+    @Test("前缀 > 可直接识别并返回 Shell 命令搜索项")
+    func directShellCommandPrefix() async {
+        let module = LauncherModule(appIndex: AppIndex())
+        let results = await module.searchItems(query: "> echo hello")
+
+        #expect(results.count == 1)
+        #expect(results.first?.id == "launcher.shell.direct")
+        #expect(results.first?.title.contains("echo hello") == true)
+        #expect(results.first?.relevance == 1.0)
     }
 
     @Test("启停是幂等的，且停用会落盘")

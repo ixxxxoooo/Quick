@@ -22,7 +22,7 @@ struct AboutPane: View {
                 SettingsRow(
                     title: "Quick",
                     subtitle: "原生 macOS 效率启动器",
-                    icon: { SettingsRowIcon(systemImage: "command.circle.fill") }
+                    icon: { SettingsRowIcon(systemImage: "macwindow.on.rectangle") }
                 ) {
                     Text(dataSource.versionDescription)
                         .foregroundStyle(.secondary)

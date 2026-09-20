@@ -16,7 +16,7 @@ public final class SnippetsModule: QuickModule {
 
     public static let id = "snippets"
     public static let name = "文本片段"
-    public static let icon = "text.quote"
+    public static let icon = "curlybraces"
 
     public var isEnabled = true
 
@@ -43,7 +43,7 @@ public final class SnippetsModule: QuickModule {
                 moduleID: Self.id,
                 title: snippet.title,
                 subtitle: snippet.preview,
-                icon: "text.quote",
+                icon: "curlybraces",
                 relevance: query.isEmpty ? Self.defaultRelevance : snippet.title.fuzzyScore(query) * 0.8,
                 shortcutHint: snippet.keyword.flatMap { ":\($0)" },
                 action: { [weak self] in

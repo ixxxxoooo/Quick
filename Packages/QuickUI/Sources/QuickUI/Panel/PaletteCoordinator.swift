@@ -266,6 +266,12 @@ public final class PaletteCoordinator {
         newPanel.onSubmit = { [weak self] in
             self?.selection.activateSelection() ?? false
         }
+        newPanel.onPointerMoved = { [weak self] location in
+            self?.selection.notePointerMoved(to: location)
+        }
+        newPanel.onDisarmHover = { [weak self] location in
+            self?.selection.disarmHover(at: location)
+        }
 
         observeOutsideClicks(on: newPanel)
         panel = newPanel

@@ -3,11 +3,12 @@
 // @author ygw
 
 import CoreGraphics
+import Foundation
 import Vision
 
 /// OCR 识别引擎
 ///
-/// 使用 Vision 框架的 VNRecognizeTextRequest 进行文字识别。
+/// 使用 Vision 框架的 RecognizeTextRequest 进行文字识别。
 /// 支持中文、英文及多语言混合识别。
 @MainActor
 @Observable
@@ -26,32 +27,27 @@ final class OCREngine {
         isProcessing = true
         defer { isProcessing = false }
 
-        return await withCheckedContinuation { continuation in
-            let request = VNRecognizeTextRequest { request, error in
-                guard error == nil,
-                    let observations = request.results as? [VNRecognizedTextObservation]
-                else {
-                    continuation.resume(returning: "")
-                    return
-                }
+        var request = RecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = [
+            Locale.Language(identifier: "zh-Hans"),
+            Locale.Language(identifier: "zh-Hant"),
+            Locale.Language(identifier: "en-US"),
+            Locale.Language(identifier: "ja"),
+            Locale.Language(identifier: "ko")
+        ]
+        request.usesLanguageCorrection = true
 
-                let text =
-                    observations
-                    .compactMap { $0.topCandidates(1).first?.string }
-                    .joined(separator: "\n")
-
-                continuation.resume(returning: text)
-            }
-
-            // 配置识别参数
-            request.recognitionLevel = .accurate
-            request.recognitionLanguages = ["zh-Hans", "zh-Hant", "en-US", "ja", "ko"]
-            request.usesLanguageCorrection = true
-
-            let handler = VNImageRequestHandler(cgImage: image)
-            DispatchQueue.global(qos: .userInitiated).async {
-                try? handler.perform([request])
-            }
+        // 现代 Vision 异步 API：perform 会在后台执行，完成后回到 MainActor，
+        // 不再需要 DispatchQueue + continuation 桥接，也就不会踩到隔离校验。
+        let handler = ImageRequestHandler(image)
+        guard let observations = try? await handler.perform(request) else {
+            lastResult = ""
+            return ""
         }
+
+        let text = observations.map(\.transcript).joined(separator: "\n")
+        lastResult = text
+        return text
     }
 }

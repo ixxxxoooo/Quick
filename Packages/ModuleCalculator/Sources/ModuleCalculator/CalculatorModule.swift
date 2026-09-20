@@ -37,11 +37,13 @@ public final class CalculatorModule: QuickModule {
                 moduleID: Self.id,
                 title: result.formatted,
                 subtitle: query,
-                icon: "equal.circle.fill",
+                icon: "equal",
                 relevance: 0.95,  // 计算结果优先级高
                 shortcutHint: "⏎ 复制",
                 action: {
                     EventBus.shared.post(CopyToClipboardEvent(text: result.formatted))
+                    EventBus.shared.post(HidePaletteEvent())
+                    EventBus.shared.post(ShowHUDEvent(message: "已复制: \(result.formatted)", tone: .success))
                 }
             )
         ]

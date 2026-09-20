@@ -15,7 +15,7 @@ public final class WindowManagerModule: QuickModule {
 
     public static let id = "windowmanager"
     public static let name = "窗口管理"
-    public static let icon = "macwindow.on.rectangle"
+    public static let icon = "macwindow"
 
     public var isEnabled = true
 

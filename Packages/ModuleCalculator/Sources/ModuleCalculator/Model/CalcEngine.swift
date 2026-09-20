@@ -48,32 +48,35 @@ final class CalcEngine {
 
     /// 判断输入是否像数学表达式
     private func looksLikeExpression(_ expr: String) -> Bool {
-        let mathChars = CharacterSet(charactersIn: "0123456789+-*/().%^ ")
         let unitKeywords = ["to", "in", "转", "换"]
         if unitKeywords.contains(where: { expr.lowercased().contains($0) }) {
             return true
         }
-        return expr.unicodeScalars.allSatisfy { mathChars.contains($0) }
-            && expr.contains(where: { "+-*/^%".contains($0) })
+
+        let mathOperators = "+-*/^%×÷"
+        if expr.contains(where: { mathOperators.contains($0) }) {
+            return true
+        }
+
+        let mathFunctions = [
+            "sqrt", "cbrt", "sin", "cos", "tan", "asin", "acos", "atan",
+            "log", "log10", "log2", "ln", "abs", "round", "floor", "ceil", "exp"
+        ]
+        let lower = expr.lowercased()
+        if mathFunctions.contains(where: { lower.hasPrefix($0 + "(") || lower.hasPrefix($0 + "（") }) {
+            return true
+        }
+
+        return false
     }
 
     // MARK: - 数学表达式
 
-    /// 使用 NSExpression 计算数学表达式
+    /// 使用纯 Swift 解析并计算数学表达式（杜绝 NSExpression 引发的未捕获异常崩溃）
     private func tryMathExpression(_ expr: String) -> CalcResult? {
-        // 替换 ^ 为 ** (NSExpression 的幂运算)
-        let nsExpr = expr.replacingOccurrences(of: "^", with: "**")
-
-        do {
-            let expression = try NSExpression(format: nsExpr)
-            guard let value = expression.expressionValue(with: nil, context: nil) as? NSNumber else {
-                return nil
-            }
-            let doubleValue = value.doubleValue
-            return CalcResult(value: doubleValue, formatted: formatNumber(doubleValue))
-        } catch {
-            return nil
-        }
+        guard let tokens = MathTokenizer(input: expr).tokenize() else { return nil }
+        guard let value = MathParser(tokens: tokens).parse() else { return nil }
+        return CalcResult(value: value, formatted: formatNumber(value))
     }
 
     // MARK: - 单位换算
@@ -193,5 +196,271 @@ final class CalcEngine {
         formatter.maximumFractionDigits = 10
         formatter.minimumFractionDigits = 0
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+}
+
+// MARK: - 纯 Swift 数学解析引擎 (零崩溃保证)
+
+enum MathToken: Equatable, Sendable {
+    case number(Double)
+    case identifier(String)
+    case plus
+    case minus
+    case multiply
+    case divide
+    case modulo
+    case power
+    case leftParen
+    case rightParen
+}
+
+struct MathTokenizer: Sendable {
+    let input: String
+
+    func tokenize() -> [MathToken]? {
+        var tokens: [MathToken] = []
+        var index = input.startIndex
+
+        while index < input.endIndex {
+            let char = input[index]
+
+            if char.isWhitespace {
+                index = input.index(after: index)
+                continue
+            }
+
+            switch char {
+            case "+":
+                tokens.append(.plus)
+                index = input.index(after: index)
+            case "-":
+                tokens.append(.minus)
+                index = input.index(after: index)
+            case "*", "×":
+                let next = input.index(after: index)
+                if next < input.endIndex && input[next] == "*" {
+                    tokens.append(.power)
+                    index = input.index(after: next)
+                } else {
+                    tokens.append(.multiply)
+                    index = next
+                }
+            case "/", "÷":
+                tokens.append(.divide)
+                index = input.index(after: index)
+            case "%":
+                tokens.append(.modulo)
+                index = input.index(after: index)
+            case "^":
+                tokens.append(.power)
+                index = input.index(after: index)
+            case "(", "（":
+                tokens.append(.leftParen)
+                index = input.index(after: index)
+            case ")", "）":
+                tokens.append(.rightParen)
+                index = input.index(after: index)
+            case "0"..."9", ".":
+                let start = index
+                var hasDot = (char == ".")
+                index = input.index(after: index)
+                while index < input.endIndex {
+                    let c = input[index]
+                    if c.isNumber {
+                        index = input.index(after: index)
+                    } else if c == "." && !hasDot {
+                        hasDot = true
+                        index = input.index(after: index)
+                    } else {
+                        break
+                    }
+                }
+                let numStr = String(input[start..<index])
+                guard let val = Double(numStr) else { return nil }
+                tokens.append(.number(val))
+            case "a"..."z", "A"..."Z", "π":
+                let start = index
+                index = input.index(after: index)
+                while index < input.endIndex
+                    && (input[index].isLetter || input[index].isNumber || input[index] == "_")
+                {
+                    index = input.index(after: index)
+                }
+                let name = String(input[start..<index]).lowercased()
+                tokens.append(.identifier(name))
+            default:
+                return nil
+            }
+        }
+        return tokens
+    }
+}
+
+final class MathParser: @unchecked Sendable {
+    private let tokens: [MathToken]
+    private var pos: Int = 0
+
+    init(tokens: [MathToken]) {
+        self.tokens = tokens
+    }
+
+    private var current: MathToken? {
+        pos < tokens.count ? tokens[pos] : nil
+    }
+
+    private func advance() -> MathToken? {
+        guard pos < tokens.count else { return nil }
+        let tok = tokens[pos]
+        pos += 1
+        return tok
+    }
+
+    func parse() -> Double? {
+        guard !tokens.isEmpty else { return nil }
+        guard let result = parseExpression() else { return nil }
+        guard pos == tokens.count, result.isFinite else { return nil }
+        return result
+    }
+
+    // expression = term (('+' | '-') term)*
+    private func parseExpression() -> Double? {
+        guard var value = parseTerm() else { return nil }
+        while let tok = current {
+            if tok == .plus {
+                _ = advance()
+                guard let right = parseTerm() else { return nil }
+                value += right
+            } else if tok == .minus {
+                _ = advance()
+                guard let right = parseTerm() else { return nil }
+                value -= right
+            } else {
+                break
+            }
+        }
+        return value
+    }
+
+    // term = power (('*' | '/' | '%') power)*
+    private func parseTerm() -> Double? {
+        guard var value = parsePower() else { return nil }
+        while let tok = current {
+            if tok == .multiply {
+                _ = advance()
+                guard let right = parsePower() else { return nil }
+                value *= right
+            } else if tok == .divide {
+                _ = advance()
+                guard let right = parsePower(), right != 0 else { return nil }
+                value /= right
+            } else if tok == .modulo {
+                _ = advance()
+                guard let right = parsePower(), right != 0 else { return nil }
+                value = value.truncatingRemainder(dividingBy: right)
+            } else {
+                break
+            }
+        }
+        return value
+    }
+
+    // power = unary ('^' power)?
+    private func parsePower() -> Double? {
+        guard let base = parseUnary() else { return nil }
+        if current == .power {
+            _ = advance()
+            guard let exponent = parsePower() else { return nil }
+            let res = pow(base, exponent)
+            guard res.isFinite else { return nil }
+            return res
+        }
+        return base
+    }
+
+    // unary = ('+' | '-') unary | primary
+    private func parseUnary() -> Double? {
+        if current == .plus {
+            _ = advance()
+            return parseUnary()
+        } else if current == .minus {
+            _ = advance()
+            guard let val = parseUnary() else { return nil }
+            return -val
+        }
+        return parsePrimary()
+    }
+
+    // primary = number | identifier | '(' expression ')'
+    private func parsePrimary() -> Double? {
+        guard let tok = advance() else { return nil }
+        switch tok {
+        case .number(let val):
+            return val
+        case .identifier(let name):
+            if name == "pi" || name == "π" {
+                return Double.pi
+            }
+            if name == "e" {
+                return M_E
+            }
+            if current == .leftParen {
+                _ = advance()
+                guard let arg = parseExpression() else { return nil }
+                guard advance() == .rightParen else { return nil }
+                return evaluateFunction(name, arg: arg)
+            }
+            return nil
+        case .leftParen:
+            guard let expr = parseExpression() else { return nil }
+            guard advance() == .rightParen else { return nil }
+            return expr
+        default:
+            return nil
+        }
+    }
+
+    private func evaluateFunction(_ name: String, arg: Double) -> Double? {
+        switch name {
+        case "sqrt":
+            guard arg >= 0 else { return nil }
+            return sqrt(arg)
+        case "cbrt":
+            return cbrt(arg)
+        case "abs":
+            return abs(arg)
+        case "sin":
+            return sin(arg)
+        case "cos":
+            return cos(arg)
+        case "tan":
+            return tan(arg)
+        case "asin":
+            guard (-1.0...1.0).contains(arg) else { return nil }
+            return asin(arg)
+        case "acos":
+            guard (-1.0...1.0).contains(arg) else { return nil }
+            return acos(arg)
+        case "atan":
+            return atan(arg)
+        case "log", "log10":
+            guard arg > 0 else { return nil }
+            return log10(arg)
+        case "ln":
+            guard arg > 0 else { return nil }
+            return log(arg)
+        case "log2":
+            guard arg > 0 else { return nil }
+            return log2(arg)
+        case "exp":
+            return exp(arg)
+        case "floor":
+            return floor(arg)
+        case "ceil":
+            return ceil(arg)
+        case "round":
+            return round(arg)
+        default:
+            return nil
+        }
     }
 }

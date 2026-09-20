@@ -2,14 +2,15 @@
 #
 # Quick — 构建 .app。
 #
-#   ./Scripts/build.sh            构建 Debug
+#   ./Scripts/build.sh            构建 Debug（Quick Dev.app / com.ygw.quick.dev）
 #   ./Scripts/build.sh --run      构建并启动
 #   ./Scripts/build.sh --path     只打印产物路径
-#   ./Scripts/build.sh --release  构建 Release
+#   ./Scripts/build.sh --release  构建 Release（Quick.app / com.ygw.quick）
 #
 # 用了固定的 derivedDataPath，所以产物路径是确定的，
 # --run / --path 不需要去猜 Xcode 把东西放哪了。
 #
+# @author ygw
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -34,7 +35,13 @@ for arg in "$@"; do
     esac
 done
 
-readonly APP="$DERIVED_DATA/Build/Products/$config/Quick.app"
+# Debug 渠道产物名是「Quick Dev.app」，Release 才是「Quick.app」
+if [[ "$config" == "Debug" ]]; then
+    readonly APP_PRODUCT="Quick Dev.app"
+else
+    readonly APP_PRODUCT="Quick.app"
+fi
+readonly APP="$DERIVED_DATA/Build/Products/$config/$APP_PRODUCT"
 
 if [[ "$print_path_only" == true ]]; then
     echo "$APP"
@@ -47,13 +54,28 @@ if [[ ! -d Quick.xcodeproj ]]; then
     xcodegen generate
 fi
 
-echo "==> 构建 Quick（${config}）"
-xcodebuild \
-    -project Quick.xcodeproj \
-    -scheme Quick \
-    -configuration "$config" \
-    -destination 'platform=macOS' \
-    -derivedDataPath "$DERIVED_DATA" \
+# 自签名证书缺失时：本机构建退回 ad-hoc（开发尚可，但 TCC 身份每次会变）；
+# 正式 DMG 由 build-dmg.sh 守门，不允许悄悄 ad-hoc。
+SIGN_OVERRIDES=()
+if ! security find-identity -p codesigning 2>/dev/null | grep -q '"Quick"'; then
+    echo "    ⚠️  找不到自签名证书「Quick」，本次用 ad-hoc 签名"
+    echo "        正式发布前请跑：bash Scripts/generate-signing-cert.sh"
+    SIGN_OVERRIDES+=(CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Automatic)
+fi
+
+echo "==> 构建 Quick（${config} → ${APP_PRODUCT}）"
+# 空数组在 set -u 下不能 "${arr[@]}"，有覆盖才展开。
+xcodebuild_args=(
+    -project Quick.xcodeproj
+    -scheme Quick
+    -configuration "$config"
+    -destination 'platform=macOS'
+    -derivedDataPath "$DERIVED_DATA"
+)
+if ((${#SIGN_OVERRIDES[@]})); then
+    xcodebuild_args+=("${SIGN_OVERRIDES[@]}")
+fi
+xcodebuild "${xcodebuild_args[@]}" \
     build 2>&1 | grep -E 'error:|warning:.*\.swift|BUILD (SUCCEEDED|FAILED)' || true
 
 if [[ ! -d "$APP" ]]; then
@@ -66,8 +88,9 @@ echo "    ✓ $APP"
 if [[ "$run_after" == true ]]; then
     echo "==> 启动"
     # 先杀掉旧实例，否则 open 只会把已有实例带到前台，你调试的其实是旧二进制。
+    pkill -f 'Quick Dev.app/Contents/MacOS/Quick Dev' 2>/dev/null || true
     pkill -f 'Quick.app/Contents/MacOS/Quick' 2>/dev/null || true
     sleep 0.3
     open "$APP"
-    echo "    ✓ 已启动。日志：./Scripts/logs.sh"
+    echo "    ✓ 已启动。日志：./Scripts/logs.sh$([ "$config" = Debug ] && echo ' --dev')"
 fi

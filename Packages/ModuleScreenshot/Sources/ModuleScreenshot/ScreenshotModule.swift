@@ -14,7 +14,7 @@ public final class ScreenshotModule: QuickModule {
 
     public static let id = "screenshot"
     public static let name = "截图工具"
-    public static let icon = "camera.viewfinder"
+    public static let icon = "camera"
 
     public var isEnabled = true
 
