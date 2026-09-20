@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import Carbon.HIToolbox
 import QuickCore
 import SwiftUI
 
@@ -10,11 +11,12 @@ import SwiftUI
 ///
 /// 管理从面板中分离出来的独立模块窗口。
 /// 每个模块最多一个分离窗口（单例策略），支持尺寸记忆。
+/// 分离窗口与主窗口保持一致外观（无红绿灯、毛玻璃背景、圆角）。
 @MainActor
 public final class ModulePanelController {
 
-    /// 已打开的分离窗口（moduleID -> NSWindow）
-    private var detachedWindows: [String: NSWindow] = [:]
+    /// 已打开的分离窗口（moduleID -> NSPanel）
+    private var detachedWindows: [String: NSPanel] = [:]
 
     /// 窗口关闭观察者（moduleID -> NSObjectProtocol）
     private var closeObservers: [String: NSObjectProtocol] = [:]
@@ -47,10 +49,10 @@ public final class ModulePanelController {
         }
 
         let savedSize = readSavedSize(for: moduleID)
-        let width = savedSize?.width ?? DesignTokens.Size.detachedPanelDefaultWidth
-        let height = savedSize?.height ?? DesignTokens.Size.detachedPanelDefaultHeight
+        let width = savedSize?.width ?? DesignTokens.Size.panelWidth
+        let height = savedSize?.height ?? DesignTokens.Size.panelHeight
 
-        let window = makeDetachedWindow(
+        let panel = makeDetachedPanel(
             moduleID: moduleID,
             moduleName: moduleName,
             icon: icon,
@@ -59,12 +61,12 @@ public final class ModulePanelController {
             height: height
         )
 
-        positionRelativeTo(sourceWindow, window: window)
+        positionRelativeTo(sourceWindow, window: panel)
 
-        detachedWindows[moduleID] = window
-        observeWindowClose(moduleID: moduleID, window: window)
+        detachedWindows[moduleID] = panel
+        observeWindowClose(moduleID: moduleID, window: panel)
 
-        window.makeKeyAndOrderFront(nil)
+        panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
         log.notice(
@@ -75,9 +77,6 @@ public final class ModulePanelController {
     }
 
     /// 聚焦已有的分离窗口
-    ///
-    /// - Parameter moduleID: 模块 ID
-    /// - Returns: 是否成功聚焦（窗口存在返回 true）
     @discardableResult
     public func focusIfOpen(_ moduleID: String) -> Bool {
         guard let window = detachedWindows[moduleID], window.isVisible else {
@@ -112,60 +111,73 @@ public final class ModulePanelController {
 
     // MARK: - 窗口创建
 
-    /// 创建分离窗口
-    private func makeDetachedWindow(
+    /// 创建分离窗口（NSPanel，无红绿灯，与主窗口同风格）
+    private func makeDetachedPanel(
         moduleID: String,
         moduleName: String,
         icon: String,
         view: AnyView,
         width: CGFloat,
         height: CGFloat
-    ) -> NSWindow {
-        let contentView = DetachedPanelContentView(
-            moduleName: moduleName,
-            moduleIcon: icon,
-            moduleView: view,
-            onClose: { [weak self] in
-                self?.close(moduleID)
-            }
-        )
-
-        let window = NSWindow(
+    ) -> NSPanel {
+        let panel = DetachedModulePanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
+            styleMask: [.borderless, .fullSizeContentView, .resizable, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
-        window.title = moduleName
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
-        window.backgroundColor = .clear
-        window.hasShadow = true
-        window.isReleasedWhenClosed = false
-        window.minSize = NSSize(
+        panel.title = moduleName
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = true
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.isReleasedWhenClosed = false
+        panel.isFloatingPanel = false
+        panel.hidesOnDeactivate = false
+        panel.level = .normal
+        panel.animationBehavior = .documentWindow
+        panel.isOpaque = false
+        panel.minSize = NSSize(
             width: DesignTokens.Size.detachedPanelMinWidth,
             height: DesignTokens.Size.detachedPanelMinHeight
         )
-        window.animationBehavior = .documentWindow
-        window.identifier = NSUserInterfaceItemIdentifier("quick.detach.\(moduleID)")
+        panel.identifier = NSUserInterfaceItemIdentifier("quick.detach.\(moduleID)")
+
+        let contentView = DetachedPanelContentView(
+            moduleName: moduleName,
+            moduleIcon: icon,
+            moduleView: view,
+            isPinned: false,
+            onClose: { [weak self] in
+                self?.close(moduleID)
+            },
+            onPin: { [weak panel] isPinned in
+                panel?.level = isPinned ? .floating : .normal
+            }
+        )
 
         let hosting = NSHostingView(rootView: contentView)
         hosting.wantsLayer = true
-        window.contentView = hosting
+        panel.contentView = hosting
 
-        return window
+        // 配置 Escape 和 ⌘W 关闭
+        panel.onEscape = { [weak self] in
+            self?.close(moduleID)
+        }
+
+        return panel
     }
 
-    /// 将分离窗口定位到源面板附近（偏移 +20, -20）
+    /// 将分离窗口定位到源面板附近（偏移 +30, -30）
     private func positionRelativeTo(_ sourceWindow: NSWindow?, window: NSWindow) {
         if let source = sourceWindow {
             let origin = source.frame.origin
             window.setFrameOrigin(
                 NSPoint(
-                    x: origin.x + 20,
-                    y: origin.y - 20
+                    x: origin.x + 30,
+                    y: origin.y - 30
                 ))
         } else {
             window.center()
@@ -174,14 +186,12 @@ public final class ModulePanelController {
 
     // MARK: - 尺寸记忆
 
-    /// 保存窗口尺寸
     private func saveWindowSize(moduleID: String, window: NSWindow) {
         let size = window.frame.size
         let dict: [String: CGFloat] = ["width": size.width, "height": size.height]
         UserDefaults.standard.set(dict, forKey: Self.sizeKeyPrefix + moduleID)
     }
 
-    /// 读取保存的窗口尺寸
     private func readSavedSize(for moduleID: String) -> NSSize? {
         guard let dict = UserDefaults.standard.dictionary(forKey: Self.sizeKeyPrefix + moduleID),
             let width = dict["width"] as? CGFloat, width > 0,
@@ -194,7 +204,6 @@ public final class ModulePanelController {
 
     // MARK: - 窗口生命周期
 
-    /// 监听窗口关闭通知
     private func observeWindowClose(moduleID: String, window: NSWindow) {
         let observer = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -215,7 +224,6 @@ public final class ModulePanelController {
         closeObservers[moduleID] = observer
     }
 
-    /// 清理已关闭窗口的引用
     private func cleanupWindow(moduleID: String) {
         detachedWindows.removeValue(forKey: moduleID)
         if let observer = closeObservers.removeValue(forKey: moduleID) {
@@ -224,32 +232,78 @@ public final class ModulePanelController {
     }
 }
 
+// MARK: - 自定义分离面板（支持 Esc/⌘W 关闭和拖拽调整）
+
+/// 分离模块的 NSPanel 子类
+///
+/// 无红绿灯、支持 Esc 关闭、⌘W 关闭、可拖拽改变大小。
+final class DetachedModulePanel: NSPanel {
+
+    var onEscape: (() -> Void)?
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown {
+            // Escape 关闭
+            if Int(event.keyCode) == kVK_Escape {
+                onEscape?()
+                return
+            }
+            // ⌘W 关闭
+            if event.modifierFlags.contains(.command),
+                event.charactersIgnoringModifiers?.lowercased() == "w"
+            {
+                onEscape?()
+                return
+            }
+        }
+        super.sendEvent(event)
+    }
+}
+
 // MARK: - 分离窗口内容视图
 
-/// 分离窗口的根视图
-///
-/// 包含自定义标题栏（模块名 + 关闭按钮）和模块视图内容。
+/// 分离窗口的根视图（与主窗口一致的外观）
 private struct DetachedPanelContentView: View {
 
     let moduleName: String
     let moduleIcon: String
     let moduleView: AnyView
+    @State var isPinned: Bool
     let onClose: () -> Void
+    let onPin: (Bool) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
+            // 自定义标题栏（可拖拽区域）
             titleBar
+
+            // 模块内容
             moduleView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(.ultraThinMaterial)
+        .background(PaletteBackground())
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
     }
 
     /// 自定义标题栏
     private var titleBar: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
+            // 关闭按钮
+            Button {
+                onClose()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            }
+            .buttonStyle(.plain)
+            .help("关闭 (Esc)")
+
             Image(systemName: moduleIcon)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
 
             Text(moduleName)
@@ -258,8 +312,21 @@ private struct DetachedPanelContentView: View {
                 .lineLimit(1)
 
             Spacer()
+
+            // 置顶按钮
+            Button {
+                isPinned.toggle()
+                onPin(isPinned)
+            } label: {
+                Image(systemName: isPinned ? "pin.fill" : "pin")
+                    .font(.system(size: 12))
+                    .foregroundStyle(isPinned ? Color.accentColor : DesignTokens.Colors.textTertiary)
+                    .rotationEffect(.degrees(isPinned ? 0 : 45))
+            }
+            .buttonStyle(.plain)
+            .help(isPinned ? "取消置顶" : "窗口置顶")
         }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
+        .padding(.horizontal, DesignTokens.Spacing.lg)
         .frame(height: DesignTokens.Size.detachedTitleBarHeight)
     }
 }

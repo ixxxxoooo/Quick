@@ -34,18 +34,26 @@ struct GeneralPane: View {
             Section("唤出") {
                 SettingsRow(
                     title: "全局快捷键",
-                    subtitle: "在任何应用里按下即可唤出面板。目前固定，尚不支持自定义。",
+                    subtitle: "在任何应用里按下即可唤出/隐藏面板。",
                     icon: { SettingsRowIcon(systemImage: "keyboard") }
                 ) {
-                    KeyCapChip(text: dataSource.hotKeyDescription, style: .outline)
+                    ShortcutRecorder(
+                        keycaps: dataSource.globalShortcutKeycaps,
+                        onRecord: { keyCode, modifiers in
+                            dataSource.setGlobalShortcut(keyCode: keyCode, carbonModifiers: modifiers)
+                        },
+                        onClear: {
+                            dataSource.clearGlobalShortcut()
+                        }
+                    )
                 }
 
                 SettingsRow(
                     title: "关闭面板",
-                    subtitle: "按 esc，或点击面板以外的任意位置。",
+                    subtitle: "按 Esc，或点击面板以外的任意位置。",
                     icon: { SettingsRowIcon(systemImage: "escape") }
                 ) {
-                    KeyCapChip(text: "esc", style: .outline)
+                    KeyCapChip(text: "Esc", style: .outline)
                 }
             }
         }

@@ -112,14 +112,40 @@ public final class PaletteCoordinator {
         guard let panel else { return }
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+
+        // 确保搜索框获得焦点：遍历找到 NSTextField 并使其成为第一响应者
+        focusSearchField(in: panel)
 
         // 菜单栏点击后应用会失活，首次 makeKey 可能不生效；下一轮 runloop 补一次。
         // 这正是 PalettePanel.hidesOnDeactivate = false 要配合的场景。
-        Task { @MainActor [weak panel] in
+        Task { @MainActor [weak self, weak panel] in
             guard let panel, panel.isVisible, !panel.isKeyWindow else { return }
-            log.debug("面板首次未取得 key window，补一次 makeKeyAndOrderFront")
+            self?.log.debug("面板首次未取得 key window，补一次 makeKeyAndOrderFront")
             panel.makeKeyAndOrderFront(nil)
+            self?.focusSearchField(in: panel)
         }
+    }
+
+    /// 将焦点强制设给面板中的搜索框
+    private func focusSearchField(in panel: NSPanel) {
+        guard let contentView = panel.contentView else { return }
+        if let textField = findTextField(in: contentView) {
+            panel.makeFirstResponder(textField)
+        }
+    }
+
+    /// 递归查找第一个 NSTextField
+    private func findTextField(in view: NSView) -> NSTextField? {
+        if let textField = view as? NSTextField, textField.isEditable {
+            return textField
+        }
+        for subview in view.subviews {
+            if let found = findTextField(in: subview) {
+                return found
+            }
+        }
+        return nil
     }
 
     /// 隐藏面板

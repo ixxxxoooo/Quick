@@ -203,27 +203,25 @@ public final class LauncherModule: QuickModule {
 
         var results = Array(items.prefix(19))
 
-        // 4. 如果开启了 Shell 兜底，追加一个兜底执行项
+        // 4. 如果开启了 Shell 兜底，追加一个兜底执行项（在终端中打开）
         if settingsStore?.isRunShellFallbackEnabled ?? true {
+            let commandText = trimmed
             results.append(
                 SearchableItem(
                     id: "launcher.shell.fallback",
                     moduleID: Self.id,
-                    title: "运行 Shell 命令",
-                    subtitle: "$ \(trimmed)",
+                    title: "在终端中运行",
+                    subtitle: "$ \(commandText)",
                     icon: "terminal",
                     relevance: 0.01,
                     action: {
                         EventBus.shared.post(HidePaletteEvent())
-                        Task {
-                            let result = await ShellCommandRunner.run(trimmed)
-                            EventBus.shared.post(
-                                ShowHUDEvent(
-                                    message: String(result.summary.prefix(80)),
-                                    tone: result.succeeded ? .success : .warning
-                                )
-                            )
-                        }
+                        // 读取用户偏好的终端
+                        let terminalID =
+                            UserDefaults.standard.string(forKey: "shell.preferredTerminal")
+                            ?? "com.apple.Terminal"
+                        let terminal = PreferredTerminal(rawValue: terminalID) ?? .terminal
+                        ShellCommandRunner.runInTerminal(commandText, terminal: terminal)
                     }
                 )
             )

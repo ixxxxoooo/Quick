@@ -121,10 +121,13 @@ public final class DevToolsModule: QuickModule {
     }
 }
 
-/// DevTools 根视图（工具列表 + 内容区）
+/// DevTools 根视图
 ///
-/// 视图创建时从模块的 `selectedToolID` 读取初始选中工具，
-/// 确保从搜索结果点击某个子工具后能直接打开对应内容。
+/// 两种显示模式：
+/// 1. 直接打开指定子工具（从搜索结果进入，selectedToolID 不为空）
+/// 2. 工具选择界面（从"开发工具"入口进入，没有指定具体工具）
+///
+/// 每个子工具独立占据完整面板，不再使用左右分栏。
 struct DevToolsRootView: View {
     let module: DevToolsModule
     let tools: [any DevTool]
@@ -132,56 +135,98 @@ struct DevToolsRootView: View {
     @State private var selectedID: String?
 
     var body: some View {
-        HStack(spacing: 0) {
-            // 左侧工具列表
-            ScrollView {
-                LazyVStack(spacing: DesignTokens.Spacing.xxs) {
-                    ForEach(module.toolEntries) { entry in
-                        HStack(spacing: DesignTokens.Spacing.md) {
-                            Image(systemName: entry.icon)
-                                .font(.system(size: 14))
-                                .foregroundStyle(DesignTokens.Colors.textSecondary)
-                                .frame(width: 20)
-                            Text(entry.name)
-                                .font(DesignTokens.Typography.rowTitle)
-                                .lineLimit(1)
-                            Spacer()
-                        }
-                        .padding(.horizontal, DesignTokens.Spacing.lg)
-                        .padding(.vertical, DesignTokens.Spacing.md)
-                        .background {
-                            RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
-                                .fill(selectedID == entry.id ? DesignTokens.Colors.selection : .clear)
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture { selectedID = entry.id }
-                    }
-                }
-                .padding(DesignTokens.Spacing.md)
-            }
-            .frame(width: 180)
-
-            Divider().opacity(0.3)
-
-            // 右侧工具内容
+        Group {
             if let id = selectedID, let tool = module.tool(for: id) {
-                tool.makeView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack(spacing: DesignTokens.Spacing.md) {
-                    Image(systemName: "wrench.and.screwdriver")
-                        .font(.system(size: 32, weight: .light))
-                        .foregroundStyle(DesignTokens.Colors.textTertiary)
-                    Text("选择一个开发工具")
-                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                // 直接显示子工具的完整面板
+                VStack(spacing: 0) {
+                    // 子工具标题栏（有返回按钮可回到工具列表）
+                    HStack(spacing: DesignTokens.Spacing.sm) {
+                        Button {
+                            selectedID = nil
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+
+                        Image(systemName: tool.icon)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
+
+                        Text(tool.name)
+                            .font(DesignTokens.Typography.sectionHeader)
+                            .foregroundStyle(DesignTokens.Colors.textPrimary)
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, DesignTokens.Spacing.lg)
+                    .frame(height: DesignTokens.Size.detachedTitleBarHeight)
+
+                    Divider().opacity(0.3)
+
+                    tool.makeView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // 工具选择网格
+                toolGrid
             }
         }
         .onAppear {
             if selectedID == nil, let toolID = module.selectedToolID {
                 selectedID = toolID
             }
+        }
+    }
+
+    /// 工具选择网格
+    private var toolGrid: some View {
+        ScrollView {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: DesignTokens.Spacing.md),
+                    GridItem(.flexible(), spacing: DesignTokens.Spacing.md),
+                    GridItem(.flexible(), spacing: DesignTokens.Spacing.md)
+                ],
+                spacing: DesignTokens.Spacing.md
+            ) {
+                ForEach(module.toolEntries) { entry in
+                    Button {
+                        selectedID = entry.id
+                    } label: {
+                        VStack(spacing: DesignTokens.Spacing.sm) {
+                            Image(systemName: entry.icon)
+                                .font(.system(size: 24))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(height: 32)
+
+                            Text(entry.name)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(DesignTokens.Colors.textPrimary)
+                                .lineLimit(1)
+
+                            Text(entry.description)
+                                .font(.system(size: 10))
+                                .foregroundStyle(DesignTokens.Colors.textTertiary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(DesignTokens.Spacing.md)
+                        .frame(maxWidth: .infinity, minHeight: 100)
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
+                                .fill(DesignTokens.Colors.cardFill)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
+                                .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: 0.5)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(DesignTokens.Spacing.lg)
         }
     }
 }

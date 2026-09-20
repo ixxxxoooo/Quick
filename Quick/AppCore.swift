@@ -19,6 +19,7 @@ import ModuleSystemMonitor
 import ModuleTranslator
 import ModuleWeather
 import ModuleWindowManager
+import Carbon.HIToolbox
 import Foundation
 import QuickCore
 import QuickPlatform
@@ -157,6 +158,15 @@ final class AppCore {
             self?.paletteCoordinator.show(moduleID: moduleID)
         }
         hotKeyService.start()
+
+        // 快捷键录制协调器：录制时暂停/恢复全局快捷键
+        ShortcutRecorderCoordinator.shared.onPause = { [weak self] in
+            self?.hotKeyService.isPaused = true
+        }
+        ShortcutRecorderCoordinator.shared.onResume = { [weak self] in
+            self?.hotKeyService.isPaused = false
+        }
+
         statusItemController.install()
         observeDebugWakeSignals()
 
@@ -409,6 +419,24 @@ extension AppCore: SettingsDataSource {
     }
 
     var hotKeyDescription: String { HotKeyService.defaultHotKeyDescription }
+
+    var globalShortcutKeycaps: [String]? {
+        hotKeyService.binding(for: .togglePalette)?.keycaps
+    }
+
+    func setGlobalShortcut(keyCode: Int, carbonModifiers: Int) {
+        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
+        hotKeyService.setBinding(shortcut, for: .togglePalette)
+    }
+
+    func clearGlobalShortcut() {
+        // 清除后恢复默认的 ⌥Space
+        let defaultShortcut = KeyShortcut(
+            carbonKeyCode: kVK_Space,
+            carbonModifiers: optionKey
+        )
+        hotKeyService.setBinding(defaultShortcut, for: .togglePalette)
+    }
 
     // MARK: - 启动器：应用与搜索范围
 

@@ -25,7 +25,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
     public var tabs: [SettingsTab] {
         switch self {
         case .general:
-            return [.general, .modules, .permissions]
+            return [.general, .permissions]
         case .launcher:
             return [.applications, .systemActions, .commands]
         case .features:

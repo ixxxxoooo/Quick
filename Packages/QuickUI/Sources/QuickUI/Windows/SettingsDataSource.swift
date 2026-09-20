@@ -157,6 +157,9 @@ public protocol SettingsDataSource: AnyObject {
     var isLaunchAtLoginEnabled: Bool { get }
     func setLaunchAtLogin(_ enabled: Bool)
     var hotKeyDescription: String { get }
+    var globalShortcutKeycaps: [String]? { get }
+    func setGlobalShortcut(keyCode: Int, carbonModifiers: Int)
+    func clearGlobalShortcut()
 
     // MARK: - 启动器：应用与搜索范围
     var searchScopes: [String] { get }

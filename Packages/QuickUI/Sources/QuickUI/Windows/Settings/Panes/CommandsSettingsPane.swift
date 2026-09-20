@@ -18,6 +18,7 @@ struct CommandsSettingsPane: View {
     @State private var runShellFallback: Bool
     @State private var showingAddSheet = false
     @State private var editingCommand: SettingsCustomCommandItem?
+    @AppStorage("shell.preferredTerminal") private var preferredTerminal = "com.apple.Terminal"
 
     init(dataSource: any SettingsDataSource) {
         self.dataSource = dataSource
@@ -28,14 +29,32 @@ struct CommandsSettingsPane: View {
         let commands = dataSource.customCommands
         return Form {
             Section {
-                Toggle("启用 Run Shell Command 回退", isOn: $runShellFallback)
-                    .onChange(of: runShellFallback) { _, newValue in
-                        dataSource.setRunShellFallbackEnabled(newValue)
-                    }
+                Toggle(isOn: $runShellFallback) {
+                    SettingsRow(
+                        title: "启用终端命令回退",
+                        subtitle: "在主面板输入任意命令或以 > 开头，可直接在终端中执行。",
+                        icon: { SettingsRowIcon(systemImage: "terminal") }
+                    )
+                }
+                .onChange(of: runShellFallback) { _, newValue in
+                    dataSource.setRunShellFallbackEnabled(newValue)
+                }
+
+                Picker(selection: $preferredTerminal) {
+                    Text("终端 (Terminal)").tag("com.apple.Terminal")
+                    Text("iTerm2").tag("com.googlecode.iterm2")
+                    Text("Warp").tag("dev.warp.Warp-Stable")
+                    Text("Kitty").tag("net.kovidgoyal.kitty")
+                    Text("Alacritty").tag("org.alacritty")
+                } label: {
+                    SettingsRow(
+                        title: "默认终端",
+                        subtitle: "运行 Shell 命令时打开的终端应用。",
+                        icon: { SettingsRowIcon(systemImage: "rectangle.topthird.inset.filled") }
+                    )
+                }
             } header: {
                 Text("终端集成")
-            } footer: {
-                Text("开启后，在主面板输入任意命令或以 `>` 开头，均可直接在 /bin/zsh 中运行并查看 HUD 反馈。")
             }
 
             Section {

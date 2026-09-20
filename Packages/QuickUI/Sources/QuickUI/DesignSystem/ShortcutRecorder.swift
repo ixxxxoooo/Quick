@@ -100,28 +100,36 @@ public struct ShortcutRecorder: View {
 
     private func startRecording() {
         isRecording = true
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+
+        // 录制期间暂停全局快捷键，否则 Carbon 会先截获按键
+        ShortcutRecorderCoordinator.shared.pauseGlobalHotKeys()
+
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             // Escape 键取消录制
-            if Int(event.keyCode) == 53 {
-                stopRecording()
+            if event.type == .keyDown, Int(event.keyCode) == 53 {
+                self.stopRecording()
                 return nil
             }
 
+            // 忽略纯修饰键变化（flagsChanged），等待实际按键
+            guard event.type == .keyDown else { return event }
+
             let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
             let hasCmdModifier = !flags.isDisjoint(with: [.command, .option, .control])
-            let isFn =
-                (event.keyCode >= 122 && event.keyCode <= 120)
-                || (event.keyCode >= 96 && event.keyCode <= 111)
 
-            if hasCmdModifier || isFn {
+            // 功能键检测（F1~F20，keyCode 范围：96~111, 118~126）
+            let kc = Int(event.keyCode)
+            let isFunctionKey = (kc >= 96 && kc <= 111) || (kc >= 118 && kc <= 126)
+
+            if hasCmdModifier || isFunctionKey {
                 var carbon = 0
                 if flags.contains(.control) { carbon |= 0x1000 }
                 if flags.contains(.option) { carbon |= 0x0800 }
                 if flags.contains(.shift) { carbon |= 0x0200 }
                 if flags.contains(.command) { carbon |= 0x0100 }
 
-                onRecord(Int(event.keyCode), carbon)
-                stopRecording()
+                self.onRecord(Int(event.keyCode), carbon)
+                self.stopRecording()
                 return nil
             }
 
@@ -135,5 +143,40 @@ public struct ShortcutRecorder: View {
             eventMonitor = nil
         }
         isRecording = false
+
+        // 恢复全局快捷键监听
+        ShortcutRecorderCoordinator.shared.resumeGlobalHotKeys()
+    }
+}
+
+/// 快捷键录制协调器
+///
+/// 在 ShortcutRecorder 录制期间暂停/恢复全局快捷键。
+/// 使用引用计数支持多个录制组件同时存在。
+@MainActor
+public final class ShortcutRecorderCoordinator {
+
+    public static let shared = ShortcutRecorderCoordinator()
+
+    /// 暂停/恢复全局快捷键的回调（由 AppCore 注入）
+    public var onPause: (() -> Void)?
+    public var onResume: (() -> Void)?
+
+    private var pauseCount = 0
+
+    private init() {}
+
+    func pauseGlobalHotKeys() {
+        pauseCount += 1
+        if pauseCount == 1 {
+            onPause?()
+        }
+    }
+
+    func resumeGlobalHotKeys() {
+        pauseCount = max(0, pauseCount - 1)
+        if pauseCount == 0 {
+            onResume?()
+        }
     }
 }

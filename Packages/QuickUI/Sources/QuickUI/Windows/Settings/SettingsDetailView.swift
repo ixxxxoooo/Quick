@@ -22,8 +22,6 @@ struct SettingsDetailView: View {
             switch navigationState.tab {
             case .general:
                 GeneralPane(dataSource: dataSource)
-            case .modules:
-                ModulesPane(dataSource: dataSource)
             case .permissions:
                 PermissionsPane(dataSource: dataSource)
             case .applications:
