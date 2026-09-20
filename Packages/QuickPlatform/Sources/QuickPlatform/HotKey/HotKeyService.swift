@@ -13,6 +13,13 @@ import QuickCore
 @MainActor
 public final class HotKeyService {
 
+    /// 默认组合键的可读描述
+    ///
+    /// 目前只注册这一个固定组合键，所以是常量。设置界面与日志都用它，
+    /// 免得同一件事在三个地方各写一遍字符串。
+    /// 等支持自定义快捷键时，它应该变成反映**实际注册值**的属性。
+    public static let defaultHotKeyDescription = "⌥Space"
+
     /// 面板切换回调
     public var onTogglePalette: (() -> Void)?
 
