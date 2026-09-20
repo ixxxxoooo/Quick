@@ -26,14 +26,6 @@ final class WindowMover {
 
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.visibleFrame
-        let r = layout.rect
-
-        let newFrame = CGRect(
-            x: screenFrame.origin.x + screenFrame.width * r.x,
-            y: screenFrame.origin.y + screenFrame.height * (1.0 - r.y - r.h),  // AppKit 坐标系
-            width: screenFrame.width * r.w,
-            height: screenFrame.height * r.h
-        )
 
         guard let frontApp = NSWorkspace.shared.frontmostApplication else { return }
         let appElement = AXUIElementCreateApplication(frontApp.processIdentifier)
@@ -45,13 +37,13 @@ final class WindowMover {
         let windowElement = window as! AXUIElement
 
         // 设置位置
-        var position = CGPoint(x: newFrame.origin.x, y: screenFrame.maxY - newFrame.maxY)
+        var position = WindowGeometry.accessibilityPosition(in: screenFrame, layout: layout)
         if let posValue = AXValueCreate(.cgPoint, &position) {
             AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, posValue)
         }
 
         // 设置大小
-        var size = CGSize(width: newFrame.width, height: newFrame.height)
+        var size = WindowGeometry.accessibilitySize(in: screenFrame, layout: layout)
         if let sizeValue = AXValueCreate(.cgSize, &size) {
             AXUIElementSetAttributeValue(windowElement, kAXSizeAttribute as CFString, sizeValue)
         }

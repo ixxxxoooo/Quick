@@ -7,5 +7,12 @@ let package = Package(
     platforms: [.macOS(.v26)],
     products: [.library(name: "PluginCalendar", targets: ["PluginCalendar"])],
     dependencies: [.package(path: "../QuickCore"), .package(path: "../QuickUI")],
-    targets: [.target(name: "PluginCalendar", dependencies: ["QuickCore", "QuickUI"])]
+    targets: [
+        .target(name: "PluginCalendar", dependencies: ["QuickCore", "QuickUI"]),
+        .testTarget(
+            name: "PluginCalendarTests",
+            // QuickCore 是必需的：契约测试要断言返回的 SearchableItem
+            dependencies: ["PluginCalendar", "QuickCore"]
+        )
+    ]
 )

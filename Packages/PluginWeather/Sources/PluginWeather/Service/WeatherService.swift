@@ -23,28 +23,8 @@ import QuickCore
 @Observable
 final class WeatherService: NSObject, CLLocationManagerDelegate {
 
-    /// 天气信息
-    struct WeatherInfo: Sendable {
-        let summary: String
-        let detail: String
-        let icon: String
-        let temperature: Double
-    }
-
-    /// 天气不可用的原因
-    ///
-    /// 分成三种而不是一个「失败」，因为每种要给用户的下一步动作不同。
-    enum UnavailableReason: Sendable {
-        /// 还没问过用户，可以申请
-        case needsPermission
-        /// 用户拒绝过，或系统定位服务被关闭 —— 只能去系统设置里开
-        case permissionDenied
-        /// 已授权但拿不到位置（室内、定位服务异常、超时）
-        case locationUnavailable
-    }
-
     private(set) var currentInfo: WeatherInfo?
-    private(set) var unavailableReason: UnavailableReason?
+    private(set) var unavailableReason: WeatherUnavailableReason?
     private(set) var isLoading = false
 
     private let locationManager = CLLocationManager()
@@ -69,13 +49,20 @@ final class WeatherService: NSObject, CLLocationManagerDelegate {
     /// 当前定位授权状态
     var authorizationStatus: CLAuthorizationStatus { locationManager.authorizationStatus }
 
-    /// 是否已获得定位授权
-    var isAuthorized: Bool {
+    /// 把框架状态翻译成 Model 层的三档
+    ///
+    /// 只有这一处需要认识 `CLAuthorizationStatus`；判断「已授权」「能不能申请」
+    /// 的规则都在 `WeatherAuthorization` 里，与框架无关因而可测。
+    private var authorization: WeatherAuthorization {
         switch authorizationStatus {
-        case .authorized, .authorizedAlways: true
-        default: false
+        case .authorized, .authorizedAlways: .authorized
+        case .notDetermined: .notDetermined
+        default: .denied
         }
     }
+
+    /// 是否已获得定位授权
+    var isAuthorized: Bool { authorization.isAuthorized }
 
     /// 申请定位权限
     ///
@@ -103,8 +90,7 @@ final class WeatherService: NSObject, CLLocationManagerDelegate {
         defer { isLoading = false }
 
         guard isAuthorized else {
-            unavailableReason =
-                authorizationStatus == .notDetermined ? .needsPermission : .permissionDenied
+            unavailableReason = authorization.unavailableReason
             currentInfo = nil
             log.notice(
                 "定位权限不可用，跳过天气刷新（状态 \(self.authorizationStatus.logName, privacy: .public)）")
@@ -115,12 +101,9 @@ final class WeatherService: NSObject, CLLocationManagerDelegate {
             let coordinate = try await fetchCoordinate()
             unavailableReason = nil
             // WeatherKit 需要真实的 Apple Developer 账号，这里先给出框架接口。
-            currentInfo = WeatherInfo(
-                summary: "天气服务就绪",
-                detail:
-                    "位置: \(String(format: "%.2f", coordinate.latitude)), \(String(format: "%.2f", coordinate.longitude))",
-                icon: "cloud.sun",
-                temperature: 0
+            currentInfo = WeatherInfo.locationReady(
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude
             )
             log.notice("已获取位置，天气服务就绪")
         } catch {

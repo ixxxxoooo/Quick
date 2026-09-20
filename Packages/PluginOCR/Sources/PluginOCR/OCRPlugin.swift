@@ -16,7 +16,7 @@ public final class OCRPlugin: QuickPlugin {
     public static let id = "ocr"
     public static let name = "文字识别"
     public static let icon = "text.viewfinder"
-    public static let triggerWords = ["ocr", "识别", "文字识别", "截图识别"]
+    public static let triggerWords = OCRQuery.triggers
 
     public var isEnabled = true
 
@@ -30,7 +30,8 @@ public final class OCRPlugin: QuickPlugin {
     // MARK: - QuickPlugin 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        guard Self.triggerWords.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        // 触发词匹配是纯逻辑，见 OCRQuery（中文按包含匹配，拉丁字母也因此会子串命中）
+        guard OCRQuery.isTriggered(by: query) else { return [] }
 
         return [
             SearchableItem(

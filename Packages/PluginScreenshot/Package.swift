@@ -7,5 +7,11 @@ let package = Package(
     platforms: [.macOS(.v26)],
     products: [.library(name: "PluginScreenshot", targets: ["PluginScreenshot"])],
     dependencies: [.package(path: "../QuickCore"), .package(path: "../QuickUI")],
-    targets: [.target(name: "PluginScreenshot", dependencies: ["QuickCore", "QuickUI"])]
+    targets: [
+        .target(name: "PluginScreenshot", dependencies: ["QuickCore", "QuickUI"]),
+        .testTarget(
+            name: "PluginScreenshotTests",
+            dependencies: ["PluginScreenshot", "QuickCore"]
+        )
+    ]
 )

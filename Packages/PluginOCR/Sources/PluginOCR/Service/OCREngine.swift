@@ -46,7 +46,8 @@ final class OCREngine {
             return ""
         }
 
-        let text = observations.map(\.transcript).joined(separator: "\n")
+        // 拼装规则是纯逻辑，放在模型层（见 OCRText）
+        let text = OCRText.joined(observations.map(\.transcript))
         lastResult = text
         return text
     }

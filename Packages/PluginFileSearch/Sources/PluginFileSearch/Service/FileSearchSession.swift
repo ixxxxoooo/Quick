@@ -91,7 +91,7 @@ final class FileSearchSession {
             let size = item.value(forAttribute: NSMetadataItemFSSizeKey) as? Int64 ?? 0
             let modified = item.value(forAttribute: NSMetadataItemFSContentChangeDateKey) as? Date
 
-            let icon = iconForFile(name)
+            let icon = FileIconMapper.icon(forFileName: name)
             results.append(
                 FileResult(
                     id: path,
@@ -117,22 +117,5 @@ final class FileSearchSession {
         }
         query?.stop()
         query = nil
-    }
-
-    /// 根据文件扩展名返回对应图标
-    private func iconForFile(_ name: String) -> String {
-        let ext = (name as NSString).pathExtension.lowercased()
-        switch ext {
-        case "pdf": return "doc.richtext"
-        case "jpg", "jpeg", "png", "gif", "webp", "heic": return "photo"
-        case "mp4", "mov", "avi": return "film"
-        case "mp3", "wav", "aac", "m4a": return "music.note"
-        case "zip", "rar", "7z", "tar", "gz": return "archivebox"
-        case "swift", "py", "js", "ts", "java", "c", "cpp", "rs":
-            return "chevron.left.forwardslash.chevron.right"
-        case "md", "txt": return "doc.text"
-        case "html", "css": return "globe"
-        default: return "doc"
-        }
     }
 }

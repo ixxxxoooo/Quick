@@ -13,6 +13,8 @@ let package = Package(
         .package(path: "../QuickUI")
     ],
     targets: [
-        .target(name: "PluginOCR", dependencies: ["QuickCore", "QuickUI"])
+        .target(name: "PluginOCR", dependencies: ["QuickCore", "QuickUI"]),
+        // QuickCore 是必需的：契约测试要用 SearchableItem 这个类型接住搜索结果
+        .testTarget(name: "PluginOCRTests", dependencies: ["PluginOCR", "QuickCore"])
     ]
 )

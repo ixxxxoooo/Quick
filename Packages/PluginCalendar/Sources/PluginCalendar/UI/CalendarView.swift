@@ -11,7 +11,7 @@ struct CalendarView: View {
 
     let service: CalendarService
 
-    @State private var events: [CalendarService.CalendarEvent] = []
+    @State private var events: [CalendarEvent] = []
     @State private var selectedDate = Date()
 
     var body: some View {

@@ -76,15 +76,10 @@ final class NetworkService {
 
     /// 获取 DNS 服务器
     private func getDNSServers() -> [String] {
-        var servers: [String] = []
-        if let resolv = try? String(contentsOfFile: "/etc/resolv.conf", encoding: .utf8) {
-            for line in resolv.components(separatedBy: "\n") {
-                if line.hasPrefix("nameserver") {
-                    let parts = line.components(separatedBy: .whitespaces)
-                    if parts.count >= 2 { servers.append(parts[1]) }
-                }
-            }
+        // 解析规则是纯逻辑，见 ResolvConf；这里只负责把文件读进来
+        guard let resolv = try? String(contentsOfFile: "/etc/resolv.conf", encoding: .utf8) else {
+            return []
         }
-        return servers
+        return ResolvConf.dnsServers(in: resolv)
     }
 }

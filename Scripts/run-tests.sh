@@ -75,6 +75,33 @@ if [[ ${#empty_targets[@]} -gt 0 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 独立检查：有源码却没有测试的包
+#
+# 「每个包都要有测试」而不是「想测才测」。系统依赖重不等于没有可测的东西 ——
+# 把系统调用挤到边缘、把纯计算剥到 Model/ 再测，见 docs/testing.md。
+# 这条检查的意义是让缺口在提交时暴露，而不是等到有人想起来去数。
+# ---------------------------------------------------------------------------
+untested=()
+for pkg in Packages/*/; do
+    pkg="${pkg%/}"
+    has_sources=$([[ -n "$(find "$pkg/Sources" -name '*.swift' -print -quit 2>/dev/null)" ]] && echo yes || echo no)
+    if [[ "$has_sources" == yes ]] && ! has_test_sources "$pkg"; then
+        untested+=("$(basename "$pkg")")
+    fi
+done
+
+if [[ ${#untested[@]} -gt 0 ]]; then
+    echo "✗ 以下包有源码但没有任何测试：" >&2
+    for name in "${untested[@]}"; do
+        echo "    - ${name}" >&2
+    done
+    echo "  修复：加一个测试目标并写至少一个测真实行为的用例。" >&2
+    echo "        纯逻辑抽到 Sources/<包名>/Model/（Foundation-only）后就能独立测；" >&2
+    echo "        系统依赖的部分测「我们对返回值的处理」，见 docs/testing.md。" >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
 # 逐包跑
 # ---------------------------------------------------------------------------
 echo "==> 测试 ${#selected[@]} 个包"

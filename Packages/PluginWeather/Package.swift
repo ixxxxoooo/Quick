@@ -15,6 +15,11 @@ let package = Package(
         .target(
             name: "PluginWeather",
             dependencies: ["QuickCore", "QuickUI", "QuickPlatform"]
+        ),
+        .testTarget(
+            name: "PluginWeatherTests",
+            // QuickCore 是必需的：契约测试要断言返回的 SearchableItem
+            dependencies: ["PluginWeather", "QuickCore"]
         )
     ]
 )

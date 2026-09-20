@@ -30,13 +30,9 @@ public final class FileSearchPlugin: QuickPlugin {
     // MARK: - QuickPlugin 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        // 仅当搜索词以 "f " 或 "file " 开头时触发文件搜索
-        let triggers = ["f ", "file ", "文件 "]
-        guard let trigger = triggers.first(where: { query.lowercased().hasPrefix($0) }) else {
-            return []
-        }
-        let keyword = String(query.dropFirst(trigger.count))
-        guard !keyword.isEmpty else { return [] }
+        // 触发词解析是纯逻辑，见 FileSearchQuery：必须以 "f " / "file " / "文件 " 开头，
+        // 且后面还要有关键词，否则这里就返回空、不去打扰 Spotlight
+        guard let keyword = FileSearchQuery.keyword(in: query) else { return [] }
 
         let files = await searchSession.search(query: keyword)
         return files.prefix(10).map { file in

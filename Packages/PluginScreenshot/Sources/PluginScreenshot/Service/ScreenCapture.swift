@@ -30,10 +30,8 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
-        let filename = "Quick_\(timestamp()).png"
-        let path = (saveDirectory as NSString).appendingPathComponent(filename)
-
-        return await runScreenCapture(arguments: ["-i", "-s", path])
+        let path = newCapturePath()
+        return await runScreenCapture(arguments: ScreenshotCommand.arguments(mode: .area, outputPath: path))
     }
 
     /// 全屏截图
@@ -42,10 +40,9 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
-        let filename = "Quick_\(timestamp()).png"
-        let path = (saveDirectory as NSString).appendingPathComponent(filename)
-
-        return await runScreenCapture(arguments: [path])
+        let path = newCapturePath()
+        return await runScreenCapture(
+            arguments: ScreenshotCommand.arguments(mode: .fullScreen, outputPath: path))
     }
 
     /// 延时截图
@@ -55,19 +52,23 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
-        let filename = "Quick_\(timestamp()).png"
-        let path = (saveDirectory as NSString).appendingPathComponent(filename)
-
-        return await runScreenCapture(arguments: ["-T", "\(delay)", path])
+        let path = newCapturePath()
+        return await runScreenCapture(
+            arguments: ScreenshotCommand.arguments(mode: .delayed(seconds: delay), outputPath: path))
     }
 
     // MARK: - 内部方法
+
+    /// 本次截图的输出路径
+    private func newCapturePath() -> String {
+        ScreenshotCommand.outputPath(in: saveDirectory, for: Date(), timeZone: .current)
+    }
 
     /// 执行 screencapture 命令
     private func runScreenCapture(arguments: [String]) async -> Bool {
         await withCheckedContinuation { continuation in
             let task = Process()
-            task.launchPath = "/usr/sbin/screencapture"
+            task.launchPath = ScreenshotCommand.executablePath
             task.arguments = arguments
 
             task.terminationHandler = { [weak self] process in
@@ -85,12 +86,5 @@ final class ScreenCapture {
                 continuation.resume(returning: false)
             }
         }
-    }
-
-    /// 时间戳文件名
-    private func timestamp() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd_HHmmss"
-        return formatter.string(from: Date())
     }
 }

@@ -30,20 +30,8 @@ public final class TranslatorPlugin: QuickPlugin {
     // MARK: - QuickPlugin 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        // "翻译 ..." 或 "tr ..." 或 "translate ..."
-        let triggers: [(String, String)] = [
-            ("翻译 ", "翻译"),
-            ("tr ", "tr"),
-            ("translate ", "translate"),
-            ("fy ", "fy")
-        ]
-
-        guard let match = triggers.first(where: { query.lowercased().hasPrefix($0.0) }) else {
-            return []
-        }
-
-        let text = String(query.dropFirst(match.0.count))
-        guard !text.isEmpty else { return [] }
+        // 触发词解析是纯逻辑，见 TranslatorQuery（"翻译 ..." / "tr ..." / "translate ..." / "fy ..."）
+        guard let text = TranslatorQuery.text(in: query) else { return [] }
 
         let result = await service.translate(text)
         guard let result, !result.isEmpty else { return [] }

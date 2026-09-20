@@ -54,18 +54,41 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 
 | 包 | 测试文件 | 状态 |
 | --- | --- | --- |
-| `QuickCore` | `EventBusTests`、`FuzzyMatchTests` | 有覆盖 |
-| `QuickUI` | `PalettePanelTests` | 有覆盖 |
-| `QuickPlatform` | `HotKeyServiceTests` | 有覆盖 |
-| `PluginCalculator` | `CalcEngineTests` | 有覆盖 |
-| `PluginLauncher` | — | 需要补 |
-| `PluginClipboard` | — | 需要补 |
-| `PluginSystemControl` | — | 需要补 |
-| 其余 10 个插件 | 未声明测试目标 | 需要补 |
+| `QuickCore` | `EventBus`、模糊匹配、SQLite 封装、`PluginStorage`、设置键 | 有覆盖 |
+| `QuickUI` | 面板显隐与模式、分离窗口控制器、悬浮胶囊几何与位置持久化 | 有覆盖 |
+| `QuickPlatform` | 热键注册、应用扫描 | 有覆盖 |
+| `PluginLauncher` | 使用频率与收藏的持久化往返 | 有覆盖 |
+| `PluginClipboard` | 去重/排序/剪枝、条数与图片预算、坏行降级 | 有覆盖 |
+| `PluginNotes` · `PluginSnippets` | 表读写往返、排序 | 有覆盖 |
+| `PluginSystemMonitor` | 时长/字节格式化的边界、`ps` 输出解析 | 有覆盖 |
+| `PluginWindowManager` | 各布局的目标矩形（含 AppKit 与 AX 的坐标翻转） | 有覆盖 |
+| `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式 | 有覆盖 |
+| `PluginTranslator` | 词典方向、触发词前缀、语言判定 | 有覆盖 |
+| `PluginOCR` · `PluginFileSearch` | 触发词匹配、文本拼接、查询前缀解析、图标映射 | 有覆盖 |
+| `PluginCalendar` | 时间区间格式、排序、农历文本 | 有覆盖 |
+| `PluginAI` | Provider 注册表完整性、搜索排序与触发闸门 | 有覆盖 |
+| 11 个开发者工具 | 各自的纯逻辑（编解码、格式化、diff、字数统计…） | 有覆盖 |
+| 其余插件 | 插件契约 + 从服务里抽出来的纯逻辑 | 有覆盖 |
+
+**30 个包全部有测试目标，由 `Scripts/run-tests.sh` 强制**：少一个包就红。
+规则是「每个包都要有测试」而不是「想测才测」—— 系统依赖重不等于没有可测的东西，
+见下面一节。
 
 **注意：声明了 testTarget 却没有测试文件，会让 `swift test` 直接失败**
 （`error: no tests found`）。所以「加测试」和「声明目标」必须同时发生，
 不能先声明后补。给插件加 testTarget 时，同一个提交里必须有至少一个非空测试文件。
+
+### 系统依赖的部分怎么测
+
+EventKit、Vision、Spotlight、CoreLocation、Accessibility、`screencapture` 这类东西在测试里
+要么要授权、要么很慢、要么直接挂。规矩是：**把系统调用挤到边缘，把纯计算剥出来测**。
+
+- 窗口布局的坐标计算、`ps` 输出的解析、`resolv.conf` 的解析、`screencapture` 的参数拼装、
+  天气授权状态的映射 —— 这些都是这样从系统调用里剥出来的，
+  落在 `Sources/<Pkg>/Model/`（Foundation-only，可脱离 App 独立编译）。
+- 真正的系统调用不测；测的是**我们对返回值的处理**。
+- 剥不出来（例如「向 EventKit 取事件」这一步本身）就明确写进报告，
+  不要为了凑覆盖率写一个永远为真的测试。
 
 ---
 
