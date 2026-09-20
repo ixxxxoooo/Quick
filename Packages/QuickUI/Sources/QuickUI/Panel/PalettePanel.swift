@@ -25,6 +25,12 @@ public final class PalettePanel: NSPanel {
     /// ⌘ 快捷键回调（搜索框编辑器拦截前处理）
     var onCommandShortcut: ((NSEvent) -> Bool)?
 
+    /// 上下键回调（`-1` 上移、`+1` 下移），返回 `true` 表示已消费
+    var onMove: ((Int) -> Bool)?
+
+    /// 回车回调，返回 `true` 表示已消费
+    var onSubmit: (() -> Bool)?
+
     /// 初始化面板
     /// - Parameter rootView: SwiftUI 根视图
     init<Content: View>(rootView: Content) {
@@ -81,6 +87,29 @@ public final class PalettePanel: NSPanel {
             return
         }
 
+        // 上下键
+        //
+        // **必须在这里拦，不能挂在 SwiftUI 视图上。** 面板打开时焦点在搜索框里，
+        // field editor 会先把上下键拿去移动光标；而挂在结果列表（既不是焦点、
+        // 也不是输入框的祖先）上的 onKeyPress 永远收不到事件。
+        // 允许 Shift：Shift+上下也该能选，没有理由禁用。
+        if event.type == .keyDown,
+            event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
+            let delta = Self.verticalDelta(for: event),
+            onMove?(delta) == true
+        {
+            return
+        }
+
+        // 回车（含小键盘回车）
+        if event.type == .keyDown,
+            Int(event.keyCode) == kVK_Return || Int(event.keyCode) == kVK_ANSI_KeypadEnter,
+            event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
+            onSubmit?() == true
+        {
+            return
+        }
+
         // ⌘ 快捷键
         if event.type == .keyDown,
             event.modifierFlags.contains(.command),
@@ -93,6 +122,15 @@ public final class PalettePanel: NSPanel {
     }
 
     // MARK: - 窗口行为
+
+    /// 上下键对应的方向，其他键返回 `nil`
+    private static func verticalDelta(for event: NSEvent) -> Int? {
+        switch Int(event.keyCode) {
+        case kVK_UpArrow: return -1
+        case kVK_DownArrow: return 1
+        default: return nil
+        }
+    }
 
     override public var canBecomeKey: Bool { true }
     override public var canBecomeMain: Bool { false }

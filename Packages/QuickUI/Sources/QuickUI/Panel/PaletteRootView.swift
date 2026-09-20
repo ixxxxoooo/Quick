@@ -30,6 +30,12 @@ import SwiftUI
 /// 详见 PaletteCoordinator 顶部的说明。
 struct PaletteRootView: View {
 
+    /// 选中状态
+    ///
+    /// 由协调器提供，上下键在 AppKit 层（`PalettePanel.sendEvent`）驱动它 ——
+    /// 焦点在搜索框里，SwiftUI 这一层收不到方向键。
+    var selection: PaletteSelection
+
     /// 执行搜索（由协调器注入）
     var searchHandler: (String) async -> [SearchableItem]
 
@@ -38,7 +44,6 @@ struct PaletteRootView: View {
 
     @State private var query: String = ""
     @State private var results: [SearchableItem] = []
-    @State private var selectedIndex: Int = 0
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
 
@@ -134,8 +139,19 @@ struct PaletteRootView: View {
                 detail: "应用、命令、公式与工具都可以直接搜"
             )
         } else {
-            ResultListView(items: results, selectedIndex: $selectedIndex)
+            ResultListView(items: results, selectedIndex: selectionBinding)
         }
+    }
+
+    /// 结果列表的选中下标绑定
+    ///
+    /// 真身在 `selection` 里：键盘从 AppKit 层写它，鼠标从列表里写它，
+    /// 两边必须看同一份状态，否则键盘选中的行和鼠标悬停的行会各说各话。
+    private var selectionBinding: Binding<Int> {
+        Binding(
+            get: { selection.index },
+            set: { selection.index = $0 }
+        )
     }
 
     /// 空状态
@@ -200,7 +216,7 @@ struct PaletteRootView: View {
     private var statusText: String {
         if isSearching { return "搜索中…" }
         if results.isEmpty { return "无结果" }
-        return "\(selectedIndex + 1) / \(results.count)"
+        return "\(selection.index + 1) / \(results.count)"
     }
 
     // MARK: - 搜索
@@ -220,8 +236,13 @@ struct PaletteRootView: View {
             guard !Task.isCancelled else { return }
 
             results = items
-            selectedIndex = 0
             isSearching = false
+            // 把新结果交给选中状态：条数变了、下标归零、并登记「回车执行哪一项」。
+            // 用局部的 items 而不是 self.results，闭包要捕获的是这一批结果本身。
+            selection.update(count: items.count) { index in
+                guard items.indices.contains(index) else { return }
+                items[index].action()
+            }
         }
     }
 }

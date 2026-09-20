@@ -35,6 +35,19 @@ public final class PaletteCoordinator {
     /// 所有已注册模块（由 AppCore 注入）
     private var modules: [any QuickModule] = []
 
+    /// 面板里的选中状态
+    ///
+    /// 放在这里而不是视图里，是因为上下键必须在 AppKit 层（`PalettePanel.sendEvent`）
+    /// 拦截，而拦截方需要一个能读写「选中第几项」的地方。它**不持有窗口**，
+    /// 所以被 SwiftUI 观察是安全的 —— 会死循环的是协调器本身。
+    public let selection = PaletteSelection()
+
+    /// 面板外点击的监视器
+    ///
+    /// 与协调器同生命周期（进程级），所以不主动摘除 —— 面板一旦创建就一直存在。
+    private var outsideClickMonitor: Any?
+    private var localClickMonitor: Any?
+
     public init() {}
 
     // MARK: - 模块注册
@@ -179,6 +192,7 @@ public final class PaletteCoordinator {
         guard panel == nil else { return }
         log.debug("首次创建面板实例")
         let rootView = PaletteRootView(
+            selection: selection,
             searchHandler: { [weak self] query in
                 guard let self else { return [] }
                 return await self.search(query: query)
@@ -196,7 +210,49 @@ public final class PaletteCoordinator {
             return true
         }
 
+        // 上下键与回车在 AppKit 层转给选中状态，见 PalettePanel.sendEvent 的说明
+        newPanel.onMove = { [weak self] delta in
+            self?.selection.move(delta) ?? false
+        }
+        newPanel.onSubmit = { [weak self] in
+            self?.selection.activateSelection() ?? false
+        }
+
+        observeOutsideClicks(on: newPanel)
         panel = newPanel
+    }
+
+    /// 点击面板以外的位置时收起
+    ///
+    /// **用事件监视器，不用 `didResignKey`。** 后者把「任何原因导致的失焦」都当成
+    /// 用户在点别处 —— 例如某个模块在启动时弹出的系统权限对话框也会抢走键盘焦点，
+    /// 于是面板会在启动几秒后自己消失。用户要的只是「点空白处关掉」，
+    /// 那就精确地只对「点击」作出反应。
+    ///
+    /// 两个监视器分工：
+    /// - **全局**：只收到发往其他应用的事件，也就是「点到别的应用去了」。
+    ///   鼠标事件不需要辅助功能权限（键盘事件才需要）。
+    /// - **本地**：本应用内的点击，目标窗口不是面板就收起（例如点了设置窗口）。
+    private func observeOutsideClicks(on panel: PalettePanel) {
+        let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
+            Task { @MainActor in self?.hideIfVisible() }
+        }
+
+        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
+            if event.window !== panel {
+                Task { @MainActor in self?.hideIfVisible() }
+            }
+            return event
+        }
+    }
+
+    /// 面板可见时收起（监视器可能在没有面板时被触发）
+    private func hideIfVisible() {
+        guard isVisible else { return }
+        log.debug("检测到面板外的点击，收起")
+        hide()
     }
 
     /// 将面板定位到光标所在屏幕的中上方
