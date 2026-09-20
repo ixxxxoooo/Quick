@@ -216,6 +216,27 @@ bundle id 时，只需要改 `AppPaths` 一个地方）。
 
 `PaletteCoordinator` 拥有面板，负责显隐、定位、模式切换，**不含任何业务逻辑**。
 
+### 设置窗口
+
+设置界面在 `QuickUI`，但模块实例与系统能力（登录项、快捷键、权限）只有组装层看得到，
+所以用 `SettingsDataSource` 协议把两边隔开 —— **`QuickUI` 因此既不认识模块，
+也不认识 `QuickPlatform`**，依赖方向保持不变。由 `AppCore` 实现协议。
+
+`SettingsStore`（持久化）由 `AppCore` 持有并注入，**不是单例**：现有单例仍然只有
+`AppCore.shared` 与 `EventBus.shared` 两个。
+
+### 键盘输入归属
+
+| 按键 | 谁处理 | 为什么 |
+| --- | --- | --- |
+| Esc / 裸退格 / ⌘ 组合键 | `PalettePanel.sendEvent` | 要在 field editor 之前拦下 |
+| ↑ ↓ / 回车 | `PalettePanel.sendEvent` → `PaletteSelection` | 同上：焦点在搜索框里，SwiftUI 层收不到 |
+| 文本输入 | 搜索框（SwiftUI `TextField`） | 它就是焦点 |
+| 点击行 / 悬停 | `ResultListView` | 鼠标路径本来就在 SwiftUI 里 |
+
+`PaletteSelection` 是一个**不持有窗口**的 `@Observable` 对象，所以被 SwiftUI 观察是
+安全的 —— 会与 AttributeGraph 死循环的是持有 `NSPanel` 的协调器本身。
+
 ### 三个 MUST 级别的窗口配置
 
 这三个值改动会导致真实故障，注释已写在代码里：

@@ -122,7 +122,10 @@ public enum DesignTokens {
         /// **不缩放**：它是比例，不是长度。
         public static let paletteTopMarginFraction: CGFloat = 0.18
         /// 设置窗口尺寸（系统窗口，不随面板缩放）
-        public static let settingsWindow = CGSize(width: 900, height: 700)
+        ///
+        /// 比参考实现的 900×700 小：那是为 22 个分栏定的，我们只有 4 个。
+        /// 窗口尺寸该由内容决定，不该照抄。
+        public static let settingsWindow = CGSize(width: 820, height: 560)
     }
 
     // MARK: - 阴影

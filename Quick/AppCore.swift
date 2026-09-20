@@ -67,6 +67,15 @@ final class AppCore {
     /// 菜单栏状态项
     let statusItemController = StatusItemController()
 
+    /// 用户设置存储（模块开关等）
+    let settingsStore = SettingsStore()
+
+    /// 设置窗口控制器
+    ///
+    /// `lazy` 是因为它需要 `self` 作为数据源，而初始化器里不能引用 `self`。
+    /// 窗口本身也是惰性创建的：没打开过设置就不该有窗口。
+    private(set) lazy var settingsWindowController = SettingsWindowController(dataSource: self)
+
     // MARK: - Feature Modules
 
     /// 所有已注册模块
@@ -122,6 +131,12 @@ final class AppCore {
             paletteCoordinator.show()
         }
 
+        // 8. 开发启动参数：立即显示设置窗口（验收用）
+        if ProcessInfo.processInfo.arguments.contains("-showSettings") {
+            log.notice("命中启动参数 -showSettings，立即显示设置窗口")
+            settingsWindowController.show()
+        }
+
         log.notice("AppCore 启动完成")
     }
 
@@ -162,27 +177,38 @@ final class AppCore {
     /// 新增模块只需在此处添加一行注册。
     private func registerModules() {
         // Phase 2: 核心模块
-        modules.append(LauncherModule(appIndex: appIndex))
-        modules.append(ClipboardModule())
-        modules.append(CalculatorModule())
-        modules.append(SystemControlModule())
+        register(LauncherModule(appIndex: appIndex))
+        register(ClipboardModule())
+        register(CalculatorModule())
+        register(SystemControlModule())
 
         // Phase 3: 效率与工具模块
-        modules.append(FileSearchModule())
-        modules.append(SnippetsModule())
-        modules.append(OCRModule())
-        modules.append(TranslatorModule())
-        modules.append(DevToolsModule())
+        register(FileSearchModule())
+        register(SnippetsModule())
+        register(OCRModule())
+        register(TranslatorModule())
+        register(DevToolsModule())
 
         // Phase 4: 扩展模块
-        modules.append(CalendarModule())
-        modules.append(WeatherModule())
-        modules.append(NotesModule())
-        modules.append(AIModule())
-        modules.append(WindowManagerModule())
-        modules.append(SystemMonitorModule())
-        modules.append(NetworkToolsModule())
-        modules.append(ScreenshotModule())
+        register(CalendarModule())
+        register(WeatherModule())
+        register(NotesModule())
+        register(AIModule())
+        register(WindowManagerModule())
+        register(SystemMonitorModule())
+        register(NetworkToolsModule())
+        register(ScreenshotModule())
+    }
+
+    /// 注册一个模块，并恢复用户上次的启用状态
+    ///
+    /// 启用状态在这里从设置里读出来应用，而不是让模块自己去读：
+    /// 模块不认识设置存储，依赖方向保持单向。
+    ///
+    /// - Parameter module: 模块实例
+    private func register(_ module: any QuickModule) {
+        module.isEnabled = settingsStore.isModuleEnabled(type(of: module).id)
+        modules.append(module)
     }
 
     // MARK: - 事件总线连接
@@ -231,5 +257,126 @@ final class AppCore {
                 self?.paletteCoordinator.show(moduleID: event.moduleID, query: event.query)
             }
         )
+    }
+}
+
+// MARK: - 设置窗口的数据源
+
+/// `AppCore` 是设置界面的数据源
+///
+/// 设置界面在 `QuickUI`，而模块实例与系统能力（登录项、快捷键）只有组装层看得到，
+/// 所以由这里实现协议、把两边接起来。
+extension AppCore: SettingsDataSource {
+
+    /// 全部模块，按显示名排序
+    ///
+    /// 排序而不是按注册顺序：注册顺序是代码结构，用户不该看到它。
+    var moduleEntries: [SettingsModule] {
+        modules
+            .map { SettingsModule(id: type(of: $0).id, name: type(of: $0).name, icon: type(of: $0).icon) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    func isModuleEnabled(_ id: String) -> Bool {
+        settingsStore.isModuleEnabled(id)
+    }
+
+    /// 切换模块启用状态
+    ///
+    /// 三件事必须一起做：持久化、改模块实例、启停模块。
+    /// 只改设置不启停，用户会看到开关变了但功能还在跑（或反过来）。
+    func setModuleEnabled(_ id: String, enabled: Bool) {
+        settingsStore.setModuleEnabled(id, enabled: enabled)
+
+        guard let module = modules.first(where: { type(of: $0).id == id }) else {
+            log.warning("找不到模块 \(id, privacy: .public)，设置已保存但未同步实例")
+            return
+        }
+        guard module.isEnabled != enabled else { return }
+
+        module.isEnabled = enabled
+        if enabled {
+            module.activate()
+        } else {
+            module.deactivate()
+        }
+        log.notice("模块 \(id, privacy: .public) 已\(enabled ? "启用" : "停用", privacy: .public)并同步实例")
+    }
+
+    var isLaunchAtLoginEnabled: Bool { launchAtLogin.isEnabled }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        launchAtLogin.setEnabled(enabled)
+    }
+
+    var hotKeyDescription: String { HotKeyService.defaultHotKeyDescription }
+
+    // MARK: - 权限
+
+    /// 权限状态
+    ///
+    /// `canRequest` 的判定依据是「系统还会不会再弹框」：
+    /// 未决定的可以申请，已经拒绝过的只能去系统设置里手动打开 ——
+    /// 这时给一个「申请」按钮是骗人的，点了什么都不会发生。
+    func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState {
+        switch permission {
+        case .accessibility:
+            let granted = permissionService.isAccessibilityGranted()
+            return SettingsPermissionState(isGranted: granted, canRequest: !granted)
+
+        case .screenCapture:
+            let granted = permissionService.isScreenCaptureGranted()
+            return SettingsPermissionState(isGranted: granted, canRequest: !granted)
+
+        case .location:
+            switch permissionService.locationStatus() {
+            case .granted:
+                return SettingsPermissionState(isGranted: true, canRequest: false)
+            case .notDetermined:
+                return SettingsPermissionState(isGranted: false, canRequest: true)
+            case .denied:
+                return SettingsPermissionState(isGranted: false, canRequest: false)
+            }
+        }
+    }
+
+    func requestPermission(_ permission: SettingsPermission) {
+        log.notice("用户从设置页申请权限 \(permission.rawValue, privacy: .public)")
+        switch permission {
+        case .accessibility:
+            permissionService.requestAccessibility()
+        case .screenCapture:
+            permissionService.requestScreenCapture()
+        case .location:
+            // 定位的申请入口只有天气模块那一处（用户主动查看天气时），
+            // 设置页只负责把状态显示出来、把人带到系统设置。
+            permissionService.openLocationSettings()
+        }
+    }
+
+    func openPermissionSettings(_ permission: SettingsPermission) {
+        switch permission {
+        case .accessibility:
+            permissionService.openAccessibilitySettings()
+        case .screenCapture:
+            permissionService.openScreenCaptureSettings()
+        case .location:
+            permissionService.openLocationSettings()
+        }
+    }
+
+    // MARK: - 关于
+
+    var versionDescription: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "\(version) (\(build))"
+    }
+
+    var bundleIdentifier: String { Bundle.main.bundleIdentifier ?? "—" }
+
+    var panelGeometryDescription: String {
+        "\(Int(DesignTokens.Size.panelWidth)) × \(Int(DesignTokens.Size.panelHeight)) · 圆角 \(Int(DesignTokens.Radius.panel))"
     }
 }

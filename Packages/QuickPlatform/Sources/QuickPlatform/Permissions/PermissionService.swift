@@ -4,6 +4,17 @@
 
 import AppKit
 import ApplicationServices
+import CoreLocation
+
+/// 定位权限的三态
+///
+/// 分成三态而不是一个 Bool：`notDetermined` 还能申请，`denied` 只能去系统设置里开，
+/// 界面给的下一步动作不同。
+public enum LocationPermissionStatus: Sendable {
+    case notDetermined
+    case granted
+    case denied
+}
 
 /// 系统权限管理服务
 ///
@@ -57,6 +68,25 @@ public final class PermissionService {
         let url = URL(
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
         NSWorkspace.shared.open(url)
+    }
+
+    // MARK: - 定位权限（天气模块按需使用）
+
+    /// 查询定位权限状态
+    ///
+    /// **只读，不会弹系统权限框。** 创建一个 `CLLocationManager` 只是拿状态，
+    /// 不触发任何申请；申请必须由用户的明确动作触发，见 `WeatherService`。
+    ///
+    /// - Returns: 定位权限的三态
+    public func locationStatus() -> LocationPermissionStatus {
+        switch CLLocationManager().authorizationStatus {
+        case .authorized, .authorizedAlways:
+            return .granted
+        case .notDetermined:
+            return .notDetermined
+        default:
+            return .denied
+        }
     }
 
     /// 打开定位服务设置面板
