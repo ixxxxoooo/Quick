@@ -58,12 +58,8 @@ struct PaletteRootView: View {
             height: DesignTokens.Size.panelHeight
         )
         .background(PaletteBackground())
+        // 不要在这里加 .shadow：面板投影由 AppKit 的窗口阴影负责，见 PaletteBackground 的说明。
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
-        .shadow(
-            color: .black.opacity(DesignTokens.Shadow.alpha),
-            radius: DesignTokens.Shadow.radius,
-            y: DesignTokens.Shadow.yOffset
-        )
         .onAppear {
             if !initialQuery.isEmpty { query = initialQuery }
             log.debug("面板视图已出现，开始首次搜索")

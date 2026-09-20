@@ -93,17 +93,11 @@ public enum DesignTokens {
 
     // MARK: - 阴影
 
-    /// 浮动面板的投影
-    ///
-    /// 面板是无边框的，没有标题栏提供边界，全靠这层投影把它与背后的窗口分开。
-    public enum Shadow {
-        /// 投影不透明度
-        public static let alpha: Double = 0.30
-        /// 投影模糊半径
-        public static let radius: CGFloat = 40
-        /// 投影垂直偏移（正值向下）
-        public static let yOffset: CGFloat = 10
-    }
+    // 面板与 HUD 的投影没有令牌，因为**它们不是自绘的**：
+    // 由 AppKit 的窗口阴影提供（`NSPanel.hasShadow`）。窗口阴影绘制在窗口之外，
+    // 形状取自窗口的 alpha 通道，所以圆角就是圆角。若改成 SwiftUI `.shadow`，
+    // 阴影会被窗口边界裁切，在圆角外侧留下不透明的方形暗块。
+    // 详见 PaletteBackground 的说明。
 
     // MARK: - 动画时长
 

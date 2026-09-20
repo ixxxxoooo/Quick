@@ -134,11 +134,26 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 
 ### 玻璃与材质
 
-- 面板背景用系统材质（`.ultraThinMaterial`）+ `Colors.panelScrim` 压暗，
-  再叠一层极淡的边缘高光（`Colors.glassFrost`），这样在浅色壁纸上也有边界。
+- 面板背景走 `PaletteBackground`：原生 vibrancy（`NSVisualEffectView`，材质 `.hudWindow`、
+  混合模式 `.behindWindow`）+ `Colors.panelScrim` 压暗 + 极淡的边缘高光。
+  用 `NSVisualEffectView` 而不是 SwiftUI 的 `.ultraThinMaterial`，是因为材质、混合模式与
+  强调状态都需要显式指定才能和系统其他面板一致。
+- 边缘高光的线宽用 `Size.hairline / displayScale` —— 直接用 `hairline` 在 2x 屏上会是 2px 的粗边。
 - 需要「浮起的玻璃控件」时用现成的 `View.frosted(in:)` 修饰器，它封装了
   `.glassEffect(.regular.interactive().tint(...))`。**不要在视图里重复写这段配置。**
 - 不要堆叠多层玻璃 —— 每层都是一次独立的 GPU pass，且会互相糊掉。
+
+### 投影由 AppKit 负责，不要在 SwiftUI 里画
+
+**面板与 HUD 的投影来自窗口阴影（`NSPanel.hasShadow`），`DesignTokens` 里没有阴影令牌。**
+
+原因：窗口阴影绘制在窗口**之外**，形状直接取自窗口的 alpha 通道，所以圆角就是圆角。
+如果改成 SwiftUI 的 `.shadow`，阴影会被窗口边界裁切，在圆角外侧的方形三角区留下
+不透明的暗块 —— 看起来就是「圆角外面多了一层方角」；而且它会把窗口 alpha 撑成方形，
+连带把 AppKit 的窗口阴影也变成方角。
+
+判断方法：若某处需要投影，先问「这是一个窗口吗」。是 → 用 `hasShadow`；
+不是（例如自绘的卡片）→ 才考虑自绘阴影，并且要确保阴影有足够的绘制空间不被裁切。
 
 ---
 
@@ -193,7 +208,8 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | 组件 | 职责 |
 | --- | --- |
 | `DesignTokens` | 全部设计令牌，以及 `NSColor.srgbInk` / `NSAppearance.isDark` / `View.frosted(in:)` |
-| `PaletteBackground` | 面板背景：材质 + scrim + 边缘高光，一处配置 |
+| `VisualEffectView` | 原生 vibrancy 背景（`NSVisualEffectView` 的 SwiftUI 封装） |
+| `PaletteBackground` | 面板背景：vibrancy + scrim + 边缘高光，一处配置。**不含投影** |
 | `KeyCapChip` | 快捷键帽。`.filled`（底栏）/ `.outline`（列表行）两种样式 |
 | `BarButton` | 底栏按钮：悬停胶囊 + 图标/文字 |
 | `SectionHeader` | 列表分组标题 |
