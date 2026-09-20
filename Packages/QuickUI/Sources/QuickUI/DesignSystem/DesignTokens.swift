@@ -71,6 +71,12 @@ public enum DesignTokens {
         public static let rowIcon: CGFloat = 24
         /// 快捷键帽尺寸
         public static let keyCap: CGFloat = 18
+        /// 紧凑快捷键帽尺寸（底栏密集提示用）
+        public static let compactKeyCap: CGFloat = 15
+        /// 一像素细线（分隔线、卡片描边）
+        public static let hairline: CGFloat = 1
+        /// 空状态 / 英雄位图标尺寸
+        public static let emptyStateIcon: CGFloat = 32
         /// HUD 最大宽度
         public static let hudMaxWidth: CGFloat = 420
         /// HUD 距屏幕底部距离
@@ -83,6 +89,20 @@ public enum DesignTokens {
         public static let paletteTopMarginFraction: CGFloat = 0.18
         /// 设置窗口尺寸
         public static let settingsWindow = CGSize(width: 900, height: 700)
+    }
+
+    // MARK: - 阴影
+
+    /// 浮动面板的投影
+    ///
+    /// 面板是无边框的，没有标题栏提供边界，全靠这层投影把它与背后的窗口分开。
+    public enum Shadow {
+        /// 投影不透明度
+        public static let alpha: Double = 0.30
+        /// 投影模糊半径
+        public static let radius: CGFloat = 40
+        /// 投影垂直偏移（正值向下）
+        public static let yOffset: CGFloat = 10
     }
 
     // MARK: - 动画时长
@@ -98,6 +118,10 @@ public enum DesignTokens {
         public static let tooltip: TimeInterval = 0.15
         /// 悬停高亮
         public static let hover: TimeInterval = 0.12
+        /// 列表滚动定位
+        ///
+        /// 比悬停更快：选中项移动时用户已经知道目标在哪，动画只是消除跳变。
+        public static let scrollReveal: TimeInterval = 0.10
         /// 复制反馈
         public static let copyFeedback: TimeInterval = 1.2
     }
@@ -107,6 +131,10 @@ public enum DesignTokens {
     public enum Typography {
         /// 搜索框字体大小
         public static let searchFieldSize: CGFloat = 20
+        /// 空状态图标字号（与 Size.emptyStateIcon 配套）
+        private static let emptyStateIconSize: CGFloat = 32
+        /// HUD 语义图标字号
+        private static let hudIconSize: CGFloat = 14
         /// 搜索框字体
         public static let searchField = Font.system(size: searchFieldSize, weight: .regular)
         /// 搜索栏图标字体
@@ -121,6 +149,14 @@ public enum DesignTokens {
         public static let panelTitle = Font.headline
         /// 快捷键帽字体
         public static let keyCap = Font.caption
+        /// 紧凑快捷键帽字体
+        public static let compactKeyCap = Font.caption2
+        /// 列表行 / 底栏图标字体（固定尺寸，图标需要与 rowIcon 槽位对齐）
+        public static let iconGlyph = Font.system(size: 16, weight: .medium)
+        /// 空状态图标字体
+        public static let emptyStateIcon = Font.system(size: emptyStateIconSize, weight: .light)
+        /// HUD 提示的语义图标字体
+        public static let hudIcon = Font.system(size: hudIconSize, weight: .semibold)
         /// 底栏按钮字体
         public static let bar = Font.callout.weight(.medium)
         /// 代码字体
@@ -135,9 +171,10 @@ public enum DesignTokens {
 
         /// 自适应颜色（深色/浅色模式分别指定）
         public static func adaptive(dark: NSColor, light: NSColor) -> Color {
-            Color(nsColor: NSColor(name: nil) {
-                $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
-            })
+            Color(
+                nsColor: NSColor(name: nil) {
+                    $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+                })
         }
 
         /// 透明度渐变（深色用白墨、浅色用黑墨）
@@ -154,6 +191,28 @@ public enum DesignTokens {
             light: .srgbInk(1, alpha: 0.55)
         )
 
+        /// 面板顶部边缘高光
+        ///
+        /// 无边框面板在浅色壁纸上如果没有这层高光，边界会糊掉。
+        /// 用渐变而不是单色，是为了让顶部亮、底部弱，读起来像有厚度。
+        public static let panelEdgeHighlight = adaptive(
+            dark: .srgbInk(1, alpha: 0.16),
+            light: .srgbInk(1, alpha: 0.22)
+        )
+
+        /// 面板边缘渐变（配合 panelEdgeHighlight 使用）
+        public static var panelEdgeGradient: LinearGradient {
+            LinearGradient(
+                colors: [
+                    panelEdgeHighlight,
+                    panelEdgeHighlight.opacity(0.35),
+                    panelEdgeHighlight.opacity(0.10)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+
         /// 选中行背景
         public static let selection = ramp(dark: 0.10, light: 0.09)
 
@@ -162,6 +221,11 @@ public enum DesignTokens {
 
         /// 分隔线
         public static let separator = ramp(dark: 0.10, light: 0.12)
+
+        /// 一像素结构细线（面板内的区分隔线）
+        ///
+        /// 比 `separator` 更淡：它是结构边界，不该和内容抢注意力。
+        public static let hairline = ramp(dark: 0.08, light: 0.10)
 
         /// 控件表面（快捷键帽等）
         public static let controlSurface = ramp(dark: 0.10, light: 0.08)
@@ -195,6 +259,9 @@ public enum DesignTokens {
 
         /// 成功色
         public static let success = Color.green
+
+        /// 注意色（可恢复的问题、降级提示）
+        public static let warning = Color.orange
 
         /// 进度色
         public static let progress = Color.blue

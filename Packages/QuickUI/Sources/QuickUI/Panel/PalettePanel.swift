@@ -41,8 +41,10 @@ public final class PalettePanel: NSPanel {
 
         isFloatingPanel = true
         acceptsMouseMovedEvents = true
+        // 关键：菜单栏点击后应用会失活；默认 true 会导致面板立刻被隐藏
+        hidesOnDeactivate = false
         level = .floating
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         isMovableByWindowBackground = false
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
@@ -63,26 +65,26 @@ public final class PalettePanel: NSPanel {
     override public func sendEvent(_ event: NSEvent) {
         // Escape 键
         if event.type == .keyDown,
-           Int(event.keyCode) == kVK_Escape,
-           event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
-           onEscape?() == true
+            Int(event.keyCode) == kVK_Escape,
+            event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
+            onEscape?() == true
         {
             return
         }
 
         // 裸退格键（搜索框为空时）
         if event.type == .keyDown,
-           Int(event.keyCode) == kVK_Delete,
-           event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
-           onBareBackspace?() == true
+            Int(event.keyCode) == kVK_Delete,
+            event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
+            onBareBackspace?() == true
         {
             return
         }
 
         // ⌘ 快捷键
         if event.type == .keyDown,
-           event.modifierFlags.contains(.command),
-           onCommandShortcut?(event) == true
+            event.modifierFlags.contains(.command),
+            onCommandShortcut?(event) == true
         {
             return
         }

@@ -16,8 +16,13 @@ public final class HUDController {
     /// 当前显示的 HUD 窗口
     private var hudWindow: NSPanel?
 
-    /// 自动消失定时器
-    private var dismissTimer: Timer?
+    /// 自动消失任务
+    ///
+    /// 用 `Task` 而不是 `Timer`：取消是即时的，所以连续两次 `show()` 时，
+    /// 上一个 HUD 的延时不会把新 HUD 提前关掉。
+    private var dismissTask: Task<Void, Never>?
+
+    private let log = QuickLog.ui
 
     public init() {}
 
@@ -60,6 +65,8 @@ public final class HUDController {
             let x = screenFrame.midX - hosting.fittingSize.width / 2
             let y = screenFrame.minY + DesignTokens.Size.hudEdgeOffset
             panel.setFrameOrigin(NSPoint(x: x, y: y))
+        } else {
+            log.warning("找不到主屏幕，HUD 位置未调整")
         }
 
         panel.alphaValue = 0
@@ -71,26 +78,46 @@ public final class HUDController {
         }
 
         hudWindow = panel
+        log.debug(
+            "HUD 已显示，tone=\(tone.logName, privacy: .public)，停留 \(duration, format: .fixed(precision: 1)) s")
 
-        dismissTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
-            Task { @MainActor in
-                self?.dismiss()
-            }
+        dismissTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled else { return }
+            self?.dismiss()
         }
     }
 
     /// 立即关闭 HUD
     public func dismiss() {
-        dismissTimer?.invalidate()
-        dismissTimer = nil
+        dismissTask?.cancel()
+        dismissTask = nil
 
         guard let panel = hudWindow else { return }
+        hudWindow = nil
+
         NSAnimationContext.runAnimationGroup { context in
             context.duration = DesignTokens.Duration.exit
             panel.animator().alphaValue = 0
-        } completionHandler: { [weak self] in
-            panel.orderOut(nil)
-            self?.hudWindow = nil
+        } completionHandler: {
+            // 完成回调不在主 actor 上，收窗口必须显式跳回去。
+            Task { @MainActor in
+                panel.orderOut(nil)
+            }
+        }
+    }
+}
+
+// MARK: - HUDTone 日志名
+
+extension HUDTone {
+    /// 日志里用的稳定短名（英文，便于过滤）
+    fileprivate var logName: String {
+        switch self {
+        case .success: "success"
+        case .info: "info"
+        case .warning: "warning"
+        case .danger: "danger"
         }
     }
 }
@@ -106,7 +133,7 @@ struct HUDMessageView: View {
         HStack(spacing: DesignTokens.Spacing.md) {
             Image(systemName: toneIcon)
                 .foregroundStyle(toneColor)
-                .font(.system(size: 14, weight: .semibold))
+                .font(DesignTokens.Typography.hudIcon)
 
             Text(message)
                 .font(DesignTokens.Typography.bar)
@@ -135,7 +162,7 @@ struct HUDMessageView: View {
         switch tone {
         case .success: DesignTokens.Colors.success
         case .info: DesignTokens.Colors.progress
-        case .warning: .orange
+        case .warning: DesignTokens.Colors.warning
         case .danger: DesignTokens.Colors.destructive
         }
     }

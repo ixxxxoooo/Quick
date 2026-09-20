@@ -2,6 +2,7 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
+import AppKit
 import QuickCore
 import SwiftUI
 
@@ -55,7 +56,7 @@ public struct ResultListView: View {
             }
             .onChange(of: selectedIndex) { _, newIndex in
                 guard newIndex >= 0, newIndex < items.count else { return }
-                withAnimation(.easeOut(duration: 0.1)) {
+                withAnimation(.easeOut(duration: DesignTokens.Duration.scrollReveal)) {
                     proxy.scrollTo(items[newIndex].id, anchor: .center)
                 }
             }
@@ -122,8 +123,9 @@ struct ResultRowView: View {
         .padding(.vertical, DesignTokens.Spacing.md)
         .background {
             RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
-                .fill(isSelected ? DesignTokens.Colors.selection :
-                        isHovered ? DesignTokens.Colors.rowHover : .clear)
+                .fill(
+                    isSelected
+                        ? DesignTokens.Colors.selection : isHovered ? DesignTokens.Colors.rowHover : .clear)
         }
         .contentShape(Rectangle())
     }
@@ -134,22 +136,39 @@ struct ResultRowView: View {
         switch item.iconType {
         case .symbol:
             Image(systemName: item.icon)
-                .font(.system(size: 16, weight: .medium))
+                .font(DesignTokens.Typography.iconGlyph)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
         case .appIcon(let path):
-            if let icon = NSWorkspace.shared.icon(forFile: path) as NSImage? {
-                Image(nsImage: icon)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } else {
-                Image(systemName: item.icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-            }
+            // 使用稳定的路径标识，避免每次 body 重建 NSImage 触发 AttributeGraph 死循环
+            AppIconImage(path: path)
         case .image(let name):
             Image(name)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+        }
+    }
+}
+
+/// 应用图标（按路径缓存，避免 SwiftUI 无限刷新）
+private struct AppIconImage: View {
+    let path: String
+    @State private var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: "app.fill")
+                    .font(DesignTokens.Typography.iconGlyph)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            }
+        }
+        .onAppear {
+            guard image == nil else { return }
+            image = NSWorkspace.shared.icon(forFile: path)
         }
     }
 }
