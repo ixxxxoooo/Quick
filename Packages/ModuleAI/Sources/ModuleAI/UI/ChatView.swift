@@ -2,90 +2,70 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
-import QuickCore
 import QuickUI
 import SwiftUI
 
-/// AI 对话视图
-struct ChatView: View {
-
-    let session: ChatSession
-    @State private var inputText = ""
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // 对话历史
-            ScrollView {
-                LazyVStack(spacing: DesignTokens.Spacing.md) {
-                    ForEach(session.messages) { msg in
-                        HStack {
-                            if msg.role == .user { Spacer() }
-                            VStack(alignment: msg.role == .user ? .trailing : .leading, spacing: 4) {
-                                Text(msg.role == .user ? "你" : "AI")
-                                    .font(.caption)
-                                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-                                Text(msg.content)
-                                    .font(DesignTokens.Typography.rowTitle)
-                                    .padding(DesignTokens.Spacing.lg)
-                                    .background {
-                                        RoundedRectangle(cornerRadius: DesignTokens.Radius.card)
-                                            .fill(
-                                                msg.role == .user
-                                                    ? Color.blue.opacity(0.15) : DesignTokens.Colors.cardFill)
-                                    }
-                                    .textSelection(.enabled)
-                            }
-                            if msg.role == .assistant { Spacer() }
-                        }
-                    }
-                }
-                .padding(DesignTokens.Spacing.xl)
-            }
-
-            Divider().opacity(0.3)
-
-            // 输入区域
-            HStack(spacing: DesignTokens.Spacing.md) {
-                TextField("输入消息…", text: $inputText)
-                    .textFieldStyle(.plain)
-                    .font(DesignTokens.Typography.rowTitle)
-                    .onSubmit { sendMessage() }
-
-                Button {
-                    sendMessage()
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 24))
-                }
-                .buttonStyle(.plain)
-                .disabled(inputText.isEmpty || session.isStreaming)
-            }
-            .padding(DesignTokens.Spacing.xl)
-        }
-    }
-
-    private func sendMessage() {
-        guard !inputText.isEmpty else { return }
-        let text = inputText
-        inputText = ""
-        Task { await session.send(text) }
-    }
-}
-
 /// AI 设置视图
+///
+/// 管理各 Provider 的启用状态和窗口偏好。
 struct AISettingsView: View {
-    @AppStorage("ai.apiKey") private var apiKey = ""
-    @AppStorage("ai.provider") private var provider = "openai"
+    @AppStorage("ai.defaultAlwaysOnTop") private var alwaysOnTop = false
 
     var body: some View {
         Form {
-            Picker("AI 服务", selection: $provider) {
-                Text("OpenAI").tag("openai")
-                Text("Claude").tag("claude")
+            Section {
+                Toggle(isOn: $alwaysOnTop) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("窗口默认置顶")
+                        Text("新打开的 AI 窗口默认悬浮在最前")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("窗口偏好")
             }
-            SecureField("API Key", text: $apiKey)
+
+            Section {
+                ForEach(AIProviderRegistry.all) { provider in
+                    AIProviderSettingsRow(provider: provider)
+                }
+            } header: {
+                Text("AI 服务")
+            } footer: {
+                Text("每个 AI 服务在独立窗口中运行，关闭窗口后登录态保持。")
+            }
         }
         .formStyle(.grouped)
-        .padding()
+    }
+}
+
+/// 单个 Provider 的设置行
+private struct AIProviderSettingsRow: View {
+    let provider: AIProvider
+    @AppStorage private var isEnabled: Bool
+
+    init(provider: AIProvider) {
+        self.provider = provider
+        self._isEnabled = AppStorage(wrappedValue: true, "ai.provider.\(provider.id).enabled")
+    }
+
+    var body: some View {
+        Toggle(isOn: $isEnabled) {
+            HStack(spacing: DesignTokens.Spacing.md) {
+                Image(systemName: provider.icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(hex: provider.accent) ?? Color.accentColor)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(provider.name)
+                        .font(.system(size: 13, weight: .medium))
+                    Text(provider.url.replacingOccurrences(of: "https://", with: ""))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }

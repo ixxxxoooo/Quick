@@ -528,62 +528,78 @@ private struct WeatherFeatureSection: View {
 }
 
 private struct AIFeatureSection: View {
-    @AppStorage("ai.defaultModel") private var model = "gpt-4o"
-    @AppStorage("ai.apiEndpoint") private var endpoint = ""
-    @AppStorage("ai.apiKey") private var apiKey = ""
-    @AppStorage("ai.temperature") private var temperature = 0.7
+    @AppStorage("ai.defaultAlwaysOnTop") private var alwaysOnTop = false
 
     var body: some View {
         Section {
-            Picker(selection: $model) {
-                Text("GPT-4o").tag("gpt-4o")
-                Text("GPT-4o mini").tag("gpt-4o-mini")
-                Text("Claude 3.5 Sonnet").tag("claude-3-5-sonnet")
-                Text("DeepSeek V3").tag("deepseek-v3")
-            } label: {
-                SettingsRow(
-                    title: "默认模型",
-                    subtitle: "对话时使用的 AI 推理模型。",
-                    icon: { SettingsRowIcon(systemImage: "brain") }
-                )
-            }
-
             SettingsRow(
-                title: "温度参数",
-                subtitle: "越高越有创造力，越低越精确。范围 0~2。"
-            ) {
-                Slider(value: $temperature, in: 0...2, step: 0.1)
-                    .frame(width: 120)
-                Text(String(format: "%.1f", temperature))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .frame(width: 30)
-            }
+                title: "AI 聚合门户",
+                subtitle: "集成 DeepSeek、ChatGPT、Gemini、Claude、豆包、Kimi、智谱、通义千问等 AI 官网。"
+                    + "每个服务在独立窗口中运行，保持登录态。",
+                icon: { SettingsRowIcon(systemImage: "sparkles") }
+            )
         } header: {
-            Text("模型与参数")
+            Text("关于")
         }
 
         Section {
-            SettingsRow(
-                title: "API 端点",
-                subtitle: "自定义 API 端点地址，留空使用默认。",
-                icon: { SettingsRowIcon(systemImage: "link") }
-            ) {
-                TextField("https://api.openai.com/v1", text: $endpoint)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
-            }
-
-            SettingsRow(
-                title: "API Key",
-                subtitle: "模型服务的 API 密钥。"
-            ) {
-                SecureField("sk-...", text: $apiKey)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
+            Toggle(isOn: $alwaysOnTop) {
+                SettingsRow(
+                    title: "窗口默认置顶",
+                    subtitle: "新打开的 AI 窗口默认悬浮在最前。",
+                    icon: { SettingsRowIcon(systemImage: "pin") }
+                )
             }
         } header: {
-            Text("接口配置")
+            Text("窗口偏好")
+        }
+
+        Section {
+            ForEach(aiProviderNames, id: \.id) { item in
+                AIProviderToggleRow(id: item.id, name: item.name, icon: item.icon)
+            }
+        } header: {
+            Text("AI 服务")
+        } footer: {
+            Text("关闭的服务不会出现在搜索结果和聚合面板中。")
+        }
+    }
+
+    /// 内置 Provider 列表（仅用于设置展示，避免 QuickUI 依赖 ModuleAI）
+    private var aiProviderNames: [(id: String, name: String, icon: String)] {
+        [
+            (id: "deepseek", name: "DeepSeek", icon: "brain.head.profile"),
+            (id: "chatgpt", name: "ChatGPT", icon: "bubble.left.and.text.bubble.right"),
+            (id: "gemini", name: "Gemini", icon: "sparkle"),
+            (id: "claude", name: "Claude", icon: "text.bubble"),
+            (id: "doubao", name: "豆包", icon: "leaf"),
+            (id: "kimi", name: "Kimi", icon: "moon"),
+            (id: "glm", name: "智谱清言", icon: "wand.and.stars"),
+            (id: "tongyi", name: "通义千问", icon: "cloud")
+        ]
+    }
+}
+
+/// 单个 AI Provider 的启用/禁用开关行
+private struct AIProviderToggleRow: View {
+    let id: String
+    let name: String
+    let icon: String
+    @AppStorage var isEnabled: Bool
+
+    init(id: String, name: String, icon: String) {
+        self.id = id
+        self.name = name
+        self.icon = icon
+        self._isEnabled = AppStorage(wrappedValue: true, "ai.provider.\(id).enabled")
+    }
+
+    var body: some View {
+        Toggle(isOn: $isEnabled) {
+            SettingsRow(
+                title: name,
+                icon: { SettingsRowIcon(systemImage: icon) }
+            )
         }
     }
 }
