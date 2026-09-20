@@ -54,11 +54,6 @@ final class StatusItemController {
     private func makeItem(title: String, action: Selector, keyEquivalent: String = "") -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
         item.target = self
-        // macOS 27 起 AppKit 会自作主张给「设置」这类菜单项补图标（如齿轮），
-        // 这里显式声明不要图标。该属性 27.0 才引入，故做可用性判断。
-        if #available(macOS 27.0, *) {
-            item.preferredImageVisibility = .hidden
-        }
         return item
     }
 

@@ -182,7 +182,7 @@ struct ResultRowView: View {
         case .image(let name):
             Image(name)
                 .resizable()
-                .aspectRatio(contentMode: .fit)
+                .scaledToFit()
                 .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
         }
     }
@@ -205,7 +205,7 @@ private struct AppIconImage: View {
             if let image {
                 Image(nsImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
             } else {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(Color.primary.opacity(0.08))

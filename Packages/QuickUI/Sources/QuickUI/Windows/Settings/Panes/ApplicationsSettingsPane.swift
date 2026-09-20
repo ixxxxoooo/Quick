@@ -137,7 +137,7 @@ private struct AppItemRow: View {
                 if let iconImage {
                     Image(nsImage: iconImage)
                         .resizable()
-                        .aspectRatio(contentMode: .fit)
+                        .scaledToFit()
                 } else {
                     Image(systemName: "app")
                         .font(DesignTokens.Typography.iconGlyph)

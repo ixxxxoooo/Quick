@@ -34,6 +34,11 @@ disabled_rules:
   - opening_brace                 # ─┐ 排版问题，formatter 负责
   - trailing_comma                # ─┘
   - empty_count                   # 会误改 HitRecord.count 这类「命中次数」字段
+  - closure_parameter_position    # 与 swift-format 的多行闭包排版冲突
+  - for_where                     # 模糊匹配等状态机循环不适合强行 where
+  - redundant_string_enum_value   # 显式 raw value 便于 Codable 稳定性
+  - redundant_sendable            # @MainActor class 显式 Sendable 是文档意图
+  - unused_setter_value           # 协议默认实现里的空 setter 是刻意的
 
 # ---------------------------------------------------------------------------
 # 打开的规则：每一条都对应一类真实缺陷

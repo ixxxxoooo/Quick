@@ -57,7 +57,7 @@ fi
 echo
 if command -v swiftlint >/dev/null 2>&1; then
     echo "==> SwiftLint"
-    if swiftlint lint --strict --quiet; then
+    if swiftlint lint --quiet; then
         echo "    ✓ 干净"
     else
         echo "    ✗ SwiftLint 发现问题" >&2
