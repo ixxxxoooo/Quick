@@ -16,6 +16,7 @@ public final class CalculatorModule: QuickModule {
     public static let id = "calculator"
     public static let name = "计算器"
     public static let icon = "plus.forwardslash.minus"
+    public static let triggerWords = ["计算", "calculator", "calc", "算", "="]
 
     public var isEnabled = true
 

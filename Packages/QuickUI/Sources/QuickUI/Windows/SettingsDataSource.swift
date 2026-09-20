@@ -10,11 +10,13 @@ public struct SettingsModule: Identifiable, Sendable {
     public let id: String
     public let name: String
     public let icon: String
+    public let triggerWords: [String]
 
-    public init(id: String, name: String, icon: String) {
+    public init(id: String, name: String, icon: String, triggerWords: [String] = []) {
         self.id = id
         self.name = name
         self.icon = icon
+        self.triggerWords = triggerWords
     }
 }
 
@@ -188,6 +190,9 @@ public protocol SettingsDataSource: AnyObject {
     func isModuleEnabled(_ id: String) -> Bool
     func setModuleEnabled(_ id: String, enabled: Bool)
     func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView?
+    func moduleShortcutKeycaps(for moduleID: String) -> [String]?
+    func setModuleShortcut(keyCode: Int, carbonModifiers: Int, for moduleID: String)
+    func clearModuleShortcut(for moduleID: String)
 
     // MARK: - 权限
     func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState

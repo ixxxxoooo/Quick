@@ -15,6 +15,7 @@ public final class ScreenshotModule: QuickModule {
     public static let id = "screenshot"
     public static let name = "截图工具"
     public static let icon = "camera"
+    public static let triggerWords = ["截图", "screenshot", "屏幕截图", "截屏", "capture"]
 
     public var isEnabled = true
 
@@ -25,8 +26,7 @@ public final class ScreenshotModule: QuickModule {
     public init() {}
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        let triggers = ["截图", "screenshot", "屏幕截图", "截屏", "capture"]
-        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        guard Self.triggerWords.contains(where: { query.lowercased().contains($0) }) else { return [] }
 
         return [
             SearchableItem(

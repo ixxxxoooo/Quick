@@ -16,6 +16,7 @@ public final class TranslatorModule: QuickModule {
     public static let id = "translator"
     public static let name = "翻译"
     public static let icon = "character.book.closed"
+    public static let triggerWords = ["翻译", "tr", "translate", "translation"]
 
     public var isEnabled = true
 

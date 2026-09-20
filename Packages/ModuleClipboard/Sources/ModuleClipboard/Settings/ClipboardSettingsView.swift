@@ -5,19 +5,15 @@
 import QuickUI
 import SwiftUI
 
-/// 剪贴板模块设置视图
+/// 剪贴板模块设置视图（嵌入 FeatureSettingsPane 的自定义区域）
+///
+/// 此视图由 ClipboardModule.makeSettingsView() 提供，
+/// 覆盖 FeatureSettingsPane 的默认 ClipboardFeatureSection。
+/// 为空实现，让 FeatureSettingsPane 使用统一的 defaultFeatureContent 即可。
+/// 已弃用 —— 配置项统一在 FeatureSettingsPanes.ClipboardFeatureSection 中管理。
 struct ClipboardSettingsView: View {
 
-    @AppStorage("clipboard.maxEntries") private var maxEntries = 500
-    @AppStorage("clipboard.monitorEnabled") private var monitorEnabled = true
-
     var body: some View {
-        Form {
-            Toggle("启用剪贴板监听", isOn: $monitorEnabled)
-
-            Stepper("最大保存条目：\(maxEntries)", value: $maxEntries, in: 100...2000, step: 100)
-        }
-        .formStyle(.grouped)
-        .padding()
+        EmptyView()
     }
 }

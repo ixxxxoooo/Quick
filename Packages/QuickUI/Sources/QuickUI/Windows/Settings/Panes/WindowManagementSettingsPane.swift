@@ -7,12 +7,6 @@ import QuickCore
 import SwiftUI
 
 /// 窗口管理设置面板
-///
-/// 完全参考 Tinycast WindowManagementSettingsView（见图 1）：
-/// - Section 1 (Window Management): Enable window management + Show in launcher
-/// - Section 2 (Options): Cycling + Gap between windows
-/// - Section 3 (Window Layouts): Show layouts in launcher + New Layout + Create Layout from Current Windows
-/// - Section 4 (Layout Commands): 窗口平铺命令列表，支持自定义快捷键与在启动器中显示
 struct WindowManagementSettingsPane: View {
 
     let dataSource: any SettingsDataSource
@@ -27,14 +21,17 @@ struct WindowManagementSettingsPane: View {
         Form {
             Section {
                 Toggle(isOn: $isEnabled) {
-                    Text("Enable window management")
-                    Text(
-                        "Moves the window you were last in, using the Accessibility permission Quick already uses to paste."
+                    SettingsRow(
+                        title: "启用窗口管理",
+                        subtitle: "允许 Quick 通过辅助功能权限移动和调整其他应用的窗口大小。",
+                        icon: { SettingsRowIcon(systemImage: "macwindow") }
                     )
                 }
                 Toggle(isOn: $showInLauncher) {
-                    Text("Show in launcher")
-                    Text("Find the window commands in launcher search.")
+                    SettingsRow(
+                        title: "在启动器中显示",
+                        subtitle: "搜索时展示窗口管理命令。"
+                    )
                 }
                 .settingsEnabled(isEnabled)
             }
@@ -52,64 +49,70 @@ struct WindowManagementSettingsPane: View {
     private var optionsSection: some View {
         Section {
             Picker(selection: $cycling) {
-                Text("None").tag("None")
-                Text("Halves and Thirds").tag("Halves and Thirds")
-                Text("Across Displays").tag("Across Displays")
+                Text("无").tag("None")
+                Text("半屏和三分之一").tag("Halves and Thirds")
+                Text("跨显示器").tag("Across Displays")
             } label: {
-                Text("Cycling")
-                Text(cycleDetail(for: cycling))
+                SettingsRow(
+                    title: "循环切换",
+                    subtitle: cycleDetail(for: cycling),
+                    icon: { SettingsRowIcon(systemImage: "arrow.triangle.2.circlepath") }
+                )
             }
 
-            LabeledContent {
+            SettingsRow(
+                title: "窗口间距",
+                subtitle: "平铺窗口之间以及屏幕边缘留白的像素值。",
+                icon: { SettingsRowIcon(systemImage: "rectangle.split.2x1") }
+            ) {
                 HStack(spacing: DesignTokens.Spacing.sm) {
                     Text("\(gap) pt")
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
-                    Stepper("Gap between windows", value: $gap, in: 0...64, step: 2)
+                    Stepper("窗口间距", value: $gap, in: 0...64, step: 2)
                         .labelsHidden()
                 }
-            } label: {
-                Text("Gap between windows")
-                Text("Points left between tiled windows and around the screen edge.")
             }
         } header: {
-            Text("Options")
+            Text("选项")
         }
     }
 
     private func cycleDetail(for cycling: String) -> String {
         switch cycling {
         case "Halves and Thirds":
-            return "Triggering a half again steps it through a third and two thirds."
+            return "重复触发半屏布局时，依次切换为三分之一和三分之二。"
         case "Across Displays":
-            return "Triggering a half again walks it to the next half across your displays, wrapping around."
+            return "重复触发半屏布局时，依次移动到下一个显示器的对应位置。"
         default:
-            return "Triggering a half again re-applies the same frame."
+            return "重复触发相同布局时保持不变。"
         }
     }
 
     private var windowLayoutsSection: some View {
         Section {
             Toggle(isOn: $showLayoutsInLauncher) {
-                Text("Show layouts in launcher")
-                Text("Find your layouts in launcher search, beside the window commands.")
+                SettingsRow(
+                    title: "在启动器中显示布局",
+                    subtitle: "搜索时展示你保存的窗口布局。"
+                )
             }
 
-            Text("Save an arrangement once, then put every window back with one shortcut.")
+            Text("保存一次窗口排列，之后用一个快捷键即可恢复全部窗口位置。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Button("New Layout") {
+            Button("新建布局") {
                 // 新建布局
             }
 
-            Button("Create Layout from Current Windows") {
+            Button("从当前窗口创建布局") {
                 // 根据当前窗口创建布局
             }
         } header: {
-            Text("Window Layouts")
+            Text("窗口布局")
         } footer: {
-            Text("A layout puts named apps at fixed sizes on chosen displays, in one pass.")
+            Text("布局会记住指定应用在指定显示器上的大小和位置，一键还原。")
         }
     }
 
@@ -119,7 +122,7 @@ struct WindowManagementSettingsPane: View {
                 WindowCommandRow(item: item)
             }
         } header: {
-            Text("Layout Commands")
+            Text("布局命令")
         }
     }
 }
@@ -130,17 +133,17 @@ private struct WindowLayoutItem: Identifiable {
     let icon: String
 
     static let defaults: [WindowLayoutItem] = [
-        WindowLayoutItem(id: "leftHalf", name: "Left Half", icon: "rectangle.lefthalf.filled"),
-        WindowLayoutItem(id: "rightHalf", name: "Right Half", icon: "rectangle.righthalf.filled"),
-        WindowLayoutItem(id: "topHalf", name: "Top Half", icon: "rectangle.tophalf.filled"),
-        WindowLayoutItem(id: "bottomHalf", name: "Bottom Half", icon: "rectangle.bottomhalf.filled"),
-        WindowLayoutItem(id: "maximize", name: "Maximize", icon: "arrow.up.left.and.arrow.down.right"),
-        WindowLayoutItem(id: "center", name: "Center", icon: "rectangle.center.inset.filled"),
-        WindowLayoutItem(id: "topLeft", name: "Top Left", icon: "rectangle.inset.topleading.filled"),
-        WindowLayoutItem(id: "topRight", name: "Top Right", icon: "rectangle.inset.toptrailing.filled"),
-        WindowLayoutItem(id: "bottomLeft", name: "Bottom Left", icon: "rectangle.inset.bottomleading.filled"),
+        WindowLayoutItem(id: "leftHalf", name: "左半屏", icon: "rectangle.lefthalf.filled"),
+        WindowLayoutItem(id: "rightHalf", name: "右半屏", icon: "rectangle.righthalf.filled"),
+        WindowLayoutItem(id: "topHalf", name: "上半屏", icon: "rectangle.tophalf.filled"),
+        WindowLayoutItem(id: "bottomHalf", name: "下半屏", icon: "rectangle.bottomhalf.filled"),
+        WindowLayoutItem(id: "maximize", name: "最大化", icon: "arrow.up.left.and.arrow.down.right"),
+        WindowLayoutItem(id: "center", name: "居中", icon: "rectangle.center.inset.filled"),
+        WindowLayoutItem(id: "topLeft", name: "左上角", icon: "rectangle.inset.topleading.filled"),
+        WindowLayoutItem(id: "topRight", name: "右上角", icon: "rectangle.inset.toptrailing.filled"),
+        WindowLayoutItem(id: "bottomLeft", name: "左下角", icon: "rectangle.inset.bottomleading.filled"),
         WindowLayoutItem(
-            id: "bottomRight", name: "Bottom Right", icon: "rectangle.inset.bottomtrailing.filled")
+            id: "bottomRight", name: "右下角", icon: "rectangle.inset.bottomtrailing.filled")
     ]
 }
 
@@ -168,7 +171,7 @@ private struct WindowCommandRow: View {
             Spacer(minLength: DesignTokens.Spacing.md)
 
             AliasField(
-                placeholder: "Add Alias",
+                placeholder: "设置别名",
                 text: $alias
             )
 
@@ -181,8 +184,8 @@ private struct WindowCommandRow: View {
             Toggle("", isOn: $isVisible)
                 .labelsHidden()
                 .toggleStyle(.checkbox)
-                .help("Show in launcher")
-                .accessibilityLabel("Show \(item.name) in launcher")
+                .help("在启动器中显示")
+                .accessibilityLabel("显示 \(item.name)")
         }
         .padding(.vertical, 2)
     }

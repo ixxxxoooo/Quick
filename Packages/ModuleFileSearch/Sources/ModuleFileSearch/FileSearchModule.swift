@@ -16,6 +16,7 @@ public final class FileSearchModule: QuickModule {
     public static let id = "filesearch"
     public static let name = "文件搜索"
     public static let icon = "doc.text.magnifyingglass"
+    public static let triggerWords = ["f", "file", "文件"]
 
     public var isEnabled = true
 

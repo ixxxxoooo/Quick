@@ -16,6 +16,9 @@ public final class SystemControlModule: QuickModule {
     public static let id = "systemcontrol"
     public static let name = "系统控制"
     public static let icon = "bolt"
+    public static let triggerWords = [
+        "锁屏", "lock", "睡眠", "sleep", "重启", "restart", "关机", "shutdown", "推出", "深色", "dark"
+    ]
 
     public var isEnabled = true
 

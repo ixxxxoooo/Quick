@@ -16,6 +16,7 @@ public final class SystemMonitorModule: QuickModule {
     public static let id = "sysmonitor"
     public static let name = "系统监控"
     public static let icon = "cpu"
+    public static let triggerWords = ["进程", "系统信息", "系统监控", "process", "monitor", "端口", "port", "cpu", "内存"]
 
     public var isEnabled = true
 
@@ -26,9 +27,8 @@ public final class SystemMonitorModule: QuickModule {
     public init() {}
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        let triggers = ["进程", "系统信息", "系统监控", "process", "monitor", "端口", "port", "cpu", "内存"]
         // 用整词匹配而不是 contains：否则 export / support / report / import 都会误触发本模块
-        guard query.matchesAnyTrigger(triggers) else { return [] }
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
         return [
             SearchableItem(

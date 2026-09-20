@@ -17,6 +17,7 @@ public final class CalendarModule: QuickModule {
     public static let id = "calendar"
     public static let name = "日历"
     public static let icon = "calendar"
+    public static let triggerWords = ["日历", "日程", "calendar", "今天", "日期"]
 
     public var isEnabled = true
 
@@ -35,8 +36,7 @@ public final class CalendarModule: QuickModule {
     // MARK: - QuickModule 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        let triggers = ["日历", "日程", "calendar", "今天", "日期"]
-        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        guard Self.triggerWords.contains(where: { query.lowercased().contains($0) }) else { return [] }
 
         let todayEvents = await calendarService.todayEvents()
         if todayEvents.isEmpty {

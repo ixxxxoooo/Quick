@@ -21,6 +21,12 @@ public protocol QuickModule: AnyObject, Sendable {
     /// 模块图标（SF Symbol 名称）
     static var icon: String { get }
 
+    /// 模块的触发词列表（中英双语）
+    ///
+    /// 用户在搜索框中输入这些词时会唤醒该模块。
+    /// 同时展示在设置页面中，方便用户了解如何使用。
+    static var triggerWords: [String] { get }
+
     /// 模块是否已启用
     var isEnabled: Bool { get set }
 
@@ -51,6 +57,9 @@ public extension QuickModule {
         get { true }
         set {}
     }
+
+    /// 默认无触发词
+    static var triggerWords: [String] { [] }
 
     /// 默认无设置视图
     func makeSettingsView() -> AnyView? { nil }

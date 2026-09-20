@@ -16,6 +16,7 @@ public final class NetworkToolsModule: QuickModule {
     public static let id = "networktools"
     public static let name = "网络工具"
     public static let icon = "network"
+    public static let triggerWords = ["ip", "网络", "network", "dns", "测速", "speed"]
 
     public var isEnabled = true
 
@@ -26,9 +27,8 @@ public final class NetworkToolsModule: QuickModule {
     public init() {}
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        let triggers = ["ip", "网络", "network", "dns", "测速", "speed"]
         // 用整词匹配而不是 contains：否则 clipboard / multiply / description 都会误触发本模块
-        guard query.matchesAnyTrigger(triggers) else { return [] }
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
         return [
             SearchableItem(

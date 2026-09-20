@@ -17,6 +17,7 @@ public final class NotesModule: QuickModule {
     public static let id = "notes"
     public static let name = "笔记"
     public static let icon = "text.page"
+    public static let triggerWords = ["笔记", "备忘", "note", "memo", "便签", "待办", "todo"]
 
     public var isEnabled = true
 
@@ -27,12 +28,11 @@ public final class NotesModule: QuickModule {
     public init() {}
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        let triggers = ["笔记", "备忘", "note", "memo", "便签", "待办", "todo"]
         // 用整词匹配而不是 contains：否则 memory 会误命中 memo
-        guard query.matchesAnyTrigger(triggers) else { return [] }
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
         // 拿剥离触发词后的词去搜；只剩触发词时为空串，表示列出全部笔记
-        let keyword = query.removingTrigger(triggers)
+        let keyword = query.removingTrigger(Self.triggerWords)
         let notes = store.search(keyword)
         return notes.prefix(5).map { note in
             SearchableItem(

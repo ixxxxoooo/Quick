@@ -16,6 +16,11 @@ public final class DevToolsModule: QuickModule {
     public static let id = "devtools"
     public static let name = "开发工具"
     public static let icon = "wrench.and.screwdriver"
+    public static let triggerWords = [
+        "json", "格式化", "format", "base64", "编码", "encode", "decode", "解码",
+        "url", "hash", "md5", "sha", "时间戳", "timestamp", "uuid", "正则", "regex",
+        "颜色", "color", "sql", "开发", "devtools"
+    ]
 
     public var isEnabled = true
 

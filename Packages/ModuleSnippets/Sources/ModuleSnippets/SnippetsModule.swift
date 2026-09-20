@@ -17,6 +17,7 @@ public final class SnippetsModule: QuickModule {
     public static let id = "snippets"
     public static let name = "文本片段"
     public static let icon = "curlybraces"
+    public static let triggerWords = ["片段", "snippet", "模板", "template"]
 
     public var isEnabled = true
 

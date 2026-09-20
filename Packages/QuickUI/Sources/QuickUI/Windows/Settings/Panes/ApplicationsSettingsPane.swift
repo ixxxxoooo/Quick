@@ -58,7 +58,7 @@ struct ApplicationsSettingsPane: View {
                 HStack(spacing: DesignTokens.Spacing.sm) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    TextField("Search applications…", text: $query)
+                    TextField("搜索应用…", text: $query)
                         .textFieldStyle(.plain)
                     if !query.isEmpty {
                         Button {
@@ -73,7 +73,7 @@ struct ApplicationsSettingsPane: View {
                 .padding(.vertical, 4)
 
                 if apps.isEmpty {
-                    Text(query.isEmpty ? "No indexed applications." : "No matches for “\(query)”.")
+                    Text(query.isEmpty ? "暂无已索引的应用程序。" : "没有匹配「\(query)」的应用。")
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, DesignTokens.Spacing.md)
@@ -83,7 +83,7 @@ struct ApplicationsSettingsPane: View {
                     }
 
                     if query.isEmpty && !showAll && totalCount > apps.count {
-                        Button("Show all \(totalCount) applications…") {
+                        Button("显示全部 \(totalCount) 个应用…") {
                             showAll = true
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -91,11 +91,9 @@ struct ApplicationsSettingsPane: View {
                     }
                 }
             } header: {
-                Text("Applications (\(totalCount))")
+                Text("应用程序（\(totalCount) 个）")
             } footer: {
-                Text(
-                    "Configure custom aliases (e.g. 'code' for VS Code) or global shortcuts to launch apps directly."
-                )
+                Text("为应用设置自定义别名（如 'code' 对应 VS Code）或全局快捷键以快速启动。")
             }
         }
         .formStyle(.grouped)
@@ -150,7 +148,7 @@ private struct AppItemRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(app.name)
                     .lineLimit(1)
-                Text(app.isSystemApp ? "System App" : "Application")
+                Text(app.isSystemApp ? "系统应用" : "应用程序")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

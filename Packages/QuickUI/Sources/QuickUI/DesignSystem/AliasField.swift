@@ -17,7 +17,7 @@ public struct AliasField: View {
     @FocusState private var focused: Bool
 
     public init(
-        placeholder: String = "Add Alias",
+        placeholder: String = "设置别名",
         text: Binding<String>,
         onChange: ((String) -> Void)? = nil
     ) {

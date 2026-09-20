@@ -112,7 +112,7 @@ private struct CustomCommandRow: View {
 
             Spacer(minLength: DesignTokens.Spacing.md)
 
-            TextField("Add Alias", text: $alias)
+            TextField("设置别名", text: $alias)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 80)
                 .onChange(of: alias) { _, newValue in

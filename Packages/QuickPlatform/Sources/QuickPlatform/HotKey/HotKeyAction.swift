@@ -19,6 +19,9 @@ public enum HotKeyAction: Hashable, Sendable {
     /// 运行自定义 Shell 命令
     case customCommand(id: UUID)
 
+    /// 导航到指定功能模块面板
+    case module(id: String)
+
     /// 持久化与 Carbon 注册用的唯一标识
     public var defaultsKey: String {
         switch self {
@@ -30,6 +33,8 @@ public enum HotKeyAction: Hashable, Sendable {
             return "hotkey.systemAction." + id
         case .customCommand(let id):
             return "hotkey.customCommand." + id.uuidString.lowercased()
+        case .module(let id):
+            return "hotkey.module." + id
         }
     }
 }

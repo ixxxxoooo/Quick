@@ -15,6 +15,7 @@ public final class AIModule: QuickModule {
     public static let id = "ai"
     public static let name = "AI 对话"
     public static let icon = "sparkles"
+    public static let triggerWords = ["ai", "聊天", "chat", "问", "ask", "gpt", "claude"]
 
     public var isEnabled = true
 
@@ -25,9 +26,8 @@ public final class AIModule: QuickModule {
     public init() {}
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        let triggers = ["ai", "聊天", "chat", "问", "ask", "gpt", "claude"]
         // 用整词匹配而不是 contains：否则 email / wait / task 都会误触发本模块
-        guard query.matchesAnyTrigger(triggers) else { return [] }
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
         return [
             SearchableItem(

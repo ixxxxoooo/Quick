@@ -17,6 +17,7 @@ public final class LauncherModule: QuickModule {
     public static let id = "launcher"
     public static let name = "应用启动器"
     public static let icon = "magnifyingglass"
+    public static let triggerWords = ["应用", "app", "打开", "open", "启动", "launch"]
 
     public var isEnabled = true
 

@@ -153,6 +153,9 @@ final class AppCore {
                 }
             }
         }
+        hotKeyService.onNavigateToModule = { [weak self] moduleID in
+            self?.paletteCoordinator.show(moduleID: moduleID)
+        }
         hotKeyService.start()
         statusItemController.install()
         observeDebugWakeSignals()
@@ -382,8 +385,10 @@ final class AppCore {
         let appIDs = appIndex.apps.map(\.bundleID)
         let systemIDs = SystemAction.allCases.map(\.rawValue)
         let cmdIDs = loadCustomCommands().map(\.id)
+        let moduleIDs = modules.map { type(of: $0).id }
         hotKeyService.restoreHotKeys(
-            appBundleIDs: appIDs, systemActionIDs: systemIDs, customCommandIDs: cmdIDs)
+            appBundleIDs: appIDs, systemActionIDs: systemIDs,
+            customCommandIDs: cmdIDs, moduleIDs: moduleIDs)
     }
 }
 
@@ -583,7 +588,14 @@ extension AppCore: SettingsDataSource {
     /// 排序而不是按注册顺序：注册顺序是代码结构，用户不该看到它。
     var moduleEntries: [SettingsModule] {
         modules
-            .map { SettingsModule(id: type(of: $0).id, name: type(of: $0).name, icon: type(of: $0).icon) }
+            .map {
+                SettingsModule(
+                    id: type(of: $0).id,
+                    name: type(of: $0).name,
+                    icon: type(of: $0).icon,
+                    triggerWords: type(of: $0).triggerWords
+                )
+            }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
@@ -620,6 +632,19 @@ extension AppCore: SettingsDataSource {
             return nil
         }
         return module.makeSettingsView()
+    }
+
+    func moduleShortcutKeycaps(for moduleID: String) -> [String]? {
+        hotKeyService.binding(for: .module(id: moduleID))?.keycaps
+    }
+
+    func setModuleShortcut(keyCode: Int, carbonModifiers: Int, for moduleID: String) {
+        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
+        hotKeyService.setBinding(shortcut, for: .module(id: moduleID))
+    }
+
+    func clearModuleShortcut(for moduleID: String) {
+        hotKeyService.setBinding(nil, for: .module(id: moduleID))
     }
 
     // MARK: - 权限

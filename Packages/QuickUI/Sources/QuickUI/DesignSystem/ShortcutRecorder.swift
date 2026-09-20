@@ -39,7 +39,7 @@ public struct ShortcutRecorder: View {
 
         Group {
             if isRecording {
-                Text("Listening…")
+                Text("按下快捷键…")
                     .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(Color.accentColor)
             } else if let keycaps, !keycaps.isEmpty {
@@ -71,7 +71,7 @@ public struct ShortcutRecorder: View {
                     }
                 }
             } else {
-                Text(isHovered ? "Record" : "Record")
+                Text("点击录制")
                     .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(
                         isHovered ? DesignTokens.Colors.textSecondary : DesignTokens.Colors.textTertiary

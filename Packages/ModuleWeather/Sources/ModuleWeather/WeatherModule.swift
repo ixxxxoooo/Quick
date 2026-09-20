@@ -19,6 +19,7 @@ public final class WeatherModule: QuickModule {
     public static let id = "weather"
     public static let name = "天气"
     public static let icon = "cloud.sun"
+    public static let triggerWords = ["天气", "weather", "温度", "预报"]
 
     public var isEnabled = true
 
@@ -26,8 +27,7 @@ public final class WeatherModule: QuickModule {
 
     private let service = WeatherService()
 
-    /// 触发词
-    private static let triggers = ["天气", "weather", "温度", "预报"]
+    // triggerWords 已在 static let triggerWords 声明
 
     public init() {}
 
@@ -37,7 +37,7 @@ public final class WeatherModule: QuickModule {
     /// 聚合搜索又要等所有模块都返回，所以在这里取位置会把**整批**结果卡住。
     /// 需要取的时候由用户点这一条去触发 —— 那也是定位权限该被申请的时机。
     public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(Self.triggers) else { return [] }
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
         if let info = service.currentInfo {
             return [

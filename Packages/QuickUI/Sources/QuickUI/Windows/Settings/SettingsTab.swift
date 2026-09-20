@@ -4,7 +4,7 @@
 
 import Foundation
 
-/// 设置窗口的分组结构（参考 Tinycast）
+/// 设置窗口的分组结构
 public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
     case general
     case launcher
@@ -15,17 +15,17 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
 
     public var title: String {
         switch self {
-        case .general: "General"
-        case .launcher: "Launcher"
-        case .features: "Features"
-        case .advanced: "Advanced"
+        case .general: "通用"
+        case .launcher: "启动器"
+        case .features: "功能模块"
+        case .advanced: "高级"
         }
     }
 
     public var tabs: [SettingsTab] {
         switch self {
         case .general:
-            return [.general, .permissions]
+            return [.general, .modules, .permissions]
         case .launcher:
             return [.applications, .systemActions, .commands]
         case .features:
@@ -44,16 +44,17 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
 /// 设置窗口的分栏
 public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 
-    // MARK: - General
+    // MARK: - 通用
     case general
+    case modules
     case permissions
 
-    // MARK: - Launcher
+    // MARK: - 启动器
     case applications
     case systemActions
     case commands
 
-    // MARK: - Features
+    // MARK: - 功能模块
     case clipboard
     case calculator
     case fileSearch
@@ -70,7 +71,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case ocr
     case screenshot
 
-    // MARK: - Advanced
+    // MARK: - 高级
     case about
 
     public var id: Self { self }
@@ -78,30 +79,31 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     /// 侧边栏标题
     public var title: String {
         switch self {
-        case .general: "General"
-        case .permissions: "Permissions"
+        case .general: "通用设置"
+        case .modules: "模块管理"
+        case .permissions: "权限"
 
-        case .applications: "Applications"
-        case .systemActions: "System Actions"
-        case .commands: "Commands"
+        case .applications: "应用程序"
+        case .systemActions: "系统操作"
+        case .commands: "终端命令"
 
-        case .clipboard: "Clipboard"
-        case .calculator: "Calculator"
-        case .fileSearch: "File Search"
-        case .snippets: "Snippets"
-        case .windowManagement: "Window Management"
-        case .notes: "Notes"
-        case .calendar: "Calendar"
-        case .weather: "Weather"
-        case .ai: "AI"
-        case .translator: "Translator"
-        case .devTools: "Developer Tools"
-        case .systemMonitor: "System Monitor"
-        case .networkTools: "Network Tools"
-        case .ocr: "OCR"
-        case .screenshot: "Screenshot"
+        case .clipboard: "剪贴板历史"
+        case .calculator: "计算器"
+        case .fileSearch: "文件搜索"
+        case .snippets: "文本片段"
+        case .windowManagement: "窗口管理"
+        case .notes: "笔记"
+        case .calendar: "日历"
+        case .weather: "天气"
+        case .ai: "AI 对话"
+        case .translator: "翻译"
+        case .devTools: "开发工具"
+        case .systemMonitor: "系统监控"
+        case .networkTools: "网络工具"
+        case .ocr: "文字识别"
+        case .screenshot: "截图工具"
 
-        case .about: "About"
+        case .about: "关于"
         }
     }
 
@@ -109,9 +111,10 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     public var systemImage: String {
         switch self {
         case .general: "switch.2"
+        case .modules: "square.grid.2x2"
         case .permissions: "lock.shield"
 
-        case .applications: "square.grid.2x2"
+        case .applications: "app.badge"
         case .systemActions: "bolt"
         case .commands: "terminal"
 

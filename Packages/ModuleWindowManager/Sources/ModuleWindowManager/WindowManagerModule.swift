@@ -16,6 +16,7 @@ public final class WindowManagerModule: QuickModule {
     public static let id = "windowmanager"
     public static let name = "窗口管理"
     public static let icon = "macwindow"
+    public static let triggerWords = ["窗口", "window", "平铺", "布局", "半屏", "全屏"]
 
     public var isEnabled = true
 
@@ -29,11 +30,10 @@ public final class WindowManagerModule: QuickModule {
     public init() {}
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        let triggers = ["窗口", "window", "平铺", "布局", "半屏", "全屏"]
-        guard query.matchesAnyTrigger(triggers) else { return [] }
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
         // 剥离触发词后再看布局关键词：`窗口` 只剩空串时应当列出全部布局，而不是一行都没有
-        let keyword = query.removingTrigger(triggers)
+        let keyword = query.removingTrigger(Self.triggerWords)
 
         return WindowLayout.allCases.compactMap { layout in
             let score = keyword.isEmpty ? 0 : layout.keywords.map { $0.fuzzyScore(keyword) }.max() ?? 0

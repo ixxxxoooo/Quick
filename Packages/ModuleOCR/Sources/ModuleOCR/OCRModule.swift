@@ -16,6 +16,7 @@ public final class OCRModule: QuickModule {
     public static let id = "ocr"
     public static let name = "文字识别"
     public static let icon = "text.viewfinder"
+    public static let triggerWords = ["ocr", "识别", "文字识别", "截图识别"]
 
     public var isEnabled = true
 
@@ -29,8 +30,7 @@ public final class OCRModule: QuickModule {
     // MARK: - QuickModule 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        let triggers = ["ocr", "识别", "文字识别", "截图识别"]
-        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        guard Self.triggerWords.contains(where: { query.lowercased().contains($0) }) else { return [] }
 
         return [
             SearchableItem(

@@ -17,6 +17,7 @@ public final class ClipboardModule: QuickModule {
     public static let id = "clipboard"
     public static let name = "剪贴板历史"
     public static let icon = "doc.on.clipboard"
+    public static let triggerWords = ["剪贴板", "clipboard", "粘贴", "复制", "历史", "cb"]
 
     public var isEnabled = true
 
@@ -34,11 +35,10 @@ public final class ClipboardModule: QuickModule {
 
     public func searchItems(query: String) async -> [SearchableItem] {
         // 仅当搜索词与剪贴板相关时才返回入口
-        let triggers = ["剪贴板", "clipboard", "粘贴", "复制", "历史", "cb"]
-        guard query.matchesAnyTrigger(triggers) else { return [] }
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
         // 剥离触发词后的词才是真正的筛选条件；为空表示列出最近几条
-        let keyword = query.removingTrigger(triggers)
+        let keyword = query.removingTrigger(Self.triggerWords)
         let matches = keyword.isEmpty ? store.entries : store.search(keyword)
 
         var results: [SearchableItem] = []
@@ -82,7 +82,8 @@ public final class ClipboardModule: QuickModule {
     }
 
     public func makeSettingsView() -> AnyView? {
-        AnyView(ClipboardSettingsView())
+        // 配置项由 FeatureSettingsPane 的 ClipboardFeatureSection 统一管理
+        nil
     }
 
     public func activate() {
