@@ -6,7 +6,7 @@ import Foundation
 import SwiftUI
 
 /// 设置窗口里的一行插件
-public struct SettingsModule: Identifiable, Sendable {
+public struct SettingsPlugin: Identifiable, Sendable {
     public let id: String
     public let name: String
     public let icon: String
@@ -189,13 +189,13 @@ public protocol SettingsDataSource: AnyObject {
     func clearCustomCommandShortcut(for id: UUID)
 
     // MARK: - 功能插件设置
-    var moduleEntries: [SettingsModule] { get }
-    func isModuleEnabled(_ id: String) -> Bool
-    func setModuleEnabled(_ id: String, enabled: Bool)
+    var pluginEntries: [SettingsPlugin] { get }
+    func isPluginEnabled(_ id: String) -> Bool
+    func setPluginEnabled(_ id: String, enabled: Bool)
     func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView?
-    func moduleShortcutKeycaps(for moduleID: String) -> [String]?
-    func setModuleShortcut(keyCode: Int, carbonModifiers: Int, for moduleID: String)
-    func clearModuleShortcut(for moduleID: String)
+    func pluginShortcutKeycaps(for pluginID: String) -> [String]?
+    func setPluginShortcut(keyCode: Int, carbonModifiers: Int, for pluginID: String)
+    func clearPluginShortcut(for pluginID: String)
 
     // MARK: - 权限
     func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState

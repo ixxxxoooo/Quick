@@ -9,7 +9,7 @@ import SwiftUI
 /// 统一搜索结果列表组件
 ///
 /// 面板中部的搜索结果列表，支持键盘导航和鼠标交互。
-/// 所有模块的搜索结果都通过此组件展示。
+/// 所有插件的搜索结果都通过此组件展示。
 ///
 /// 列表会从 header 与底栏下面**穿过**（由外壳用 `safeAreaInset` 留出栏位），
 /// 靠 `edgeDissolve()` 淡出，而不是被硬切。
@@ -151,7 +151,7 @@ struct ResultRowView: View {
             }
 
             // 来源插件标注
-            if let name = item.moduleName {
+            if let name = item.pluginName {
                 Text(name)
                     .font(.system(size: 10))
                     .foregroundStyle(DesignTokens.Colors.textTertiary)

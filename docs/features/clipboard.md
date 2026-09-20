@@ -27,11 +27,11 @@
 
 | 类型 | 职责 |
 | --- | --- |
-| `ClipboardModule` | 模块入口，把 `ClipboardMonitor` 的新内容转给 `ClipboardStore` |
+| `ClipboardPlugin` | 插件入口，把 `ClipboardMonitor` 的新内容转给 `ClipboardStore` |
 | `ClipboardMonitor` | 轮询系统剪贴板，回调 `onNewContent` |
 | `ClipboardStore` | 内存缓存 + 去重 + 上限裁剪 + 防抖落盘 |
 | `ClipboardEntry` | 值类型条目（`Codable` + `Sendable`） |
-| `ClipboardListView` | 模块主视图 |
+| `ClipboardListView` | 插件主视图 |
 | `ClipboardSettingsView` | 设置页 |
 
 `ClipboardStore` 标了 `@Observable`，供 `ClipboardListView` 观察。
@@ -40,11 +40,11 @@
 
 ## 持久化
 
-`history.json`（`ClipboardEntry` 的 JSON 数组），路径走 `AppPaths.moduleData("clipboard")`。
+`history.json`（`ClipboardEntry` 的 JSON 数组），路径走 `AppPaths.pluginData("clipboard")`。
 
 - `init(storageURL:)` 接收可选路径，默认走 `AppPaths`。
   **测试必须传临时目录**，否则会污染用户真实的剪贴板历史。
-- 解码失败降级为空历史并记 `.error`，不让模块起不来。
+- 解码失败降级为空历史并记 `.error`，不让插件起不来。
 
 ## 已知限制
 

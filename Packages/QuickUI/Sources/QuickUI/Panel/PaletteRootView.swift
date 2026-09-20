@@ -13,14 +13,14 @@ import SwiftUI
 /// header 和底栏都是用 `safeAreaInset` 挂在滚动内容上的，内容从它们下面穿过，
 /// 靠 `edgeDissolve()` 淡出。
 ///
-/// **模块模式**：当用户选中一个模块后，切换到该模块的完整视图。
-/// 头部变为返回按钮 + 模块名称 + 分离按钮，内容区显示模块的 `makeView()`。
+/// **插件模式**：当用户选中一个插件后，切换到该插件的完整视图。
+/// 头部变为返回按钮 + 插件名称 + 分离按钮，内容区显示插件的 `makeView()`。
 ///
 /// ```
-/// ┌──────────── 搜索模式 ─────────────┐  ┌──────────── 模块模式 ─────────────┐
-/// │  [icon] 搜索框              [状态]  │  │  [<] [icon] 模块名称       [分离]  │
+/// ┌──────────── 搜索模式 ─────────────┐  ┌──────────── 插件模式 ─────────────┐
+/// │  [icon] 搜索框              [状态]  │  │  [<] [icon] 插件名称       [分离]  │
 /// │                                     │  │                                    │
-/// │   结果行从 header 下面穿过并淡出      │  │   模块的 makeView() 内容            │
+/// │   结果行从 header 下面穿过并淡出      │  │   插件的 makeView() 内容            │
 /// │                                     │  │                                    │
 /// │  计数                  ( 打开  ↵ )   │  │                                    │
 /// └─────────────────────────────────────┘  └────────────────────────────────────┘
@@ -37,7 +37,7 @@ struct PaletteRootView: View {
     /// 焦点在搜索框里，SwiftUI 这一层收不到方向键。
     var selection: PaletteSelection
 
-    /// 面板模式（搜索 vs 模块）
+    /// 面板模式（搜索 vs 插件）
     ///
     /// 由协调器提供的 `@Observable` 桥接对象，不持有 NSPanel，安全观察。
     var paletteMode: PaletteMode
@@ -45,10 +45,10 @@ struct PaletteRootView: View {
     /// 执行搜索（由协调器注入）
     var searchHandler: (String) async -> [SearchableItem]
 
-    /// 获取模块视图（由协调器注入）
+    /// 获取插件视图（由协调器注入）
     ///
-    /// 参数：(moduleID, context) -> 模块视图；返回 nil 表示模块不可用。
-    var moduleViewProvider: (String, [String: String]) -> AnyView?
+    /// 参数：(pluginID, context) -> 插件视图；返回 nil 表示插件不可用。
+    var pluginViewProvider: (String, [String: String]) -> AnyView?
 
     /// 初始查询
     var initialQuery: String = ""
@@ -66,8 +66,8 @@ struct PaletteRootView: View {
 
     var body: some View {
         ZStack {
-            if paletteMode.isModuleMode {
-                moduleContent
+            if paletteMode.isPluginMode {
+                pluginContent
             } else {
                 searchContent
             }
@@ -93,7 +93,7 @@ struct PaletteRootView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            if results.isEmpty && !paletteMode.isModuleMode {
+            if results.isEmpty && !paletteMode.isPluginMode {
                 runSearch(query)
             }
         }
@@ -215,27 +215,27 @@ struct PaletteRootView: View {
         .frosted(in: Capsule())
     }
 
-    // MARK: - 模块模式
+    // MARK: - 插件模式
 
-    /// 模块模式完整视图
-    private var moduleContent: some View {
+    /// 插件模式完整视图
+    private var pluginContent: some View {
         VStack(spacing: 0) {
-            ModuleHeaderView(
-                moduleName: paletteMode.activeModuleName ?? "",
-                moduleIcon: paletteMode.activeModuleIcon ?? "questionmark",
+            PluginHeaderView(
+                pluginName: paletteMode.activePluginName ?? "",
+                pluginIcon: paletteMode.activePluginIcon ?? "questionmark",
                 onBack: {
                     paletteMode.popToRoot()
                 },
                 onDetach: {
-                    guard let moduleID = paletteMode.activeModuleID else { return }
-                    EventBus.shared.post(DetachPanelEvent(moduleID: moduleID))
+                    guard let pluginID = paletteMode.activePluginID else { return }
+                    EventBus.shared.post(DetachPanelEvent(pluginID: pluginID))
                 }
             )
 
-            if let moduleID = paletteMode.activeModuleID,
-                let moduleView = moduleViewProvider(moduleID, paletteMode.context)
+            if let pluginID = paletteMode.activePluginID,
+                let pluginView = pluginViewProvider(pluginID, paletteMode.context)
             {
-                moduleView
+                pluginView
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
             } else {

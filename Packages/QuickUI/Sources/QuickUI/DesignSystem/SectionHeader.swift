@@ -6,7 +6,7 @@ import SwiftUI
 
 /// 列表分组标题
 ///
-/// 用在结果列表里分隔不同模块的结果。底部留白是固定的
+/// 用在结果列表里分隔不同插件的结果。底部留白是固定的
 /// （`Spacing.sectionHeaderBottom`），这样标题与它下面第一行的距离
 /// 在任何分组里都一致。
 public struct SectionHeader: View {

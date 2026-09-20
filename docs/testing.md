@@ -13,7 +13,7 @@
 
 ```swift
 import Testing
-@testable import ModuleCalculator
+@testable import PluginCalculator
 
 @Suite("计算器引擎")
 struct CalcEngineTests {
@@ -57,15 +57,15 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 | `QuickCore` | `EventBusTests`、`FuzzyMatchTests` | 有覆盖 |
 | `QuickUI` | `PalettePanelTests` | 有覆盖 |
 | `QuickPlatform` | `HotKeyServiceTests` | 有覆盖 |
-| `ModuleCalculator` | `CalcEngineTests` | 有覆盖 |
-| `ModuleLauncher` | — | 需要补 |
-| `ModuleClipboard` | — | 需要补 |
-| `ModuleSystemControl` | — | 需要补 |
-| 其余 10 个模块 | 未声明测试目标 | 需要补 |
+| `PluginCalculator` | `CalcEngineTests` | 有覆盖 |
+| `PluginLauncher` | — | 需要补 |
+| `PluginClipboard` | — | 需要补 |
+| `PluginSystemControl` | — | 需要补 |
+| 其余 10 个插件 | 未声明测试目标 | 需要补 |
 
 **注意：声明了 testTarget 却没有测试文件，会让 `swift test` 直接失败**
 （`error: no tests found`）。所以「加测试」和「声明目标」必须同时发生，
-不能先声明后补。给模块加 testTarget 时，同一个提交里必须有至少一个非空测试文件。
+不能先声明后补。给插件加 testTarget 时，同一个提交里必须有至少一个非空测试文件。
 
 ---
 
@@ -76,14 +76,14 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 **必测（纯逻辑层）**
 - 解析、匹配、评分：模糊匹配、计算器表达式、模板变量替换、文本 diff。
 - 持久化：`Store` 的读写往返、损坏数据时的降级、上限裁剪（例如历史只留 N 条）。
-- 状态机：面板显隐与模式切换、模块启停的幂等性。
+- 状态机：面板显隐与模式切换、插件启停的幂等性。
 - `EventBus`：订阅/取消订阅/`removeAll` 的语义。
 
 **应测（契约层）**
-- 每个 `QuickModule`：`searchItems` 对空查询与正常查询的行为、
+- 每个 `QuickPlugin`：`searchItems` 对空查询与正常查询的行为、
   `id` 的唯一性、`deactivate()` 是否落盘。
 - 关键不变量：`hidesOnDeactivate == false`、面板尺寸有效、
-  `SearchableItem.id` 在同一模块内不重复。
+  `SearchableItem.id` 在同一插件内不重复。
 
 **不测（除非另有理由）**
 - SwiftUI 视图的像素级外观 —— 那靠人工验收与 `docs/ui.md` 的规范约束。
@@ -115,7 +115,7 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 ```bash
 ./Scripts/run-tests.sh                    # 全部包
 ./Scripts/run-tests.sh QuickCore          # 单个包
-./Scripts/run-tests.sh ModuleCalculator QuickCore   # 多个包
+./Scripts/run-tests.sh PluginCalculator QuickCore   # 多个包
 ```
 
 脚本会对每个声明了测试的包执行 `swift test`，汇总结果，**任何一个包失败就整体退出非零**

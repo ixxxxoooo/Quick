@@ -12,8 +12,8 @@ import os
 ///
 /// 用法：
 /// ```swift
-/// private let log = QuickLog.module(ClipboardModule.id)
-/// log.info("模块已激活，加载 \(entries.count, privacy: .public) 条历史")
+/// private let log = QuickLog.plugin(ClipboardPlugin.id)
+/// log.info("插件已激活，加载 \(entries.count, privacy: .public) 条历史")
 /// log.error("写入失败: \(url.lastPathComponent, privacy: .public)")
 /// ```
 ///
@@ -30,7 +30,7 @@ public enum QuickLog {
 
     // MARK: - 固定区域
 
-    /// 应用生命周期：启动、模块注册、退出的各阶段
+    /// 应用生命周期：启动、插件注册、退出的各阶段
     public static let app = Logger(subsystem: subsystem, category: Category.app)
 
     /// 面板：显隐、定位、模式切换、聚合搜索
@@ -51,17 +51,17 @@ public enum QuickLog {
     /// 持久化读写
     public static let persistence = Logger(subsystem: subsystem, category: Category.persistence)
 
-    // MARK: - 模块日志
+    // MARK: - 插件日志
 
-    /// 取某个模块的日志通道
+    /// 取某个插件的日志通道
     ///
-    /// 分类形如 `module.launcher`，可以用
-    /// `log stream --predicate 'category BEGINSWITH "module."'` 一次性看所有模块。
+    /// 分类形如 `plugin.launcher`，可以用
+    /// `log stream --predicate 'category BEGINSWITH "plugin."'` 一次性看所有插件。
     ///
-    /// - Parameter id: 模块的 `QuickModule.id`，必须与注册时使用的 id 一致
-    /// - Returns: 该模块专用的 `Logger`
-    public static func module(_ id: String) -> Logger {
-        Logger(subsystem: subsystem, category: "\(Category.modulePrefix)\(id)")
+    /// - Parameter id: 插件的 `QuickPlugin.id`，必须与注册时使用的 id 一致
+    /// - Returns: 该插件专用的 `Logger`
+    public static func plugin(_ id: String) -> Logger {
+        Logger(subsystem: subsystem, category: "\(Category.pluginPrefix)\(id)")
     }
 
     /// 取任意分类的日志通道（用于上面没列出的新区域）
@@ -106,7 +106,7 @@ public enum QuickLog {
         public static let ui = "ui"
         public static let persistence = "persistence"
 
-        /// 模块分类的统一前缀，最终形如 `module.clipboard`
-        public static let modulePrefix = "module."
+        /// 插件分类的统一前缀，最终形如 `plugin.clipboard`
+        public static let pluginPrefix = "plugin."
     }
 }

@@ -38,11 +38,11 @@ public enum AppPaths {
         return url
     }
 
-    /// 模块数据目录
-    /// - Parameter moduleID: 模块唯一标识
-    /// - Returns: 模块专属数据目录
-    public static func moduleData(_ moduleID: String) -> URL {
-        let url = applicationSupport().appendingPathComponent("Modules").appendingPathComponent(moduleID)
+    /// 插件数据目录
+    /// - Parameter pluginID: 插件唯一标识
+    /// - Returns: 插件专属数据目录
+    public static func pluginData(_ pluginID: String) -> URL {
+        let url = applicationSupport().appendingPathComponent("Plugins").appendingPathComponent(pluginID)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }

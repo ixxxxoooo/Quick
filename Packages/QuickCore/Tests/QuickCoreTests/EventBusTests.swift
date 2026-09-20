@@ -18,10 +18,10 @@ struct EventBusTests {
         var received = false
         bus.on(NavigateEvent.self) { event in
             received = true
-            #expect(event.moduleID == "devtools")
+            #expect(event.pluginID == "devtools")
         }
 
-        bus.post(NavigateEvent(moduleID: "devtools", context: ["tool": "json"]))
+        bus.post(NavigateEvent(pluginID: "devtools", context: ["tool": "json"]))
         #expect(received)
     }
 
@@ -45,17 +45,17 @@ struct EventBusTests {
     }
 
     /// 测试分离面板事件发布与接收
-    @Test("DetachPanelEvent 正确传递模块 ID")
+    @Test("DetachPanelEvent 正确传递插件 ID")
     func detachPanelEvent() {
         let bus = EventBus.shared
         defer { bus.removeAll() }
 
-        var receivedModuleID: String?
+        var receivedPluginID: String?
         bus.on(DetachPanelEvent.self) { event in
-            receivedModuleID = event.moduleID
+            receivedPluginID = event.pluginID
         }
 
-        bus.post(DetachPanelEvent(moduleID: "clipboard"))
-        #expect(receivedModuleID == "clipboard")
+        bus.post(DetachPanelEvent(pluginID: "clipboard"))
+        #expect(receivedPluginID == "clipboard")
     }
 }

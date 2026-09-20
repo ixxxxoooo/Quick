@@ -11,13 +11,13 @@
 ┌──────────────────────────────────────────────────────────┐
 │  Quick（应用目标）                                        │
 │  QuickApp / AppDelegate / AppCore / StatusItemController  │
-│  —— 唯一的 composition root，唯一 import Module* 的地方    │
+│  —— 唯一的 composition root，唯一 import Plugin* 的地方    │
 └───────────────────────┬──────────────────────────────────┘
                         │
         ┌───────────────┼───────────────┐
         ▼               ▼               ▼
   ┌──────────┐   ┌───────────┐   ┌──────────────┐
-  │ Module*  │   │  QuickUI  │   │ QuickPlatform│   （17 个 / 1 个 / 1 个）
+  │ Plugin*  │   │  QuickUI  │   │ QuickPlatform│   （17 个 / 1 个 / 1 个）
   └────┬─────┘   └─────┬─────┘   └──────┬───────┘
        │               │                │
        └───────────────┴────────────────┘
@@ -30,13 +30,13 @@
 **规则：箭头只能向下。** 具体到 import：
 
 - `QuickCore` 不 import 任何本项目其他包，也不 import AppKit / SwiftUI（它只依赖 Foundation
-  和 `SwiftUI` 的 `AnyView` 类型 —— `QuickModule.makeView()` 签名需要）。
-- `QuickUI` / `QuickPlatform` 依赖 `QuickCore`，**不**依赖任何模块。
-- `Module*` 依赖 `QuickCore` + `QuickUI`，需要系统能力时再加 `QuickPlatform`。
-  **模块之间永不互相依赖。**
-- `Quick/` 依赖全部。只有它能 import 各模块。
+  和 `SwiftUI` 的 `AnyView` 类型 —— `QuickPlugin.makeView()` 签名需要）。
+- `QuickUI` / `QuickPlatform` 依赖 `QuickCore`，**不**依赖任何插件。
+- `Plugin*` 依赖 `QuickCore` + `QuickUI`，需要系统能力时再加 `QuickPlatform`。
+  **插件之间永不互相依赖。**
+- `Quick/` 依赖全部。只有它能 import 各插件。
 
-**为什么模块间不能互相依赖：** 20 个模块两两依赖会变成一张网，任何改动都会波及全仓，
+**为什么插件间不能互相依赖：** 20 个插件两两依赖会变成一张网，任何改动都会波及全仓，
 且没法单独测试。需要协作时走 `EventBus`。
 
 ---
@@ -56,27 +56,27 @@
 | `pasteboardService` | `PasteboardService` | 剪贴板读写 |
 | `appIndex` | `AppIndex` | 应用清单与模糊搜索 |
 | `hud` | `HUDController` | 底部轻量提示 |
-| `modulePanelController` | `ModulePanelController` | 分离窗口管理（创建、单例、尺寸记忆） |
+| `pluginPanelController` | `PluginPanelController` | 分离窗口管理（创建、单例、尺寸记忆） |
 | `launchAtLogin` | `LaunchAtLogin` | 登录项（`SMAppService`） |
 | `statusItemController` | `StatusItemController` | 菜单栏图标与菜单 |
-| `modules` | `[any QuickModule]` | 全部 17 个模块实例 |
+| `plugins` | `[any QuickPlugin]` | 全部 17 个插件实例 |
 | `subscriptions` | `[EventSubscription]` | 事件订阅句柄（不持有就会被释放） |
 
 ### `start()` 的固定顺序
 
 顺序是有意的，改动前想清楚依赖：
 
-1. `registerModules()` —— 组装模块（**唯一实例化模块的地方**）
-2. `paletteCoordinator.setModules(modules)` —— 让面板能搜索
+1. `registerPlugins()` —— 组装插件（**唯一实例化插件的地方**）
+2. `paletteCoordinator.setPlugins(plugins)` —— 让面板能搜索
 3. `wireEventBus()` —— 订阅事件，把事件接到协调器/剪贴板/HUD
 4. 热键：设 `onTogglePalette` 回调 → `hotKeyService.start()`
 5. `statusItemController.install()` —— 菜单栏图标
 6. `observeDebugWakeSignals()` —— 调试用分布式通知
 7. `Task { await appIndex.refresh() }` —— **异步**扫描应用，不阻塞启动
-8. 对每个已启用模块调用 `activate()`
+8. 对每个已启用插件调用 `activate()`
 9. 若启动参数带 `-showPalette`，立即显示面板
 
-退出走 `prepareForTermination()`：停热键 → 摘菜单栏 → `deactivate()` 各模块 →
+退出走 `prepareForTermination()`：停热键 → 摘菜单栏 → `deactivate()` 各插件 →
 `EventBus.shared.removeAll()`。
 
 ### 新增状态的规矩
@@ -85,23 +85,23 @@
 - **绝不**另起一个 `static let shared` 单例来放状态。目前只有两个单例：
   `AppCore.shared` 和 `EventBus.shared`，两者都是有意的，不要加第三个。
 - 视图**不要**直接拿 `AppCore`。视图通过 `@Environment` 拿协调器，或通过构造参数注入
-  依赖（例如 `LauncherModule(appIndex:)`）。
+  依赖（例如 `LauncherPlugin(appIndex:)`）。
 
 ---
 
-## 3. 模块契约：`QuickModule`
+## 3. 插件契约：`QuickPlugin`
 
-[`Packages/QuickCore/Sources/QuickCore/Protocols/QuickModule.swift`](../Packages/QuickCore/Sources/QuickCore/Protocols/QuickModule.swift)
+[`Packages/QuickCore/Sources/QuickCore/Protocols/QuickPlugin.swift`](../Packages/QuickCore/Sources/QuickCore/Protocols/QuickPlugin.swift)
 
 ```swift
 @MainActor
-public protocol QuickModule: AnyObject, Sendable {
+public protocol QuickPlugin: AnyObject, Sendable {
     static var id: String { get }        // 全局唯一主键：事件路由 + 设置存储
     static var name: String { get }      // 出现在搜索结果与设置页
     static var icon: String { get }      // SF Symbol 名
     var isEnabled: Bool { get set }
     func searchItems(query: String) async -> [SearchableItem]
-    func makeView() -> AnyView           // 面板内的模块主视图
+    func makeView() -> AnyView           // 面板内的插件主视图
     func makeSettingsView() -> AnyView?  // 设置页；无设置返回 nil
     func activate()                      // 启动 / 启用时
     func deactivate()                    // 退出 / 禁用时
@@ -114,40 +114,40 @@ public protocol QuickModule: AnyObject, Sendable {
 
 ### 不变量
 
-- **`static var id` 一旦发布就不能改。** 它是 `SettingsKey.moduleEnabled(id)` 的键，
+- **`static var id` 一旦发布就不能改。** 它是 `SettingsKey.pluginEnabled(id)` 的键，
   改了等于用户设置丢失。
-- **`searchItems` 必须是纯查询。** 不要在里面激活模块、写盘、发网络请求、改 `isEnabled`。
+- **`searchItems` 必须是纯查询。** 不要在里面激活插件、写盘、发网络请求、改 `isEnabled`。
   它可能在每次按键时被调用（虽然并发，但不是免费的）。要缓存就在 `activate()` 里预热。
 - **`searchItems` 必须尊重防抖与取消。** 调用方（`PaletteCoordinator`）只在防抖后调用，
-  但模块内部若有昂贵准备，要检查 `Task.isCancelled`。
-- **`makeView()` 返回的视图不要持有 `AppCore`。** 需要能力就通过模块构造器注入。
-- **`activate()` / `deactivate()` 必须成对且幂等。** 模块可能被反复启停。
+  但插件内部若有昂贵准备，要检查 `Task.isCancelled`。
+- **`makeView()` 返回的视图不要持有 `AppCore`。** 需要能力就通过插件构造器注入。
+- **`activate()` / `deactivate()` 必须成对且幂等。** 插件可能被反复启停。
 - **`deactivate()` 里要落盘。** 未保存的运行时状态在退出时就丢了。
 
 ### 注册流程
 
-模块**不自注册**。加一个模块要做四件事：
+插件**不自注册**。加一个插件要做四件事：
 
-1. 写 `<Name>Module.swift` 实现协议。
-2. 在 `AppCore.registerModules()` 里 `modules.append(...)`。
+1. 写 `<Name>Plugin.swift` 实现协议。
+2. 在 `AppCore.registerPlugins()` 里 `plugins.append(...)`。
 3. 在 `project.yml` 的 `packages:` 加路径、在 `Quick` target 的 `dependencies:` 加
-   `- package: Module<Name>`，然后 `xcodegen generate`。
-4. 在 `docs/features/<id>.md` 写下这个模块的不变量。
+   `- package: Plugin<Name>`，然后 `xcodegen generate`。
+4. 在 `docs/features/<id>.md` 写下这个插件的不变量。
 
-第 2 步是唯一实例化点。如果你发现自己在别处 `new` 一个模块，那就是错了。
+第 2 步是唯一实例化点。如果你发现自己在别处 `new` 一个插件，那就是错了。
 
 ---
 
-## 4. `EventBus`：模块间唯一的通信方式
+## 4. `EventBus`：插件间唯一的通信方式
 
 [`Packages/QuickCore/Sources/QuickCore/Events/EventBus.swift`](../Packages/QuickCore/Sources/QuickCore/Events/EventBus.swift)
 
 ```swift
 @MainActor public final class EventBus: Sendable {
     public static let shared: EventBus
-    public func post<E: ModuleEvent>(_ event: E)
+    public func post<E: PluginEvent>(_ event: E)
     @discardableResult
-    public func on<E: ModuleEvent>(_ type: E.Type, handler: @escaping (E) -> Void) -> EventSubscription
+    public func on<E: PluginEvent>(_ type: E.Type, handler: @escaping (E) -> Void) -> EventSubscription
     public func unsubscribe(_ subscription: EventSubscription)
     public func removeAll()
 }
@@ -157,21 +157,21 @@ public protocol QuickModule: AnyObject, Sendable {
 
 | 事件 | 用途 |
 | --- | --- |
-| `NavigateEvent` | 让面板跳到某个模块（可带 query 上下文） |
+| `NavigateEvent` | 让面板跳到某个插件（可带 query 上下文） |
 | `ShowPaletteEvent` / `HidePaletteEvent` | 显隐面板 |
 | `CopyToClipboardEvent` | 请求写剪贴板 |
 | `ShowHUDEvent`（+ `HUDTone`） | 请求弹一条提示 |
-| `DetachPanelEvent` | 请求将当前模块分离为独立窗口 |
+| `DetachPanelEvent` | 请求将当前插件分离为独立窗口 |
 
 ### 不变量
 
 - **必须保存 `EventSubscription`。** 它是句柄，返回值丢弃就等于随 ARC 一起取消订阅。
-  保存到 `AppCore.subscriptions` 或模块自己的属性里，并在 `deactivate()` 时释放。
+  保存到 `AppCore.subscriptions` 或插件自己的属性里，并在 `deactivate()` 时释放。
 - **事件处理器在主 actor 上同步执行。** 不要在里面做重活；需要异步就 `Task { }`。
 - **事件名（`static var name`）是全局命名空间**，用 `quick.<区域>.<动作>` 格式，
-  不要和别的模块撞。
-- **不要用 `EventBus` 做请求-响应。** 它没有返回值。需要拿结果就直接调那个模块 ——
-  但那种情况说明这两个模块的边界画错了，先重新想。
+  不要和别的插件撞。
+- **不要用 `EventBus` 做请求-响应。** 它没有返回值。需要拿结果就直接调那个插件 ——
+  但那种情况说明这两个插件的边界画错了，先重新想。
 
 ---
 
@@ -184,7 +184,7 @@ public protocol QuickModule: AnyObject, Sendable {
 ```swift
 public struct SearchableItem: Identifiable, Sendable {
     public let id: String
-    public let moduleID: String
+    public let pluginID: String
     public let title: String
     public let subtitle: String?
     public let icon: String
@@ -195,11 +195,11 @@ public struct SearchableItem: Identifiable, Sendable {
 }
 ```
 
-- `Hashable` **只基于 `id`**。所以 `id` 必须在模块内唯一且稳定；重复 id 会让列表错乱。
-- `relevance` 是跨模块比较的**唯一**依据。`String.fuzzyScore` 给出的阶梯是：
+- `Hashable` **只基于 `id`**。所以 `id` 必须在插件内唯一且稳定；重复 id 会让列表错乱。
+- `relevance` 是跨插件比较的**唯一**依据。`String.fuzzyScore` 给出的阶梯是：
   完全匹配 `1.0`、前缀匹配 `0.9`、包含匹配 `0.7`、子序列模糊匹配 `0.4`、不匹配 `0`
-  （见 `QuickCore/Extensions/StringExtensions.swift`）。模块可以在这个基础上叠加自己的
-  权重（`LauncherModule` 就是 `fuzzyScore * 0.7 + 使用频率 * 0.3`），
+  （见 `QuickCore/Extensions/StringExtensions.swift`）。插件可以在这个基础上叠加自己的
+  权重（`LauncherPlugin` 就是 `fuzzyScore * 0.7 + 使用频率 * 0.3`），
   但**不要所有结果都给 `1.0`** —— 那等于放弃了排序，列表顺序会变成随机。
 - `action` 在按下回车/点击时于主 actor 执行。它应该**只发事件或调用已注入的依赖**，
   不要直接 `NSWorkspace` 之类的全局调用（除了启动应用这种确实没有别的写法的情况）。
@@ -208,7 +208,7 @@ public struct SearchableItem: Identifiable, Sendable {
 
 所有落盘路径走
 [`AppPaths`](../Packages/QuickPlatform/Sources/QuickPlatform/System/AppPaths.swift)：
-`applicationSupport()` / `caches()` / `logs()` / `moduleData(_:)`。
+`applicationSupport()` / `caches()` / `logs()` / `pluginData(_:)`。
 **不要自己拼 `~/Library/...`** —— 路径集中在一处。`AppPaths` 已按
 `Bundle.main.bundleIdentifier` 分目录，Debug（`.dev`）与 Release 互不污染。
 
@@ -220,8 +220,8 @@ public struct SearchableItem: Identifiable, Sendable {
 
 ### 设置窗口
 
-设置界面在 `QuickUI`，但模块实例与系统能力（登录项、快捷键、权限）只有组装层看得到，
-所以用 `SettingsDataSource` 协议把两边隔开 —— **`QuickUI` 因此既不认识模块，
+设置界面在 `QuickUI`，但插件实例与系统能力（登录项、快捷键、权限）只有组装层看得到，
+所以用 `SettingsDataSource` 协议把两边隔开 —— **`QuickUI` 因此既不认识插件，
 也不认识 `QuickPlatform`**，依赖方向保持不变。由 `AppCore` 实现协议。
 
 `SettingsStore`（持久化）由 `AppCore` 持有并注入，**不是单例**：现有单例仍然只有
@@ -254,26 +254,26 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 
 ### 面板的两种模式
 
-面板支持**搜索模式**和**模块模式**，通过 `PaletteMode`（`@Observable`）桥接状态：
+面板支持**搜索模式**和**插件模式**，通过 `PaletteMode`（`@Observable`）桥接状态：
 
-- **搜索模式**（默认）：搜索框 + 结果列表，用户输入关键词查找模块功能。
-- **模块模式**：用户选中一个模块后，面板切换为该模块的完整视图（`makeView()`）。
-  头部变为返回按钮 + 模块名称 + 分离按钮。Esc 返回搜索模式。
+- **搜索模式**（默认）：搜索框 + 结果列表，用户输入关键词查找插件功能。
+- **插件模式**：用户选中一个插件后，面板切换为该插件的完整视图（`makeView()`）。
+  头部变为返回按钮 + 插件名称 + 分离按钮。Esc 返回搜索模式。
 
-`PaletteMode` 不持有 `NSPanel`，只持有纯状态（`activeModuleID`、`context`、模块元信息），
+`PaletteMode` 不持有 `NSPanel`，只持有纯状态（`activePluginID`、`context`、插件元信息），
 所以被 SwiftUI 观察是安全的。协调器在 `navigate` / `popToRoot` 时同步更新它。
 
 ### 分离窗口
 
-模块面板可以通过 ⌘D 或头部分离按钮分离为独立 `NSWindow`。
-`ModulePanelController` 管理分离窗口，策略如下：
+插件面板可以通过 ⌘D 或头部分离按钮分离为独立 `NSWindow`。
+`PluginPanelController` 管理分离窗口，策略如下：
 
-- **单例**：同一模块只允许一个分离窗口，再次分离时聚焦已有窗口。
+- **单例**：同一插件只允许一个分离窗口，再次分离时聚焦已有窗口。
 - **尺寸记忆**：关闭时保存到 `UserDefaults`，下次打开恢复。
 - **主面板行为**：分离后主面板 `popToRoot()` 回到搜索模式并隐藏。
 
-分离事件通过 `DetachPanelEvent` → `EventBus` → `AppCore.detachModule()` 路由，
-`AppCore` 从模块实例获取视图并交给 `ModulePanelController` 创建窗口。
+分离事件通过 `DetachPanelEvent` → `EventBus` → `AppCore.detachPlugin()` 路由，
+`AppCore` 从插件实例获取视图并交给 `PluginPanelController` 创建窗口。
 
 ### 不要给协调器加 `@Observable`
 

@@ -12,22 +12,22 @@ struct PaletteModeTests {
     @Test("初始状态为搜索模式")
     func initialStateIsSearchMode() {
         let mode = PaletteMode()
-        #expect(mode.activeModuleID == nil)
-        #expect(mode.isModuleMode == false)
+        #expect(mode.activePluginID == nil)
+        #expect(mode.isPluginMode == false)
         #expect(mode.context.isEmpty)
-        #expect(mode.activeModuleName == nil)
-        #expect(mode.activeModuleIcon == nil)
+        #expect(mode.activePluginName == nil)
+        #expect(mode.activePluginIcon == nil)
     }
 
-    @Test("navigate 切换到模块模式")
-    func navigateToModule() {
+    @Test("navigate 切换到插件模式")
+    func navigateToPlugin() {
         let mode = PaletteMode()
         mode.navigate(to: "devtools", name: "开发工具", icon: "wrench.and.screwdriver", context: ["tool": "json"])
 
-        #expect(mode.activeModuleID == "devtools")
-        #expect(mode.isModuleMode == true)
-        #expect(mode.activeModuleName == "开发工具")
-        #expect(mode.activeModuleIcon == "wrench.and.screwdriver")
+        #expect(mode.activePluginID == "devtools")
+        #expect(mode.isPluginMode == true)
+        #expect(mode.activePluginName == "开发工具")
+        #expect(mode.activePluginIcon == "wrench.and.screwdriver")
         #expect(mode.context["tool"] == "json")
     }
 
@@ -36,27 +36,27 @@ struct PaletteModeTests {
         let mode = PaletteMode()
         mode.navigate(to: "clipboard", name: "剪贴板", icon: "doc.on.clipboard")
 
-        #expect(mode.isModuleMode == true)
+        #expect(mode.isPluginMode == true)
 
         mode.popToRoot()
 
-        #expect(mode.activeModuleID == nil)
-        #expect(mode.isModuleMode == false)
-        #expect(mode.activeModuleName == nil)
-        #expect(mode.activeModuleIcon == nil)
+        #expect(mode.activePluginID == nil)
+        #expect(mode.isPluginMode == false)
+        #expect(mode.activePluginName == nil)
+        #expect(mode.activePluginIcon == nil)
         #expect(mode.context.isEmpty)
     }
 
-    @Test("多次 navigate 切换模块")
-    func switchBetweenModules() {
+    @Test("多次 navigate 切换插件")
+    func switchBetweenPlugins() {
         let mode = PaletteMode()
 
         mode.navigate(to: "devtools", name: "开发工具", icon: "wrench.and.screwdriver")
-        #expect(mode.activeModuleID == "devtools")
+        #expect(mode.activePluginID == "devtools")
 
         mode.navigate(to: "clipboard", name: "剪贴板", icon: "doc.on.clipboard", context: ["filter": "text"])
-        #expect(mode.activeModuleID == "clipboard")
-        #expect(mode.activeModuleName == "剪贴板")
+        #expect(mode.activePluginID == "clipboard")
+        #expect(mode.activePluginName == "剪贴板")
         #expect(mode.context["filter"] == "text")
     }
 
@@ -65,12 +65,12 @@ struct PaletteModeTests {
         let coordinator = PaletteCoordinator()
         let mode = coordinator.paletteMode
 
-        #expect(mode.isModuleMode == false)
+        #expect(mode.isPluginMode == false)
 
         coordinator.navigate(to: "devtools", context: ["tool": "json"])
 
-        #expect(mode.isModuleMode == true)
-        #expect(mode.activeModuleID == "devtools")
+        #expect(mode.isPluginMode == true)
+        #expect(mode.activePluginID == "devtools")
         #expect(mode.context["tool"] == "json")
 
         coordinator.hide(restoreFocus: false)
@@ -82,11 +82,11 @@ struct PaletteModeTests {
         let mode = coordinator.paletteMode
 
         coordinator.navigate(to: "clipboard")
-        #expect(mode.isModuleMode == true)
+        #expect(mode.isPluginMode == true)
 
         coordinator.popToRoot()
-        #expect(mode.isModuleMode == false)
-        #expect(mode.activeModuleID == nil)
+        #expect(mode.isPluginMode == false)
+        #expect(mode.activePluginID == nil)
 
         coordinator.hide(restoreFocus: false)
     }

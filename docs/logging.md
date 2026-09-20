@@ -14,8 +14,8 @@
 ```swift
 import QuickCore
 
-// 模块：用模块自己的 id 作为分类
-private let log = QuickLog.module(ClipboardModule.id)
+// 插件：用插件自己的 id 作为分类
+private let log = QuickLog.plugin(ClipboardPlugin.id)
 
 // 应用/框架层：用固定区域名
 private let log = QuickLog.palette
@@ -49,8 +49,8 @@ private let log = QuickLog.palette
 | --- | --- | --- | --- |
 | `.debug` | 开发期细节：每次按键、每行渲染、循环内部 | 否 | 否 |
 | `.info` | 实时观察用的中间状态：面板显隐耗时、搜索耗时 | 否 | 否 |
-| `.notice` | **生命周期与状态变化**：应用启停、模块激活、快捷键注册结果、扫描结果、权限授予、设置改动 | **是** | **是** |
-| `.warning` | 可恢复的问题：某模块降级、图标缺失、取消订阅无效 | 是 | 是 |
+| `.notice` | **生命周期与状态变化**：应用启停、插件激活、快捷键注册结果、扫描结果、权限授予、设置改动 | **是** | **是** |
+| `.warning` | 可恢复的问题：某插件降级、图标缺失、取消订阅无效 | 是 | 是 |
 | `.error` | 操作失败且用户会受影响：写盘失败、注册快捷键失败、外部命令非零退出 | 是 | 是 |
 | `.fault` | 编程错误 / 状态不可信：不变量被打破 | 是 | 是 |
 
@@ -63,8 +63,8 @@ private let log = QuickLog.palette
 写新功能时逐条对照，一项都不能漏：
 
 **生命周期**
-- 应用启动的每个关键阶段：启动开始/完成、模块注册完成（打了几个）、事件总线接线条数。
-- 模块 `activate()` / `deactivate()`，以及加载了多少条持久化数据（`.notice`）。
+- 应用启动的每个关键阶段：启动开始/完成、插件注册完成（打了几个）、事件总线接线条数。
+- 插件 `activate()` / `deactivate()`，以及加载了多少条持久化数据（`.notice`）。
 - 应用扫描完成：条目数、去重后条目数、耗时（`.notice`）。
 - `AppCore.prepareForTermination()` 的退出路径。
 
@@ -81,12 +81,12 @@ private let log = QuickLog.palette
 
 **状态与错误**
 - 每个 `catch` 分支至少一条日志。**空 `catch` 是不可接受的。**
-- 状态机的迁移（面板显示/隐藏、模块切换、模式切换）—— `.info`。
+- 状态机的迁移（面板显示/隐藏、插件切换、模式切换）—— `.info`。
 - 不变量被打破 —— `.fault`。
 
 **性能敏感路径**
 - 面板显隐耗时（`show()` 到可见）—— `.info` + signpost。
-- 一次聚合搜索：耗时、参与模块数、命中条数 —— `.debug`（高频）+ signpost。
+- 一次聚合搜索：耗时、参与插件数、命中条数 —— `.debug`（高频）+ signpost。
 - 应用扫描 / 文件索引：条目数、耗时 —— `.notice` + signpost。
 
 ---
@@ -120,7 +120,7 @@ log.info("面板已显示，耗时 " + String(elapsed) + " ms")
 
 - 数字用 `format:` 指定精度。
 - 可能含用户信息的字符串标 `privacy: .private`（默认就是 private）。
-- 需要能在 Console 里直接看到值的（模块 id、状态名、错误码）标 `privacy: .public`。
+- 需要能在 Console 里直接看到值的（插件 id、状态名、错误码）标 `privacy: .public`。
 
 ---
 
@@ -155,7 +155,7 @@ log.info("复制文本: \(clipboardText)")
 print("\(Date()) 面板已显示")
 
 // ✅ 正确的样子
-log.info("模块已激活，加载 \(entries.count, privacy: .public) 条历史")
+log.info("插件已激活，加载 \(entries.count, privacy: .public) 条历史")
 log.error("写入失败: \(url.lastPathComponent, privacy: .public) — \(error.localizedDescription, privacy: .public)")
 log.debug("搜索完成，命中 \(results.count, privacy: .public) 条")
 ```
@@ -169,14 +169,14 @@ log.debug("搜索完成，命中 \(results.count, privacy: .public) 条")
 ./Scripts/logs.sh --errors         # 近 1 小时的 warning / error / fault
 ./Scripts/logs.sh --saved          # 已落盘的历史（notice 及以上）
 ./Scripts/logs.sh -c palette       # 只看面板这个分类
-./Scripts/logs.sh -c module.clipboard   # 只看剪贴板模块
+./Scripts/logs.sh -c plugin.clipboard   # 只看剪贴板插件
 ```
 
 底层命令（脚本已处理「用户 shell 可能覆盖 `log`」的问题，手动敲时注意用绝对路径）：
 
 ```bash
 /usr/bin/log stream --predicate 'subsystem == "com.ygw.quick"' --level debug --style compact
-/usr/bin/log stream --predicate 'subsystem == "com.ygw.quick" AND category == "module.clipboard"' --level debug
+/usr/bin/log stream --predicate 'subsystem == "com.ygw.quick" AND category == "plugin.clipboard"' --level debug
 /usr/bin/log show --predicate 'subsystem == "com.ygw.quick" AND messageType >= warning' --last 1h --style compact
 ```
 

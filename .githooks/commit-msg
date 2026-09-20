@@ -33,7 +33,7 @@ if ! printf '%s' "$subject" | grep -qE "^($TYPES)(\([a-z0-9._-]+\))?!?: .+"; the
     echo >&2
     echo "  期望格式: <type>(<scope>): <英文祈使句描述>" >&2
     echo "    type  : $TYPES" >&2
-    echo "    scope : 模块 id 或区域，如 launcher / palette / quickui / core / tooling" >&2
+    echo "    scope : 插件 id 或区域，如 launcher / palette / quickui / core / tooling" >&2
     echo >&2
     echo "  示例: feat(clipboard): add pinning with a 30-entry history cap" >&2
     echo "        fix(palette): keep the panel on screen when the app deactivates" >&2

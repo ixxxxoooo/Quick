@@ -23,14 +23,14 @@ struct FeatureSettingsPane: View {
     init(tab: SettingsTab, dataSource: any SettingsDataSource) {
         self.tab = tab
         self.dataSource = dataSource
-        let modID = tab.moduleID ?? ""
-        _isEnabled = State(initialValue: dataSource.isModuleEnabled(modID))
+        let modID = tab.pluginID ?? ""
+        _isEnabled = State(initialValue: dataSource.isPluginEnabled(modID))
     }
 
-    /// 查找当前模块的元信息
-    private var moduleInfo: SettingsModule? {
-        guard let moduleID = tab.moduleID else { return nil }
-        return dataSource.moduleEntries.first { $0.id == moduleID }
+    /// 查找当前插件的元信息
+    private var pluginInfo: SettingsPlugin? {
+        guard let pluginID = tab.pluginID else { return nil }
+        return dataSource.pluginEntries.first { $0.id == pluginID }
     }
 
     var body: some View {
@@ -45,8 +45,8 @@ struct FeatureSettingsPane: View {
                     )
                 }
                 .onChange(of: isEnabled) { _, newValue in
-                    if let modID = tab.moduleID {
-                        dataSource.setModuleEnabled(modID, enabled: newValue)
+                    if let modID = tab.pluginID {
+                        dataSource.setPluginEnabled(modID, enabled: newValue)
                     }
                 }
                 Toggle(isOn: $showInLauncher) {
@@ -83,7 +83,7 @@ struct FeatureSettingsPane: View {
     /// 触发词列表区域
     @ViewBuilder
     private var triggerWordsSection: some View {
-        if let info = moduleInfo, !info.triggerWords.isEmpty {
+        if let info = pluginInfo, !info.triggerWords.isEmpty {
             Section {
                 let chinese = info.triggerWords.filter { $0.containsCJK }
                 let english = info.triggerWords.filter { !$0.containsCJK }
@@ -133,7 +133,7 @@ struct FeatureSettingsPane: View {
     /// 快捷键绑定区域
     @ViewBuilder
     private var shortcutSection: some View {
-        if let moduleID = tab.moduleID {
+        if let pluginID = tab.pluginID {
             Section {
                 SettingsRow(
                     title: "全局快捷键",
@@ -141,13 +141,13 @@ struct FeatureSettingsPane: View {
                     icon: { SettingsRowIcon(systemImage: "keyboard") }
                 ) {
                     ShortcutRecorder(
-                        keycaps: dataSource.moduleShortcutKeycaps(for: moduleID),
+                        keycaps: dataSource.pluginShortcutKeycaps(for: pluginID),
                         onRecord: { keyCode, modifiers in
-                            dataSource.setModuleShortcut(
-                                keyCode: keyCode, carbonModifiers: modifiers, for: moduleID)
+                            dataSource.setPluginShortcut(
+                                keyCode: keyCode, carbonModifiers: modifiers, for: pluginID)
                         },
                         onClear: {
-                            dataSource.clearModuleShortcut(for: moduleID)
+                            dataSource.clearPluginShortcut(for: pluginID)
                         }
                     )
                 }
@@ -209,7 +209,7 @@ private extension String {
     }
 }
 
-// MARK: - 各模块配置子表单
+// MARK: - 各插件配置子表单
 
 private struct ClipboardFeatureSection: View {
     @AppStorage("clipboard.maxEntries") private var maxEntries = 500
@@ -565,7 +565,7 @@ private struct AIFeatureSection: View {
         }
     }
 
-    /// 内置 Provider 列表（仅用于设置展示，避免 QuickUI 依赖 ModuleAI）
+    /// 内置 Provider 列表（仅用于设置展示，避免 QuickUI 依赖 PluginAI）
     private var aiProviderNames: [(id: String, name: String, icon: String)] {
         [
             (id: "deepseek", name: "DeepSeek", icon: "brain.head.profile"),

@@ -3,7 +3,7 @@
 # Quick — 跑测试。这是提交的硬门禁。
 #
 #   ./Scripts/run-tests.sh                            全部包
-#   ./Scripts/run-tests.sh QuickCore ModuleCalculator  指定包
+#   ./Scripts/run-tests.sh QuickCore PluginCalculator  指定包
 #
 # 任何一个包失败，整体退出非零 —— pre-commit 钩子依赖这个信号。
 #

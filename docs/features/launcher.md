@@ -2,8 +2,8 @@
 
 主搜索入口。扫描系统已安装的应用，支持模糊搜索、使用频率排序与收藏。
 
-`LauncherModule` 是唯一把 `AppIndex` 通过构造器注入的模块 —— 因为它是唯一需要
-应用清单的模块，而 `AppIndex` 由 `AppCore` 拥有并异步刷新。
+`LauncherPlugin` 是唯一把 `AppIndex` 通过构造器注入的插件 —— 因为它是唯一需要
+应用清单的插件，而 `AppIndex` 由 `AppCore` 拥有并异步刷新。
 
 ## 不变量
 
@@ -26,14 +26,14 @@
 
 | 类型 | 职责 |
 | --- | --- |
-| `LauncherModule` | 模块入口，实现 `QuickModule`；搜索（应用、别名、Shell 与自定义命令）与排序逻辑 |
+| `LauncherPlugin` | 插件入口，实现 `QuickPlugin`；搜索（应用、别名、Shell 与自定义命令）与排序逻辑 |
 | `RankingStore` | 使用次数记录（bundleID → 次数），归一化成 0…1 的评分 |
 | `FavoritesStore` | 收藏的 bundleID 列表，保持插入顺序 |
 | `AppIndex` | 应用程序索引与扫描，支持动态自定义搜索范围配置 |
 | `ShellCommandRunner` | 结构化后台异步执行 Shell 脚本并捕获 stdout/stderr/退出码 |
 | `CustomCommand` | 用户自定义 Shell 命令数据结构 |
 | `KeyShortcut` / `HotKeyService` | 全局热键与应用/操作绑定服务 |
-| `LauncherView` | 模块在面板内的主视图 |
+| `LauncherView` | 插件在面板内的主视图 |
 
 ## 持久化
 

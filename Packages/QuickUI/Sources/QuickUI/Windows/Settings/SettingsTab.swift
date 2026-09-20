@@ -46,7 +46,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 
     // MARK: - 通用
     case general
-    case modules
+    case plugins
     case permissions
 
     // MARK: - 启动器
@@ -80,7 +80,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     public var title: String {
         switch self {
         case .general: "通用设置"
-        case .modules: "插件管理"
+        case .plugins: "插件管理"
         case .permissions: "权限"
 
         case .applications: "应用程序"
@@ -111,7 +111,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     public var systemImage: String {
         switch self {
         case .general: "switch.2"
-        case .modules: "square.grid.2x2"
+        case .plugins: "square.grid.2x2"
         case .permissions: "lock.shield"
 
         case .applications: "app.badge"
@@ -139,7 +139,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// 对应功能插件 ID（若该分栏代表一个 Feature Plugin）
-    public var moduleID: String? {
+    public var pluginID: String? {
         switch self {
         case .applications: "launcher"
         case .systemActions: "systemcontrol"

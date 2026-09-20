@@ -23,7 +23,7 @@ struct SettingsSidebarView: View {
     @FocusState private var searchFocused: Bool
 
     private var results: [SettingsSearchEntry] {
-        SettingsSearchCatalog.results(for: query, modules: dataSource.moduleEntries)
+        SettingsSearchCatalog.results(for: query, plugins: dataSource.pluginEntries)
     }
 
     var body: some View {

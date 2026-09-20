@@ -16,7 +16,7 @@
 
 | 后缀 | 含义 | 例子 |
 | --- | --- | --- |
-| `Module` | 一个功能模块，实现 `QuickModule` | `ClipboardModule` |
+| `Plugin` | 一个功能插件，实现 `QuickPlugin` | `ClipboardPlugin` |
 | `Store` | 持久化某类数据的读写者，负责落盘 | `RankingStore`、`ClipboardStore` |
 | `Service` | 对系统或网络的封装，无 UI | `WeatherService`、`HotKeyService` |
 | `Coordinator` | 编排一组视图/窗口的生命周期与路由 | `PaletteCoordinator` |
@@ -51,8 +51,8 @@
 
 ### 2.1 隔离默认在主 actor
 
-- UI 相关类型一律 `@MainActor`：视图、协调器、控制器、模块。
-- `QuickModule` 协议本身是 `@MainActor`，所以模块实现天然主线程隔离。
+- UI 相关类型一律 `@MainActor`：视图、协调器、控制器、插件。
+- `QuickPlugin` 协议本身是 `@MainActor`，所以插件实现天然主线程隔离。
 - 跨 actor 传递的模型类型必须是 `Sendable`。优先用 `struct` + `let` 属性 —— 它是自动
   `Sendable` 的，不需要任何标注。
 
@@ -81,7 +81,7 @@ self.entries = entries
 ### 2.3 取消与生命周期
 
 - 长任务持有 `Task` 句柄，并在新输入到来或视图消失时 `cancel()`。搜索类功能必须防抖 + 取消，
-  否则每次按键都会堆积一次全模块扫描。
+  否则每次按键都会堆积一次全插件扫描。
 - `withTaskGroup` 的并发分支里不要捕获 `self` 的可变状态；让每个分支只做纯计算并返回结果。
 - 定时器优先用 `Task` + `Task.sleep`，而不是 `Timer`；用了 `Timer` 就在 `deinit`/退出路径上
   `invalidate()`。
@@ -189,7 +189,7 @@ hidesOnDeactivate = false
 - **不要 `try!`**（linter 设为 error）。要么 `try?` 显式接受失败，要么 `do/catch` 处理。
 - **不要用 `fatalError` 处理可恢复的错误**。它只用于「编程错误，且状态已不可信」，
   例如 switch 穷尽性兜底。
-- **`catch` 里不要空着。** 至少记一条日志：`QuickLog.module("clipboard").error("...")`。
+- **`catch` 里不要空着。** 至少记一条日志：`QuickLog.plugin("clipboard").error("...")`。
   静默吞掉错误是排查困难的头号来源。
 - **面向用户的失败要有反馈**：`EventBus` 发 `ShowHUDEvent`，或用 `HUDController` 提示，
   不要把错误只丢进日志。
@@ -223,10 +223,10 @@ hidesOnDeactivate = false
 出问题时应当能只靠日志定位，不需要重现。
 
 - 统一使用 `QuickLog`，**禁止裸 `print`**（见 [logging.md](logging.md)）。
-- 每个模块有自己的 category：`QuickLog.module(ClipboardModule.id)`。
-- 必须打日志的位置：模块 `activate()` / `deactivate()`、外部命令或网络请求的发起与结果、
+- 每个插件有自己的 category：`QuickLog.plugin(ClipboardPlugin.id)`。
+- 必须打日志的位置：插件 `activate()` / `deactivate()`、外部命令或网络请求的发起与结果、
   权限申请、快捷键注册与失败、持久化读写失败、任何 `catch` 分支、状态机的重要迁移。
-- 必须打日志的性能敏感点：面板显隐耗时、聚合搜索耗时与命中模块数、应用扫描耗时与条目数。
+- 必须打日志的性能敏感点：面板显隐耗时、聚合搜索耗时与命中插件数、应用扫描耗时与条目数。
 - **不要打用户隐私内容**：剪贴板正文、笔记正文、AI 对话内容一律不进日志，
   只记长度或类型。日志里不要出现完整路径以外的个人信息。
 

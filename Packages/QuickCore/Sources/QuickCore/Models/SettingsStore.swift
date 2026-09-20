@@ -6,8 +6,8 @@ import Foundation
 
 /// 用户设置的持久化存储
 ///
-/// 只负责读写，不含任何 UI，也不认识模块实例 —— 模块启用状态由组装层在注册时
-/// 从这里读出来应用。这样「设置」和「模块」之间没有反向依赖。
+/// 只负责读写，不含任何 UI，也不认识插件实例 —— 插件启用状态由组装层在注册时
+/// 从这里读出来应用。这样「设置」和「插件」之间没有反向依赖。
 ///
 /// 由 `AppCore` 持有并注入，**不是单例**。
 @MainActor
@@ -22,37 +22,37 @@ public final class SettingsStore {
         self.defaults = defaults
     }
 
-    // MARK: - 模块开关
+    // MARK: - 插件开关
 
-    /// 模块是否启用
+    /// 插件是否启用
     ///
-    /// **未设置过一律视为启用**：新模块默认就该能用，用户没有主动关过它。
+    /// **未设置过一律视为启用**：新插件默认就该能用，用户没有主动关过它。
     /// 所以这里不能用 `bool(forKey:)` 直接读 —— 那会把「没设置过」读成 `false`。
     ///
-    /// - Parameter moduleID: 模块 ID
+    /// - Parameter pluginID: 插件 ID
     /// - Returns: 是否启用
-    public func isModuleEnabled(_ moduleID: String) -> Bool {
-        let key = SettingsKey.moduleEnabled(moduleID)
+    public func isPluginEnabled(_ pluginID: String) -> Bool {
+        let key = SettingsKey.pluginEnabled(pluginID)
         guard defaults.object(forKey: key) != nil else { return true }
         return defaults.bool(forKey: key)
     }
 
-    /// 设置模块启用状态
+    /// 设置插件启用状态
     /// - Parameters:
-    ///   - moduleID: 模块 ID
+    ///   - pluginID: 插件 ID
     ///   - enabled: 是否启用
-    public func setModuleEnabled(_ moduleID: String, enabled: Bool) {
-        defaults.set(enabled, forKey: SettingsKey.moduleEnabled(moduleID))
-        log.notice("模块 \(moduleID, privacy: .public) 已\(enabled ? "启用" : "停用", privacy: .public)")
+    public func setPluginEnabled(_ pluginID: String, enabled: Bool) {
+        defaults.set(enabled, forKey: SettingsKey.pluginEnabled(pluginID))
+        log.notice("插件 \(pluginID, privacy: .public) 已\(enabled ? "启用" : "停用", privacy: .public)")
     }
 
-    /// 所有被显式停用过的模块 ID
+    /// 所有被显式停用过的插件 ID
     ///
-    /// 用于排查「某个功能怎么没了」：日志里一眼能看到哪些模块是被用户关掉的。
-    /// - Parameter candidateIDs: 当前存在的模块 ID
+    /// 用于排查「某个功能怎么没了」：日志里一眼能看到哪些插件是被用户关掉的。
+    /// - Parameter candidateIDs: 当前存在的插件 ID
     /// - Returns: 其中被停用的那些
-    public func disabledModuleIDs(among candidateIDs: [String]) -> [String] {
-        candidateIDs.filter { !isModuleEnabled($0) }
+    public func disabledPluginIDs(among candidateIDs: [String]) -> [String] {
+        candidateIDs.filter { !isPluginEnabled($0) }
     }
 
     // MARK: - 启动器与别名

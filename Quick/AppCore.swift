@@ -2,23 +2,23 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
-import ModuleAI
-import ModuleCalculator
-import ModuleCalendar
-import ModuleClipboard
-import ModuleDevTools
-import ModuleFileSearch
-import ModuleLauncher
-import ModuleNetworkTools
-import ModuleNotes
-import ModuleOCR
-import ModuleScreenshot
-import ModuleSnippets
-import ModuleSystemControl
-import ModuleSystemMonitor
-import ModuleTranslator
-import ModuleWeather
-import ModuleWindowManager
+import PluginAI
+import PluginCalculator
+import PluginCalendar
+import PluginClipboard
+import PluginDevTools
+import PluginFileSearch
+import PluginLauncher
+import PluginNetworkTools
+import PluginNotes
+import PluginOCR
+import PluginScreenshot
+import PluginSnippets
+import PluginSystemControl
+import PluginSystemMonitor
+import PluginTranslator
+import PluginWeather
+import PluginWindowManager
 import Carbon.HIToolbox
 import Foundation
 import QuickCore
@@ -29,8 +29,8 @@ import SwiftUI
 /// 应用核心组装器
 ///
 /// AppCore 是整个应用的组装层，职责如下：
-/// 1. 创建所有基础设施服务和 Feature Module 实例
-/// 2. 将依赖注入到各模块
+/// 1. 创建所有基础设施服务和 Feature Plugin 实例
+/// 2. 将依赖注入到各插件
 /// 3. 连接 EventBus 的订阅关系
 /// 4. 管理全局生命周期（启动/退出）
 ///
@@ -43,7 +43,7 @@ final class AppCore {
 
     private let log = QuickLog.app
 
-    // MARK: - 基础设施（不是 Module）
+    // MARK: - 基础设施（不是 Plugin）
 
     /// 全局快捷键服务
     let hotKeyService = HotKeyService()
@@ -64,7 +64,7 @@ final class AppCore {
     let hudController = HUDController()
 
     /// 分离窗口控制器
-    let modulePanelController = ModulePanelController()
+    let pluginPanelController = PluginPanelController()
 
     /// 开机自启管理
     let launchAtLogin = LaunchAtLogin()
@@ -72,7 +72,7 @@ final class AppCore {
     /// 菜单栏状态项
     let statusItemController = StatusItemController()
 
-    /// 用户设置存储（模块开关等）
+    /// 用户设置存储（插件开关等）
     let settingsStore = SettingsStore()
 
     /// 设置窗口控制器
@@ -81,10 +81,10 @@ final class AppCore {
     /// 窗口本身也是惰性创建的：没打开过设置就不该有窗口。
     private(set) lazy var settingsWindowController = SettingsWindowController(dataSource: self)
 
-    // MARK: - Feature Modules
+    // MARK: - Feature Plugins
 
-    /// 所有已注册模块
-    private(set) var modules: [any QuickModule] = []
+    /// 所有已注册插件
+    private(set) var plugins: [any QuickPlugin] = []
 
     /// 事件订阅凭证（防止被释放）
     private var subscriptions: [EventSubscription] = []
@@ -103,24 +103,24 @@ final class AppCore {
     /// 启动应用核心
     ///
     /// 由 AppDelegate.applicationDidFinishLaunching 调用一次。
-    /// 按顺序完成：创建模块 → 注册事件 → 启动服务 → 激活模块。
+    /// 按顺序完成：创建插件 → 注册事件 → 启动服务 → 激活插件。
     func start() {
         log.notice("AppCore 启动，bundle id=\(Bundle.main.bundleIdentifier ?? "-", privacy: .public)")
 
-        // 1. 创建并注册所有 Feature Module
-        registerModules()
-        log.notice("模块注册完成，共 \(self.modules.count, privacy: .public) 个")
+        // 1. 创建并注册所有 Feature Plugin
+        registerPlugins()
+        log.notice("插件注册完成，共 \(self.plugins.count, privacy: .public) 个")
 
-        // 2. 将模块注入到面板协调器
-        paletteCoordinator.setModules(modules)
+        // 2. 将插件注入到面板协调器
+        paletteCoordinator.setPlugins(plugins)
 
         // 3. 连接事件总线
         wireEventBus()
         log.notice("事件总线接线完成，订阅 \(self.subscriptions.count, privacy: .public) 条")
 
         // 4. 设置协调器的分离回调
-        paletteCoordinator.onDetach = { [weak self] moduleID in
-            self?.detachModule(moduleID)
+        paletteCoordinator.onDetach = { [weak self] pluginID in
+            self?.detachPlugin(pluginID)
         }
 
         // 5. 启动基础设施服务
@@ -131,11 +131,11 @@ final class AppCore {
             self?.appIndex.app(withBundleID: bundleID)?.launch()
         }
         hotKeyService.onRunSystemAction = { [weak self] id in
-            if let systemModule = self?.modules.first(where: { type(of: $0).id == SystemControlModule.id })
-                as? SystemControlModule,
+            if let systemPlugin = self?.plugins.first(where: { type(of: $0).id == SystemControlPlugin.id })
+                as? SystemControlPlugin,
                 let action = SystemAction(rawValue: id)
             {
-                systemModule.execute(action)
+                systemPlugin.execute(action)
             }
         }
         hotKeyService.onRunCustomCommand = { [weak self] id in
@@ -154,8 +154,8 @@ final class AppCore {
                 }
             }
         }
-        hotKeyService.onNavigateToModule = { [weak self] moduleID in
-            self?.paletteCoordinator.show(moduleID: moduleID)
+        hotKeyService.onNavigateToPlugin = { [weak self] pluginID in
+            self?.paletteCoordinator.show(pluginID: pluginID)
         }
         hotKeyService.start()
 
@@ -177,9 +177,9 @@ final class AppCore {
             self.restoreSavedHotKeys()
         }
 
-        // 6. 激活所有已启用的模块
-        for module in modules where module.isEnabled {
-            module.activate()
+        // 6. 激活所有已启用的插件
+        for plugin in plugins where plugin.isEnabled {
+            plugin.activate()
         }
 
         // 7. 开发启动参数：立即显示面板（验收用）
@@ -220,34 +220,34 @@ final class AppCore {
         log.notice("开始退出清理")
         hotKeyService.stop()
         statusItemController.remove()
-        modulePanelController.closeAll()
-        for module in modules {
-            module.deactivate()
+        pluginPanelController.closeAll()
+        for plugin in plugins {
+            plugin.deactivate()
         }
         EventBus.shared.removeAll()
         log.notice("退出清理完成")
     }
 
-    // MARK: - 模块分离
+    // MARK: - 插件分离
 
-    /// 将指定模块分离为独立窗口
+    /// 将指定插件分离为独立窗口
     ///
-    /// 查找模块实例 → 获取视图 → 创建独立窗口 → 主面板返回搜索模式。
-    private func detachModule(_ moduleID: String) {
-        guard let module = modules.first(where: { type(of: $0).id == moduleID }),
-            module.isEnabled
+    /// 查找插件实例 → 获取视图 → 创建独立窗口 → 主面板返回搜索模式。
+    private func detachPlugin(_ pluginID: String) {
+        guard let plugin = plugins.first(where: { type(of: $0).id == pluginID }),
+            plugin.isEnabled
         else {
-            log.warning("分离失败：找不到模块 \(moduleID, privacy: .public) 或模块已禁用")
+            log.warning("分离失败：找不到插件 \(pluginID, privacy: .public) 或插件已禁用")
             return
         }
 
-        let view = module.makeView()
-        let name = type(of: module).name
-        let icon = type(of: module).icon
+        let view = plugin.makeView()
+        let name = type(of: plugin).name
+        let icon = type(of: plugin).icon
 
-        modulePanelController.detach(
-            moduleID: moduleID,
-            moduleName: name,
+        pluginPanelController.detach(
+            pluginID: pluginID,
+            pluginName: name,
             icon: icon,
             view: view,
             sourceWindow: nil
@@ -257,61 +257,61 @@ final class AppCore {
         paletteCoordinator.hide(restoreFocus: false)
     }
 
-    // MARK: - 模块注册
+    // MARK: - 插件注册
 
-    /// 注册所有 Feature Module
+    /// 注册所有 Feature Plugin
     ///
-    /// 这是唯一创建模块实例的地方。
-    /// 新增模块只需在此处添加一行注册。
-    private func registerModules() {
-        // Phase 2: 核心模块
-        register(LauncherModule(appIndex: appIndex, settingsStore: settingsStore))
-        register(ClipboardModule())
-        register(CalculatorModule())
-        register(SystemControlModule(settingsStore: settingsStore))
+    /// 这是唯一创建插件实例的地方。
+    /// 新增插件只需在此处添加一行注册。
+    private func registerPlugins() {
+        // Phase 2: 核心插件
+        register(LauncherPlugin(appIndex: appIndex, settingsStore: settingsStore))
+        register(ClipboardPlugin())
+        register(CalculatorPlugin())
+        register(SystemControlPlugin(settingsStore: settingsStore))
 
-        // Phase 3: 效率与工具模块
-        register(FileSearchModule())
-        register(SnippetsModule())
-        register(OCRModule())
-        register(TranslatorModule())
-        register(DevToolsModule())
+        // Phase 3: 效率与工具插件
+        register(FileSearchPlugin())
+        register(SnippetsPlugin())
+        register(OCRPlugin())
+        register(TranslatorPlugin())
+        register(DevToolsPlugin())
 
-        // Phase 4: 扩展模块
-        register(CalendarModule())
-        register(WeatherModule())
-        register(NotesModule())
-        register(AIModule())
-        register(WindowManagerModule())
-        register(SystemMonitorModule())
-        register(NetworkToolsModule())
-        register(ScreenshotModule())
+        // Phase 4: 扩展插件
+        register(CalendarPlugin())
+        register(WeatherPlugin())
+        register(NotesPlugin())
+        register(AIPlugin())
+        register(WindowManagerPlugin())
+        register(SystemMonitorPlugin())
+        register(NetworkToolsPlugin())
+        register(ScreenshotPlugin())
     }
 
-    /// 注册一个模块，并恢复用户上次的启用状态
+    /// 注册一个插件，并恢复用户上次的启用状态
     ///
-    /// 启用状态在这里从设置里读出来应用，而不是让模块自己去读：
-    /// 模块不认识设置存储，依赖方向保持单向。
+    /// 启用状态在这里从设置里读出来应用，而不是让插件自己去读：
+    /// 插件不认识设置存储，依赖方向保持单向。
     ///
-    /// - Parameter module: 模块实例
-    private func register(_ module: any QuickModule) {
-        module.isEnabled = settingsStore.isModuleEnabled(type(of: module).id)
-        modules.append(module)
+    /// - Parameter plugin: 插件实例
+    private func register(_ plugin: any QuickPlugin) {
+        plugin.isEnabled = settingsStore.isPluginEnabled(type(of: plugin).id)
+        plugins.append(plugin)
     }
 
     // MARK: - 事件总线连接
 
     /// 连接 EventBus 订阅
     ///
-    /// 所有模块间的通信都在这里统一接线。
-    /// 模块发布事件 → EventBus → AppCore 路由到目标。
+    /// 所有插件间的通信都在这里统一接线。
+    /// 插件发布事件 → EventBus → AppCore 路由到目标。
     private func wireEventBus() {
         let bus = EventBus.shared
 
         // 导航事件 → 面板协调器
         subscriptions.append(
             bus.on(NavigateEvent.self) { [weak self] event in
-                self?.paletteCoordinator.navigate(to: event.moduleID, context: event.context)
+                self?.paletteCoordinator.navigate(to: event.pluginID, context: event.context)
             }
         )
 
@@ -342,7 +342,7 @@ final class AppCore {
         // 显示面板事件
         subscriptions.append(
             bus.on(ShowPaletteEvent.self) { [weak self] event in
-                self?.paletteCoordinator.show(moduleID: event.moduleID, query: event.query)
+                self?.paletteCoordinator.show(pluginID: event.pluginID, query: event.query)
             }
         )
 
@@ -356,11 +356,11 @@ final class AppCore {
             }
         )
 
-        // 分离面板事件 → 创建独立模块窗口
+        // 分离面板事件 → 创建独立插件窗口
         subscriptions.append(
             bus.on(DetachPanelEvent.self) { [weak self] event in
                 guard let self else { return }
-                self.detachModule(event.moduleID)
+                self.detachPlugin(event.pluginID)
             }
         )
 
@@ -395,10 +395,10 @@ final class AppCore {
         let appIDs = appIndex.apps.map(\.bundleID)
         let systemIDs = SystemAction.allCases.map(\.rawValue)
         let cmdIDs = loadCustomCommands().map(\.id)
-        let moduleIDs = modules.map { type(of: $0).id }
+        let pluginIDs = plugins.map { type(of: $0).id }
         hotKeyService.restoreHotKeys(
             appBundleIDs: appIDs, systemActionIDs: systemIDs,
-            customCommandIDs: cmdIDs, moduleIDs: moduleIDs)
+            customCommandIDs: cmdIDs, pluginIDs: pluginIDs)
     }
 }
 
@@ -406,7 +406,7 @@ final class AppCore {
 
 /// `AppCore` 是设置界面的数据源
 ///
-/// 设置界面在 `QuickUI`，而模块实例与系统能力（登录项、快捷键）只有组装层看得到，
+/// 设置界面在 `QuickUI`，而插件实例与系统能力（登录项、快捷键）只有组装层看得到，
 /// 所以由这里实现协议、把两边接起来。
 extension AppCore: SettingsDataSource {
 
@@ -609,15 +609,15 @@ extension AppCore: SettingsDataSource {
         cachedCustomCommands = nil
     }
 
-    // MARK: - 功能模块设置
+    // MARK: - 功能插件设置
 
-    /// 全部模块，按显示名排序
+    /// 全部插件，按显示名排序
     ///
     /// 排序而不是按注册顺序：注册顺序是代码结构，用户不该看到它。
-    var moduleEntries: [SettingsModule] {
-        modules
+    var pluginEntries: [SettingsPlugin] {
+        plugins
             .map {
-                SettingsModule(
+                SettingsPlugin(
                     id: type(of: $0).id,
                     name: type(of: $0).name,
                     icon: type(of: $0).icon,
@@ -627,52 +627,52 @@ extension AppCore: SettingsDataSource {
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    func isModuleEnabled(_ id: String) -> Bool {
-        settingsStore.isModuleEnabled(id)
+    func isPluginEnabled(_ id: String) -> Bool {
+        settingsStore.isPluginEnabled(id)
     }
 
-    /// 切换模块启用状态
+    /// 切换插件启用状态
     ///
-    /// 三件事必须一起做：持久化、改模块实例、启停模块。
+    /// 三件事必须一起做：持久化、改插件实例、启停插件。
     /// 只改设置不启停，用户会看到开关变了但功能还在跑（或反过来）。
-    func setModuleEnabled(_ id: String, enabled: Bool) {
-        settingsStore.setModuleEnabled(id, enabled: enabled)
+    func setPluginEnabled(_ id: String, enabled: Bool) {
+        settingsStore.setPluginEnabled(id, enabled: enabled)
 
-        guard let module = modules.first(where: { type(of: $0).id == id }) else {
-            log.warning("找不到模块 \(id, privacy: .public)，设置已保存但未同步实例")
+        guard let plugin = plugins.first(where: { type(of: $0).id == id }) else {
+            log.warning("找不到插件 \(id, privacy: .public)，设置已保存但未同步实例")
             return
         }
-        guard module.isEnabled != enabled else { return }
+        guard plugin.isEnabled != enabled else { return }
 
-        module.isEnabled = enabled
+        plugin.isEnabled = enabled
         if enabled {
-            module.activate()
+            plugin.activate()
         } else {
-            module.deactivate()
+            plugin.deactivate()
         }
-        log.notice("模块 \(id, privacy: .public) 已\(enabled ? "启用" : "停用", privacy: .public)并同步实例")
+        log.notice("插件 \(id, privacy: .public) 已\(enabled ? "启用" : "停用", privacy: .public)并同步实例")
     }
 
     func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView? {
-        guard let moduleID = tab.moduleID,
-            let module = modules.first(where: { type(of: $0).id == moduleID })
+        guard let pluginID = tab.pluginID,
+            let plugin = plugins.first(where: { type(of: $0).id == pluginID })
         else {
             return nil
         }
-        return module.makeSettingsView()
+        return plugin.makeSettingsView()
     }
 
-    func moduleShortcutKeycaps(for moduleID: String) -> [String]? {
-        hotKeyService.binding(for: .module(id: moduleID))?.keycaps
+    func pluginShortcutKeycaps(for pluginID: String) -> [String]? {
+        hotKeyService.binding(for: .plugin(id: pluginID))?.keycaps
     }
 
-    func setModuleShortcut(keyCode: Int, carbonModifiers: Int, for moduleID: String) {
+    func setPluginShortcut(keyCode: Int, carbonModifiers: Int, for pluginID: String) {
         let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        hotKeyService.setBinding(shortcut, for: .module(id: moduleID))
+        hotKeyService.setBinding(shortcut, for: .plugin(id: pluginID))
     }
 
-    func clearModuleShortcut(for moduleID: String) {
-        hotKeyService.setBinding(nil, for: .module(id: moduleID))
+    func clearPluginShortcut(for pluginID: String) {
+        hotKeyService.setBinding(nil, for: .plugin(id: pluginID))
     }
 
     // MARK: - 权限
@@ -712,7 +712,7 @@ extension AppCore: SettingsDataSource {
         case .screenCapture:
             permissionService.requestScreenCapture()
         case .location:
-            // 定位的申请入口只有天气模块那一处（用户主动查看天气时），
+            // 定位的申请入口只有天气插件那一处（用户主动查看天气时），
             // 设置页只负责把状态显示出来、把人带到系统设置。
             permissionService.openLocationSettings()
         }

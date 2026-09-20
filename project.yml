@@ -21,40 +21,40 @@ packages:
     path: Packages/QuickUI
   QuickPlatform:
     path: Packages/QuickPlatform
-  ModuleLauncher:
-    path: Packages/ModuleLauncher
-  ModuleClipboard:
-    path: Packages/ModuleClipboard
-  ModuleCalculator:
-    path: Packages/ModuleCalculator
-  ModuleSystemControl:
-    path: Packages/ModuleSystemControl
-  ModuleFileSearch:
-    path: Packages/ModuleFileSearch
-  ModuleSnippets:
-    path: Packages/ModuleSnippets
-  ModuleOCR:
-    path: Packages/ModuleOCR
-  ModuleTranslator:
-    path: Packages/ModuleTranslator
-  ModuleDevTools:
-    path: Packages/ModuleDevTools
-  ModuleCalendar:
-    path: Packages/ModuleCalendar
-  ModuleWeather:
-    path: Packages/ModuleWeather
-  ModuleNotes:
-    path: Packages/ModuleNotes
-  ModuleAI:
-    path: Packages/ModuleAI
-  ModuleWindowManager:
-    path: Packages/ModuleWindowManager
-  ModuleSystemMonitor:
-    path: Packages/ModuleSystemMonitor
-  ModuleNetworkTools:
-    path: Packages/ModuleNetworkTools
-  ModuleScreenshot:
-    path: Packages/ModuleScreenshot
+  PluginLauncher:
+    path: Packages/PluginLauncher
+  PluginClipboard:
+    path: Packages/PluginClipboard
+  PluginCalculator:
+    path: Packages/PluginCalculator
+  PluginSystemControl:
+    path: Packages/PluginSystemControl
+  PluginFileSearch:
+    path: Packages/PluginFileSearch
+  PluginSnippets:
+    path: Packages/PluginSnippets
+  PluginOCR:
+    path: Packages/PluginOCR
+  PluginTranslator:
+    path: Packages/PluginTranslator
+  PluginDevTools:
+    path: Packages/PluginDevTools
+  PluginCalendar:
+    path: Packages/PluginCalendar
+  PluginWeather:
+    path: Packages/PluginWeather
+  PluginNotes:
+    path: Packages/PluginNotes
+  PluginAI:
+    path: Packages/PluginAI
+  PluginWindowManager:
+    path: Packages/PluginWindowManager
+  PluginSystemMonitor:
+    path: Packages/PluginSystemMonitor
+  PluginNetworkTools:
+    path: Packages/PluginNetworkTools
+  PluginScreenshot:
+    path: Packages/PluginScreenshot
 
 targets:
   Quick:
@@ -94,20 +94,20 @@ targets:
       - package: QuickCore
       - package: QuickUI
       - package: QuickPlatform
-      - package: ModuleLauncher
-      - package: ModuleClipboard
-      - package: ModuleCalculator
-      - package: ModuleSystemControl
-      - package: ModuleFileSearch
-      - package: ModuleSnippets
-      - package: ModuleOCR
-      - package: ModuleTranslator
-      - package: ModuleDevTools
-      - package: ModuleCalendar
-      - package: ModuleWeather
-      - package: ModuleNotes
-      - package: ModuleAI
-      - package: ModuleWindowManager
-      - package: ModuleSystemMonitor
-      - package: ModuleNetworkTools
-      - package: ModuleScreenshot
+      - package: PluginLauncher
+      - package: PluginClipboard
+      - package: PluginCalculator
+      - package: PluginSystemControl
+      - package: PluginFileSearch
+      - package: PluginSnippets
+      - package: PluginOCR
+      - package: PluginTranslator
+      - package: PluginDevTools
+      - package: PluginCalendar
+      - package: PluginWeather
+      - package: PluginNotes
+      - package: PluginAI
+      - package: PluginWindowManager
+      - package: PluginSystemMonitor
+      - package: PluginNetworkTools
+      - package: PluginScreenshot

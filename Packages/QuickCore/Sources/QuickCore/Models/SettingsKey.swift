@@ -6,7 +6,7 @@ import Foundation
 
 /// 类型安全的设置键定义
 ///
-/// 每个模块在 QuickCore 中注册自己的设置键，
+/// 每个插件在 QuickCore 中注册自己的设置键，
 /// 避免字符串硬编码和键冲突。
 public enum SettingsKey {
 
@@ -43,12 +43,12 @@ public enum SettingsKey {
         "quick.alias.\(key)"
     }
 
-    // MARK: - 模块开关前缀
+    // MARK: - 插件开关前缀
 
-    /// 生成模块启用状态的设置键
-    /// - Parameter moduleID: 模块 ID
+    /// 生成插件启用状态的设置键
+    /// - Parameter pluginID: 插件 ID
     /// - Returns: 设置键字符串
-    public static func moduleEnabled(_ moduleID: String) -> String {
-        "quick.module.\(moduleID).enabled"
+    public static func pluginEnabled(_ pluginID: String) -> String {
+        "quick.plugin.\(pluginID).enabled"
     }
 }

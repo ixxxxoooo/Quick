@@ -23,15 +23,15 @@ struct SettingsStoreTests {
         return (SettingsStore(defaults: defaults), defaults, suite)
     }
 
-    @Test("没设置过的模块默认启用")
-    func unsetModuleDefaultsToEnabled() {
+    @Test("没设置过的插件默认启用")
+    func unsetPluginDefaultsToEnabled() {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
 
-        // 这一条是「新模块默认能用」的保证：用 bool(forKey:) 直接读会把
-        // 没设置过读成 false，于是所有模块一上来就是关的。
-        #expect(store.isModuleEnabled("launcher"))
-        #expect(store.isModuleEnabled("clipboard"))
+        // 这一条是「新插件默认能用」的保证：用 bool(forKey:) 直接读会把
+        // 没设置过读成 false，于是所有插件一上来就是关的。
+        #expect(store.isPluginEnabled("launcher"))
+        #expect(store.isPluginEnabled("clipboard"))
     }
 
     @Test("停用后读到 false，重新启用后读到 true")
@@ -39,23 +39,23 @@ struct SettingsStoreTests {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
 
-        store.setModuleEnabled("clipboard", enabled: false)
-        #expect(store.isModuleEnabled("clipboard") == false)
-        #expect(store.isModuleEnabled("launcher"), "只该影响被改的那个模块")
+        store.setPluginEnabled("clipboard", enabled: false)
+        #expect(store.isPluginEnabled("clipboard") == false)
+        #expect(store.isPluginEnabled("launcher"), "只该影响被改的那个插件")
 
-        store.setModuleEnabled("clipboard", enabled: true)
-        #expect(store.isModuleEnabled("clipboard"))
+        store.setPluginEnabled("clipboard", enabled: true)
+        #expect(store.isPluginEnabled("clipboard"))
     }
 
-    @Test("停用列表只含被显式停用的模块")
-    func disabledListReflectsOnlyDisabledModules() {
+    @Test("停用列表只含被显式停用的插件")
+    func disabledListReflectsOnlyDisabledPlugins() {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
 
-        store.setModuleEnabled("weather", enabled: false)
-        store.setModuleEnabled("notes", enabled: false)
+        store.setPluginEnabled("weather", enabled: false)
+        store.setPluginEnabled("notes", enabled: false)
 
-        let disabled = store.disabledModuleIDs(among: ["launcher", "weather", "notes", "calculator"])
+        let disabled = store.disabledPluginIDs(among: ["launcher", "weather", "notes", "calculator"])
         #expect(Set(disabled) == ["weather", "notes"])
     }
 
@@ -68,11 +68,11 @@ struct SettingsStoreTests {
         }
         defer { defaults.removePersistentDomain(forName: suite) }
 
-        SettingsStore(defaults: defaults).setModuleEnabled("ocr", enabled: false)
+        SettingsStore(defaults: defaults).setPluginEnabled("ocr", enabled: false)
 
         // 换一个实例读同一个域，模拟「重启应用」
         let reopened = SettingsStore(defaults: defaults)
-        #expect(reopened.isModuleEnabled("ocr") == false)
+        #expect(reopened.isPluginEnabled("ocr") == false)
     }
 
     @Test("不同偏好域互不影响")
@@ -84,9 +84,9 @@ struct SettingsStoreTests {
             defaultsB.removePersistentDomain(forName: suiteB)
         }
 
-        storeA.setModuleEnabled("snippets", enabled: false)
+        storeA.setPluginEnabled("snippets", enabled: false)
 
-        #expect(storeA.isModuleEnabled("snippets") == false)
-        #expect(storeB.isModuleEnabled("snippets"), "另一个域不该看到这次改动")
+        #expect(storeA.isPluginEnabled("snippets") == false)
+        #expect(storeB.isPluginEnabled("snippets"), "另一个域不该看到这次改动")
     }
 }

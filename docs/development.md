@@ -32,7 +32,7 @@
 ./Scripts/lint.sh            # 排版检查（swift-format）+ 语义检查（swiftlint，若已安装）
 ./Scripts/lint.sh --changed  # 只检查本次暂存的文件（pre-commit 用）
 ./Scripts/run-tests.sh       # 跑全部包的测试
-./Scripts/run-tests.sh QuickCore ModuleCalculator   # 只跑指定的包
+./Scripts/run-tests.sh QuickCore PluginCalculator   # 只跑指定的包
 ./Scripts/build.sh           # 构建 Debug .app
 ./Scripts/build.sh --run     # 构建并启动（轻量；日常改动请用 restart.sh）
 ./Scripts/restart.sh         # 构建 + 杀旧进程 + 启动新实例（改完必跑）
@@ -40,7 +40,7 @@
 ./Scripts/restart.sh --no-build  # 只重启，不重新编译
 ./Scripts/logs.sh            # 实时跟踪 Quick 的日志
 ./Scripts/logs.sh --errors   # 只看近 1 小时的 warning / error / fault
-./Scripts/new-module.sh ModuleFoo   # 生成新功能模块骨架
+./Scripts/new-plugin.sh PluginFoo   # 生成新功能插件骨架
 ```
 
 **提交前的最小动作**：`./Scripts/format.sh && ./Scripts/run-tests.sh`。
@@ -66,17 +66,17 @@ git add project.yml Quick.xcodeproj     # 两边一起提交
 
 ### 加依赖包时改哪两处
 
-新增一个 `Packages/ModuleXxx` 需要在 `project.yml` 里改两个地方，漏一个就会编译不过：
+新增一个 `Packages/PluginXxx` 需要在 `project.yml` 里改两个地方，漏一个就会编译不过：
 
 ```yaml
 packages:                                   # ① 声明包
-  ModuleXxx:
-    path: Packages/ModuleXxx
+  PluginXxx:
+    path: Packages/PluginXxx
 
 targets:
   Quick:
     dependencies:                           # ② 让 app 依赖它
-      - package: ModuleXxx
+      - package: PluginXxx
 ```
 
 ### 命令行构建
@@ -202,31 +202,31 @@ docs(ui): record the palette geometry and its tokens
 
 ---
 
-## 6. 新增功能模块
+## 6. 新增功能插件
 
-完整流程见 [../AGENTS.md#新增一个功能模块](../AGENTS.md)。命令侧就是：
+完整流程见 [../AGENTS.md#新增一个功能插件](../AGENTS.md)。命令侧就是：
 
 ```bash
-./Scripts/new-module.sh ModuleFoo
+./Scripts/new-plugin.sh PluginFoo
 xcodegen generate
-./Scripts/run-tests.sh ModuleFoo
+./Scripts/run-tests.sh PluginFoo
 ```
 
 脚手架会生成：
 
 ```
-Packages/ModuleFoo/
+Packages/PluginFoo/
 ├── Package.swift                       # 已声明依赖与 testTarget
-├── Sources/ModuleFoo/
-│   ├── FooModule.swift                 # 实现 QuickModule 的骨架
+├── Sources/PluginFoo/
+│   ├── FooPlugin.swift                 # 实现 QuickPlugin 的骨架
 │   ├── Model/
 │   ├── Service/
 │   └── UI/
-└── Tests/ModuleFooTests/
-    └── FooModuleTests.swift            # 非空测试 —— 避免 testTarget 空导致测试失败
+└── Tests/PluginFooTests/
+    └── FooPluginTests.swift            # 非空测试 —— 避免 testTarget 空导致测试失败
 ```
 
-**别忘的三步**：在 `AppCore.registerModules()` 注册、在 `project.yml` 加两处、
+**别忘的三步**：在 `AppCore.registerPlugins()` 注册、在 `project.yml` 加两处、
 在 `docs/features/<id>.md` 写不变量。
 
 ---
@@ -238,7 +238,7 @@ Packages/ModuleFoo/
 
 | 用途 | 位置 |
 | --- | --- |
-| 模块数据 | `~/Library/Application Support/<bundle id>/Modules/<module id>/` |
+| 插件数据 | `~/Library/Application Support/<bundle id>/Plugins/<plugin id>/` |
 | 缓存 | `~/Library/Caches/<bundle id>/` |
 | 日志 | 统一日志系统（不是文件），见 [logging.md](logging.md) |
 

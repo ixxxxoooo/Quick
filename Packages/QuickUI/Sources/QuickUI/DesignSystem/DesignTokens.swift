@@ -132,14 +132,14 @@ public enum DesignTokens {
         /// 设置搜索框高度
         public static let settingsSearchField: CGFloat = 28
 
-        // MARK: 模块模式
+        // MARK: 插件模式
 
-        /// 模块模式头部高度（与搜索栏高度一致，保持视觉平衡）
-        public static let moduleHeaderHeight = scaled(44)
-        /// 模块模式头部返回按钮尺寸
-        public static let moduleBackButton = scaled(28)
-        /// 模块模式头部图标尺寸
-        public static let moduleHeaderIcon = scaled(20)
+        /// 插件模式头部高度（与搜索栏高度一致，保持视觉平衡）
+        public static let pluginHeaderHeight = scaled(44)
+        /// 插件模式头部返回按钮尺寸
+        public static let pluginBackButton = scaled(28)
+        /// 插件模式头部图标尺寸
+        public static let pluginHeaderIcon = scaled(20)
 
         // MARK: 分离窗口
 

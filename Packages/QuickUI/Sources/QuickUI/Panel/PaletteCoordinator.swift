@@ -15,8 +15,8 @@ import SwiftUI
 @MainActor
 public final class PaletteCoordinator {
 
-    /// 当前活跃的模块 ID（nil 表示主搜索模式）
-    public private(set) var activeModuleID: String?
+    /// 当前活跃的插件 ID（nil 表示主搜索模式）
+    public private(set) var activePluginID: String?
 
     /// 面板是否可见
     public var isVisible: Bool { panel?.isVisible ?? false }
@@ -27,7 +27,7 @@ public final class PaletteCoordinator {
     /// 面板模式状态（供 SwiftUI 观察的桥接对象）
     ///
     /// 协调器本身不能被 SwiftUI 观察（会死循环），但视图需要知道
-    /// 当前是搜索模式还是模块模式。这个对象只持有纯状态，安全观察。
+    /// 当前是搜索模式还是插件模式。这个对象只持有纯状态，安全观察。
     public let paletteMode = PaletteMode()
 
     private let log = QuickLog.palette
@@ -38,8 +38,8 @@ public final class PaletteCoordinator {
     /// 面板实例（延迟创建）
     private var panel: PalettePanel?
 
-    /// 所有已注册模块（由 AppCore 注入）
-    private var modules: [any QuickModule] = []
+    /// 所有已注册插件（由 AppCore 注入）
+    private var plugins: [any QuickPlugin] = []
 
     /// 面板里的选中状态
     ///
@@ -53,17 +53,17 @@ public final class PaletteCoordinator {
     /// 与协调器同生命周期（进程级），所以不主动摘除 —— 面板一旦创建就一直存在。
     private var outsideClickMonitor: Any?
 
-    /// 分离面板回调（由 AppCore 注入，协调器不直接持有 ModulePanelController）
+    /// 分离面板回调（由 AppCore 注入，协调器不直接持有 PluginPanelController）
     public var onDetach: ((String) -> Void)?
 
     public init() {}
 
-    // MARK: - 模块注册
+    // MARK: - 插件注册
 
-    /// 设置模块列表（AppCore 组装时调用一次）
-    /// - Parameter modules: 所有已注册的 Feature Module
-    public func setModules(_ modules: [any QuickModule]) {
-        self.modules = modules
+    /// 设置插件列表（AppCore 组装时调用一次）
+    /// - Parameter plugins: 所有已注册的 Feature Plugin
+    public func setPlugins(_ plugins: [any QuickPlugin]) {
+        self.plugins = plugins
     }
 
     // MARK: - 面板控制
@@ -77,16 +77,16 @@ public final class PaletteCoordinator {
         }
     }
 
-    /// 显示面板（带模块切换）
+    /// 显示面板（带插件切换）
     /// - Parameters:
-    ///   - moduleID: 目标模块 ID（nil 表示主搜索）
+    ///   - pluginID: 目标插件 ID（nil 表示主搜索）
     ///   - query: 预填搜索文本
-    public func show(moduleID: String? = nil, query: String? = nil) {
+    public func show(pluginID: String? = nil, query: String? = nil) {
         if let query { self.query = query }
 
-        if let moduleID {
-            activeModuleID = moduleID
-            syncPaletteMode(moduleID: moduleID)
+        if let pluginID {
+            activePluginID = pluginID
+            syncPaletteMode(pluginID: pluginID)
         }
 
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
@@ -102,7 +102,7 @@ public final class PaletteCoordinator {
         let elapsedMS = Date().timeIntervalSince(started) * 1000
         log.info(
             """
-            面板已显示：模块=\(self.activeModuleID ?? "主搜索", privacy: .public)，\
+            面板已显示：插件=\(self.activePluginID ?? "主搜索", privacy: .public)，\
             耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
             """)
     }
@@ -164,14 +164,14 @@ public final class PaletteCoordinator {
         }
     }
 
-    /// 导航到指定模块
+    /// 导航到指定插件
     /// - Parameters:
-    ///   - moduleID: 目标模块 ID
+    ///   - pluginID: 目标插件 ID
     ///   - context: 附加上下文
-    public func navigate(to moduleID: String, context: [String: String] = [:]) {
-        activeModuleID = moduleID
+    public func navigate(to pluginID: String, context: [String: String] = [:]) {
+        activePluginID = pluginID
         query = context["query"] ?? ""
-        syncPaletteMode(moduleID: moduleID, context: context)
+        syncPaletteMode(pluginID: pluginID, context: context)
 
         if !isVisible {
             show()
@@ -180,54 +180,54 @@ public final class PaletteCoordinator {
 
     /// 返回主搜索模式
     public func popToRoot() {
-        activeModuleID = nil
+        activePluginID = nil
         query = ""
         paletteMode.popToRoot()
     }
 
-    /// 将协调器的模块状态同步到 PaletteMode
+    /// 将协调器的插件状态同步到 PaletteMode
     ///
-    /// 从 modules 中查找对应模块的元信息（名称、图标），一并写入 PaletteMode。
-    private func syncPaletteMode(moduleID: String, context: [String: String] = [:]) {
-        let module = modules.first { type(of: $0).id == moduleID }
-        let name = module.map { type(of: $0).name } ?? moduleID
-        let icon = module.map { type(of: $0).icon } ?? "questionmark"
-        paletteMode.navigate(to: moduleID, name: name, icon: icon, context: context)
+    /// 从 plugins 中查找对应插件的元信息（名称、图标），一并写入 PaletteMode。
+    private func syncPaletteMode(pluginID: String, context: [String: String] = [:]) {
+        let plugin = plugins.first { type(of: $0).id == pluginID }
+        let name = plugin.map { type(of: $0).name } ?? pluginID
+        let icon = plugin.map { type(of: $0).icon } ?? "questionmark"
+        paletteMode.navigate(to: pluginID, name: name, icon: icon, context: context)
     }
 
     // MARK: - 搜索
 
     /// 单次搜索的结果上限
     ///
-    /// 没有上限时，一个失控的模块会把几千条塞进 SwiftUI 列表、还要在主线程排序。
+    /// 没有上限时，一个失控的插件会把几千条塞进 SwiftUI 列表、还要在主线程排序。
     private static let resultLimit = 60
 
-    /// 单个模块的搜索超时
+    /// 单个插件的搜索超时
     ///
-    /// 模块的 `searchItems` 跑在主 actor 上（协议本身是 `@MainActor`），
+    /// 插件的 `searchItems` 跑在主 actor 上（协议本身是 `@MainActor`），
     /// 所以一个慢查询（EventKit、Spotlight、定位）会把**整批**结果卡住 ——
-    /// 聚合是等所有模块都返回才结束的。超时之后放弃这个模块，
+    /// 聚合是等所有插件都返回才结束的。超时之后放弃这个插件，
     /// 而不是让整块面板陪它等。
-    private static let moduleTimeout = Duration.seconds(2)
+    private static let pluginTimeout = Duration.seconds(2)
 
-    /// 聚合搜索：查询所有已启用模块
+    /// 聚合搜索：查询所有已启用插件
     ///
     /// - Parameter query: 搜索关键词
     /// - Returns: 去重、排序、限流之后的结果
     public func search(query: String) async -> [SearchableItem] {
-        let enabledModules = modules.filter(\.isEnabled)
+        let enabledPlugins = plugins.filter(\.isEnabled)
 
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
         let interval = signpost.beginInterval("palette.search")
         let started = Date()
 
         let collected = await withTaskGroup(of: [SearchableItem].self) { group in
-            for module in enabledModules {
-                let moduleName = type(of: module).name
+            for plugin in enabledPlugins {
+                let pluginName = type(of: plugin).name
                 group.addTask {
-                    let items = await Self.search(module: module, query: query)
+                    let items = await Self.search(plugin: plugin, query: query)
                     // 给每条搜索结果标注来源插件名
-                    return items.map { $0.moduleName == nil ? $0.withModuleName(moduleName) : $0 }
+                    return items.map { $0.pluginName == nil ? $0.withPluginName(pluginName) : $0 }
                 }
             }
             var results: [SearchableItem] = []
@@ -237,7 +237,7 @@ public final class PaletteCoordinator {
             return results
         }
 
-        // 去重：`SearchableItem` 的 `Hashable` 只看 id，而「id 以模块 id 开头」
+        // 去重：`SearchableItem` 的 `Hashable` 只看 id，而「id 以插件 id 开头」
         // 只是一条约定，没有任何东西在强制它。重复 id 会让 `ForEach` 进入未定义行为
         // （丢行、选中高亮错位），所以在这里挡一道。
         var seen = Set<String>()
@@ -257,7 +257,7 @@ public final class PaletteCoordinator {
         let elapsedMS = Date().timeIntervalSince(started) * 1000
         log.debug(
             """
-            聚合搜索完成：\(enabledModules.count, privacy: .public) 个模块，\
+            聚合搜索完成：\(enabledPlugins.count, privacy: .public) 个插件，\
             命中 \(collected.count, privacy: .public) 条 → \
             去重后 \(deduped.count, privacy: .public) 条 → \
             返回 \(limited.count, privacy: .public) 条，\
@@ -267,16 +267,16 @@ public final class PaletteCoordinator {
         return limited
     }
 
-    /// 查询单个模块，超时即放弃
+    /// 查询单个插件，超时即放弃
     ///
-    /// 竞速两个子任务：模块自己，和一个超时计时器。先完成的那个决定结果。
-    /// 注意超时**不会**中断模块内部的同步工作（它在主 actor 上），
-    /// 只是让我们不再等它 —— 这正是需要的：面板不能陪一个慢模块等下去。
-    private static func search(module: any QuickModule, query: String) async -> [SearchableItem] {
+    /// 竞速两个子任务：插件自己，和一个超时计时器。先完成的那个决定结果。
+    /// 注意超时**不会**中断插件内部的同步工作（它在主 actor 上），
+    /// 只是让我们不再等它 —— 这正是需要的：面板不能陪一个慢插件等下去。
+    private static func search(plugin: any QuickPlugin, query: String) async -> [SearchableItem] {
         await withTaskGroup(of: [SearchableItem].self) { group in
-            group.addTask { await module.searchItems(query: query) }
+            group.addTask { await plugin.searchItems(query: query) }
             group.addTask {
-                try? await Task.sleep(for: Self.moduleTimeout)
+                try? await Task.sleep(for: Self.pluginTimeout)
                 return []
             }
             let first = await group.next() ?? []
@@ -298,16 +298,16 @@ public final class PaletteCoordinator {
                 guard let self else { return [] }
                 return await self.search(query: query)
             },
-            moduleViewProvider: { [weak self] moduleID, context in
+            pluginViewProvider: { [weak self] pluginID, context in
                 guard let self else { return nil }
-                return self.makeModuleView(moduleID: moduleID, context: context)
+                return self.makePluginView(pluginID: pluginID, context: context)
             }
         )
         let newPanel = PalettePanel(rootView: rootView)
 
         newPanel.onEscape = { [weak self] in
             guard let self else { return false }
-            if self.activeModuleID != nil {
+            if self.activePluginID != nil {
                 self.popToRoot()
             } else {
                 self.hide()
@@ -316,8 +316,8 @@ public final class PaletteCoordinator {
         }
 
         newPanel.onDetach = { [weak self] in
-            guard let self, let moduleID = self.activeModuleID else { return false }
-            self.onDetach?(moduleID)
+            guard let self, let pluginID = self.activePluginID else { return false }
+            self.onDetach?(pluginID)
             return true
         }
 
@@ -342,7 +342,7 @@ public final class PaletteCoordinator {
     /// 点击面板以外的位置时收起
     ///
     /// **用事件监视器，不用 `didResignKey`。** 后者把「任何原因导致的失焦」都当成
-    /// 用户在点别处 —— 例如某个模块在启动时弹出的系统权限对话框也会抢走键盘焦点，
+    /// 用户在点别处 —— 例如某个插件在启动时弹出的系统权限对话框也会抢走键盘焦点，
     /// 于是面板会在启动几秒后自己消失。用户要的只是「点空白处关掉」，
     /// 那就精确地只对「点击」作出反应。
     ///
@@ -369,17 +369,17 @@ public final class PaletteCoordinator {
         hide()
     }
 
-    /// 根据模块 ID 构建模块视图
+    /// 根据插件 ID 构建插件视图
     ///
-    /// 通过闭包注入给 PaletteRootView，避免视图层直接依赖模块。
-    private func makeModuleView(moduleID: String, context: [String: String]) -> AnyView? {
-        guard let module = modules.first(where: { type(of: $0).id == moduleID }),
-            module.isEnabled
+    /// 通过闭包注入给 PaletteRootView，避免视图层直接依赖插件。
+    private func makePluginView(pluginID: String, context: [String: String]) -> AnyView? {
+        guard let plugin = plugins.first(where: { type(of: $0).id == pluginID }),
+            plugin.isEnabled
         else {
-            log.warning("找不到模块 \(moduleID, privacy: .public) 或模块已禁用")
+            log.warning("找不到插件 \(pluginID, privacy: .public) 或插件已禁用")
             return nil
         }
-        return module.makeView()
+        return plugin.makeView()
     }
 
     /// 将面板定位到光标所在屏幕的中上方

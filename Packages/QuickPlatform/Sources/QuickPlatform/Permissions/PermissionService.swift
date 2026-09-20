@@ -19,7 +19,7 @@ public enum LocationPermissionStatus: Sendable {
 /// 系统权限管理服务
 ///
 /// 封装 macOS 各项系统权限的检查和申请。
-/// 模块通过此服务检查所需权限状态，引导用户授权。
+/// 插件通过此服务检查所需权限状态，引导用户授权。
 @MainActor
 public final class PermissionService {
 
@@ -70,7 +70,7 @@ public final class PermissionService {
         NSWorkspace.shared.open(url)
     }
 
-    // MARK: - 定位权限（天气模块按需使用）
+    // MARK: - 定位权限（天气插件按需使用）
 
     /// 查询定位权限状态
     ///

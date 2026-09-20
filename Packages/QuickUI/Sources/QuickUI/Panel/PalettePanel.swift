@@ -141,7 +141,7 @@ public final class PalettePanel: NSPanel {
                     _ = onEscape?()
                     return
                 }
-                // ⌘D：分离当前模块到独立窗口
+                // ⌘D：分离当前插件到独立窗口
                 if characters.lowercased() == "d",
                     onDetach?() == true
                 {

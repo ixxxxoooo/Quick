@@ -6,7 +6,7 @@ import SwiftUI
 
 /// 搜索结果的统一模型
 ///
-/// 所有模块的搜索结果都封装为此类型，由面板统一展示。
+/// 所有插件的搜索结果都封装为此类型，由面板统一展示。
 /// 包含显示信息、相关度评分和执行动作。
 public struct SearchableItem: Identifiable, Sendable {
 
@@ -14,10 +14,10 @@ public struct SearchableItem: Identifiable, Sendable {
     public let id: String
 
     /// 来源插件 ID
-    public let moduleID: String
+    public let pluginID: String
 
     /// 来源插件显示名称（用于搜索结果右侧标注）
-    public let moduleName: String?
+    public let pluginName: String?
 
     /// 显示标题
     public let title: String
@@ -53,8 +53,8 @@ public struct SearchableItem: Identifiable, Sendable {
     /// 初始化搜索结果项
     /// - Parameters:
     ///   - id: 唯一标识
-    ///   - moduleID: 来源插件标识
-    ///   - moduleName: 来源插件显示名称（搜索结果右侧标注）
+    ///   - pluginID: 来源插件标识
+    ///   - pluginName: 来源插件显示名称（搜索结果右侧标注）
     ///   - title: 显示标题
     ///   - subtitle: 副标题
     ///   - icon: SF Symbol 名称
@@ -64,8 +64,8 @@ public struct SearchableItem: Identifiable, Sendable {
     ///   - action: 执行动作
     public init(
         id: String,
-        moduleID: String,
-        moduleName: String? = nil,
+        pluginID: String,
+        pluginName: String? = nil,
         title: String,
         subtitle: String? = nil,
         icon: String,
@@ -75,8 +75,8 @@ public struct SearchableItem: Identifiable, Sendable {
         action: @escaping @Sendable @MainActor () -> Void
     ) {
         self.id = id
-        self.moduleID = moduleID
-        self.moduleName = moduleName
+        self.pluginID = pluginID
+        self.pluginName = pluginName
         self.title = title
         self.subtitle = subtitle
         self.icon = icon
@@ -86,12 +86,12 @@ public struct SearchableItem: Identifiable, Sendable {
         self.action = action
     }
 
-    /// 返回一个新实例，填充 `moduleName`
-    public func withModuleName(_ name: String) -> SearchableItem {
+    /// 返回一个新实例，填充 `pluginName`
+    public func withPluginName(_ name: String) -> SearchableItem {
         SearchableItem(
             id: id,
-            moduleID: moduleID,
-            moduleName: name,
+            pluginID: pluginID,
+            pluginName: name,
             title: title,
             subtitle: subtitle,
             icon: icon,

@@ -55,7 +55,7 @@ enum SettingsSearchCatalog {
     ]
 
     /// 按关键词搜索
-    static func results(for query: String, modules: [SettingsModule]) -> [SettingsSearchEntry] {
+    static func results(for query: String, plugins: [SettingsPlugin]) -> [SettingsSearchEntry] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return [] }
 

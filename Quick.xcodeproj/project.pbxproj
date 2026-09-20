@@ -8,62 +8,62 @@
 
 /* Begin PBXBuildFile section */
 		03D030042B8C230428E13BF8 /* QuickPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = EB1FAFFF92FB2D709E88377F /* QuickPlatform */; };
-		277B92A1F7D8BA105B19055E /* ModuleCalculator in Frameworks */ = {isa = PBXBuildFile; productRef = 3E2B64891828AAE6DFA2C296 /* ModuleCalculator */; };
+		277B92A1F7D8BA105B19055E /* PluginCalculator in Frameworks */ = {isa = PBXBuildFile; productRef = 892814393E695508914504C9 /* PluginCalculator */; };
 		3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7873A36EB616CB4FE27F295 /* AppCore.swift */; };
-		39BF304AD2D01B87D3F7834C /* ModuleFileSearch in Frameworks */ = {isa = PBXBuildFile; productRef = AB89B21D37E90F6E000F1492 /* ModuleFileSearch */; };
-		417799EEF90D61AF8F7AF754 /* ModuleAI in Frameworks */ = {isa = PBXBuildFile; productRef = 0EF70A56F6C3F9A76897D3AF /* ModuleAI */; };
-		43E6D248378B141C8E7591D4 /* ModuleWindowManager in Frameworks */ = {isa = PBXBuildFile; productRef = E422B47D6EBF13ABF58021B9 /* ModuleWindowManager */; };
+		39BF304AD2D01B87D3F7834C /* PluginFileSearch in Frameworks */ = {isa = PBXBuildFile; productRef = 1B94608C8CFE671C17CCDBC7 /* PluginFileSearch */; };
+		417799EEF90D61AF8F7AF754 /* PluginAI in Frameworks */ = {isa = PBXBuildFile; productRef = A55EC642F7A5A977D30FB60D /* PluginAI */; };
+		43E6D248378B141C8E7591D4 /* PluginWindowManager in Frameworks */ = {isa = PBXBuildFile; productRef = 3C11519BC7F46E586F7239D8 /* PluginWindowManager */; };
 		4B431AEF9D4BE531431145DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4AD2A44C727483F56A0A316D /* Assets.xcassets */; };
-		4FB5C899DD337B31D55F59DE /* ModuleClipboard in Frameworks */ = {isa = PBXBuildFile; productRef = 6D044E1B050753A6FBE6ADE3 /* ModuleClipboard */; };
+		4FB5C899DD337B31D55F59DE /* PluginClipboard in Frameworks */ = {isa = PBXBuildFile; productRef = 967C96E3F4CC521690436415 /* PluginClipboard */; };
 		52363DE2F513149A6038375A /* QuickUI in Frameworks */ = {isa = PBXBuildFile; productRef = 783AEBF3F1FAE829DCAFC004 /* QuickUI */; };
-		53A985DAB5B69501293E3EC9 /* ModuleLauncher in Frameworks */ = {isa = PBXBuildFile; productRef = 078DDB7169BD3EDB9596F40A /* ModuleLauncher */; };
-		76B868B658D790B18C10FC2C /* ModuleScreenshot in Frameworks */ = {isa = PBXBuildFile; productRef = DD34C1E5DE14D029BD0899A3 /* ModuleScreenshot */; };
-		86A89A47B2880D49A08EBBBC /* ModuleTranslator in Frameworks */ = {isa = PBXBuildFile; productRef = 0F5C306BBE664AB40FB396D9 /* ModuleTranslator */; };
+		53A985DAB5B69501293E3EC9 /* PluginLauncher in Frameworks */ = {isa = PBXBuildFile; productRef = 101707495A6AF30BDD48497F /* PluginLauncher */; };
+		76B868B658D790B18C10FC2C /* PluginScreenshot in Frameworks */ = {isa = PBXBuildFile; productRef = 94AAA82063614DB0D0F9D16A /* PluginScreenshot */; };
+		86A89A47B2880D49A08EBBBC /* PluginTranslator in Frameworks */ = {isa = PBXBuildFile; productRef = CA41B567971AB8CE0445F5C7 /* PluginTranslator */; };
 		947ED1B4A3109AF5B63E3E83 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5894ED469482915CE3F1ED6A /* AppIcon.icon */; };
-		95C2CAFCA62640B6BB7D9474 /* ModuleWeather in Frameworks */ = {isa = PBXBuildFile; productRef = 6B137BD2BEC5376E06CC89A5 /* ModuleWeather */; };
+		95C2CAFCA62640B6BB7D9474 /* PluginWeather in Frameworks */ = {isa = PBXBuildFile; productRef = C13C3BD98FF9599DBE7CF660 /* PluginWeather */; };
 		99C17420548B0EF4F181ECCA /* QuickCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */; };
 		9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1701F76E22B29388E212E6DA /* QuickApp.swift */; };
-		A3F5185C4E5024554087DADF /* ModuleOCR in Frameworks */ = {isa = PBXBuildFile; productRef = 4332CA4B074D3CF1E9C8030C /* ModuleOCR */; };
+		A3F5185C4E5024554087DADF /* PluginOCR in Frameworks */ = {isa = PBXBuildFile; productRef = 8F56EC8E050625C22BC8D67D /* PluginOCR */; };
 		A5F5BA05FBA565DA840A590D /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */; };
-		BA5058D145F68F4B1230A9D6 /* ModuleSystemMonitor in Frameworks */ = {isa = PBXBuildFile; productRef = A1F6A1277F3F2C2E948ABA6D /* ModuleSystemMonitor */; };
-		C168ED1A3E5CA36E9E363842 /* ModuleNetworkTools in Frameworks */ = {isa = PBXBuildFile; productRef = 24193F54E61A6C98582B1EB3 /* ModuleNetworkTools */; };
-		CDCBFE06CE05C92920350DC7 /* ModuleCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 6A3F51B8236D217DE92BA22A /* ModuleCalendar */; };
-		D94821D4837449038E038DB6 /* ModuleNotes in Frameworks */ = {isa = PBXBuildFile; productRef = 6B3D3CF78E634C873291F720 /* ModuleNotes */; };
-		DB8A9B8692F4BE8F23B18966 /* ModuleSnippets in Frameworks */ = {isa = PBXBuildFile; productRef = 59BCF4B7D262EAE2464533FD /* ModuleSnippets */; };
-		DE7F122FCEC7A48CA773BCBD /* ModuleDevTools in Frameworks */ = {isa = PBXBuildFile; productRef = E20228E59CDDFE81B3082CE5 /* ModuleDevTools */; };
+		BA5058D145F68F4B1230A9D6 /* PluginSystemMonitor in Frameworks */ = {isa = PBXBuildFile; productRef = 730276E735A178193257030B /* PluginSystemMonitor */; };
+		C168ED1A3E5CA36E9E363842 /* PluginNetworkTools in Frameworks */ = {isa = PBXBuildFile; productRef = 7E26B93AF39A58B145948CCE /* PluginNetworkTools */; };
+		CDCBFE06CE05C92920350DC7 /* PluginCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 14C604C793BB19FA72FF5B6D /* PluginCalendar */; };
+		D94821D4837449038E038DB6 /* PluginNotes in Frameworks */ = {isa = PBXBuildFile; productRef = 0158B63D69632B31FBFE46A0 /* PluginNotes */; };
+		DB8A9B8692F4BE8F23B18966 /* PluginSnippets in Frameworks */ = {isa = PBXBuildFile; productRef = E01449FAF7BA101578F06AF4 /* PluginSnippets */; };
+		DE7F122FCEC7A48CA773BCBD /* PluginDevTools in Frameworks */ = {isa = PBXBuildFile; productRef = F66E890F7E3EA6EDD96E7D02 /* PluginDevTools */; };
 		F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6253BE55917823E5C48BF0A6 /* AppDelegate.swift */; };
-		F1453649AD3331E4B9612090 /* ModuleSystemControl in Frameworks */ = {isa = PBXBuildFile; productRef = BD5BD83022332B19E9A03E60 /* ModuleSystemControl */; };
+		F1453649AD3331E4B9612090 /* PluginSystemControl in Frameworks */ = {isa = PBXBuildFile; productRef = F6EF76EEC6647C0CF9D9325A /* PluginSystemControl */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		00A1B58BBD8B3D2B436F3C38 /* PluginCalculator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginCalculator; path = Packages/PluginCalculator; sourceTree = SOURCE_ROOT; };
+		069995C27ED0207684ACBC39 /* PluginOCR */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginOCR; path = Packages/PluginOCR; sourceTree = SOURCE_ROOT; };
+		08C34749B979D4BD05A13DEA /* PluginWindowManager */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginWindowManager; path = Packages/PluginWindowManager; sourceTree = SOURCE_ROOT; };
 		09526C0009FCB6C64F053D41 /* QuickCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickCore; path = Packages/QuickCore; sourceTree = SOURCE_ROOT; };
-		0F710D4884AA7298F9845059 /* ModuleLauncher */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleLauncher; path = Packages/ModuleLauncher; sourceTree = SOURCE_ROOT; };
 		1701F76E22B29388E212E6DA /* QuickApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickApp.swift; sourceTree = "<group>"; };
-		1D6320D78F22C62395E64797 /* ModuleOCR */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleOCR; path = Packages/ModuleOCR; sourceTree = SOURCE_ROOT; };
 		29D3223EB25304FC1C719BA9 /* Quick.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Quick.entitlements; sourceTree = "<group>"; };
-		2B93E5D07123815A53EFAE07 /* ModuleScreenshot */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleScreenshot; path = Packages/ModuleScreenshot; sourceTree = SOURCE_ROOT; };
-		37FDDDFD8909B2E7EE8D5536 /* ModuleTranslator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleTranslator; path = Packages/ModuleTranslator; sourceTree = SOURCE_ROOT; };
-		3815383C76E204F3EE8BF353 /* ModuleDevTools */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleDevTools; path = Packages/ModuleDevTools; sourceTree = SOURCE_ROOT; };
-		397129CFFDF99AC13B43D998 /* ModuleNotes */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleNotes; path = Packages/ModuleNotes; sourceTree = SOURCE_ROOT; };
-		46F2160BD290AE8B2066F0F7 /* ModuleFileSearch */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleFileSearch; path = Packages/ModuleFileSearch; sourceTree = SOURCE_ROOT; };
+		341B7D52174464D3E6F210BA /* PluginScreenshot */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginScreenshot; path = Packages/PluginScreenshot; sourceTree = SOURCE_ROOT; };
+		3A1E8D41A9C09C7D9E73CCCD /* PluginSystemControl */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginSystemControl; path = Packages/PluginSystemControl; sourceTree = SOURCE_ROOT; };
+		411482A21BFC85FD3CC7696C /* PluginAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginAI; path = Packages/PluginAI; sourceTree = SOURCE_ROOT; };
 		4AD2A44C727483F56A0A316D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4F7A9C41ED7ADB3B1DE26A45 /* PluginLauncher */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginLauncher; path = Packages/PluginLauncher; sourceTree = SOURCE_ROOT; };
+		55801C1D7B74B8E7FC29368A /* PluginCalendar */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginCalendar; path = Packages/PluginCalendar; sourceTree = SOURCE_ROOT; };
 		5894ED469482915CE3F1ED6A /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		6253BE55917823E5C48BF0A6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		7939DC1691ADB7A9291C4669 /* ModuleClipboard */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleClipboard; path = Packages/ModuleClipboard; sourceTree = SOURCE_ROOT; };
+		79275F0D51498BD4793203D7 /* PluginSystemMonitor */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginSystemMonitor; path = Packages/PluginSystemMonitor; sourceTree = SOURCE_ROOT; };
+		7F354F9D3878CF7F2A0B8F68 /* PluginTranslator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginTranslator; path = Packages/PluginTranslator; sourceTree = SOURCE_ROOT; };
 		815E7C080A517F26BC34F2F7 /* QuickUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickUI; path = Packages/QuickUI; sourceTree = SOURCE_ROOT; };
-		82333CE06AA3D77586B6FE55 /* ModuleSystemControl */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleSystemControl; path = Packages/ModuleSystemControl; sourceTree = SOURCE_ROOT; };
 		84C6DDB5084BAABFA569E71D /* Quick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Quick.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		859C9D9B672D640CC22809EF /* QuickPlatform */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickPlatform; path = Packages/QuickPlatform; sourceTree = SOURCE_ROOT; };
-		8949CBD20474E3159BB470CA /* ModuleWeather */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleWeather; path = Packages/ModuleWeather; sourceTree = SOURCE_ROOT; };
+		885C95C97CFC23FD83D482C7 /* PluginClipboard */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginClipboard; path = Packages/PluginClipboard; sourceTree = SOURCE_ROOT; };
+		8FED61D349B20FA4466AF18C /* PluginWeather */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginWeather; path = Packages/PluginWeather; sourceTree = SOURCE_ROOT; };
 		A7873A36EB616CB4FE27F295 /* AppCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCore.swift; sourceTree = "<group>"; };
-		AC9F4F94144C7ABB8EB16FB6 /* ModuleNetworkTools */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleNetworkTools; path = Packages/ModuleNetworkTools; sourceTree = SOURCE_ROOT; };
-		B79DFBDF60041ED35FF7A9F2 /* ModuleCalendar */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleCalendar; path = Packages/ModuleCalendar; sourceTree = SOURCE_ROOT; };
-		B9DFF8686185548AD6527BBD /* ModuleSnippets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleSnippets; path = Packages/ModuleSnippets; sourceTree = SOURCE_ROOT; };
-		D7E1C071B2C6C0C8B12D5975 /* ModuleSystemMonitor */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleSystemMonitor; path = Packages/ModuleSystemMonitor; sourceTree = SOURCE_ROOT; };
-		DB23378333DC3A355BE14940 /* ModuleAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleAI; path = Packages/ModuleAI; sourceTree = SOURCE_ROOT; };
+		BFEB3A087185F195EDE752D1 /* PluginSnippets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginSnippets; path = Packages/PluginSnippets; sourceTree = SOURCE_ROOT; };
+		DAE083F8C32E921D91600BCF /* PluginNetworkTools */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginNetworkTools; path = Packages/PluginNetworkTools; sourceTree = SOURCE_ROOT; };
+		E419DFC22ADD15066FA15850 /* PluginDevTools */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginDevTools; path = Packages/PluginDevTools; sourceTree = SOURCE_ROOT; };
 		E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
-		EA6E44BF4814BE2EB25CF030 /* ModuleCalculator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleCalculator; path = Packages/ModuleCalculator; sourceTree = SOURCE_ROOT; };
-		EB3CC32F59D3B99133680908 /* ModuleWindowManager */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModuleWindowManager; path = Packages/ModuleWindowManager; sourceTree = SOURCE_ROOT; };
+		ECC0C21D103D53478067559C /* PluginNotes */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginNotes; path = Packages/PluginNotes; sourceTree = SOURCE_ROOT; };
+		F597EC369E2F2D2F52684F76 /* PluginFileSearch */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginFileSearch; path = Packages/PluginFileSearch; sourceTree = SOURCE_ROOT; };
 		FE2289C2B74C6E51D568A553 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -75,23 +75,23 @@
 				99C17420548B0EF4F181ECCA /* QuickCore in Frameworks */,
 				52363DE2F513149A6038375A /* QuickUI in Frameworks */,
 				03D030042B8C230428E13BF8 /* QuickPlatform in Frameworks */,
-				53A985DAB5B69501293E3EC9 /* ModuleLauncher in Frameworks */,
-				4FB5C899DD337B31D55F59DE /* ModuleClipboard in Frameworks */,
-				277B92A1F7D8BA105B19055E /* ModuleCalculator in Frameworks */,
-				F1453649AD3331E4B9612090 /* ModuleSystemControl in Frameworks */,
-				39BF304AD2D01B87D3F7834C /* ModuleFileSearch in Frameworks */,
-				DB8A9B8692F4BE8F23B18966 /* ModuleSnippets in Frameworks */,
-				A3F5185C4E5024554087DADF /* ModuleOCR in Frameworks */,
-				86A89A47B2880D49A08EBBBC /* ModuleTranslator in Frameworks */,
-				DE7F122FCEC7A48CA773BCBD /* ModuleDevTools in Frameworks */,
-				CDCBFE06CE05C92920350DC7 /* ModuleCalendar in Frameworks */,
-				95C2CAFCA62640B6BB7D9474 /* ModuleWeather in Frameworks */,
-				D94821D4837449038E038DB6 /* ModuleNotes in Frameworks */,
-				417799EEF90D61AF8F7AF754 /* ModuleAI in Frameworks */,
-				43E6D248378B141C8E7591D4 /* ModuleWindowManager in Frameworks */,
-				BA5058D145F68F4B1230A9D6 /* ModuleSystemMonitor in Frameworks */,
-				C168ED1A3E5CA36E9E363842 /* ModuleNetworkTools in Frameworks */,
-				76B868B658D790B18C10FC2C /* ModuleScreenshot in Frameworks */,
+				53A985DAB5B69501293E3EC9 /* PluginLauncher in Frameworks */,
+				4FB5C899DD337B31D55F59DE /* PluginClipboard in Frameworks */,
+				277B92A1F7D8BA105B19055E /* PluginCalculator in Frameworks */,
+				F1453649AD3331E4B9612090 /* PluginSystemControl in Frameworks */,
+				39BF304AD2D01B87D3F7834C /* PluginFileSearch in Frameworks */,
+				DB8A9B8692F4BE8F23B18966 /* PluginSnippets in Frameworks */,
+				A3F5185C4E5024554087DADF /* PluginOCR in Frameworks */,
+				86A89A47B2880D49A08EBBBC /* PluginTranslator in Frameworks */,
+				DE7F122FCEC7A48CA773BCBD /* PluginDevTools in Frameworks */,
+				CDCBFE06CE05C92920350DC7 /* PluginCalendar in Frameworks */,
+				95C2CAFCA62640B6BB7D9474 /* PluginWeather in Frameworks */,
+				D94821D4837449038E038DB6 /* PluginNotes in Frameworks */,
+				417799EEF90D61AF8F7AF754 /* PluginAI in Frameworks */,
+				43E6D248378B141C8E7591D4 /* PluginWindowManager in Frameworks */,
+				BA5058D145F68F4B1230A9D6 /* PluginSystemMonitor in Frameworks */,
+				C168ED1A3E5CA36E9E363842 /* PluginNetworkTools in Frameworks */,
+				76B868B658D790B18C10FC2C /* PluginScreenshot in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,23 +125,23 @@
 		5DC7B04B4CE032600AA9A8FD /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				DB23378333DC3A355BE14940 /* ModuleAI */,
-				EA6E44BF4814BE2EB25CF030 /* ModuleCalculator */,
-				B79DFBDF60041ED35FF7A9F2 /* ModuleCalendar */,
-				7939DC1691ADB7A9291C4669 /* ModuleClipboard */,
-				3815383C76E204F3EE8BF353 /* ModuleDevTools */,
-				46F2160BD290AE8B2066F0F7 /* ModuleFileSearch */,
-				0F710D4884AA7298F9845059 /* ModuleLauncher */,
-				AC9F4F94144C7ABB8EB16FB6 /* ModuleNetworkTools */,
-				397129CFFDF99AC13B43D998 /* ModuleNotes */,
-				1D6320D78F22C62395E64797 /* ModuleOCR */,
-				2B93E5D07123815A53EFAE07 /* ModuleScreenshot */,
-				B9DFF8686185548AD6527BBD /* ModuleSnippets */,
-				82333CE06AA3D77586B6FE55 /* ModuleSystemControl */,
-				D7E1C071B2C6C0C8B12D5975 /* ModuleSystemMonitor */,
-				37FDDDFD8909B2E7EE8D5536 /* ModuleTranslator */,
-				8949CBD20474E3159BB470CA /* ModuleWeather */,
-				EB3CC32F59D3B99133680908 /* ModuleWindowManager */,
+				411482A21BFC85FD3CC7696C /* PluginAI */,
+				00A1B58BBD8B3D2B436F3C38 /* PluginCalculator */,
+				55801C1D7B74B8E7FC29368A /* PluginCalendar */,
+				885C95C97CFC23FD83D482C7 /* PluginClipboard */,
+				E419DFC22ADD15066FA15850 /* PluginDevTools */,
+				F597EC369E2F2D2F52684F76 /* PluginFileSearch */,
+				4F7A9C41ED7ADB3B1DE26A45 /* PluginLauncher */,
+				DAE083F8C32E921D91600BCF /* PluginNetworkTools */,
+				ECC0C21D103D53478067559C /* PluginNotes */,
+				069995C27ED0207684ACBC39 /* PluginOCR */,
+				341B7D52174464D3E6F210BA /* PluginScreenshot */,
+				BFEB3A087185F195EDE752D1 /* PluginSnippets */,
+				3A1E8D41A9C09C7D9E73CCCD /* PluginSystemControl */,
+				79275F0D51498BD4793203D7 /* PluginSystemMonitor */,
+				7F354F9D3878CF7F2A0B8F68 /* PluginTranslator */,
+				8FED61D349B20FA4466AF18C /* PluginWeather */,
+				08C34749B979D4BD05A13DEA /* PluginWindowManager */,
 				09526C0009FCB6C64F053D41 /* QuickCore */,
 				859C9D9B672D640CC22809EF /* QuickPlatform */,
 				815E7C080A517F26BC34F2F7 /* QuickUI */,
@@ -185,23 +185,23 @@
 				5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */,
 				783AEBF3F1FAE829DCAFC004 /* QuickUI */,
 				EB1FAFFF92FB2D709E88377F /* QuickPlatform */,
-				078DDB7169BD3EDB9596F40A /* ModuleLauncher */,
-				6D044E1B050753A6FBE6ADE3 /* ModuleClipboard */,
-				3E2B64891828AAE6DFA2C296 /* ModuleCalculator */,
-				BD5BD83022332B19E9A03E60 /* ModuleSystemControl */,
-				AB89B21D37E90F6E000F1492 /* ModuleFileSearch */,
-				59BCF4B7D262EAE2464533FD /* ModuleSnippets */,
-				4332CA4B074D3CF1E9C8030C /* ModuleOCR */,
-				0F5C306BBE664AB40FB396D9 /* ModuleTranslator */,
-				E20228E59CDDFE81B3082CE5 /* ModuleDevTools */,
-				6A3F51B8236D217DE92BA22A /* ModuleCalendar */,
-				6B137BD2BEC5376E06CC89A5 /* ModuleWeather */,
-				6B3D3CF78E634C873291F720 /* ModuleNotes */,
-				0EF70A56F6C3F9A76897D3AF /* ModuleAI */,
-				E422B47D6EBF13ABF58021B9 /* ModuleWindowManager */,
-				A1F6A1277F3F2C2E948ABA6D /* ModuleSystemMonitor */,
-				24193F54E61A6C98582B1EB3 /* ModuleNetworkTools */,
-				DD34C1E5DE14D029BD0899A3 /* ModuleScreenshot */,
+				101707495A6AF30BDD48497F /* PluginLauncher */,
+				967C96E3F4CC521690436415 /* PluginClipboard */,
+				892814393E695508914504C9 /* PluginCalculator */,
+				F6EF76EEC6647C0CF9D9325A /* PluginSystemControl */,
+				1B94608C8CFE671C17CCDBC7 /* PluginFileSearch */,
+				E01449FAF7BA101578F06AF4 /* PluginSnippets */,
+				8F56EC8E050625C22BC8D67D /* PluginOCR */,
+				CA41B567971AB8CE0445F5C7 /* PluginTranslator */,
+				F66E890F7E3EA6EDD96E7D02 /* PluginDevTools */,
+				14C604C793BB19FA72FF5B6D /* PluginCalendar */,
+				C13C3BD98FF9599DBE7CF660 /* PluginWeather */,
+				0158B63D69632B31FBFE46A0 /* PluginNotes */,
+				A55EC642F7A5A977D30FB60D /* PluginAI */,
+				3C11519BC7F46E586F7239D8 /* PluginWindowManager */,
+				730276E735A178193257030B /* PluginSystemMonitor */,
+				7E26B93AF39A58B145948CCE /* PluginNetworkTools */,
+				94AAA82063614DB0D0F9D16A /* PluginScreenshot */,
 			);
 			productName = Quick;
 			productReference = 84C6DDB5084BAABFA569E71D /* Quick.app */;
@@ -232,23 +232,23 @@
 			mainGroup = 00A5C497509B3E074CC64DB5;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				D3DE13F4C36DC042792AA231 /* XCLocalSwiftPackageReference "Packages/ModuleAI" */,
-				1AE3E6DCBD017AB4245974AA /* XCLocalSwiftPackageReference "Packages/ModuleCalculator" */,
-				3F319671EC5A507C47EAC52C /* XCLocalSwiftPackageReference "Packages/ModuleCalendar" */,
-				6AAB2BC91244A1D236334373 /* XCLocalSwiftPackageReference "Packages/ModuleClipboard" */,
-				8FBD3D723EA7D1D0707C3B10 /* XCLocalSwiftPackageReference "Packages/ModuleDevTools" */,
-				68E3BB62C19CAB5E69010F31 /* XCLocalSwiftPackageReference "Packages/ModuleFileSearch" */,
-				E3CFDE976BBA6E973331BED6 /* XCLocalSwiftPackageReference "Packages/ModuleLauncher" */,
-				BEBE1221A9DB6B1A8EC11BB8 /* XCLocalSwiftPackageReference "Packages/ModuleNetworkTools" */,
-				B83D957017EA0A44B1D53694 /* XCLocalSwiftPackageReference "Packages/ModuleNotes" */,
-				686B53E4C8841E4683D406F8 /* XCLocalSwiftPackageReference "Packages/ModuleOCR" */,
-				54DB2181CE0C08276F3D0AA8 /* XCLocalSwiftPackageReference "Packages/ModuleScreenshot" */,
-				F92DC0B83E7A6E67E96C1553 /* XCLocalSwiftPackageReference "Packages/ModuleSnippets" */,
-				B075C3D8DECE94B399F5C510 /* XCLocalSwiftPackageReference "Packages/ModuleSystemControl" */,
-				005FE9CE92A53EEED98C5ADD /* XCLocalSwiftPackageReference "Packages/ModuleSystemMonitor" */,
-				99289B11FBC159CA0ECA3021 /* XCLocalSwiftPackageReference "Packages/ModuleTranslator" */,
-				FF78591D895E92696E5450D8 /* XCLocalSwiftPackageReference "Packages/ModuleWeather" */,
-				8B1FDA8D3E2FC559D1AF557C /* XCLocalSwiftPackageReference "Packages/ModuleWindowManager" */,
+				4109C120192A12214C8CC23A /* XCLocalSwiftPackageReference "Packages/PluginAI" */,
+				C7A18CB8FEE77FB273FB9DA8 /* XCLocalSwiftPackageReference "Packages/PluginCalculator" */,
+				9C06C1F1E120954ECC50CFE8 /* XCLocalSwiftPackageReference "Packages/PluginCalendar" */,
+				802CCF29C3403E755DE8A55E /* XCLocalSwiftPackageReference "Packages/PluginClipboard" */,
+				64C7DE77EC175385E650FFAB /* XCLocalSwiftPackageReference "Packages/PluginDevTools" */,
+				9AA7FBDED908A6CF4EAF317B /* XCLocalSwiftPackageReference "Packages/PluginFileSearch" */,
+				5BB3BD7C6A84770F24989247 /* XCLocalSwiftPackageReference "Packages/PluginLauncher" */,
+				C85CDD358764B6ECD54009D2 /* XCLocalSwiftPackageReference "Packages/PluginNetworkTools" */,
+				4A94B2ED45B777990E88CC59 /* XCLocalSwiftPackageReference "Packages/PluginNotes" */,
+				E5A5094E6A2612667FBC9FA8 /* XCLocalSwiftPackageReference "Packages/PluginOCR" */,
+				9EB180A7BA38927174248A94 /* XCLocalSwiftPackageReference "Packages/PluginScreenshot" */,
+				EEB589FAB59023A4A81C800A /* XCLocalSwiftPackageReference "Packages/PluginSnippets" */,
+				1C9651E11EDF0B472AA2F6DE /* XCLocalSwiftPackageReference "Packages/PluginSystemControl" */,
+				CE3B7FBB5698B3FDB380CCC8 /* XCLocalSwiftPackageReference "Packages/PluginSystemMonitor" */,
+				395ADE48902321953B6994DE /* XCLocalSwiftPackageReference "Packages/PluginTranslator" */,
+				CB0D43A2AC29F9950C0ABBE7 /* XCLocalSwiftPackageReference "Packages/PluginWeather" */,
+				3B5587574764CA7DFC4AA064 /* XCLocalSwiftPackageReference "Packages/PluginWindowManager" */,
 				75D35DB3831942F6E0B178F1 /* XCLocalSwiftPackageReference "Packages/QuickCore" */,
 				7B06A941256B96B3AE256285 /* XCLocalSwiftPackageReference "Packages/QuickPlatform" */,
 				6A9170B1C6D924E06C1B6DAE /* XCLocalSwiftPackageReference "Packages/QuickUI" */,
@@ -479,37 +479,37 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		005FE9CE92A53EEED98C5ADD /* XCLocalSwiftPackageReference "Packages/ModuleSystemMonitor" */ = {
+		1C9651E11EDF0B472AA2F6DE /* XCLocalSwiftPackageReference "Packages/PluginSystemControl" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleSystemMonitor;
+			relativePath = Packages/PluginSystemControl;
 		};
-		1AE3E6DCBD017AB4245974AA /* XCLocalSwiftPackageReference "Packages/ModuleCalculator" */ = {
+		395ADE48902321953B6994DE /* XCLocalSwiftPackageReference "Packages/PluginTranslator" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleCalculator;
+			relativePath = Packages/PluginTranslator;
 		};
-		3F319671EC5A507C47EAC52C /* XCLocalSwiftPackageReference "Packages/ModuleCalendar" */ = {
+		3B5587574764CA7DFC4AA064 /* XCLocalSwiftPackageReference "Packages/PluginWindowManager" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleCalendar;
+			relativePath = Packages/PluginWindowManager;
 		};
-		54DB2181CE0C08276F3D0AA8 /* XCLocalSwiftPackageReference "Packages/ModuleScreenshot" */ = {
+		4109C120192A12214C8CC23A /* XCLocalSwiftPackageReference "Packages/PluginAI" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleScreenshot;
+			relativePath = Packages/PluginAI;
 		};
-		686B53E4C8841E4683D406F8 /* XCLocalSwiftPackageReference "Packages/ModuleOCR" */ = {
+		4A94B2ED45B777990E88CC59 /* XCLocalSwiftPackageReference "Packages/PluginNotes" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleOCR;
+			relativePath = Packages/PluginNotes;
 		};
-		68E3BB62C19CAB5E69010F31 /* XCLocalSwiftPackageReference "Packages/ModuleFileSearch" */ = {
+		5BB3BD7C6A84770F24989247 /* XCLocalSwiftPackageReference "Packages/PluginLauncher" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleFileSearch;
+			relativePath = Packages/PluginLauncher;
+		};
+		64C7DE77EC175385E650FFAB /* XCLocalSwiftPackageReference "Packages/PluginDevTools" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/PluginDevTools;
 		};
 		6A9170B1C6D924E06C1B6DAE /* XCLocalSwiftPackageReference "Packages/QuickUI" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/QuickUI;
-		};
-		6AAB2BC91244A1D236334373 /* XCLocalSwiftPackageReference "Packages/ModuleClipboard" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleClipboard;
 		};
 		75D35DB3831942F6E0B178F1 /* XCLocalSwiftPackageReference "Packages/QuickCore" */ = {
 			isa = XCLocalSwiftPackageReference;
@@ -519,128 +519,128 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/QuickPlatform;
 		};
-		8B1FDA8D3E2FC559D1AF557C /* XCLocalSwiftPackageReference "Packages/ModuleWindowManager" */ = {
+		802CCF29C3403E755DE8A55E /* XCLocalSwiftPackageReference "Packages/PluginClipboard" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleWindowManager;
+			relativePath = Packages/PluginClipboard;
 		};
-		8FBD3D723EA7D1D0707C3B10 /* XCLocalSwiftPackageReference "Packages/ModuleDevTools" */ = {
+		9AA7FBDED908A6CF4EAF317B /* XCLocalSwiftPackageReference "Packages/PluginFileSearch" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleDevTools;
+			relativePath = Packages/PluginFileSearch;
 		};
-		99289B11FBC159CA0ECA3021 /* XCLocalSwiftPackageReference "Packages/ModuleTranslator" */ = {
+		9C06C1F1E120954ECC50CFE8 /* XCLocalSwiftPackageReference "Packages/PluginCalendar" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleTranslator;
+			relativePath = Packages/PluginCalendar;
 		};
-		B075C3D8DECE94B399F5C510 /* XCLocalSwiftPackageReference "Packages/ModuleSystemControl" */ = {
+		9EB180A7BA38927174248A94 /* XCLocalSwiftPackageReference "Packages/PluginScreenshot" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleSystemControl;
+			relativePath = Packages/PluginScreenshot;
 		};
-		B83D957017EA0A44B1D53694 /* XCLocalSwiftPackageReference "Packages/ModuleNotes" */ = {
+		C7A18CB8FEE77FB273FB9DA8 /* XCLocalSwiftPackageReference "Packages/PluginCalculator" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleNotes;
+			relativePath = Packages/PluginCalculator;
 		};
-		BEBE1221A9DB6B1A8EC11BB8 /* XCLocalSwiftPackageReference "Packages/ModuleNetworkTools" */ = {
+		C85CDD358764B6ECD54009D2 /* XCLocalSwiftPackageReference "Packages/PluginNetworkTools" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleNetworkTools;
+			relativePath = Packages/PluginNetworkTools;
 		};
-		D3DE13F4C36DC042792AA231 /* XCLocalSwiftPackageReference "Packages/ModuleAI" */ = {
+		CB0D43A2AC29F9950C0ABBE7 /* XCLocalSwiftPackageReference "Packages/PluginWeather" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleAI;
+			relativePath = Packages/PluginWeather;
 		};
-		E3CFDE976BBA6E973331BED6 /* XCLocalSwiftPackageReference "Packages/ModuleLauncher" */ = {
+		CE3B7FBB5698B3FDB380CCC8 /* XCLocalSwiftPackageReference "Packages/PluginSystemMonitor" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleLauncher;
+			relativePath = Packages/PluginSystemMonitor;
 		};
-		F92DC0B83E7A6E67E96C1553 /* XCLocalSwiftPackageReference "Packages/ModuleSnippets" */ = {
+		E5A5094E6A2612667FBC9FA8 /* XCLocalSwiftPackageReference "Packages/PluginOCR" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleSnippets;
+			relativePath = Packages/PluginOCR;
 		};
-		FF78591D895E92696E5450D8 /* XCLocalSwiftPackageReference "Packages/ModuleWeather" */ = {
+		EEB589FAB59023A4A81C800A /* XCLocalSwiftPackageReference "Packages/PluginSnippets" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/ModuleWeather;
+			relativePath = Packages/PluginSnippets;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		078DDB7169BD3EDB9596F40A /* ModuleLauncher */ = {
+		0158B63D69632B31FBFE46A0 /* PluginNotes */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleLauncher;
+			productName = PluginNotes;
 		};
-		0EF70A56F6C3F9A76897D3AF /* ModuleAI */ = {
+		101707495A6AF30BDD48497F /* PluginLauncher */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleAI;
+			productName = PluginLauncher;
 		};
-		0F5C306BBE664AB40FB396D9 /* ModuleTranslator */ = {
+		14C604C793BB19FA72FF5B6D /* PluginCalendar */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleTranslator;
+			productName = PluginCalendar;
 		};
-		24193F54E61A6C98582B1EB3 /* ModuleNetworkTools */ = {
+		1B94608C8CFE671C17CCDBC7 /* PluginFileSearch */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleNetworkTools;
+			productName = PluginFileSearch;
 		};
-		3E2B64891828AAE6DFA2C296 /* ModuleCalculator */ = {
+		3C11519BC7F46E586F7239D8 /* PluginWindowManager */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleCalculator;
-		};
-		4332CA4B074D3CF1E9C8030C /* ModuleOCR */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ModuleOCR;
-		};
-		59BCF4B7D262EAE2464533FD /* ModuleSnippets */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ModuleSnippets;
+			productName = PluginWindowManager;
 		};
 		5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = QuickCore;
 		};
-		6A3F51B8236D217DE92BA22A /* ModuleCalendar */ = {
+		730276E735A178193257030B /* PluginSystemMonitor */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleCalendar;
-		};
-		6B137BD2BEC5376E06CC89A5 /* ModuleWeather */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ModuleWeather;
-		};
-		6B3D3CF78E634C873291F720 /* ModuleNotes */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ModuleNotes;
-		};
-		6D044E1B050753A6FBE6ADE3 /* ModuleClipboard */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ModuleClipboard;
+			productName = PluginSystemMonitor;
 		};
 		783AEBF3F1FAE829DCAFC004 /* QuickUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = QuickUI;
 		};
-		A1F6A1277F3F2C2E948ABA6D /* ModuleSystemMonitor */ = {
+		7E26B93AF39A58B145948CCE /* PluginNetworkTools */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleSystemMonitor;
+			productName = PluginNetworkTools;
 		};
-		AB89B21D37E90F6E000F1492 /* ModuleFileSearch */ = {
+		892814393E695508914504C9 /* PluginCalculator */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleFileSearch;
+			productName = PluginCalculator;
 		};
-		BD5BD83022332B19E9A03E60 /* ModuleSystemControl */ = {
+		8F56EC8E050625C22BC8D67D /* PluginOCR */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleSystemControl;
+			productName = PluginOCR;
 		};
-		DD34C1E5DE14D029BD0899A3 /* ModuleScreenshot */ = {
+		94AAA82063614DB0D0F9D16A /* PluginScreenshot */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleScreenshot;
+			productName = PluginScreenshot;
 		};
-		E20228E59CDDFE81B3082CE5 /* ModuleDevTools */ = {
+		967C96E3F4CC521690436415 /* PluginClipboard */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleDevTools;
+			productName = PluginClipboard;
 		};
-		E422B47D6EBF13ABF58021B9 /* ModuleWindowManager */ = {
+		A55EC642F7A5A977D30FB60D /* PluginAI */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ModuleWindowManager;
+			productName = PluginAI;
+		};
+		C13C3BD98FF9599DBE7CF660 /* PluginWeather */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PluginWeather;
+		};
+		CA41B567971AB8CE0445F5C7 /* PluginTranslator */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PluginTranslator;
+		};
+		E01449FAF7BA101578F06AF4 /* PluginSnippets */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PluginSnippets;
 		};
 		EB1FAFFF92FB2D709E88377F /* QuickPlatform */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = QuickPlatform;
+		};
+		F66E890F7E3EA6EDD96E7D02 /* PluginDevTools */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PluginDevTools;
+		};
+		F6EF76EEC6647C0CF9D9325A /* PluginSystemControl */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PluginSystemControl;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

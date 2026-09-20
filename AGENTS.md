@@ -1,7 +1,7 @@
 # Quick
 
 原生 macOS 效率启动器：菜单栏常驻 + 全局快捷键（默认 ⌥Space）唤出的命令面板，
-聚合应用启动、剪贴板历史、计算器、文件搜索、系统控制等 17 个功能模块。
+聚合应用启动、剪贴板历史、计算器、文件搜索、系统控制等 17 个功能插件。
 
 SwiftUI + AppKit，以 accessory 模式运行（`LSUIElement`，无 Dock 图标）。零第三方依赖。
 
@@ -42,25 +42,25 @@ SwiftUI + AppKit，以 accessory 模式运行（`LSUIElement`，无 Dock 图标�
 | 目录 | 放什么 |
 | --- | --- |
 | `Quick/` | 应用目标（composition root）：`@main`、`AppDelegate`、`AppCore`、`StatusItemController` |
-| `Packages/QuickCore/` | 内核：`QuickModule` 协议、`EventBus`、`SearchableItem`、`QuickLog`、字符串扩展 |
+| `Packages/QuickCore/` | 内核：`QuickPlugin` 协议、`EventBus`、`SearchableItem`、`QuickLog`、字符串扩展 |
 | `Packages/QuickUI/` | 共享 UI：`DesignTokens`、面板外壳（`PalettePanel`/`PaletteCoordinator`/`PaletteRootView`）、设计系统组件、`HUDController` |
 | `Packages/QuickPlatform/` | 系统能力封装：热键、应用扫描、权限、剪贴板、图标缓存、路径 |
-| `Packages/Module*/` | 17 个功能模块，每个一个包；大模块内部再分 `Model/` `Service/` `UI/` `Settings/` |
+| `Packages/Plugin*/` | 17 个功能插件，每个一个包；大插件内部再分 `Model/` `Service/` `UI/` `Settings/` |
 | `Scripts/` | 所有可执行脚本：测试、构建、lint、格式化、脚手架 |
-| `docs/` | 规范文档（本目录）；每个功能模块的约束写在 `docs/features/` |
+| `docs/` | 规范文档（本目录）；每个功能插件的约束写在 `docs/features/` |
 | `.githooks/` | 版本控制的 git 钩子，通过 `Scripts/setup.sh` 启用 |
 
 **依赖方向是单向的，永不反向：**
 
 ```
-Module*  →  QuickUI / QuickPlatform  →  QuickCore
+Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
    ↓                ↓                      ↓
    └────────────────┴──────────────────────┘
-            只有 Quick/ 目标能同时看到模块
+            只有 Quick/ 目标能同时看到插件
 ```
 
-`QuickCore` 不认识任何模块，`QuickUI` / `QuickPlatform` 也不认识任何模块。只有 `Quick/AppCore.swift`
-能 `import Module*`。
+`QuickCore` 不认识任何插件，`QuickUI` / `QuickPlatform` 也不认识任何插件。只有 `Quick/AppCore.swift`
+能 `import Plugin*`。
 
 ---
 
@@ -74,7 +74,7 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
 | 声称一个改动「做完了」 | [docs/testing.md](docs/testing.md) |
 | 编译、运行、调试、生成工程 | [docs/development.md](docs/development.md) |
 | 新增或调整任何视图 | [docs/ui.md](docs/ui.md) |
-| 动某个模块的内部 | [docs/features/](docs/features/) —— 每份以不变量开头 |
+| 动某个插件的内部 | [docs/features/](docs/features/) —— 每份以不变量开头 |
 
 ---
 
@@ -85,12 +85,12 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
 
 - **`AppCore` 是唯一的所有者。** 新的长生命周期状态挂到 `AppCore` 上，在 `start()` 里接线，
   **绝不**另起一个并行的单例。视图通过 `@Environment` 拿协调器，不直接拿 `AppCore`。
-- **模块只在 `AppCore.registerModules()` 里实例化。** 这是全仓唯一 `modules.append(...)` 的地方。
-  模块**不自注册**，没有插件扫描，没有服务定位器。
-- **模块之间只通过 `EventBus` 通信。** 模块互不 `import`、互不持有引用、互不直接调用。
+- **插件只在 `AppCore.registerPlugins()` 里实例化。** 这是全仓唯一 `plugins.append(...)` 的地方。
+  插件**不自注册**，没有插件扫描，没有服务定位器。
+- **插件之间只通过 `EventBus` 通信。** 插件互不 `import`、互不持有引用、互不直接调用。
   需要通知别人就 `EventBus.shared.post(...)`；需要被通知就 `on(...)` 并保存
   `EventSubscription`（不保存会随返回值一起销毁）。
-- **`QuickModule` 是 `@MainActor` 的。** 模块状态默认主线程隔离；跨 actor 传递的模型类型必须
+- **`QuickPlugin` 是 `@MainActor` 的。** 插件状态默认主线程隔离；跨 actor 传递的模型类型必须
   `Sendable`。重活、IO 密集的活放到 `nonisolated` 函数里，由 `Task.detached` 驱动，
   **不要新增第二个 actor**。
 - **Swift 6 语言模式：数据竞争是硬错误。** 严格并发是 `complete`。引入一个新的共享可变状态前，
@@ -99,7 +99,7 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
   家目录、利率）一律作为参数注入 —— 这样模型层才能被测试独立编译。这条由编译期保证，不靠约定。
 - **UI 数值只来自 `DesignTokens`。** 视图里出现裸的间距、圆角、尺寸、颜色字面量就是缺陷。
   见 [docs/ui.md](docs/ui.md)。
-- **日志只走 `QuickLog`，禁止裸 `print`。** 每个模块用自己的 category。见
+- **日志只走 `QuickLog`，禁止裸 `print`。** 每个插件用自己的 category。见
   [docs/logging.md](docs/logging.md)。
 - **裸 `try!` 永远不可接受。** 强制转换偶尔有正当理由（AppKit / AX 桥接），所以只警告。
 - **`project.yml` 是工程的唯一真相。** `Quick.xcodeproj` 由 XcodeGen 生成但**要提交** ——
@@ -144,18 +144,18 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
  （见 `StatusItemController.restart()` 的说明），表现就是「改了却没生效」。
  **不要只跑 `build.sh` 就以为生效了** —— 必须走 `restart.sh`。
 
-### 新增一个功能模块
+### 新增一个功能插件
 
-1. 生成骨架：`./Scripts/new-module.sh ModuleFoo`（同时建好 `Package.swift`、模块类、
+1. 生成骨架：`./Scripts/new-plugin.sh PluginFoo`（同时建好 `Package.swift`、插件类、
    `Model/ Service/ UI/ Settings/` 目录与一个占位测试）。
-2. 实现 `ModuleFooModule.swift`，遵循 `QuickModule`。`static var id` 必须全局唯一 ——
+2. 实现 `PluginFooPlugin.swift`，遵循 `QuickPlugin`。`static var id` 必须全局唯一 ——
    它是事件路由和设置存储的主键，一旦发布就不能再改。
-3. 在 `Quick/AppCore.swift#registerModules()` 里注册。**这是唯一实例化模块的地方。**
+3. 在 `Quick/AppCore.swift#registerPlugins()` 里注册。**这是唯一实例化插件的地方。**
 4. 在 `project.yml` 里加两处（`packages:` 与 `Quick` target 的 `dependencies:`），
    然后 `xcodegen generate`。
 5. 加测试，`./Scripts/run-tests.sh` 必须全绿。
-6. 加日志：`QuickLog.module("<id>")`，覆盖 `activate()` / `deactivate()` / 错误路径。
-7. 在 `docs/features/<id>.md` 写下这个模块的不变量。
+6. 加日志：`QuickLog.plugin("<id>")`，覆盖 `activate()` / `deactivate()` / 错误路径。
+7. 在 `docs/features/<id>.md` 写下这个插件的不变量。
 8. 提交。
 
 ### 定义「做完」
@@ -203,7 +203,7 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
 ```
 
 - **type**：`feat` `fix` `refactor` `perf` `docs` `test` `chore` `build` `ci` `style` `revert`
-- **scope**：模块 id 或区域，如 `launcher` `palette` `quickui` `core` `hotkey` `tooling` `docs`
+- **scope**：插件 id 或区域，如 `launcher` `palette` `quickui` `core` `hotkey` `tooling` `docs`
 - 主题行祈使语气、小写开头、**句末不加句号**、不超过 72 字符。
 - 正文写**为什么**，不写「改了什么」—— 改动本身 `git diff` 已经说了。
 
@@ -211,7 +211,7 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
 feat(clipboard): add pinning with a 30-entry history cap
 fix(palette): keep the panel on screen when the app deactivates
 perf(launcher): score app names once per refresh instead of per keystroke
-docs(standards): state the logging contract for modules
+docs(standards): state the logging contract for plugins
 ```
 
 `commit-msg` 钩子会校验格式并拒绝非 ASCII 主题行（等价于强制英文）。

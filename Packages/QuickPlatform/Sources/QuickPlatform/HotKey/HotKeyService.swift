@@ -57,8 +57,8 @@ public final class HotKeyService {
     /// 运行自定义 Shell 命令回调
     public var onRunCustomCommand: ((UUID) -> Void)?
 
-    /// 导航到功能模块回调
-    public var onNavigateToModule: ((String) -> Void)?
+    /// 导航到功能插件回调
+    public var onNavigateToPlugin: ((String) -> Void)?
 
     private let log = QuickLog.hotKey
 
@@ -170,7 +170,7 @@ public final class HotKeyService {
     /// 恢复已持久化的热键绑定
     public func restoreHotKeys(
         appBundleIDs: [String], systemActionIDs: [String],
-        customCommandIDs: [UUID], moduleIDs: [String] = []
+        customCommandIDs: [UUID], pluginIDs: [String] = []
     ) {
         for bundleID in appBundleIDs {
             let action = HotKeyAction.app(bundleID: bundleID)
@@ -190,8 +190,8 @@ public final class HotKeyService {
                 register(action)
             }
         }
-        for id in moduleIDs {
-            let action = HotKeyAction.module(id: id)
+        for id in pluginIDs {
+            let action = HotKeyAction.plugin(id: id)
             if binding(for: action) != nil {
                 register(action)
             }
@@ -286,8 +286,8 @@ public final class HotKeyService {
             onRunSystemAction?(id)
         case .customCommand(let id):
             onRunCustomCommand?(id)
-        case .module(let id):
-            onNavigateToModule?(id)
+        case .plugin(let id):
+            onNavigateToPlugin?(id)
         }
     }
 }
