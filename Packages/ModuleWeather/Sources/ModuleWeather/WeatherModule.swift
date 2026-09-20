@@ -26,15 +26,18 @@ public final class WeatherModule: QuickModule {
 
     private let service = WeatherService()
 
+    /// 触发词
+    private static let triggers = ["天气", "weather", "温度", "预报"]
+
     public init() {}
 
+    /// 纯查询：**这里不取位置。**
+    ///
+    /// `searchItems` 每次按键（防抖后）都会跑，而取位置最长要 8 秒；
+    /// 聚合搜索又要等所有模块都返回，所以在这里取位置会把**整批**结果卡住。
+    /// 需要取的时候由用户点这一条去触发 —— 那也是定位权限该被申请的时机。
     public func searchItems(query: String) async -> [SearchableItem] {
-        let triggers = ["天气", "weather", "温度", "预报"]
-        guard triggers.contains(where: { query.lowercased().contains($0) }) else { return [] }
-
-        // 用户已经在找天气了，这时拉数据是合理的上下文。
-        // refresh() 不会弹权限框：未授权时它只记录原因。
-        await service.refresh()
+        guard query.matchesAnyTrigger(Self.triggers) else { return [] }
 
         if let info = service.currentInfo {
             return [
@@ -45,12 +48,11 @@ public final class WeatherModule: QuickModule {
                     subtitle: info.detail,
                     icon: info.icon,
                     relevance: 0.6,
-                    action: {}
+                    action: { [weak self] in self?.fetchAndReport() }
                 )
             ]
         }
 
-        // 拿不到数据时给一条可操作的入口，而不是一句「失败」。
         switch service.unavailableReason {
         case .needsPermission:
             return [
@@ -85,21 +87,36 @@ public final class WeatherModule: QuickModule {
                 )
             ]
 
-        case .locationUnavailable:
+        case .locationUnavailable, nil:
+            // 还没取过，或上次没取到：给一条会去取的动作。
+            // 这一条是天气模块唯一会发起定位请求的地方。
             return [
                 SearchableItem(
-                    id: "weather.location-unavailable",
+                    id: "weather.fetch",
                     moduleID: Self.id,
-                    title: "暂时拿不到位置",
-                    subtitle: "已授权但系统未返回位置，稍后重试",
-                    icon: "location.slash",
-                    relevance: 0.5,
-                    action: {}
+                    title: "查看当前天气",
+                    subtitle: "需要获取一次大致位置（公里级）",
+                    icon: "cloud.sun",
+                    relevance: 0.6,
+                    action: { [weak self] in self?.fetchAndReport() }
                 )
             ]
+        }
+    }
 
-        case nil:
-            return []
+    /// 取一次天气，并把结果通过 HUD 报出来
+    ///
+    /// 面板目前还没有承载模块视图，所以结果走 HUD 而不是一个天气页面 ——
+    /// 至少用户点了之后能看到东西，而不是面板一关什么都没发生。
+    private func fetchAndReport() {
+        Task { @MainActor in
+            await service.refresh()
+            if let info = service.currentInfo {
+                EventBus.shared.post(ShowHUDEvent(message: info.detail, tone: .info))
+            } else {
+                EventBus.shared.post(ShowHUDEvent(message: "暂时拿不到位置，稍后重试", tone: .warning))
+            }
+            EventBus.shared.post(HidePaletteEvent())
         }
     }
 

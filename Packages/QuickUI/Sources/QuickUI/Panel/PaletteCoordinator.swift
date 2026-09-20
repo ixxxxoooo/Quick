@@ -150,9 +150,23 @@ public final class PaletteCoordinator {
 
     // MARK: - 搜索
 
-    /// 聚合搜索：并发查询所有已启用模块
+    /// 单次搜索的结果上限
+    ///
+    /// 没有上限时，一个失控的模块会把几千条塞进 SwiftUI 列表、还要在主线程排序。
+    private static let resultLimit = 60
+
+    /// 单个模块的搜索超时
+    ///
+    /// 模块的 `searchItems` 跑在主 actor 上（协议本身是 `@MainActor`），
+    /// 所以一个慢查询（EventKit、Spotlight、定位）会把**整批**结果卡住 ——
+    /// 聚合是等所有模块都返回才结束的。超时之后放弃这个模块，
+    /// 而不是让整块面板陪它等。
+    private static let moduleTimeout = Duration.seconds(2)
+
+    /// 聚合搜索：查询所有已启用模块
+    ///
     /// - Parameter query: 搜索关键词
-    /// - Returns: 排序后的搜索结果
+    /// - Returns: 去重、排序、限流之后的结果
     public func search(query: String) async -> [SearchableItem] {
         let enabledModules = modules.filter(\.isEnabled)
 
@@ -160,29 +174,65 @@ public final class PaletteCoordinator {
         let interval = signpost.beginInterval("palette.search")
         let started = Date()
 
-        let results = await withTaskGroup(of: [SearchableItem].self) { group in
+        let collected = await withTaskGroup(of: [SearchableItem].self) { group in
             for module in enabledModules {
                 group.addTask {
-                    await module.searchItems(query: query)
+                    await Self.search(module: module, query: query)
                 }
             }
-            var collected: [SearchableItem] = []
+            var results: [SearchableItem] = []
             for await items in group {
-                collected.append(contentsOf: items)
+                results.append(contentsOf: items)
             }
-            return collected.sorted { $0.relevance > $1.relevance }
+            return results
         }
+
+        // 去重：`SearchableItem` 的 `Hashable` 只看 id，而「id 以模块 id 开头」
+        // 只是一条约定，没有任何东西在强制它。重复 id 会让 `ForEach` 进入未定义行为
+        // （丢行、选中高亮错位），所以在这里挡一道。
+        var seen = Set<String>()
+        let deduped = collected.filter { seen.insert($0.id).inserted }
+
+        // 排序：相关度降序，**同分时按 id 升序**。
+        // 只按相关度排的话同分项的顺序由任务完成顺序决定，而常量相关度
+        // （0.5 / 0.6 是常态）意味着同分是多数情况 —— 那等于没有顺序保证，
+        // 列表每次刷新都可能换一个样子。
+        let sorted = deduped.sorted {
+            $0.relevance == $1.relevance ? $0.id < $1.id : $0.relevance > $1.relevance
+        }
+
+        let limited = Array(sorted.prefix(Self.resultLimit))
 
         signpost.endInterval("palette.search", interval)
         let elapsedMS = Date().timeIntervalSince(started) * 1000
         log.debug(
             """
             聚合搜索完成：\(enabledModules.count, privacy: .public) 个模块，\
-            命中 \(results.count, privacy: .public) 条，\
+            命中 \(collected.count, privacy: .public) 条 → \
+            去重后 \(deduped.count, privacy: .public) 条 → \
+            返回 \(limited.count, privacy: .public) 条，\
             耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
             """)
 
-        return results
+        return limited
+    }
+
+    /// 查询单个模块，超时即放弃
+    ///
+    /// 竞速两个子任务：模块自己，和一个超时计时器。先完成的那个决定结果。
+    /// 注意超时**不会**中断模块内部的同步工作（它在主 actor 上），
+    /// 只是让我们不再等它 —— 这正是需要的：面板不能陪一个慢模块等下去。
+    private static func search(module: any QuickModule, query: String) async -> [SearchableItem] {
+        await withTaskGroup(of: [SearchableItem].self) { group in
+            group.addTask { await module.searchItems(query: query) }
+            group.addTask {
+                try? await Task.sleep(for: Self.moduleTimeout)
+                return []
+            }
+            let first = await group.next() ?? []
+            group.cancelAll()
+            return first
+        }
     }
 
     // MARK: - 内部方法
