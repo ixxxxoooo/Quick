@@ -64,7 +64,7 @@ struct AboutPane: View {
             } header: {
                 Text("排查")
             } footer: {
-                Text("遇到问题时先看日志：模块是否激活、快捷键是否注册成功、哪一步失败，都会记在里面。")
+                Text("遇到问题时先看日志：插件是否激活、快捷键是否注册成功、哪一步失败，都会记在里面。")
             }
         }
         .formStyle(.grouped)

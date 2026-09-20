@@ -5,7 +5,7 @@
 import Foundation
 import SwiftUI
 
-/// 设置窗口里的一行模块
+/// 设置窗口里的一行插件
 public struct SettingsModule: Identifiable, Sendable {
     public let id: String
     public let name: String
@@ -133,7 +133,7 @@ public enum SettingsPermission: String, CaseIterable, Sendable {
         case .screenCapture:
             "用于截图与窗口捕获。macOS 只允许已授权的应用读取屏幕内容。"
         case .location:
-            "用于天气模块。只在你主动查看天气时申请，不会在启动时弹出。"
+            "用于天气插件。只在你主动查看天气时申请，不会在启动时弹出。"
         }
     }
 }
@@ -188,7 +188,7 @@ public protocol SettingsDataSource: AnyObject {
     func setCustomCommandShortcut(keyCode: Int, carbonModifiers: Int, for id: UUID)
     func clearCustomCommandShortcut(for id: UUID)
 
-    // MARK: - 功能模块设置
+    // MARK: - 功能插件设置
     var moduleEntries: [SettingsModule] { get }
     func isModuleEnabled(_ id: String) -> Bool
     func setModuleEnabled(_ id: String, enabled: Bool)

@@ -34,7 +34,10 @@
 ./Scripts/run-tests.sh       # 跑全部包的测试
 ./Scripts/run-tests.sh QuickCore ModuleCalculator   # 只跑指定的包
 ./Scripts/build.sh           # 构建 Debug .app
-./Scripts/build.sh --run     # 构建并启动
+./Scripts/build.sh --run     # 构建并启动（轻量；日常改动请用 restart.sh）
+./Scripts/restart.sh         # 构建 + 杀旧进程 + 启动新实例（改完必跑）
+./Scripts/restart.sh --show  # 同上，启动后立刻弹出面板
+./Scripts/restart.sh --no-build  # 只重启，不重新编译
 ./Scripts/logs.sh            # 实时跟踪 Quick 的日志
 ./Scripts/logs.sh --errors   # 只看近 1 小时的 warning / error / fault
 ./Scripts/new-module.sh ModuleFoo   # 生成新功能模块骨架
@@ -85,8 +88,15 @@ xcodebuild -project Quick.xcodeproj -scheme Quick \
            -configuration Debug -destination 'platform=macOS' build
 ```
 
-构建产物在 Xcode 的 DerivedData 里；`./Scripts/build.sh --run` 会构建、找到 `.app`、
-启动它并把路径打出来。
+构建产物在固定的 `build/DerivedData` 里。**改完代码后请跑：**
+
+```bash
+./Scripts/restart.sh         # 构建 → 杀旧进程 → 启动新实例
+./Scripts/restart.sh --show  # 启动后立刻弹出面板（省掉手按 ⌥Space）
+```
+
+只构建不启动用 `./Scripts/build.sh`；`build.sh --run` 也能启动，但杀进程不如
+`restart.sh` 稳（后者会等到旧进程真正退出）。
 
 ### 单独构建某个包（快得多，用于验证编译）
 

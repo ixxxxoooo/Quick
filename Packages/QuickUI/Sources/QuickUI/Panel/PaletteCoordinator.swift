@@ -223,8 +223,11 @@ public final class PaletteCoordinator {
 
         let collected = await withTaskGroup(of: [SearchableItem].self) { group in
             for module in enabledModules {
+                let moduleName = type(of: module).name
                 group.addTask {
-                    await Self.search(module: module, query: query)
+                    let items = await Self.search(module: module, query: query)
+                    // 给每条搜索结果标注来源插件名
+                    return items.map { $0.moduleName == nil ? $0.withModuleName(moduleName) : $0 }
                 }
             }
             var results: [SearchableItem] = []

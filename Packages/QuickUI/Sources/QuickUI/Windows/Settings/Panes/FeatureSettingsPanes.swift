@@ -5,13 +5,13 @@
 import QuickCore
 import SwiftUI
 
-/// 功能模块独立设置页容器
+/// 功能插件独立设置页容器
 ///
-/// 每个功能模块的设置页结构：
+/// 每个功能插件的设置页结构：
 /// 1. 启用开关 + 在启动器中显示
 /// 2. 触发词列表（展示中英双语唤醒命令）
-/// 3. 全局快捷键绑定（快速打开模块面板）
-/// 4. 模块专属配置项
+/// 3. 全局快捷键绑定（快速打开插件面板）
+/// 4. 插件专属配置项
 struct FeatureSettingsPane: View {
 
     let tab: SettingsTab
@@ -40,7 +40,7 @@ struct FeatureSettingsPane: View {
                 Toggle(isOn: $isEnabled) {
                     SettingsRow(
                         title: "启用\(tab.title)",
-                        subtitle: "开启后可在 Quick 面板中搜索和使用此功能。",
+                        subtitle: "开启后可在 Quick 面板中搜索和使用此插件。",
                         icon: { SettingsRowIcon(systemImage: tab.systemImage) }
                     )
                 }
@@ -52,7 +52,7 @@ struct FeatureSettingsPane: View {
                 Toggle(isOn: $showInLauncher) {
                     SettingsRow(
                         title: "在启动器中显示",
-                        subtitle: "搜索时展示该模块的结果项。"
+                        subtitle: "搜索时展示该插件的结果项。"
                     )
                 }
                 .settingsEnabled(isEnabled)
@@ -108,7 +108,7 @@ struct FeatureSettingsPane: View {
             } header: {
                 Text("唤醒命令")
             } footer: {
-                Text("在搜索框中输入以上任一关键词即可唤醒此模块。")
+                Text("在搜索框中输入以上任一关键词即可唤醒此插件。")
             }
         }
     }
@@ -137,7 +137,7 @@ struct FeatureSettingsPane: View {
             Section {
                 SettingsRow(
                     title: "全局快捷键",
-                    subtitle: "在任何应用中按下即可打开此模块面板。",
+                    subtitle: "在任何应用中按下即可打开此插件面板。",
                     icon: { SettingsRowIcon(systemImage: "keyboard") }
                 ) {
                     ShortcutRecorder(

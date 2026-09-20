@@ -4,9 +4,9 @@
 
 import SwiftUI
 
-/// 模块开关
+/// 插件开关
 ///
-/// 17 个模块一屏放不下，所以顶部有一个筛选框（参考实现的做法：
+/// 插件数量较多时一屏放不下，所以顶部有一个筛选框（参考实现的做法：
 /// 长列表上方给一个搜索框，而不是让用户自己滚）。
 struct ModulesPane: View {
 
@@ -44,12 +44,12 @@ struct ModulesPane: View {
     var body: some View {
         Form {
             Section {
-                SettingsFilterField(prompt: "筛选模块", query: $filter, isFocused: $filterFocused)
+                SettingsFilterField(prompt: "筛选插件", query: $filter, isFocused: $filterFocused)
             }
 
             Section {
                 if visibleModules.isEmpty {
-                    SettingsRow(title: "没有匹配的模块", subtitle: "换个关键词试试")
+                    SettingsRow(title: "没有匹配的插件", subtitle: "换个关键词试试")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(visibleModules) { module in
@@ -70,12 +70,12 @@ struct ModulesPane: View {
                     }
                 }
             } header: {
-                Text("模块")
+                Text("插件")
             } footer: {
                 if disabledCount > 0 {
-                    Text("已停用 \(disabledCount) 个模块。停用的模块不会被搜索到，也不会在启动时加载。")
+                    Text("已停用 \(disabledCount) 个插件。停用的插件不会被搜索到，也不会在启动时加载。")
                 } else {
-                    Text("停用的模块不会被搜索到，也不会在启动时加载。")
+                    Text("停用的插件不会被搜索到，也不会在启动时加载。")
                 }
             }
         }

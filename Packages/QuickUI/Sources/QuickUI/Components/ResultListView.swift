@@ -149,6 +149,20 @@ struct ResultRowView: View {
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                     .lineLimit(1)
             }
+
+            // 来源插件标注
+            if let name = item.moduleName {
+                Text(name)
+                    .font(.system(size: 10))
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    )
+                    .lineLimit(1)
+            }
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .padding(.vertical, DesignTokens.Spacing.md)

@@ -118,6 +118,7 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
 ./Scripts/format.sh                # 改完先格式化
 ./Scripts/run-tests.sh             # 跑全量测试（提交前必跑）
 ./Scripts/build.sh                 # 构建 .app
+./Scripts/restart.sh               # 构建 + 杀旧进程 + 启动新实例（改完必跑）
 ./Scripts/lint.sh                  # 排版 + 语义检查
 ```
 
@@ -133,14 +134,15 @@ Module*  →  QuickUI / QuickPlatform  →  QuickCore
    攒批会让「这次改了什么」和「哪次改坏了」变得无法追溯。
 2. **重启新实例。** 构建完**先杀旧进程，再启动新的**，确保跑的就是刚构建的产物：
 
-   ```bash
-   ./Scripts/build.sh
-   pkill -f "Quick Dev"; sleep 1
-   open -n "build/DerivedData/Build/Products/Debug/Quick Dev.app"
-   ```
+ ```bash
+ ./Scripts/restart.sh            # 构建 + 杀旧进程 + 启动新实例
+ ./Scripts/restart.sh --show     # 同上，启动后立刻弹出面板
+ ./Scripts/restart.sh --no-build # 只重启，不重新编译
+ ```
 
-   `pkill` 必须在 `open -n` 之前：旧进程不退，⌥Space 仍被它占着，新实例注册热键会失败
-   （见 `StatusItemController.restart()` 的说明），表现就是「改了却没生效」。
+ 旧进程不退，⌥Space 仍被它占着，新实例注册热键会失败
+ （见 `StatusItemController.restart()` 的说明），表现就是「改了却没生效」。
+ **不要只跑 `build.sh` 就以为生效了** —— 必须走 `restart.sh`。
 
 ### 新增一个功能模块
 

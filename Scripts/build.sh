@@ -86,11 +86,11 @@ fi
 echo "    ✓ $APP"
 
 if [[ "$run_after" == true ]]; then
-    echo "==> 启动"
-    # 先杀掉旧实例，否则 open 只会把已有实例带到前台，你调试的其实是旧二进制。
+    # 日常改完请优先用 ./Scripts/restart.sh（等进程退出更稳，支持 --show）。
+    echo "==> 启动（等价于 ./Scripts/restart.sh --no-build，但不等待进程退出）"
     pkill -f 'Quick Dev.app/Contents/MacOS/Quick Dev' 2>/dev/null || true
     pkill -f 'Quick.app/Contents/MacOS/Quick' 2>/dev/null || true
-    sleep 0.3
-    open "$APP"
+    sleep 0.5
+    open -n "$APP"
     echo "    ✓ 已启动。日志：./Scripts/logs.sh$([ "$config" = Debug ] && echo ' --dev')"
 fi

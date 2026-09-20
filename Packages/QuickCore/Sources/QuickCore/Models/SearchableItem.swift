@@ -13,8 +13,11 @@ public struct SearchableItem: Identifiable, Sendable {
     /// 结果唯一 ID
     public let id: String
 
-    /// 来源模块 ID
+    /// 来源插件 ID
     public let moduleID: String
+
+    /// 来源插件显示名称（用于搜索结果右侧标注）
+    public let moduleName: String?
 
     /// 显示标题
     public let title: String
@@ -50,7 +53,8 @@ public struct SearchableItem: Identifiable, Sendable {
     /// 初始化搜索结果项
     /// - Parameters:
     ///   - id: 唯一标识
-    ///   - moduleID: 来源模块标识
+    ///   - moduleID: 来源插件标识
+    ///   - moduleName: 来源插件显示名称（搜索结果右侧标注）
     ///   - title: 显示标题
     ///   - subtitle: 副标题
     ///   - icon: SF Symbol 名称
@@ -61,6 +65,7 @@ public struct SearchableItem: Identifiable, Sendable {
     public init(
         id: String,
         moduleID: String,
+        moduleName: String? = nil,
         title: String,
         subtitle: String? = nil,
         icon: String,
@@ -71,6 +76,7 @@ public struct SearchableItem: Identifiable, Sendable {
     ) {
         self.id = id
         self.moduleID = moduleID
+        self.moduleName = moduleName
         self.title = title
         self.subtitle = subtitle
         self.icon = icon
@@ -78,6 +84,22 @@ public struct SearchableItem: Identifiable, Sendable {
         self.relevance = relevance
         self.shortcutHint = shortcutHint
         self.action = action
+    }
+
+    /// 返回一个新实例，填充 `moduleName`
+    public func withModuleName(_ name: String) -> SearchableItem {
+        SearchableItem(
+            id: id,
+            moduleID: moduleID,
+            moduleName: name,
+            title: title,
+            subtitle: subtitle,
+            icon: icon,
+            iconType: iconType,
+            relevance: relevance,
+            shortcutHint: shortcutHint,
+            action: action
+        )
     }
 }
 

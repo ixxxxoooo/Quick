@@ -17,7 +17,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .general: "通用"
         case .launcher: "启动器"
-        case .features: "功能模块"
+        case .features: "功能插件"
         case .advanced: "高级"
         }
     }
@@ -54,7 +54,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case systemActions
     case commands
 
-    // MARK: - 功能模块
+    // MARK: - 功能插件
     case clipboard
     case calculator
     case fileSearch
@@ -80,7 +80,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     public var title: String {
         switch self {
         case .general: "通用设置"
-        case .modules: "模块管理"
+        case .modules: "插件管理"
         case .permissions: "权限"
 
         case .applications: "应用程序"
@@ -95,7 +95,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .notes: "笔记"
         case .calendar: "日历"
         case .weather: "天气"
-        case .ai: "AI 对话"
+        case .ai: "AI 聚合"
         case .translator: "翻译"
         case .devTools: "开发工具"
         case .systemMonitor: "系统监控"
@@ -138,7 +138,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// 对应功能模块 ID（若该分栏代表一个 Feature Module）
+    /// 对应功能插件 ID（若该分栏代表一个 Feature Plugin）
     public var moduleID: String? {
         switch self {
         case .applications: "launcher"

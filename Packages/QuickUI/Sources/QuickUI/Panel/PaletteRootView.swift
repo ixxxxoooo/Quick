@@ -158,7 +158,7 @@ struct PaletteRootView: View {
             emptyState(
                 icon: "questionmark.circle",
                 message: "没有找到结果",
-                detail: "换个关键词试试，或检查对应模块是否已启用"
+                detail: "换个关键词试试，或检查对应插件是否已启用"
             )
         } else if results.isEmpty && query.isEmpty {
             if isSearching {
@@ -241,8 +241,8 @@ struct PaletteRootView: View {
             } else {
                 emptyState(
                     icon: "exclamationmark.triangle",
-                    message: "模块不可用",
-                    detail: "该模块可能已被禁用或未安装"
+                    message: "插件不可用",
+                    detail: "该插件可能已被禁用或未安装"
                 )
             }
         }
