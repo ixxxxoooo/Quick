@@ -291,17 +291,6 @@ private struct DetachedPanelContentView: View {
     /// 自定义标题栏
     private var titleBar: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
-            // 关闭按钮
-            Button {
-                onClose()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-            }
-            .buttonStyle(.plain)
-            .help("关闭 (Esc)")
-
             Image(systemName: moduleIcon)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
@@ -325,6 +314,17 @@ private struct DetachedPanelContentView: View {
             }
             .buttonStyle(.plain)
             .help(isPinned ? "取消置顶" : "窗口置顶")
+
+            // 关闭按钮
+            Button {
+                onClose()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            }
+            .buttonStyle(.plain)
+            .help("关闭 (⌘W / Esc)")
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .frame(height: DesignTokens.Size.detachedTitleBarHeight)
