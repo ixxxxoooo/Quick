@@ -23,9 +23,52 @@ public final class NotesPlugin: QuickPlugin {
 
     private let log = QuickLog.plugin(NotesPlugin.id)
 
-    private let store = NoteStore()
+    private let store: NoteStore
 
-    public init() {}
+    /// - Parameter storage: 由 AppCore 注入的存储句柄
+    public init(storage: PluginStorage) {
+        self.store = NoteStore(storage: storage)
+    }
+
+    // MARK: - 存储 schema
+
+    /// 笔记与待办两张表
+    ///
+    /// 表结构归插件所有：宿主只负责把它跑一遍，不读这两张表。
+    /// 排序索引对应界面顺序 —— 笔记最新在前，待办按添加顺序。
+    public static var storageMigrations: [SQLiteMigration] {
+        [
+            SQLiteMigration(
+                id: "notes.items",
+                statements: [
+                    """
+                    CREATE TABLE IF NOT EXISTS notes (
+                        id TEXT PRIMARY KEY,
+                        title TEXT NOT NULL DEFAULT '',
+                        content TEXT NOT NULL DEFAULT '',
+                        category TEXT NOT NULL,
+                        is_pinned INTEGER NOT NULL DEFAULT 0,
+                        created_at REAL NOT NULL,
+                        updated_at REAL NOT NULL
+                    )
+                    """,
+                    "CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at DESC)"
+                ]),
+            SQLiteMigration(
+                id: "notes.todos",
+                statements: [
+                    """
+                    CREATE TABLE IF NOT EXISTS todos (
+                        id TEXT PRIMARY KEY,
+                        text TEXT NOT NULL DEFAULT '',
+                        is_completed INTEGER NOT NULL DEFAULT 0,
+                        created_at REAL NOT NULL
+                    )
+                    """,
+                    "CREATE INDEX IF NOT EXISTS idx_todos_created ON todos(created_at ASC)"
+                ])
+        ]
+    }
 
     public func searchItems(query: String) async -> [SearchableItem] {
         // 用整词匹配而不是 contains：否则 memory 会误命中 memo
@@ -52,7 +95,7 @@ public final class NotesPlugin: QuickPlugin {
     }
 
     public func activate() {
-        store.load()
+        // 加载已在 init 里完成，这里只汇报
         log.notice(
             """
             插件已激活：加载 \(self.store.notes.count, privacy: .public) 条笔记、\

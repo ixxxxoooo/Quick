@@ -27,9 +27,45 @@ public final class ClipboardPlugin: QuickPlugin {
     private let monitor = ClipboardMonitor()
 
     /// 剪贴板条目存储
-    private let store = ClipboardStore()
+    private let store: ClipboardStore
 
-    public init() {}
+    /// - Parameter storage: 由 AppCore 注入的存储句柄
+    public init(storage: PluginStorage) {
+        self.store = ClipboardStore(storage: storage)
+    }
+
+    // MARK: - 存储 schema
+
+    /// 剪贴板历史表
+    ///
+    /// 表结构归插件所有：宿主只负责把它跑一遍，不读这张表。
+    /// `(is_pinned, created_at)` 的复合索引对应界面上的排序 —— 置顶在最前，其余按时间倒序。
+    public static var storageMigrations: [SQLiteMigration] {
+        [
+            SQLiteMigration(
+                id: "clipboard.history",
+                statements: [
+                    """
+                    CREATE TABLE IF NOT EXISTS clipboard_history (
+                        id TEXT PRIMARY KEY,
+                        text TEXT NOT NULL DEFAULT '',
+                        image_data BLOB,
+                        image_size TEXT,
+                        type TEXT NOT NULL,
+                        is_favorite INTEGER NOT NULL DEFAULT 0,
+                        is_pinned INTEGER NOT NULL DEFAULT 0,
+                        created_at REAL NOT NULL
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_clip_order
+                        ON clipboard_history(is_pinned DESC, created_at DESC)
+                    """,
+                    "CREATE INDEX IF NOT EXISTS idx_clip_type ON clipboard_history(type)",
+                    "CREATE INDEX IF NOT EXISTS idx_clip_text ON clipboard_history(text)"
+                ])
+        ]
+    }
 
     // MARK: - QuickPlugin 协议
 
@@ -88,7 +124,6 @@ public final class ClipboardPlugin: QuickPlugin {
     }
 
     public func activate() {
-        store.load()
         monitor.onNewContent = { [weak self] entry in
             self?.store.add(entry)
         }

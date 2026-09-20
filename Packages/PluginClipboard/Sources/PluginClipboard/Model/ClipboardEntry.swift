@@ -109,4 +109,28 @@ public struct ClipboardEntry: Identifiable, Codable, Sendable {
         self.imageData = imageData
         self.imageSizeDescription = sizeDescription
     }
+
+    /// 从数据库的一行还原
+    ///
+    /// 与上面两个初始化器不同，这个不生成新 id、不覆盖时间戳 —— 它还原的是已经存在过的
+    /// 条目，任何「当作新条目」的默认值都会让历史在每次读取时漂移。
+    init(
+        id: UUID,
+        text: String,
+        imageData: Data?,
+        imageSizeDescription: String?,
+        type: ContentType,
+        timestamp: Date,
+        isFavorite: Bool,
+        isPinned: Bool
+    ) {
+        self.id = id
+        self.text = text
+        self.imageData = imageData
+        self.imageSizeDescription = imageSizeDescription
+        self.type = type
+        self.timestamp = timestamp
+        self.isFavorite = isFavorite
+        self.isPinned = isPinned
+    }
 }

@@ -11,7 +11,7 @@ struct JSONFormatterView: View {
     @State private var output = ""
     @State private var errorMessage: String?
     /// 缩进风格持久化：设置页里的「JSON 缩进」改的就是它
-    @AppStorage("jsonFormatter.indent") private var indent = 2
+    @AppStorage(PluginSettingKey.JSONFormatter.indent) private var indent = 2
     @State private var nodeCount = 0
 
     var body: some View {

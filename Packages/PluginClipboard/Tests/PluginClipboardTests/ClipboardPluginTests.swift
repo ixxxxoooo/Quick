@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import QuickCore
 import Testing
 
 @testable import PluginClipboard
@@ -11,15 +12,18 @@ import Testing
 @MainActor
 struct ClipboardPluginTests {
 
-    /// 临时存储路径
+    /// 造一个跑过插件迁移的内存库
     ///
-    /// 目录要真正建出来：生产环境里 `AppPaths.pluginData(_:)` 会创建目录，
-    /// 这里必须模拟同样的前提，否则测的是「目录不存在」而不是存储本身。
-    private func temporaryStorageURL() throws -> URL {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("quick-tests-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent("history.json")
+    /// 内存库每个实例互相独立，所以测试之间不会串数据，也不用清临时目录。
+    private func makeDatabase() throws -> SQLiteDatabase {
+        let database = try SQLiteDatabase()
+        try database.migrate(ClipboardPlugin.storageMigrations)
+        return database
+    }
+
+    private func makeStore(database: SQLiteDatabase? = nil) throws -> ClipboardStore {
+        let database = try database ?? makeDatabase()
+        return ClipboardStore(storage: PluginStorage(pluginID: ClipboardPlugin.id, database: database))
     }
 
     // MARK: - 插件契约
@@ -31,9 +35,16 @@ struct ClipboardPluginTests {
         #expect(!ClipboardPlugin.icon.isEmpty)
     }
 
+    @Test("插件声明了自己的 schema")
+    func pluginDeclaresItsSchema() {
+        let ids = ClipboardPlugin.storageMigrations.map(\.id)
+        #expect(ids == ["clipboard.history"])
+    }
+
     @Test("启停是幂等的")
-    func activationIsIdempotent() {
-        let plugin = ClipboardPlugin()
+    func activationIsIdempotent() throws {
+        let plugin = ClipboardPlugin(
+            storage: PluginStorage(pluginID: ClipboardPlugin.id, database: try makeDatabase()))
         plugin.activate()
         plugin.activate()
         plugin.deactivate()
@@ -75,7 +86,7 @@ struct ClipboardPluginTests {
 
     @Test("相同内容不重复记录，且新的排在最前")
     func addDeduplicatesByText() throws {
-        let store = ClipboardStore(storageURL: try temporaryStorageURL())
+        let store = try makeStore()
 
         let first = ClipboardEntry(text: "同一段内容")
         store.add(first)
@@ -86,18 +97,32 @@ struct ClipboardPluginTests {
         #expect(store.entries.first?.id == second.id)
     }
 
-    @Test("历史条数被限制在上限内")
-    func historyIsCapped() throws {
-        let store = ClipboardStore(storageURL: try temporaryStorageURL())
-        for index in 0..<505 {
-            store.add(ClipboardEntry(text: "条目 \(index)"))
-        }
-        #expect(store.entries.count == 500)
+    @Test("图片按数据内容去重")
+    func addDeduplicatesImagesByData() throws {
+        let store = try makeStore()
+        let data = Data(repeating: 0x42, count: 128)
+
+        store.add(ClipboardEntry(imageData: data, sizeDescription: "8×8"))
+        store.add(ClipboardEntry(imageData: data, sizeDescription: "8×8"))
+
+        #expect(store.entries.count == 1)
+        #expect(store.entries.first?.imageData == data)
+    }
+
+    @Test("去重发生在数据库里，不只是内存里")
+    func deduplicationPersists() throws {
+        let database = try makeDatabase()
+        let store = try makeStore(database: database)
+        store.add(ClipboardEntry(text: "重复"))
+        store.add(ClipboardEntry(text: "重复"))
+
+        // 直接问数据库：内存里只剩一条不算数，表里也必须只有一条
+        #expect(try database.scalarInt("SELECT COUNT(*) AS value FROM clipboard_history") == 1)
     }
 
     @Test("清空历史会保留收藏")
     func clearHistoryKeepsFavorites() throws {
-        let store = ClipboardStore(storageURL: try temporaryStorageURL())
+        let store = try makeStore()
 
         let kept = ClipboardEntry(text: "要保留的")
         store.add(kept)
@@ -113,7 +138,7 @@ struct ClipboardPluginTests {
 
     @Test("搜索忽略大小写，空查询返回全部")
     func searchIsCaseInsensitive() throws {
-        let store = ClipboardStore(storageURL: try temporaryStorageURL())
+        let store = try makeStore()
         store.add(ClipboardEntry(text: "Hello World"))
         store.add(ClipboardEntry(text: "别的内容"))
 
@@ -123,9 +148,10 @@ struct ClipboardPluginTests {
         #expect(store.search("不存在的关键词").isEmpty)
     }
 
-    @Test("删除按 id 生效")
+    @Test("删除按 id 生效，并且真的从库里删掉")
     func removeById() throws {
-        let store = ClipboardStore(storageURL: try temporaryStorageURL())
+        let database = try makeDatabase()
+        let store = try makeStore(database: database)
         let entry = ClipboardEntry(text: "待删除")
         store.add(entry)
         store.add(ClipboardEntry(text: "保留"))
@@ -134,16 +160,33 @@ struct ClipboardPluginTests {
 
         #expect(store.entries.count == 1)
         #expect(store.entries.first?.text == "保留")
+        #expect(try database.scalarInt("SELECT COUNT(*) AS value FROM clipboard_history") == 1)
+    }
+
+    @Test("置顶与收藏状态能改回数据库")
+    func flagsArePersisted() throws {
+        let database = try makeDatabase()
+        let store = try makeStore(database: database)
+        let entry = ClipboardEntry(text: "置顶我")
+        store.add(entry)
+
+        store.togglePinned(entry.id)
+        store.toggleFavorite(entry.id)
+
+        let row = try database.query("SELECT is_pinned, is_favorite FROM clipboard_history").first
+        #expect(row?.bool("is_pinned") == true)
+        #expect(row?.bool("is_favorite") == true)
     }
 
     @Test("历史可以往返持久化")
     func historyRoundTrip() throws {
-        let url = try temporaryStorageURL()
-        let writer = ClipboardStore(storageURL: url)
+        let database = try makeDatabase()
+        let writer = try makeStore(database: database)
         writer.add(ClipboardEntry(text: "往返测试", type: .code))
         writer.save()
 
-        let reader = ClipboardStore(storageURL: url)
+        // 同一个库上重新打开一个 store：这就是「重启应用后历史还在」的场景
+        let reader = try makeStore(database: database)
         reader.load()
 
         #expect(reader.entries.count == 1)
@@ -151,17 +194,159 @@ struct ClipboardPluginTests {
         #expect(reader.entries.first?.type == .code)
     }
 
-    @Test("损坏的存储文件不会让加载失败")
-    func corruptStorageDegradesGracefully() throws {
-        let url = try temporaryStorageURL()
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data("这不是合法 JSON".utf8).write(to: url)
+    @Test("图片数据往返不丢字节")
+    func imageRoundTrip() throws {
+        let database = try makeDatabase()
+        let png = Data([0x89, 0x50, 0x4E, 0x47] + Array(repeating: 0xCD, count: 4096))
+        let writer = try makeStore(database: database)
+        writer.add(ClipboardEntry(imageData: png, sizeDescription: "64×64"))
 
-        let store = ClipboardStore(storageURL: url)
-        store.load()
-        #expect(store.entries.isEmpty, "损坏数据必须降级为空历史，而不是让插件崩掉")
+        let reader = try makeStore(database: database)
+        #expect(reader.entries.first?.imageData == png)
+        #expect(reader.entries.first?.imageSizeDescription == "64×64")
+        #expect(reader.entries.first?.type == .image)
+    }
+
+    @Test("坏数据只丢那一行，不影响整份历史")
+    func corruptRowIsSkipped() throws {
+        // 以前是「整个 json 解码失败 → 历史全空」。现在一行坏数据只坏一行。
+        let database = try makeDatabase()
+        let store = try makeStore(database: database)
+        store.add(ClipboardEntry(text: "好数据"))
+
+        try database.execute(
+            """
+            INSERT INTO clipboard_history (id, text, type, created_at)
+            VALUES ('不是 uuid', '坏数据', '未知类型', 0)
+            """)
+
+        let reopened = try makeStore(database: database)
+        #expect(reopened.entries.count == 1)
+        #expect(reopened.entries.first?.text == "好数据")
+    }
+
+    @Test("排序是置顶优先，其余按时间倒序")
+    func pinnedSortsFirst() throws {
+        let store = try makeStore()
+        let oldest = ClipboardEntry(text: "最早的")
+        store.add(oldest)
+        store.add(ClipboardEntry(text: "中间的"))
+        store.add(ClipboardEntry(text: "最新的"))
+
+        store.togglePinned(oldest.id)
+
+        #expect(store.entries.first?.text == "最早的")
+        #expect(store.entries.first?.isPinned == true)
+        #expect(store.entries.map(\.text).dropFirst() == ["最新的", "中间的"])
+    }
+}
+
+// MARK: - 上限与预算
+
+/// 这一组会改 `UserDefaults`，所以串行执行：`UserDefaults` 是进程级的，
+/// 并行跑会让「上限是多少」这件事取决于另一个测试的进度。
+@Suite("剪贴板上限与图片预算", .serialized)
+@MainActor
+struct ClipboardLimitTests {
+
+    private func makeDatabase() throws -> SQLiteDatabase {
+        let database = try SQLiteDatabase()
+        try database.migrate(ClipboardPlugin.storageMigrations)
+        return database
+    }
+
+    /// 临时改一个设置键并在结束时还原
+    private func withSetting(_ key: String, value: Any, _ body: () throws -> Void) rethrows {
+        let original = UserDefaults.standard.object(forKey: key)
+        UserDefaults.standard.set(value, forKey: key)
+        defer {
+            if let original {
+                UserDefaults.standard.set(original, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+        try body()
+    }
+
+    @Test("条数上限来自设置，而不是硬编码")
+    func capComesFromSettings() throws {
+        try withSetting(PluginSettingKey.Clipboard.maxEntries, value: 3) {
+            let store = try! ClipboardStore(
+                storage: PluginStorage(pluginID: ClipboardPlugin.id, database: makeDatabase()))
+            for index in 0..<10 {
+                store.add(ClipboardEntry(text: "条目 \(index)"))
+            }
+
+            #expect(store.entries.count == 3)
+            // 留下的是最新的三条
+            #expect(store.entries.map(\.text) == ["条目 9", "条目 8", "条目 7"])
+        }
+    }
+
+    @Test("置顶与收藏不参与条数剪枝")
+    func pinnedAndFavoritesSurvivePruning() throws {
+        try withSetting(PluginSettingKey.Clipboard.maxEntries, value: 2) {
+            let store = try! ClipboardStore(
+                storage: PluginStorage(pluginID: ClipboardPlugin.id, database: makeDatabase()))
+
+            let pinned = ClipboardEntry(text: "置顶的")
+            store.add(pinned)
+            store.togglePinned(pinned.id)
+
+            let favorite = ClipboardEntry(text: "收藏的")
+            store.add(favorite)
+            store.toggleFavorite(favorite.id)
+
+            for index in 0..<5 {
+                store.add(ClipboardEntry(text: "普通 \(index)"))
+            }
+
+            let texts = Set(store.entries.map(\.text))
+            #expect(texts.contains("置顶的"), "置顶条目不该被剪掉")
+            #expect(texts.contains("收藏的"), "收藏条目不该被剪掉")
+            // 普通条目只剩上限允许的两条
+            #expect(store.entries.filter { !$0.isPinned && !$0.isFavorite }.count == 2)
+        }
+    }
+
+    @Test("图片超出字节预算时按最旧优先剪枝，置顶的图片保留")
+    func imageBudgetPrunesOldestFirst() throws {
+        // 预算 1000 字节，每条图片 400 字节 → 只放得下两条
+        try withSetting(PluginSettingKey.Clipboard.imageByteBudget, value: 1000) {
+            let store = try! ClipboardStore(
+                storage: PluginStorage(pluginID: ClipboardPlugin.id, database: makeDatabase()))
+
+            let pinnedImage = ClipboardEntry(
+                imageData: Data(repeating: 0x01, count: 400), sizeDescription: "1×1")
+            store.add(pinnedImage)
+            store.togglePinned(pinnedImage.id)
+
+            for index in 0..<4 {
+                store.add(
+                    ClipboardEntry(
+                        imageData: Data(repeating: UInt8(index + 2), count: 400),
+                        sizeDescription: "2×2"))
+            }
+
+            let images = store.entries.filter { $0.type == .image }
+            #expect(images.contains { $0.isPinned }, "置顶的图片必须留下")
+
+            let total = images.compactMap(\.imageData).reduce(0) { $0 + $1.count }
+            // 置顶的 400 字节不受预算约束，普通图片要压到预算以内
+            let unpinned = images.filter { !$0.isPinned }.compactMap(\.imageData).reduce(0) { $0 + $1.count }
+            #expect(unpinned <= 1000, "普通图片总字节 \(unpinned) 应压到预算内（含置顶共 \(total)）")
+        }
+    }
+
+    @Test("没有设置时用默认上限")
+    func fallsBackToDefaults() throws {
+        UserDefaults.standard.removeObject(forKey: PluginSettingKey.Clipboard.maxEntries)
+        let store = try ClipboardStore(
+            storage: PluginStorage(pluginID: ClipboardPlugin.id, database: makeDatabase()))
+        for index in 0..<505 {
+            store.add(ClipboardEntry(text: "条目 \(index)"))
+        }
+        #expect(store.entries.count == 500)
     }
 }

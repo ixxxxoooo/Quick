@@ -11,11 +11,11 @@ struct WindowManagementSettingsPane: View {
 
     let dataSource: any SettingsDataSource
 
-    @AppStorage("windowManager.enabled") private var isEnabled = false
-    @AppStorage("windowManager.showInLauncher") private var showInLauncher = true
-    @AppStorage("windowManager.cycling") private var cycling = "None"
-    @AppStorage("windowManager.gap") private var gap = 0
-    @AppStorage("windowManager.showLayoutsInLauncher") private var showLayoutsInLauncher = true
+    @AppStorage(PluginSettingKey.WindowManager.enabled) private var isEnabled = false
+    @AppStorage(PluginSettingKey.WindowManager.showInLauncher) private var showInLauncher = true
+    @AppStorage(PluginSettingKey.WindowManager.cycling) private var cycling = "None"
+    @AppStorage(PluginSettingKey.WindowManager.gap) private var gap = 0
+    @AppStorage(PluginSettingKey.WindowManager.showLayoutsInLauncher) private var showLayoutsInLauncher = true
 
     var body: some View {
         Form {

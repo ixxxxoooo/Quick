@@ -10,8 +10,8 @@ struct UUIDGeneratorView: View {
     @State private var uuids: [String] = []
     @State private var count = 5
     /// 大小写与连字符持久化：设置页里的开关改的就是它们
-    @AppStorage("uuidGenerator.uppercase") private var uppercase = true
-    @AppStorage("uuidGenerator.removeDashes") private var removeDashes = false
+    @AppStorage(PluginSettingKey.UUIDGenerator.uppercase) private var uppercase = true
+    @AppStorage(PluginSettingKey.UUIDGenerator.removeDashes) private var removeDashes = false
     @State private var copiedIndex: Int?
 
     var body: some View {

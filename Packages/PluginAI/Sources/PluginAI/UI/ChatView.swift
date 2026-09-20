@@ -2,6 +2,7 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
+import QuickCore
 import QuickUI
 import SwiftUI
 
@@ -9,7 +10,7 @@ import SwiftUI
 ///
 /// 管理各 Provider 的启用状态和窗口偏好。
 struct AISettingsView: View {
-    @AppStorage("ai.defaultAlwaysOnTop") private var alwaysOnTop = false
+    @AppStorage(PluginSettingKey.AI.defaultAlwaysOnTop) private var alwaysOnTop = false
 
     var body: some View {
         Form {

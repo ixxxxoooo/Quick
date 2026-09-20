@@ -24,7 +24,7 @@ public final class SnippetsPlugin: QuickPlugin {
     private let log = QuickLog.plugin(SnippetsPlugin.id)
 
     /// 片段存储
-    private let store = SnippetStore()
+    private let store: SnippetStore
 
     /// 模板引擎
     private let templateEngine = TemplateEngine()
@@ -32,7 +32,36 @@ public final class SnippetsPlugin: QuickPlugin {
     /// 空查询列出全部片段时的基础相关度，避免整屏结果都是 0 分
     private static let defaultRelevance = 0.5
 
-    public init() {}
+    /// - Parameter storage: 由 AppCore 注入的存储句柄
+    public init(storage: PluginStorage) {
+        self.store = SnippetStore(storage: storage)
+    }
+
+    // MARK: - 存储 schema
+
+    /// 片段表
+    ///
+    /// 表结构归插件所有：宿主只负责把它跑一遍，不读这张表。
+    public static var storageMigrations: [SQLiteMigration] {
+        [
+            SQLiteMigration(
+                id: "snippets.items",
+                statements: [
+                    """
+                    CREATE TABLE IF NOT EXISTS snippets (
+                        id TEXT PRIMARY KEY,
+                        title TEXT NOT NULL DEFAULT '',
+                        content TEXT NOT NULL DEFAULT '',
+                        keyword TEXT,
+                        category TEXT,
+                        created_at REAL NOT NULL,
+                        updated_at REAL NOT NULL
+                    )
+                    """,
+                    "CREATE INDEX IF NOT EXISTS idx_snippets_created ON snippets(created_at DESC)"
+                ])
+        ]
+    }
 
     // MARK: - QuickPlugin 协议
 
@@ -62,7 +91,7 @@ public final class SnippetsPlugin: QuickPlugin {
     }
 
     public func activate() {
-        store.load()
+        // 加载已在 init 里完成，这里只汇报
         log.notice("插件已激活：加载 \(self.store.snippets.count, privacy: .public) 个片段")
     }
 

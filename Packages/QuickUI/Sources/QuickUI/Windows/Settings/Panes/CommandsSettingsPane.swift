@@ -18,7 +18,7 @@ struct CommandsSettingsPane: View {
     @State private var runShellFallback: Bool
     @State private var showingAddSheet = false
     @State private var editingCommand: SettingsCustomCommandItem?
-    @AppStorage("shell.preferredTerminal") private var preferredTerminal = "com.apple.Terminal"
+    @AppStorage(PluginSettingKey.Shell.preferredTerminal) private var preferredTerminal = "com.apple.Terminal"
 
     init(dataSource: any SettingsDataSource) {
         self.dataSource = dataSource

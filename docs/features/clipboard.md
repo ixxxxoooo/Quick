@@ -40,17 +40,37 @@
 
 ## 持久化
 
-`history.json`（`ClipboardEntry` 的 JSON 数组），路径走 `AppPaths.pluginData("clipboard")`。
+`clipboard_history` 表，在应用唯一的 `quick.db` 里（迁移 id `clipboard.history`）。
+图片以 PNG 存在 `image_data` 列（BLOB），不落成散文件。
 
-- `init(storageURL:)` 接收可选路径，默认走 `AppPaths`。
-  **测试必须传临时目录**，否则会污染用户真实的剪贴板历史。
-- 解码失败降级为空历史并记 `.error`，不让插件起不来。
+- **`init(storage:)` 接收存储句柄，并在 `init` 里同步加载。** 测试传内存库
+  （`SQLiteDatabase()` + 跑一遍 `ClipboardPlugin.storageMigrations`），既不碰磁盘，
+  也不会污染用户真实历史。
+- **改动直接落库，没有防抖。** 以前整份历史是一个 JSON 文件，写一次就是重写全文，
+  所以必须攒批 2 秒；现在每条记录一行，`add` 的代价与历史长度无关，防抖只会让
+  「复制完立刻崩溃」丢掉刚复制的内容。
+- **一次 `add` 是一个事务，语句顺序不能换**：先删重复、再插入、最后按上限剪枝。
+  反过来的话，去重那一步会把刚插入的这条自己删掉，而且不报错。
+- **数据库是唯一真相。** 置顶会改变排序，而排序由 SQL 的 `ORDER BY` 定义，
+  所以任何写操作结束后都从库里重读内存缓存，不在内存里推算「应该剩哪些」。
+- 单行坏数据只丢那一行（`entry(from:)` 返回 nil 就跳过），不像 JSON 那样整份历史归零。
+
+### 两条上限
+
+| 上限 | 设置键 | 默认 | 豁免 |
+| --- | --- | --- | --- |
+| 条数 | `clipboard.maxEntries` | 500 | 置顶、收藏 |
+| 图片总字节 | `clipboard.imageByteBudget` | 256 MB | 置顶、收藏 |
+
+条数上限以前硬编码在 store 里，设置页那个 Stepper 改了没有任何效果 —— 现在两边读同一个键。
+图片预算用一条带窗口函数的 SQL 算「从最新往回累加，累到超预算为止」，超出的部分即剪枝对象。
 
 ## 已知限制
 
-- **只记录文本。** 类型推断（`ClipboardMonitor.detectContentType`）会把内容分成
-  `.url` / `.color` / `.code` / `.text`，但**只处理文本类型**：图片、文件、富文本
-  一律被忽略，`pasteboard.string(forType: .string)` 取不到就丢弃。
+- **单条图片上限 5MB**（`ClipboardMonitor` 里的限制），超过就整条丢弃 ——
+  大图进库会拖慢每次读取。
+- **只处理文本与图片。** 类型推断（`ClipboardMonitor.detectContentType`）把文本分成
+  `.url` / `.color` / `.code` / `.text`；文件、富文本一律被忽略。
 - **类型推断是启发式的，会误判。** 判定顺序是 URL → 颜色 → 代码 → 文本：
   - `URL(string:)` 只要有 scheme 就算 URL，所以 `a:b` 这类字符串会被误判为 URL。
   - 颜色只认 `#RGB` 与 `#RRGGBB` 两种形式，`rgb(...)` / 具名颜色都不认

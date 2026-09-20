@@ -14,6 +14,8 @@ let package = Package(
         .package(path: "../QuickPlatform")
     ],
     targets: [
-        .target(name: "PluginSnippets", dependencies: ["QuickCore", "QuickUI", "QuickPlatform"])
+        .target(name: "PluginSnippets", dependencies: ["QuickCore", "QuickUI", "QuickPlatform"]),
+        // QuickCore 是必需的：测试要构造内存数据库与存储句柄来验证持久化。
+        .testTarget(name: "PluginSnippetsTests", dependencies: ["PluginSnippets", "QuickCore"])
     ]
 )

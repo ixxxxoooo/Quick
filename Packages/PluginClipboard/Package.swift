@@ -18,6 +18,10 @@ let package = Package(
             name: "PluginClipboard",
             dependencies: ["QuickCore", "QuickUI", "QuickPlatform"]
         ),
-        .testTarget(name: "PluginClipboardTests", dependencies: ["PluginClipboard"])
+        .testTarget(
+            name: "PluginClipboardTests",
+            // QuickCore 是必需的：测试要自己造一个内存库并跑插件声明的迁移
+            dependencies: ["PluginClipboard", "QuickCore"]
+        )
     ]
 )

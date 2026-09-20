@@ -46,4 +46,12 @@ public enum AppPaths {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
+
+    /// 数据库文件
+    ///
+    /// 全应用一个库：插件的批量数据与插件键值都在里面。集中在一处是为了让
+    /// 「备份 Quick」等于「拷一个文件」，而不是记住一串散落的 json 路径。
+    public static func database() -> URL {
+        applicationSupport().appendingPathComponent("quick.db")
+    }
 }

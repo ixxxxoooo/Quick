@@ -46,6 +46,15 @@ public protocol QuickPlugin: AnyObject, Sendable {
 
     /// 插件停用（应用退出或插件被禁用时调用）
     func deactivate()
+
+    /// 这个插件自己那份数据库 schema
+    ///
+    /// 只有需要真表的插件才要实现它（剪贴板历史、笔记、片段这类要排序和过滤的
+    /// 数据）。用键值存零散状态的插件留空即可。
+    ///
+    /// 表结构归插件自己所有：宿主不预先建任何插件表，也不读插件表。迁移 id 一旦
+    /// 发布就不能改，它是「这段 DDL 跑过没有」的唯一判据。
+    static var storageMigrations: [SQLiteMigration] { get }
 }
 
 // MARK: - 默认实现
@@ -70,4 +79,7 @@ public extension QuickPlugin {
     /// 默认无操作
     func activate() {}
     func deactivate() {}
+
+    /// 默认不建表：只有用真表的插件才声明 schema
+    static var storageMigrations: [SQLiteMigration] { [] }
 }

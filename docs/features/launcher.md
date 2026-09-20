@@ -37,8 +37,10 @@
 
 ## 持久化
 
-| 文件 / 存储键 | 内容 | 写入时机 |
+宿主只提供数据库句柄，两张表的结构由 `LauncherPlugin.storageMigrations` 声明。
+
+| 表 | 内容 | 写入时机 |
 | --- | --- | --- |
-| `ranking.json` | `[bundleID: 使用次数]` | 记录使用后 **防抖 5 秒**落盘；停用时立即落盘 |
-| `favorites.json` | `[bundleID]` | 每次增删**立即**落盘 |
+| `usage_stats`（迁移 `launcher.usage_stats`） | `item_id` → `count`、`last_used` | 每次启动应用**单行自增**，不再防抖 |
+| `favorites`（迁移 `launcher.favorites`） | `item_id` + `sort_order`、`created_at` | 每次增删立即写入，顺序由 `sort_order` 决定 |
 | `SettingsStore` (UserDefaults) | 搜索范围、别名映射、自定义命令列表、Shell 回退开关 | 设置变更时立即写入 |

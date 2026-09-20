@@ -4,12 +4,16 @@
 
 import Foundation
 import QuickCore
-import QuickPlatform
 
 /// 使用频率排序存储
 ///
 /// 记录每个应用的使用次数，用于搜索结果排序。
-/// 数据持久化到 Application Support 目录。
+///
+/// ## 为什么从「整份重写」改成「单行自增」
+///
+/// 旧版每次启动一个应用，都要把整个 `[bundleID: count]` 编码成 JSON 重写文件，
+/// 而且带 5 秒防抖 —— 防抖窗口内退出，这一次计数就丢了。现在每行一个应用，
+/// 启动一次就是一行 `count + 1`，代价与记录数无关，也不需要防抖。
 @MainActor
 final class RankingStore {
 
@@ -21,30 +25,40 @@ final class RankingStore {
 
     private let log = QuickLog.plugin(LauncherPlugin.id)
 
-    /// 延迟保存任务
-    private var saveTask: Task<Void, Never>?
+    /// 存储句柄
+    private let storage: PluginStorage
 
-    /// 防抖保存间隔
-    private static let saveDebounce = Duration.seconds(5)
-
-    /// 存储文件路径
-    private let storageURL: URL
-
-    /// 初始化
-    /// - Parameter storageURL: 存储路径。传 nil 用默认位置；测试传临时目录以获得无副作用的行为。
-    init(storageURL: URL? = nil) {
-        self.storageURL =
-            storageURL
-            ?? AppPaths.pluginData("launcher").appendingPathComponent("ranking.json")
+    /// 初始化并加载
+    /// - Parameter storage: 由 AppCore 注入的存储句柄（测试传内存库）
+    init(storage: PluginStorage) {
+        self.storage = storage
+        load()
     }
 
     /// 记录一次使用
     /// - Parameter bundleID: 应用 Bundle ID
     func recordUsage(_ bundleID: String) {
+        do {
+            // 单行 upsert：冲突时 count 自增，不再重写整份数据
+            try storage.database.execute(
+                """
+                INSERT INTO usage_stats (item_id, count, last_used)
+                VALUES (?, 1, ?)
+                ON CONFLICT(item_id) DO UPDATE SET
+                    count = count + 1,
+                    last_used = excluded.last_used
+                """,
+                [.text(bundleID), .date(Date())])
+        } catch {
+            log.error("使用频率写入失败：\(error)")
+            // 写失败就按库里的真相回退，避免内存里出现一个没落库的计数
+            load()
+            return
+        }
+
         let count = (usageCounts[bundleID] ?? 0) + 1
         usageCounts[bundleID] = count
         if count > maxCount { maxCount = count }
-        scheduleSave()
     }
 
     /// 获取应用的排序评分（0.0 ~ 1.0）
@@ -57,40 +71,29 @@ final class RankingStore {
 
     // MARK: - 持久化
 
-    /// 从磁盘加载
+    /// 从数据库加载
     func load() {
-        guard let data = try? Data(contentsOf: storageURL) else {
-            log.debug("没有使用频率记录，按空记录启动")
-            return
-        }
         do {
-            let counts = try JSONDecoder().decode([String: Int].self, from: data)
+            let rows = try storage.database.query("SELECT item_id, count FROM usage_stats")
+            var counts: [String: Int] = [:]
+            for row in rows {
+                guard let itemID = row.text("item_id") else { continue }
+                counts[itemID] = Int(row.int("count") ?? 0)
+            }
             usageCounts = counts
             maxCount = max(counts.values.max() ?? 1, 1)
             log.info("使用频率已加载，\(counts.count, privacy: .public) 个应用")
         } catch {
-            log.error("使用频率解码失败，已按空记录继续：\(error.localizedDescription, privacy: .public)")
+            log.error("使用频率读取失败，已按空记录继续：\(error)")
+            usageCounts = [:]
+            maxCount = 1
         }
     }
 
-    /// 保存到磁盘
+    /// 把内存缓存刷成数据库里的真实内容
+    ///
+    /// 每次 `recordUsage` 都已经落库了，这里只是退出前的「确保一致」。
     func save() {
-        do {
-            let data = try JSONEncoder().encode(usageCounts)
-            try data.write(to: storageURL)
-            log.debug("使用频率已写入，\(self.usageCounts.count, privacy: .public) 个应用")
-        } catch {
-            log.error("使用频率写入失败：\(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    /// 防抖保存（避免频繁磁盘写入）
-    private func scheduleSave() {
-        saveTask?.cancel()
-        saveTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: Self.saveDebounce)
-            guard !Task.isCancelled else { return }
-            self?.save()
-        }
+        load()
     }
 }

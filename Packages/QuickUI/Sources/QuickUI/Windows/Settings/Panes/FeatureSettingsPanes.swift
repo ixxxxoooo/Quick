@@ -268,11 +268,20 @@ private extension String {
 // MARK: - 各插件配置子表单
 
 private struct ClipboardFeatureSection: View {
-    @AppStorage("clipboard.maxEntries") private var maxEntries = 500
-    @AppStorage("clipboard.clearOnQuit") private var clearOnQuit = false
-    @AppStorage("clipboard.monitorEnabled") private var monitorEnabled = true
-    @AppStorage("clipboard.showPreview") private var showPreview = true
-    @AppStorage("clipboard.deduplication") private var deduplication = true
+    @AppStorage(PluginSettingKey.Clipboard.maxEntries) private var maxEntries = 500
+    /// 图片预算以 MB 为单位给用户选，存储层用的是字节
+    @AppStorage(PluginSettingKey.Clipboard.imageByteBudget) private var imageBudgetBytes = 256 * 1024 * 1024
+
+    private var imageBudgetMB: Binding<Int> {
+        Binding(
+            get: { imageBudgetBytes / (1024 * 1024) },
+            set: { imageBudgetBytes = $0 * 1024 * 1024 }
+        )
+    }
+    @AppStorage(PluginSettingKey.Clipboard.clearOnQuit) private var clearOnQuit = false
+    @AppStorage(PluginSettingKey.Clipboard.monitorEnabled) private var monitorEnabled = true
+    @AppStorage(PluginSettingKey.Clipboard.showPreview) private var showPreview = true
+    @AppStorage(PluginSettingKey.Clipboard.deduplication) private var deduplication = true
 
     var body: some View {
         Section {
@@ -290,11 +299,26 @@ private struct ClipboardFeatureSection: View {
         Section {
             SettingsRow(
                 title: "历史记录上限",
-                subtitle: "超过上限时自动淘汰最旧的条目。",
+                subtitle: "超过上限时自动淘汰最旧的条目。置顶与收藏的条目不受影响。",
                 icon: { SettingsRowIcon(systemImage: "tray.full") }
             ) {
                 Stepper("\(maxEntries) 条", value: $maxEntries, in: 100...5000, step: 100)
                     .frame(width: 120)
+            }
+
+            SettingsRow(
+                title: "图片占用上限",
+                subtitle: "图片比文字大得多，只限条数挡不住。超出后从最旧的图片开始删。",
+                icon: { SettingsRowIcon(systemImage: "photo.stack") }
+            ) {
+                Picker("", selection: imageBudgetMB) {
+                    Text("64 MB").tag(64)
+                    Text("128 MB").tag(128)
+                    Text("256 MB").tag(256)
+                    Text("512 MB").tag(512)
+                }
+                .labelsHidden()
+                .frame(width: 120)
             }
 
             Toggle(isOn: $deduplication) {
@@ -329,9 +353,9 @@ private struct ClipboardFeatureSection: View {
 }
 
 private struct CalculatorFeatureSection: View {
-    @AppStorage("calculator.precision") private var precision = 4
-    @AppStorage("calculator.useGroupingSeparator") private var useGrouping = true
-    @AppStorage("calculator.autoCopy") private var autoCopy = false
+    @AppStorage(PluginSettingKey.Calculator.precision) private var precision = 4
+    @AppStorage(PluginSettingKey.Calculator.useGroupingSeparator) private var useGrouping = true
+    @AppStorage(PluginSettingKey.Calculator.autoCopy) private var autoCopy = false
 
     var body: some View {
         Section {
@@ -368,9 +392,9 @@ private struct CalculatorFeatureSection: View {
 }
 
 private struct FileSearchFeatureSection: View {
-    @AppStorage("fileSearch.ignoreHidden") private var ignoreHidden = true
-    @AppStorage("fileSearch.maxResults") private var maxResults = 50
-    @AppStorage("fileSearch.includeContents") private var includeContents = false
+    @AppStorage(PluginSettingKey.FileSearch.ignoreHidden) private var ignoreHidden = true
+    @AppStorage(PluginSettingKey.FileSearch.maxResults) private var maxResults = 50
+    @AppStorage(PluginSettingKey.FileSearch.includeContents) private var includeContents = false
 
     var body: some View {
         Section {
@@ -409,8 +433,8 @@ private struct FileSearchFeatureSection: View {
 }
 
 private struct SnippetsFeatureSection: View {
-    @AppStorage("snippets.autoExpand") private var autoExpand = true
-    @AppStorage("snippets.showSnippetHint") private var showHint = true
+    @AppStorage(PluginSettingKey.Snippets.autoExpand) private var autoExpand = true
+    @AppStorage(PluginSettingKey.Snippets.showSnippetHint) private var showHint = true
 
     var body: some View {
         Section {
@@ -435,9 +459,9 @@ private struct SnippetsFeatureSection: View {
 }
 
 private struct WindowManagerFeatureSection: View {
-    @AppStorage("windowManager.gap") private var gap = 8
-    @AppStorage("windowManager.screenMargin") private var margin = 8
-    @AppStorage("windowManager.snapOnDrag") private var snapOnDrag = true
+    @AppStorage(PluginSettingKey.WindowManager.gap) private var gap = 8
+    @AppStorage(PluginSettingKey.WindowManager.screenMargin) private var margin = 8
+    @AppStorage(PluginSettingKey.WindowManager.snapOnDrag) private var snapOnDrag = true
 
     var body: some View {
         Section {
@@ -471,8 +495,8 @@ private struct WindowManagerFeatureSection: View {
 }
 
 private struct NotesFeatureSection: View {
-    @AppStorage("notes.autoSave") private var autoSave = true
-    @AppStorage("notes.defaultFormat") private var defaultFormat = "plain"
+    @AppStorage(PluginSettingKey.Notes.autoSave) private var autoSave = true
+    @AppStorage(PluginSettingKey.Notes.defaultFormat) private var defaultFormat = "plain"
 
     var body: some View {
         Section {
@@ -500,9 +524,9 @@ private struct NotesFeatureSection: View {
 }
 
 private struct CalendarFeatureSection: View {
-    @AppStorage("calendar.reminderMinutes") private var reminderMinutes = 10
-    @AppStorage("calendar.autoExtractMeetingLinks") private var autoLinks = true
-    @AppStorage("calendar.showWeekNumber") private var showWeekNumber = false
+    @AppStorage(PluginSettingKey.Calendar.reminderMinutes) private var reminderMinutes = 10
+    @AppStorage(PluginSettingKey.Calendar.autoExtractMeetingLinks) private var autoLinks = true
+    @AppStorage(PluginSettingKey.Calendar.showWeekNumber) private var showWeekNumber = false
 
     var body: some View {
         Section {
@@ -539,9 +563,9 @@ private struct CalendarFeatureSection: View {
 }
 
 private struct WeatherFeatureSection: View {
-    @AppStorage("weather.defaultCity") private var defaultCity = "自动定位"
-    @AppStorage("weather.unit") private var unit = "celsius"
-    @AppStorage("weather.showHumidity") private var showHumidity = true
+    @AppStorage(PluginSettingKey.Weather.defaultCity) private var defaultCity = "自动定位"
+    @AppStorage(PluginSettingKey.Weather.unit) private var unit = "celsius"
+    @AppStorage(PluginSettingKey.Weather.showHumidity) private var showHumidity = true
 
     var body: some View {
         Section {
@@ -584,7 +608,7 @@ private struct WeatherFeatureSection: View {
 }
 
 private struct AIFeatureSection: View {
-    @AppStorage("ai.defaultAlwaysOnTop") private var alwaysOnTop = false
+    @AppStorage(PluginSettingKey.AI.defaultAlwaysOnTop) private var alwaysOnTop = false
 
     var body: some View {
         Section {
@@ -661,8 +685,8 @@ private struct AIProviderToggleRow: View {
 }
 
 private struct TranslatorFeatureSection: View {
-    @AppStorage("translator.targetLang") private var targetLang = "zh-Hans"
-    @AppStorage("translator.autoDetect") private var autoDetect = true
+    @AppStorage(PluginSettingKey.Translator.targetLang) private var targetLang = "zh-Hans"
+    @AppStorage(PluginSettingKey.Translator.autoDetect) private var autoDetect = true
 
     var body: some View {
         Section {
@@ -701,7 +725,7 @@ private struct TranslatorFeatureSection: View {
 /// 键与 `JSONFormatterView` 里的 `@AppStorage` 是同一个 —— 这里改的就是工具面板里那一项，
 /// 两边读写同一份值，不存在「设置里能调但工具不理会」的假开关。
 private struct JSONFormatterFeatureSection: View {
-    @AppStorage("jsonFormatter.indent") private var indent = 2
+    @AppStorage(PluginSettingKey.JSONFormatter.indent) private var indent = 2
 
     var body: some View {
         Section {
@@ -725,8 +749,8 @@ private struct JSONFormatterFeatureSection: View {
 
 /// UUID 生成器的专属选项
 private struct UUIDGeneratorFeatureSection: View {
-    @AppStorage("uuidGenerator.uppercase") private var uppercase = true
-    @AppStorage("uuidGenerator.removeDashes") private var removeDashes = false
+    @AppStorage(PluginSettingKey.UUIDGenerator.uppercase) private var uppercase = true
+    @AppStorage(PluginSettingKey.UUIDGenerator.removeDashes) private var removeDashes = false
 
     var body: some View {
         Section {
@@ -753,8 +777,8 @@ private struct UUIDGeneratorFeatureSection: View {
 }
 
 private struct SystemMonitorFeatureSection: View {
-    @AppStorage("sysmonitor.interval") private var interval = 2
-    @AppStorage("sysmonitor.showMenuBarStats") private var showMenuBar = false
+    @AppStorage(PluginSettingKey.SystemMonitor.interval) private var interval = 2
+    @AppStorage(PluginSettingKey.SystemMonitor.showMenuBarStats) private var showMenuBar = false
 
     var body: some View {
         Section {
@@ -784,9 +808,9 @@ private struct SystemMonitorFeatureSection: View {
 }
 
 private struct NetworkToolsFeatureSection: View {
-    @AppStorage("networkTools.pingCount") private var pingCount = 4
-    @AppStorage("networkTools.timeout") private var timeout = 5
-    @AppStorage("networkTools.showExternalIP") private var showExternalIP = true
+    @AppStorage(PluginSettingKey.NetworkTools.pingCount) private var pingCount = 4
+    @AppStorage(PluginSettingKey.NetworkTools.timeout) private var timeout = 5
+    @AppStorage(PluginSettingKey.NetworkTools.showExternalIP) private var showExternalIP = true
 
     var body: some View {
         Section {
@@ -826,8 +850,8 @@ private struct NetworkToolsFeatureSection: View {
 }
 
 private struct OCRFeatureSection: View {
-    @AppStorage("ocr.autoCopy") private var autoCopy = true
-    @AppStorage("ocr.language") private var language = "auto"
+    @AppStorage(PluginSettingKey.OCR.autoCopy) private var autoCopy = true
+    @AppStorage(PluginSettingKey.OCR.language) private var language = "auto"
 
     var body: some View {
         Section {
@@ -857,9 +881,9 @@ private struct OCRFeatureSection: View {
 }
 
 private struct ScreenshotFeatureSection: View {
-    @AppStorage("screenshot.format") private var format = "png"
-    @AppStorage("screenshot.includePointer") private var includePointer = false
-    @AppStorage("screenshot.saveToDesktop") private var saveToDesktop = true
+    @AppStorage(PluginSettingKey.Screenshot.format) private var format = "png"
+    @AppStorage(PluginSettingKey.Screenshot.includePointer) private var includePointer = false
+    @AppStorage(PluginSettingKey.Screenshot.saveToDesktop) private var saveToDesktop = true
 
     var body: some View {
         Section {

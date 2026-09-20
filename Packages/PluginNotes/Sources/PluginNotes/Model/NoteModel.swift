@@ -28,6 +28,28 @@ struct NoteItem: Identifiable, Codable, Sendable {
         self.createdAt = Date()
         self.updatedAt = Date()
     }
+
+    /// 从数据库的一行还原
+    ///
+    /// 与上面的初始化器不同，这个不生成新 id、不覆盖时间戳 —— 还原的是已经存在过的
+    /// 笔记，任何「当作新笔记」的默认值都会让身份与时间在每次读取时漂移。
+    init(
+        id: UUID,
+        title: String,
+        content: String,
+        category: NoteCategory,
+        isPinned: Bool,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.title = title
+        self.content = content
+        self.category = category
+        self.isPinned = isPinned
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
 }
 
 /// 笔记类别
@@ -57,5 +79,13 @@ struct TodoItem: Identifiable, Codable, Sendable {
         self.text = text
         self.isCompleted = false
         self.createdAt = Date()
+    }
+
+    /// 从数据库的一行还原（不生成新 id、不覆盖时间戳，理由同 `NoteItem`）
+    init(id: UUID, text: String, isCompleted: Bool, createdAt: Date) {
+        self.id = id
+        self.text = text
+        self.isCompleted = isCompleted
+        self.createdAt = createdAt
     }
 }

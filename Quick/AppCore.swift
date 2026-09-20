@@ -120,11 +120,41 @@ final class AppCore {
     /// 用户设置存储（插件开关等）
     let settingsStore = SettingsStore()
 
+    /// 数据库
+    ///
+    /// 全应用一个库，插件的批量数据与插件键值都在里面。`lazy` 是因为打开可能失败，
+    /// 而失败的兜底需要写日志（`log` 是实例属性）。
+    private(set) lazy var database: SQLiteDatabase = Self.openDatabase()
+
     /// 设置窗口控制器
     ///
     /// `lazy` 是因为它需要 `self` 作为数据源，而初始化器里不能引用 `self`。
     /// 窗口本身也是惰性创建的：没打开过设置就不该有窗口。
     private(set) lazy var settingsWindowController = SettingsWindowController(dataSource: self)
+
+    /// 打开数据库
+    ///
+    /// 打不开文件时退到内存库继续运行：剪贴板、笔记这些功能不该因为存储问题整个用不了，
+    /// 代价是本次运行不落盘 —— 所以这条日志是 error 级，不静默。
+    private static func openDatabase() -> SQLiteDatabase {
+        do {
+            return try SQLiteDatabase(path: AppPaths.database())
+        } catch {
+            QuickLog.app.error("数据库打不开，本次运行改用内存库，数据不会保存：\(error)")
+            guard let fallback = try? SQLiteDatabase() else {
+                // 连内存库都开不起来，说明进程已经没有可用的存储了
+                fatalError("无法创建内存数据库：\(error)")
+            }
+            return fallback
+        }
+    }
+
+    /// 取某个插件的存储句柄
+    ///
+    /// 句柄绑定插件 id，所以插件写不到别人的命名空间里去。
+    func storage(for pluginID: String) -> PluginStorage {
+        PluginStorage(pluginID: pluginID, database: database)
+    }
 
     // MARK: - Feature Plugins
 
@@ -152,23 +182,28 @@ final class AppCore {
     func start() {
         log.notice("AppCore 启动，bundle id=\(Bundle.main.bundleIdentifier ?? "-", privacy: .public)")
 
-        // 1. 创建并注册所有 Feature Plugin
+        // 1. 打开数据库并应用宿主自己的 schema
+        //    必须在注册插件之前：需要真表的插件在构造时就要拿到存储句柄
+        migrateHostStorage()
+        log.notice("数据库已就绪：\(self.database.path ?? "内存库", privacy: .public)")
+
+        // 2. 建表 → 创建并注册所有 Feature Plugin
         registerPlugins()
         log.notice("插件注册完成，共 \(self.plugins.count, privacy: .public) 个")
 
-        // 2. 将插件注入到面板协调器
+        // 3. 将插件注入到面板协调器
         paletteCoordinator.setPlugins(plugins)
 
-        // 3. 连接事件总线
+        // 4. 连接事件总线
         wireEventBus()
         log.notice("事件总线接线完成，订阅 \(self.subscriptions.count, privacy: .public) 条")
 
-        // 4. 设置协调器的分离回调
+        // 5. 设置协调器的分离回调
         paletteCoordinator.onDetach = { [weak self] pluginID in
             self?.detachPlugin(pluginID)
         }
 
-        // 5. 启动基础设施服务
+        // 6. 启动基础设施服务
         hotKeyService.onTogglePalette = { [weak self] in
             self?.paletteCoordinator.toggle()
         }
@@ -215,25 +250,25 @@ final class AppCore {
         statusItemController.install()
         observeDebugWakeSignals()
 
-        // 5. 读取持久化的搜索范围并在后台刷新应用索引
+        // 7. 读取持久化的搜索范围并在后台刷新应用索引
         let initialScopes = settingsStore.searchScopes(defaultScopes: SearchScopes.defaults)
         Task {
             await appIndex.refresh(scopes: initialScopes)
             self.restoreSavedHotKeys()
         }
 
-        // 6. 激活所有已启用的插件
+        // 8. 激活所有已启用的插件
         for plugin in plugins where plugin.isEnabled {
             plugin.activate()
         }
 
-        // 7. 开发启动参数：立即显示面板（验收用）
+        // 9. 开发启动参数：立即显示面板（验收用）
         if ProcessInfo.processInfo.arguments.contains("-showPalette") {
             log.notice("命中启动参数 -showPalette，立即显示面板")
             paletteCoordinator.show()
         }
 
-        // 8. 开发启动参数：立即显示设置窗口（验收用）
+        // 10. 开发启动参数：立即显示设置窗口（验收用）
         if ProcessInfo.processInfo.arguments.contains("-showSettings") {
             log.notice("命中启动参数 -showSettings，立即显示设置窗口")
             paletteCoordinator.hide()
@@ -302,47 +337,112 @@ final class AppCore {
         paletteCoordinator.hide(restoreFocus: false)
     }
 
+    // MARK: - 存储迁移
+
+    /// 应用宿主自己的 schema
+    private func migrateHostStorage() {
+        do {
+            try database.migrate([.corePluginData])
+        } catch {
+            // 迁移失败不能静默：继续跑下去会以「表不存在」的形式在插件里炸开，
+            // 那时已经看不出根因了
+            log.error("宿主存储迁移失败：\(error)")
+        }
+    }
+
+    /// 应用各插件声明的 schema
+    ///
+    /// 表结构归插件所有，宿主只负责按注册顺序把它们跑一遍。顺序固定（注册顺序），
+    /// 所以同一个库在两台机器上的建表顺序一致。
+    /// - Parameter types: 插件类型列表；`storageMigrations` 是静态的，所以不需要实例
+    private func migratePluginStorage(_ types: [any QuickPlugin.Type]) {
+        let migrations = types.flatMap { $0.storageMigrations }
+        guard !migrations.isEmpty else { return }
+        do {
+            try database.migrate(migrations)
+            log.notice("插件 schema 已就绪，共 \(migrations.count, privacy: .public) 个迁移")
+        } catch {
+            log.error("插件存储迁移失败：\(error)")
+        }
+    }
+
     // MARK: - 插件注册
 
     /// 注册所有 Feature Plugin
     ///
     /// 这是唯一创建插件实例的地方。
     /// 新增插件只需在此处添加一行注册。
+    /// 插件的注册清单
+    ///
+    /// 每一项是「类型 + 工厂」而不是直接给实例：**schema 必须在实例化之前建好**。
+    /// 需要真表的插件在 `init` 里就会查自己的表（store 同步加载），如果先构造再迁移，
+    /// 首次启动时表还不存在，插件会以「读取失败，按空数据继续」启动 —— 数据看起来
+    /// 像是丢了，而且只在第一次运行时出现。
+    ///
+    /// 类型与工厂成对列出，是为了让迁移能从类型上取（`storageMigrations` 是静态的），
+    /// 而依赖注入留在工厂里。
+    private var pluginRegistrations: [(type: any QuickPlugin.Type, make: () -> any QuickPlugin)] {
+        [
+            // Phase 2: 核心插件
+            (
+                LauncherPlugin.self,
+                {
+                    LauncherPlugin(
+                        appIndex: self.appIndex,
+                        settingsStore: self.settingsStore,
+                        storage: self.storage(for: LauncherPlugin.id))
+                }
+            ),
+            (ClipboardPlugin.self, { ClipboardPlugin(storage: self.storage(for: ClipboardPlugin.id)) }),
+            (CalculatorPlugin.self, { CalculatorPlugin() }),
+            (SystemControlPlugin.self, { SystemControlPlugin(settingsStore: self.settingsStore) }),
+
+            // Phase 3: 效率与工具插件
+            (FileSearchPlugin.self, { FileSearchPlugin() }),
+            (SnippetsPlugin.self, { SnippetsPlugin(storage: self.storage(for: SnippetsPlugin.id)) }),
+            (OCRPlugin.self, { OCRPlugin() }),
+            (TranslatorPlugin.self, { TranslatorPlugin() }),
+
+            // Phase 3.5: 开发者工具插件（原先是一个 devtools 容器，现在每个工具都是独立插件）
+            (JSONFormatterPlugin.self, { JSONFormatterPlugin() }),
+            (SQLFormatterPlugin.self, { SQLFormatterPlugin() }),
+            (Base64CodecPlugin.self, { Base64CodecPlugin() }),
+            (URLCodecPlugin.self, { URLCodecPlugin() }),
+            (UUIDGeneratorPlugin.self, { UUIDGeneratorPlugin() }),
+            (HashCalculatorPlugin.self, { HashCalculatorPlugin() }),
+            (TimestampConverterPlugin.self, { TimestampConverterPlugin() }),
+            (WordCounterPlugin.self, { WordCounterPlugin() }),
+            (TextDiffPlugin.self, { TextDiffPlugin() }),
+            (MarkdownPreviewPlugin.self, { MarkdownPreviewPlugin() }),
+            (ColorComparePlugin.self, { ColorComparePlugin() }),
+
+            // Phase 4: 扩展插件
+            (CalendarPlugin.self, { CalendarPlugin() }),
+            (WeatherPlugin.self, { WeatherPlugin() }),
+            (NotesPlugin.self, { NotesPlugin(storage: self.storage(for: NotesPlugin.id)) }),
+            (AIPlugin.self, { AIPlugin() }),
+            (WindowManagerPlugin.self, { WindowManagerPlugin() }),
+            (SystemMonitorPlugin.self, { SystemMonitorPlugin() }),
+            (NetworkToolsPlugin.self, { NetworkToolsPlugin() }),
+            (ScreenshotPlugin.self, { ScreenshotPlugin() })
+        ]
+    }
+
+    /// 建表并实例化全部插件
+    ///
+    /// 这是全仓唯一 `plugins.append(...)` 的地方。
     private func registerPlugins() {
-        // Phase 2: 核心插件
-        register(LauncherPlugin(appIndex: appIndex, settingsStore: settingsStore))
-        register(ClipboardPlugin())
-        register(CalculatorPlugin())
-        register(SystemControlPlugin(settingsStore: settingsStore))
+        let registrations = pluginRegistrations
 
-        // Phase 3: 效率与工具插件
-        register(FileSearchPlugin())
-        register(SnippetsPlugin())
-        register(OCRPlugin())
-        register(TranslatorPlugin())
+        // 先建 schema：插件的 store 在 init 里就会读表
+        migratePluginStorage(registrations.map(\.type))
 
-        // Phase 3.5: 开发者工具插件（原先是一个 devtools 容器，现在每个工具都是独立插件）
-        register(JSONFormatterPlugin())
-        register(SQLFormatterPlugin())
-        register(Base64CodecPlugin())
-        register(URLCodecPlugin())
-        register(UUIDGeneratorPlugin())
-        register(HashCalculatorPlugin())
-        register(TimestampConverterPlugin())
-        register(WordCounterPlugin())
-        register(TextDiffPlugin())
-        register(MarkdownPreviewPlugin())
-        register(ColorComparePlugin())
-
-        // Phase 4: 扩展插件
-        register(CalendarPlugin())
-        register(WeatherPlugin())
-        register(NotesPlugin())
-        register(AIPlugin())
-        register(WindowManagerPlugin())
-        register(SystemMonitorPlugin())
-        register(NetworkToolsPlugin())
-        register(ScreenshotPlugin())
+        // 再实例化
+        for registration in registrations {
+            let plugin = registration.make()
+            plugin.isEnabled = settingsStore.isPluginEnabled(type(of: plugin).id)
+            plugins.append(plugin)
+        }
     }
 
     /// 注册一个插件，并恢复用户上次的启用状态

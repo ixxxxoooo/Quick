@@ -220,13 +220,77 @@ public struct SearchableItem: Identifiable, Sendable {
 - `action` 在按下回车/点击时于主 actor 执行。它应该**只发事件或调用已注入的依赖**，
   不要直接 `NSWorkspace` 之类的全局调用（除了启动应用这种确实没有别的写法的情况）。
 
-### 持久化用 `AppPaths`
+### 持久化
 
-所有落盘路径走
-[`AppPaths`](../Packages/QuickPlatform/Sources/QuickPlatform/System/AppPaths.swift)：
-`applicationSupport()` / `caches()` / `logs()` / `pluginData(_:)`。
-**不要自己拼 `~/Library/...`** —— 路径集中在一处。`AppPaths` 已按
-`Bundle.main.bundleIdentifier` 分目录，Debug（`.dev`）与 Release 互不污染。
+**偏好进 `UserDefaults`，插件数据进一个 SQLite 库。** 这条分界是这个仓库里最容易被搞错的一件事，
+所以写清楚理由：
+
+| | 放哪 | 为什么 |
+| --- | --- | --- |
+| 用户偏好（开关、快捷键、缩进风格、窗口尺寸） | `UserDefaults` | 量小、用户可改、要能一键重置。`@AppStorage` 是 SwiftUI 里绑定控件的正统写法，换成自定义存储只会多一层包装。 |
+| 插件数据（剪贴板历史、笔记、片段、使用频率） | `quick.db`（SQLite） | 是**用户内容**：不可重置、会增长、要和别的数据一起备份。整份读进内存再整体重写的老做法撑不住，也查不动。 |
+
+两者混在一起会怎样：`UserDefaults` 里放了几千条剪贴板历史之后，「重置设置」就变成了
+「删掉用户的历史」。反过来，把「上次选的编码模式」塞进数据库，也只是给一件小事配一套 schema。
+
+**路径**：所有落盘位置走
+[`AppPaths`](../Packages/QuickPlatform/Sources/QuickPlatform/System/AppPaths.swift)
+（`applicationSupport()` / `database()` / `logs()` / `pluginData(_:)`）。
+**不要自己拼 `~/Library/...`**。`AppPaths` 已按 `Bundle.main.bundleIdentifier` 分目录，
+Debug（`.dev`）与 Release 互不污染。
+
+### 存储：一个库，两层能力
+
+[`SQLiteDatabase`](../Packages/QuickCore/Sources/QuickCore/Storage/SQLiteDatabase.swift) 是
+系统 `libsqlite3` 上的一层薄封装（**零第三方依赖**：`import SQLite3` 是 SDK 自带的系统模块）。
+[`PluginStorage`](../Packages/QuickCore/Sources/QuickCore/Storage/PluginStorage.swift)
+是交给插件的句柄，它绑定插件 id，插件写不到别人的命名空间里去。
+
+1. **键值层（默认选择）**：`storage.set(_:forKey:)` / `value(_:forKey:)`，值是任意 `Codable`。
+   存「上次选的是哪个模式」这类零散状态用它 —— 不必为一件小事设计文件格式。
+   这是 Fasty `plugin_data` 表的做法。
+2. **插件自己的表**：需要排序、分页、过滤的批量数据（剪贴板历史、笔记、片段）用
+   `storage.database` 直接写 SQL，schema 通过 `QuickPlugin.storageMigrations` 声明。
+
+**表结构归插件所有**：宿主只跑一遍声明，不预先建任何插件表，也不读插件表。
+
+#### 迁移按 id 记账，不用递增版本号
+
+迁移是一个 `(id, [SQL])`。id 形如 `clipboard.history`、`notes.items`，写在
+`schema_migrations` 表里作为「这段 DDL 跑过没有」的判据，**一旦发布就不能改**。
+
+用字符串 id 而不是版本号，是因为 schema 由多方声明（宿主一份 + 每个插件一份）：递增编号会
+强迫所有插件去协调「谁拿 7 谁拿 8」，加一个插件就要动别人的编号。id 各自独立，加插件不需要碰任何人。
+每个迁移在自己的事务里执行，失败就停在上一个完整状态，不会留一个改了一半的表结构。
+
+#### 为什么是同步 API，而不是 actor
+
+`SQLiteDatabase` 的所有方法都是同步的，内部用一个 `Synchronization.Mutex` 保护句柄
+（所以它是编译器保证的 `Sendable`，不是 `@unchecked`）。理由：
+
+- 调用点全在同步路径上 —— 插件的 `activate()` 是同步的，视图直接在 body 里读 store 的数组。
+  做成 actor 的话 `await` 会顺着调用链传染到插件生命周期和所有视图，而并发收益是零。
+- 本地 SQLite 的一次写入是微秒级，而且写操作本来就要串行。串行化在几千条数据的规模下代价可以忽略。
+
+连接参数与 Fasty 一致：`journal_mode=WAL`（读写不互相阻塞）、`busy_timeout=5000`、
+`synchronous=NORMAL`（WAL 下仍然安全）、`foreign_keys=ON`。
+
+#### 写操作的两条硬规则
+
+1. **数据库是唯一真相。** 内存里的数组只是给 SwiftUI 读的缓存。任何在 SQL 里做过剪枝/删除的
+   操作，结束后必须从库里重读缓存（见 `ClipboardStore.reloadCacheFromDatabase`）——
+   自己在内存里推算「应该剩哪些」迟早会和库里的不一致。
+2. **一次业务动作要么一个事务，要么一个语句。** 例如剪贴板「去重 + 插入 + 剪枝」必须同时发生，
+   顺序也有讲究：先删重复再插入，反过来会把刚插入的这条自己删掉，而且不报错。
+
+`try?` 一律不可接受：写失败被静默吞掉，表现出来就是「数据自己没了」。
+
+#### 偏好键走注册表
+
+插件选项的键集中在
+[`PluginSettingKey`](../Packages/QuickCore/Sources/QuickCore/Models/PluginSettingKey.swift)。
+以前键名只以字面量形式散落在设置页和存储层两处，拼错一个字母就是「设置改了没反应」，
+编译器还帮不上忙。现在两边引用同一个常量。
 
 ---
 
