@@ -24,5 +24,13 @@
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>LSUIElement</key>
     <true/>
+    <!-- 定位用途说明。macOS 在申请定位权限时要求 Info.plist 里有这条，
+         缺失会导致申请被系统直接拒绝。两个键都写上：NSLocationUsageDescription 是
+         macOS 文档里的键名，NSLocationWhenInUseUsageDescription 与所调用的
+         requestWhenInUseAuthorization() 同名，不同系统版本会查其中一个。 -->
+    <key>NSLocationUsageDescription</key>
+    <string>Quick 只在你主动查看天气时使用你的大致位置（公里级），不会在启动时申请，也不会记录或上传。</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Quick 只在你主动查看天气时使用你的大致位置（公里级），不会在启动时申请，也不会记录或上传。</string>
 </dict>
 </plist>

@@ -58,4 +58,14 @@ public final class PermissionService {
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
         NSWorkspace.shared.open(url)
     }
+
+    /// 打开定位服务设置面板
+    ///
+    /// 只负责「带用户去开」，不负责申请：定位权限的申请必须由用户的明确动作触发，
+    /// 见 `WeatherService` 的定位权限策略。
+    public func openLocationSettings() {
+        let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices")!
+        NSWorkspace.shared.open(url)
+    }
 }

@@ -12,7 +12,8 @@
 | --- | --- | --- |
 | `launcher` | [launcher.md](launcher.md) | 已写 |
 | `clipboard` | [clipboard.md](clipboard.md) | 已写 |
-| 其余 15 个 | — | 待补。新增或深改一个模块时同步补上 |
+| `weather` | [weather.md](weather.md) | 已写（定位权限策略是重点） |
+| 其余 14 个 | — | 待补。新增或深改一个模块时同步补上 |
 
 ## 模板
 

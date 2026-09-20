@@ -6,6 +6,15 @@ let package = Package(
     name: "ModuleWeather",
     platforms: [.macOS(.v26)],
     products: [.library(name: "ModuleWeather", targets: ["ModuleWeather"])],
-    dependencies: [.package(path: "../QuickCore"), .package(path: "../QuickUI")],
-    targets: [.target(name: "ModuleWeather", dependencies: ["QuickCore", "QuickUI"])]
+    dependencies: [
+        .package(path: "../QuickCore"),
+        .package(path: "../QuickUI"),
+        .package(path: "../QuickPlatform")
+    ],
+    targets: [
+        .target(
+            name: "ModuleWeather",
+            dependencies: ["QuickCore", "QuickUI", "QuickPlatform"]
+        )
+    ]
 )
