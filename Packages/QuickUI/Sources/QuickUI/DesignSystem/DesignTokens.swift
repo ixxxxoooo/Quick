@@ -175,17 +175,11 @@ public enum DesignTokens {
 
         // MARK: 悬浮胶囊
 
-        /// 分离窗口标题栏为悬浮胶囊让出的宽度
-        ///
-        /// 就是胶囊收起时的宽度（边缘内缩 + 抓手 + 展开箭头 + 内边距）。
-        /// 展开后的宽度不预留：那时用户正在操作胶囊，标题被压一点不影响阅读。
-        public static let capsuleReservedWidth =
-            Capsule.edgeInset + Capsule.padding * 2 + Capsule.gripWidth
-            + Capsule.itemSpacing * 2 + Capsule.buttonSize
-
         /// 悬浮胶囊的几何与间距
         ///
-        /// 胶囊叠在窗口内容之上，是插件窗口唯一的常驻控件（关闭 / 刷新 / 置顶）。
+        /// 胶囊叠在窗口内容之上，是 **AI 网页窗口**唯一的常驻控件（关闭 / 刷新 / 置顶 / 外部打开）。
+        /// 内容是一整块网页的窗口没有自己的边框，控制只能浮在上面；分离窗口有自己的标题栏，
+        /// 控制就长在标题栏里，不用胶囊。
         /// 数值取自 Fasty 的 `capsuleInjectionScript`：22px 圆钮、2px 内边距、
         /// 全圆角（`border-radius: 9999px`）。
         public enum Capsule {

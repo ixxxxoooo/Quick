@@ -10,19 +10,23 @@ import SwiftUI
 /// 分离窗口控制器
 ///
 /// 管理从面板中分离出来的独立插件窗口。每个插件最多一个分离窗口（单例策略），
-/// 支持尺寸记忆。窗口控制（关闭 / 刷新 / 置顶）全部由右上角的悬浮胶囊承担，
-/// 所以分离窗口既没有系统红绿灯，也不需要在内容里再切一条工具栏。
+/// 支持尺寸记忆。窗口控制（置顶 / 关闭）在**标题栏右侧**，所以分离窗口既没有系统红绿灯，
+/// 也不需要在内容里再切一条工具栏。
 ///
-/// 分离窗口与主面板是**两个互不相干的窗口**：唤出主面板不会把它们带到前台，
-/// 关掉主面板也不会影响它们。这也正是胶囊必须存在的理由 —— 用户不看着主面板时，
-/// 关闭 / 刷新 / 置顶这三个动作得有个地方可点。
+/// 分离窗口与主面板是**两个互不相干的窗口**：唤出主面板不会把它带到前台，关掉主面板也不
+/// 影响它。所以关闭 / 置顶这两个动作必须长在窗口自己身上 —— 用户不看着主面板时也得点得到。
+///
+/// **它的控制不使用悬浮胶囊**：胶囊是为「内容是一整块网页、没有任何自己的边框」的窗口准备的
+/// （AI 网页窗口正是如此），而分离窗口本来就有一条自绘标题栏，控制放进标题栏比让用户去拖一个
+/// 浮层自然。
 @MainActor
 public final class PluginPanelController {
 
-    /// 一个分离窗口及其悬浮胶囊
+    /// 一个分离窗口及其内容容器
     private struct DetachedWindow {
         let panel: DetachedPluginPanel
-        let capsule: FloatingCapsuleView
+        /// 容器持有标题栏的置顶态，置顶变化时要让它重建根视图
+        let container: DetachedWindowContainer
     }
 
     /// 已打开的分离窗口（pluginID -> 窗口）
@@ -30,7 +34,7 @@ public final class PluginPanelController {
 
     /// 重建插件视图的工厂（pluginID -> 视图提供者）
     ///
-    /// 存的是工厂而不是建好的视图：胶囊的「刷新」要能重新走一遍插件的
+    /// 存的是工厂而不是建好的视图：刷新要能重新走一遍插件的
     /// `makePluginView()`，否则刷新只能重画一份旧状态。
     private var viewProviders: [String: () -> AnyView] = [:]
 
@@ -41,9 +45,6 @@ public final class PluginPanelController {
 
     /// 分离窗口尺寸存储键前缀
     private static let sizeKeyPrefix = "quick.detach.size."
-
-    /// 胶囊里置顶按钮的标识
-    private static let pinActionID = "pin"
 
     public init() {}
 
@@ -108,9 +109,9 @@ public final class PluginPanelController {
         return true
     }
 
-    /// 重建分离窗口里的插件视图（胶囊的刷新按钮 / ⌘R）
+    /// 重建分离窗口里的插件视图（⌘R）
     public func refresh(_ pluginID: String) {
-        guard let container = windows[pluginID]?.panel.contentView as? DetachedWindowContainer,
+        guard let container = windows[pluginID]?.container,
             let provider = viewProviders[pluginID]
         else {
             log.warning("刷新失败：找不到插件 \(pluginID, privacy: .public) 的分离窗口")
@@ -120,15 +121,18 @@ public final class PluginPanelController {
         log.notice("已刷新插件分离窗口：\(pluginID, privacy: .public)")
     }
 
+    /// 切换分离窗口置顶
+    public func toggleAlwaysOnTop(_ pluginID: String) {
+        guard let handle = windows[pluginID] else { return }
+        setAlwaysOnTop(pluginID, isOn: handle.panel.level != .floating)
+    }
+
     /// 设置分离窗口置顶
     public func setAlwaysOnTop(_ pluginID: String, isOn: Bool) {
         guard let handle = windows[pluginID] else { return }
         handle.panel.level = isOn ? .floating : .normal
-        handle.capsule.setToggle(
-            Self.pinActionID,
-            isOn: isOn,
-            tooltip: isOn ? "取消置顶" : "窗口置顶"
-        )
+        // 标题栏那颗按钮的激活态归视图管，容器重建一次根视图把它同步过去
+        handle.container.setPinned(isOn)
     }
 
     /// 关闭指定插件的分离窗口
@@ -194,47 +198,21 @@ public final class PluginPanelController {
         )
         panel.identifier = NSUserInterfaceItemIdentifier("quick.detach.\(pluginID)")
 
-        // 悬浮胶囊：窗口控制都在这里
-        let capsule = FloatingCapsuleView(
-            positionKey: "detach.\(pluginID)",
-            actions: [
-                CapsuleAction(
-                    id: Self.pinActionID,
-                    symbol: "pin",
-                    tooltip: "窗口置顶",
-                    kind: .toggle
-                ) { [weak self] in
-                    guard let self, let handle = self.windows[pluginID] else { return }
-                    self.setAlwaysOnTop(pluginID, isOn: handle.panel.level != .floating)
-                },
-                CapsuleAction(
-                    id: "refresh",
-                    symbol: "arrow.clockwise",
-                    tooltip: "刷新插件视图 (⌘R)"
-                ) { [weak self] in
-                    self?.refresh(pluginID)
-                },
-                CapsuleAction(
-                    id: "close",
-                    symbol: "xmark",
-                    tooltip: "关闭窗口 (⌘W / Esc)",
-                    kind: .destructive
-                ) { [weak self] in
-                    self?.close(pluginID)
-                }
-            ]
-        )
-
+        // 标题栏右侧的置顶 / 关闭按钮长在面板自己身上（不再有悬浮胶囊）
         let container = DetachedWindowContainer(
             pluginName: pluginName,
             pluginIcon: icon,
             pluginView: view,
-            capsule: capsule
+            onTogglePin: { [weak self] in
+                self?.toggleAlwaysOnTop(pluginID)
+            },
+            onClose: { [weak self] in
+                self?.close(pluginID)
+            }
         )
         panel.contentView = container
 
-        windows[pluginID] = DetachedWindow(panel: panel, capsule: capsule)
-        capsule.positionInSuperview()
+        windows[pluginID] = DetachedWindow(panel: panel, container: container)
 
         panel.onClose = { [weak self] in
             self?.close(pluginID)
@@ -352,27 +330,40 @@ final class DetachedPluginPanel: NSPanel {
 
 /// 分离窗口的内容容器：插件视图铺满，悬浮胶囊叠在右上角
 ///
-/// 胶囊必须**叠**在内容之上而不是挤进布局：插件视图自己并不知道头顶多了个控件，
-/// 叠放才能保证「随便哪个插件都能拿到窗口控制」，而不是只有留了白的插件才行。
+/// 分离窗口的内容容器
+///
+/// 只负责把 SwiftUI 根视图铺满，并把标题栏的置顶态传下去 —— 窗口控制长在标题栏里，
+/// 所以这里不再叠任何浮层。
 final class DetachedWindowContainer: NSView {
 
     private let hosting: NSHostingView<DetachedPanelContentView>
     private let pluginName: String
     private let pluginIcon: String
+    private let onTogglePin: () -> Void
+    private let onClose: () -> Void
+
+    /// 当前置顶态（由控制器写入）
+    private var isPinned = false
 
     init(
         pluginName: String,
         pluginIcon: String,
         pluginView: AnyView,
-        capsule: FloatingCapsuleView
+        onTogglePin: @escaping () -> Void,
+        onClose: @escaping () -> Void
     ) {
         self.pluginName = pluginName
         self.pluginIcon = pluginIcon
+        self.onTogglePin = onTogglePin
+        self.onClose = onClose
         self.hosting = NSHostingView(
             rootView: DetachedPanelContentView(
                 pluginName: pluginName,
                 pluginIcon: pluginIcon,
-                pluginView: pluginView
+                pluginView: pluginView,
+                isPinned: false,
+                onTogglePin: onTogglePin,
+                onClose: onClose
             ))
 
         super.init(frame: .zero)
@@ -381,17 +372,31 @@ final class DetachedWindowContainer: NSView {
         hosting.frame = bounds
         hosting.autoresizingMask = [.width, .height]
         addSubview(hosting)
-        addSubview(capsule)
     }
 
     @available(*, unavailable) required init?(coder _: NSCoder) { fatalError() }
 
-    /// 用工厂新产出的视图替换内容（保留胶囊与窗口本身）
+    /// 用工厂新产出的视图替换内容（保留窗口本身与标题栏）
     func replacePluginView(with view: AnyView) {
+        render(pluginView: view)
+    }
+
+    /// 同步置顶态到标题栏那颗按钮
+    func setPinned(_ isPinned: Bool) {
+        guard isPinned != self.isPinned else { return }
+        self.isPinned = isPinned
+        render(pluginView: hosting.rootView.pluginView)
+    }
+
+    /// 重建根视图
+    private func render(pluginView: AnyView) {
         hosting.rootView = DetachedPanelContentView(
             pluginName: pluginName,
             pluginIcon: pluginIcon,
-            pluginView: view
+            pluginView: pluginView,
+            isPinned: isPinned,
+            onTogglePin: onTogglePin,
+            onClose: onClose
         )
     }
 }
@@ -400,13 +405,16 @@ final class DetachedWindowContainer: NSView {
 
 /// 分离窗口的根视图（与主窗口一致的外观）
 ///
-/// 只承载身份（图标 + 名称）与内容 —— 置顶 / 刷新 / 关闭都在悬浮胶囊里。
+/// 身份（图标 + 名称）与窗口控制（置顶 / 关闭）都在标题栏里，内容在下面铺满。
 /// 标题栏本身仍是窗口的拖拽区（`isMovableByWindowBackground`）。
 private struct DetachedPanelContentView: View {
 
     let pluginName: String
     let pluginIcon: String
     let pluginView: AnyView
+    let isPinned: Bool
+    let onTogglePin: () -> Void
+    let onClose: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -419,7 +427,7 @@ private struct DetachedPanelContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
     }
 
-    /// 标题栏：只放插件身份，窗口控制交给悬浮胶囊
+    /// 标题栏：左侧插件身份，右侧窗口控制
     private var titleBar: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
             Image(systemName: pluginIcon)
@@ -431,11 +439,26 @@ private struct DetachedPanelContentView: View {
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
                 .lineLimit(1)
 
-            Spacer()
+            Spacer(minLength: DesignTokens.Spacing.md)
+
+            BarButton(
+                title: isPinned ? "取消窗口置顶" : "窗口置顶",
+                icon: "pin",
+                style: .icon,
+                isActive: isPinned,
+                action: onTogglePin
+            )
+
+            BarButton(
+                title: "关闭窗口",
+                icon: "xmark",
+                style: .icon,
+                tone: .destructive,
+                action: onClose
+            )
         }
         .padding(.leading, DesignTokens.Spacing.lg)
-        // 右侧让开胶囊：标题不会被它压住
-        .padding(.trailing, DesignTokens.Size.capsuleReservedWidth)
+        .padding(.trailing, DesignTokens.Spacing.md)
         .frame(height: DesignTokens.Size.detachedTitleBarHeight)
     }
 }

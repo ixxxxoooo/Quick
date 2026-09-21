@@ -45,6 +45,30 @@ struct PluginPanelControllerTests {
         controller.closeAll()
     }
 
+    /// 回归测试：分离窗口的窗口控制长在它自己的标题栏里，不再有悬浮胶囊
+    ///
+    /// 胶囊是给「内容是一整块网页、没有自己的边框」的 AI 窗口用的；分离窗口有自绘标题栏，
+    /// 再叠一个浮层会多出一套只在这里存在的交互（可拖、可折叠、位置要持久化）。
+    @Test("分离窗口不再带悬浮胶囊")
+    func detachedWindowHasNoCapsule() {
+        let controller = PluginPanelController()
+        let view = AnyView(Text("测试工具"))
+
+        controller.detach(
+            pluginID: "no-capsule",
+            pluginName: "颜色工具",
+            icon: "paintpalette",
+            viewProvider: { view },
+            sourceWindow: nil
+        )
+
+        let container = detachedPanel("no-capsule")?.contentView
+        #expect(container != nil)
+        #expect(container?.subviews.contains { $0 is FloatingCapsuleView } == false)
+
+        controller.closeAll()
+    }
+
     @Test("单例策略：同一插件不重复创建窗口")
     func singletonPreventsDoubleCreate() {
         let controller = PluginPanelController()
