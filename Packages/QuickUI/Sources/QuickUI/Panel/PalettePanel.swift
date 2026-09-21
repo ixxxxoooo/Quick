@@ -22,6 +22,12 @@ public final class PalettePanel: NSPanel {
     /// Escape 键回调
     var onEscape: (() -> Bool)?
 
+    /// ⌘W 关闭回调
+    ///
+    /// 与 Esc 分开：Esc 在搜索框有内容时只清空，而 ⌘W 的语义始终是「关掉这个面板」。
+    /// 两者共用一个回调会让 ⌘W 退化成清空。
+    var onClose: (() -> Void)?
+
     /// ⌘ 快捷键回调（搜索框编辑器拦截前处理）
     var onCommandShortcut: ((NSEvent) -> Bool)?
 
@@ -138,7 +144,7 @@ public final class PalettePanel: NSPanel {
                     return
                 }
                 if characters.lowercased() == "w" {
-                    _ = onEscape?()
+                    onClose?()
                     return
                 }
                 // ⌘D：分离当前插件到独立窗口

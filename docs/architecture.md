@@ -383,7 +383,10 @@ accessory 应用不进 Dock、也不进 ⌘Tab 切换器 —— 用户一旦从�
 
 | 按键 | 谁处理 | 为什么 |
 | --- | --- | --- |
-| Esc / 裸退格 / ⌘ 组合键 | `PalettePanel.sendEvent` | 要在 field editor 之前拦下 |
+| Esc | `PalettePanel.sendEvent` → `PaletteCoordinator.handleEscape` | 要在 field editor 之前拦下。三层优先级：插件模式退回搜索 → 搜索框有内容则清空 → 都空才收起面板 |
+| 裸退格 | `PalettePanel.sendEvent` | 搜索框为空时退回上一层 |
+| ⌘W | `PalettePanel.sendEvent` → `onClose` | 始终是「收起面板」。**不与 Esc 共用回调**，否则会退化成「清空搜索框」 |
+| 其他 ⌘ 组合键 | `PalettePanel.sendEvent` | 要在 field editor 之前拦下 |
 | ↑ ↓ / 回车 | `PalettePanel.sendEvent` → `PaletteSelection` | 同上：焦点在搜索框里，SwiftUI 层收不到 |
 | 文本输入 | 搜索框（SwiftUI `TextField`） | 它就是焦点 |
 | ⌘A / ⌘C / ⌘V / ⌘X / ⌘Z | 主菜单的编辑菜单项 | **不是文本框自己实现的**：它们是菜单项的 key equivalent，由 AppKit 沿响应链派发 `selectAll:` / `copy:` / `paste:`。没有主菜单这些组合键就没人处理 —— 而 accessory 应用默认没有主菜单，见 `MainMenu` |
@@ -416,8 +419,11 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 面板支持**搜索模式**和**插件模式**，通过 `PaletteMode`（`@Observable`）桥接状态：
 
 - **搜索模式**（默认）：搜索框 + 结果列表，用户输入关键词查找插件功能。
+  Esc 在搜索框有内容时**只清空输入**，空输入时才收起面板 —— 关掉整个面板的代价太大，
+  而用户按 Esc 时多半只是想重打一个关键词。
 - **插件模式**：用户选中一个插件后，面板切换为该插件的完整视图（`makeView()`）。
-  头部变为返回按钮 + 插件名称 + 分离按钮。Esc 返回搜索模式。
+  头部变为返回按钮 + 插件名称 + 分离按钮。Esc 返回搜索模式（此时屏幕上没有搜索框，
+  所以不存在「清空」这一层）。
 
 `PaletteMode` 不持有 `NSPanel`，只持有纯状态（`activePluginID`、`context`、插件元信息），
 所以被 SwiftUI 观察是安全的。协调器在 `navigate` / `popToRoot` 时同步更新它。

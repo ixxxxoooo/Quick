@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 import Testing
 @testable import QuickUI
@@ -72,5 +73,99 @@ struct PalettePanelTests {
         panel.orderFrontRegardless()
         #expect(panel.isVisible)
         panel.orderOut(nil)
+    }
+
+    // MARK: - Esc
+
+    /// Esc 的三层优先级
+    @Test("Esc 动作决策：插件 → 有输入 → 关闭")
+    func escapeActionDecision() {
+        #expect(PaletteCoordinator.escapeAction(isPluginMode: true, query: "") == .popToRoot)
+        // 插件模式下搜索框里的残留内容不算数：屏幕上根本没有搜索框
+        #expect(PaletteCoordinator.escapeAction(isPluginMode: true, query: "abc") == .popToRoot)
+        #expect(PaletteCoordinator.escapeAction(isPluginMode: false, query: "abc") == .clearQuery)
+        #expect(PaletteCoordinator.escapeAction(isPluginMode: false, query: "") == .dismiss)
+    }
+
+    /// 搜索框有内容时 Esc 清空而不关面板，清空后再按才关闭
+    @Test("Esc 先清空搜索框，再按才关闭面板")
+    func escapeClearsQueryBeforeDismissing() {
+        let coordinator = PaletteCoordinator()
+        coordinator.show()
+        coordinator.query = "计算器"
+
+        coordinator.handleEscape()
+        #expect(coordinator.query == "")
+        #expect(coordinator.isVisible)
+
+        coordinator.handleEscape()
+        #expect(coordinator.isVisible == false)
+        coordinator.hide(restoreFocus: false)
+    }
+
+    /// 插件模式下 Esc 仍然只是退回搜索，不关面板
+    @Test("插件模式下 Esc 退回搜索而不关面板")
+    func escapeInPluginModePopsToRoot() {
+        let coordinator = PaletteCoordinator()
+        coordinator.navigate(to: "demo")
+        #expect(coordinator.activePluginID == "demo")
+
+        coordinator.handleEscape()
+        #expect(coordinator.activePluginID == nil)
+        #expect(coordinator.isVisible)
+        coordinator.hide(restoreFocus: false)
+    }
+
+    /// 按键路由：Esc 走 `onEscape`，⌘W 走 `onClose`
+    ///
+    /// 这两条路必须分开 —— 合并的话 ⌘W 会退化成「清空搜索框」，
+    /// 而用户按 ⌘W 想的是关掉面板。
+    @Test("Esc 与 ⌘W 走各自回调")
+    func escapeAndCommandWRouting() {
+        let panel = PalettePanel(rootView: Text("t"))
+        var escaped = 0
+        var closed = 0
+        panel.onEscape = {
+            escaped += 1
+            return true
+        }
+        panel.onClose = { closed += 1 }
+
+        guard let escape = Self.keyDown(keyCode: kVK_Escape, modifiers: [], characters: "\u{1B}"),
+            let commandW = Self.keyDown(keyCode: kVK_ANSI_W, modifiers: .command, characters: "w")
+        else {
+            Issue.record("无法构造合成按键事件")
+            return
+        }
+
+        panel.sendEvent(escape)
+        #expect(escaped == 1)
+        #expect(closed == 0)
+
+        panel.sendEvent(commandW)
+        #expect(escaped == 1)
+        #expect(closed == 1)
+
+        panel.close()
+    }
+
+    /// 合成一个按下事件（返回 nil 时由调用方记一条失败，而不是崩掉）
+    private static func keyDown(
+        keyCode: Int,
+        modifiers: NSEvent.ModifierFlags,
+        characters: String
+    ) -> NSEvent? {
+        NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: modifiers,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: UInt16(keyCode)
+        )
     }
 }

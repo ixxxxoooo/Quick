@@ -277,6 +277,47 @@ public final class PaletteCoordinator {
         }
     }
 
+    // MARK: - Esc
+
+    /// 按下 Esc 时该做的事
+    public enum EscapeAction: Equatable, Sendable {
+        /// 插件模式：退回主搜索
+        case popToRoot
+        /// 搜索模式且搜索框有内容：清空输入
+        case clearQuery
+        /// 搜索模式且搜索框为空：收起面板
+        case dismiss
+    }
+
+    /// Esc 的动作决策
+    ///
+    /// 抽成纯函数是为了能单独测：三层优先级（插件 → 有输入 → 关闭）里，
+    /// 任何一层写错都会表现成「Esc 莫名其妙把面板关了」，而那是最难当场复现的一类问题。
+    ///
+    /// 「有内容」按原样判空，不 trim —— 与搜索框右侧那个 ✕ 清空按钮的显示条件
+    /// （`!query.isEmpty`）保持一致，用户看到的清空按钮在什么时候出现，
+    /// Esc 就在什么时候清空。
+    public static func escapeAction(isPluginMode: Bool, query: String) -> EscapeAction {
+        if isPluginMode { return .popToRoot }
+        return query.isEmpty ? .dismiss : .clearQuery
+    }
+
+    /// 执行 Esc：有输入先清空，没输入才关面板
+    ///
+    /// 搜索框里有内容时 Esc 只清空，不关面板 —— 关掉整个面板的代价太大，
+    /// 而用户按下 Esc 时多半只是想重打一个关键词。
+    func handleEscape() {
+        switch Self.escapeAction(isPluginMode: activePluginID != nil, query: query) {
+        case .popToRoot:
+            popToRoot()
+        case .clearQuery:
+            log.debug("Esc 清空搜索框")
+            query = ""
+        case .dismiss:
+            hide()
+        }
+    }
+
     /// 将协调器的插件状态同步到 PaletteMode
     ///
     /// 从 plugins 中查找对应插件的元信息（名称、图标），一并写入 PaletteMode。
@@ -441,12 +482,12 @@ public final class PaletteCoordinator {
 
         newPanel.onEscape = { [weak self] in
             guard let self else { return false }
-            if self.activePluginID != nil {
-                self.popToRoot()
-            } else {
-                self.hide()
-            }
+            self.handleEscape()
             return true
+        }
+
+        newPanel.onClose = { [weak self] in
+            self?.hide()
         }
 
         newPanel.onDetach = { [weak self] in
