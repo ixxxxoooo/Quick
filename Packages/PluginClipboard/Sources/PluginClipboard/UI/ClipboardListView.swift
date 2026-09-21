@@ -23,6 +23,13 @@ struct ClipboardListView: View {
     /// 搜索文本
     @State private var searchText = ""
 
+    /// 本视图是否持有键盘焦点
+    ///
+    /// **方向键与回车要先有人接。** 插件模式下搜索框不在视图树里，没有这句焦点声明的话
+    /// 焦点会落在面板本身，`onKeyPress` 一个都收不到 —— 它们是「视图或其后代获得焦点时」
+    /// 才触发的。这是 `docs/ui.md` §2b 记过的同一个坑：键盘不能指望「挂上去就有人送」。
+    @FocusState private var isFocused: Bool
+
     /// 标签枚举
     enum ClipboardTab: String, CaseIterable {
         case all = "全部"
@@ -76,25 +83,40 @@ struct ClipboardListView: View {
                 entryList
             }
         }
-        .onKeyPress(.leftArrow) {
+        // 焦点必须落在内容上，键盘才走得通：`.focusable()` 让这个视图可以成为第一响应者，
+        // `.focused` 把它绑到 `isFocused`，`onAppear` 里主动取一次 —— 插件视图是随导航
+        // 新插进视图树的，没人会替它取焦点。`.focusEffectDisabled()` 是因为焦点圈在这里
+        // 只会糊住整块内容：面板自己就是「焦点所在」的视觉提示，不需要再描一圈。
+        .focusable()
+        .focused($isFocused)
+        .focusEffectDisabled()
+        .onAppear { isFocused = true }
+        // **`phases:` 要显式写。** 单键重载 `onKeyPress(.downArrow) { }` 不带 phases，
+        // 只响应第一次按下：长按方向键不会连续移动，手感就是「按住了没反应」。
+        .onKeyPress(.leftArrow, phases: [.down, .repeat]) { _ in
             switchTab(direction: -1)
             return .handled
         }
-        .onKeyPress(.rightArrow) {
+        .onKeyPress(.rightArrow, phases: [.down, .repeat]) { _ in
             switchTab(direction: 1)
             return .handled
         }
-        .onKeyPress(.upArrow) {
+        .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in
             moveSelection(direction: -1)
             return .handled
         }
-        .onKeyPress(.downArrow) {
+        .onKeyPress(.downArrow, phases: [.down, .repeat]) { _ in
             moveSelection(direction: 1)
             return .handled
         }
         .onKeyPress(.return) {
             confirmSelection()
             return .handled
+        }
+        // 列表会在面板开着的时候变短（右键删掉一条、历史被裁剪）。下标停在界外时，上下键
+        // 要连按几次才「回到列表里」，看起来就是按了不动 —— 变短就立刻夹回范围内。
+        .onChange(of: currentEntries.count) { _, count in
+            selectedIndex = ClipboardListNavigation.clamp(selectedIndex, count: count)
         }
     }
 
@@ -238,12 +260,11 @@ struct ClipboardListView: View {
     }
 
     private func moveSelection(direction: Int) {
-        let count = currentEntries.count
-        guard count > 0 else { return }
-        let newIndex = selectedIndex + direction
-        if newIndex >= 0, newIndex < count {
-            selectedIndex = newIndex
-        }
+        selectedIndex = ClipboardListNavigation.step(
+            from: selectedIndex,
+            direction: direction,
+            count: currentEntries.count
+        )
     }
 
     private func confirmSelection() {

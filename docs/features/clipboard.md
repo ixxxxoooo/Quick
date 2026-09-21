@@ -33,6 +33,7 @@
 | `ClipboardStore` | 内存缓存 + 去重 + 上限裁剪 + 防抖落盘 |
 | `ClipboardEntry` | 值类型条目（`Codable` + `Sendable`） |
 | `ClipboardListView` | 插件主视图 |
+| `ClipboardListNavigation` | 上下键移动下标的纯函数（两端夹取、下标越界时也要能走） |
 | `ClipboardSettingsView` | 设置页 |
 
 `ClipboardStore` 标了 `@Observable`，供 `ClipboardListView` 观察。
