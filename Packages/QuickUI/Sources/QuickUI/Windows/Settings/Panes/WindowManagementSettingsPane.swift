@@ -61,7 +61,7 @@ struct WindowManagementSettingsPane: View {
         } header: {
             Text("布局命令")
         } footer: {
-            Text("关掉的命令不会出现在搜索结果里，快捷键绑定也一并失效。")
+            Text("关掉的命令不会出现在搜索结果里。")
         }
     }
 }
