@@ -33,23 +33,31 @@ final class AIWebViewWindowManager {
     // MARK: - 窗口生命周期
 
     /// 打开或聚焦指定 Provider 的窗口
+    ///
+    /// 三句都是必需的，少一句就会「唤醒了却不在最前面」：`NSApp.activate` 让应用成为前台
+    /// （accessory 应用同样有效），`makeKeyAndOrderFront` 拿到键盘焦点，`orderFrontRegardless`
+    /// 让它越过其他应用已经排在前面的窗口 —— 新建的窗口尤其容易因为少了这一句而留在后面。
     func openOrFocus(providerId: String) {
         guard let provider = AIProviderRegistry.provider(for: providerId) else {
             log.error("未知 Provider: \(providerId, privacy: .public)")
             return
         }
 
+        let window: AIWebViewWindow
         if let existing = windows[providerId] {
-            existing.panel.makeKeyAndOrderFront(nil)
-            existing.panel.orderFrontRegardless()
+            window = existing
             log.debug("聚焦窗口: \(provider.name, privacy: .public)")
         } else {
-            let window = createWindow(for: provider)
+            window = createWindow(for: provider)
             windows[providerId] = window
-            window.panel.makeKeyAndOrderFront(nil)
             window.panel.center()
             log.notice("创建窗口: \(provider.name, privacy: .public)")
         }
+
+        NSApp.activate(ignoringOtherApps: true)
+        window.panel.makeKeyAndOrderFront(nil)
+        window.panel.orderFrontRegardless()
+        syncDockPresence()
 
         EventBus.shared.post(HidePaletteEvent())
     }
@@ -63,6 +71,7 @@ final class AIWebViewWindowManager {
     /// 隐藏窗口（保持会话）
     func hideWindow(for providerId: String) {
         windows[providerId]?.panel.orderOut(nil)
+        syncDockPresence()
     }
 
     /// 销毁窗口（释放 WebView）
@@ -71,6 +80,7 @@ final class AIWebViewWindowManager {
         window.panel.onClose = nil
         window.panel.close()
         windows[providerId] = nil
+        syncDockPresence()
         log.notice("销毁窗口: \(providerId, privacy: .public)")
     }
 
@@ -83,6 +93,38 @@ final class AIWebViewWindowManager {
             log.notice("随插件停用关闭窗口: \(providerId, privacy: .public)")
         }
         windows.removeAll()
+        syncDockPresence()
+    }
+
+    // MARK: - Dock 身份
+
+    /// 已经在 `ActivationPolicyKeeper` 里登记过的 Provider
+    private var dockHolders: Set<String> = []
+
+    /// 让「应用要不要 Dock 身份」跟着可见窗口走
+    ///
+    /// AI 窗口是普通窗口，必须能在 ⌘Tab / Mission Control 里被找回 —— 而 accessory 应用
+    /// 根本不在切换器里。所以只要还有一个可见窗口，就暂时占用 Dock 身份；最后一个窗口
+    /// 隐藏或销毁时交还，平时仍然是一个不占位的效率工具。
+    ///
+    /// 隐藏（点红绿灯）也要交还：窗口看不见时没有「找回来」的需求，而 Dock 里挂着一个
+    /// 点开什么都没有的图标只会更困惑。
+    private func syncDockPresence() {
+        let visible = activeProviderIDs()
+
+        for providerId in visible.subtracting(dockHolders) {
+            ActivationPolicyKeeper.retain(Self.activationHolder(providerId))
+            dockHolders.insert(providerId)
+        }
+        for providerId in dockHolders.subtracting(visible) {
+            ActivationPolicyKeeper.release(Self.activationHolder(providerId))
+            dockHolders.remove(providerId)
+        }
+    }
+
+    /// 该 Provider 在 `ActivationPolicyKeeper` 里的持有者标识
+    private static func activationHolder(_ providerId: String) -> String {
+        "ai.\(providerId)"
     }
 
     /// 刷新页面
@@ -95,6 +137,35 @@ final class AIWebViewWindowManager {
                 window.webView.reload()
             }
         }
+    }
+
+    // MARK: - 窗口构造
+
+    /// 造一个 Provider 窗口（不含 WebView、不加载网页）
+    ///
+    /// 抽成独立方法是为了能直接断言窗口配置 —— 「能不能在 ⌘Tab 里被找回来」全部由这几个
+    /// 参数决定，而它们在真的建窗口那条路上要连网加载页面，不适合放进测试。
+    ///
+    /// - Parameters:
+    ///   - provider: 目标 Provider
+    ///   - size: 初始尺寸
+    /// - Returns: 尚未安装内容视图的窗口
+    static func makePanel(provider: AIProvider, size: NSSize) -> AIWebViewPanel {
+        let panel = AIWebViewPanel(
+            contentRect: NSRect(origin: .zero, size: size),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = provider.name
+        panel.titlebarAppearsTransparent = true
+        panel.titleVisibility = .visible
+        panel.isMovableByWindowBackground = true
+        panel.minSize = NSSize(width: 600, height: 400)
+        panel.isReleasedWhenClosed = false
+        panel.hidesOnDeactivate = false
+        panel.identifier = NSUserInterfaceItemIdentifier("quick.ai.\(provider.id)")
+        return panel
     }
 
     /// 切换窗口置顶
@@ -143,25 +214,19 @@ final class AIWebViewWindowManager {
             webView.load(URLRequest(url: url))
         }
 
-        // `.nonactivatingPanel`：唤出主面板时不要把 AI 窗口一起带到前台。
-        // 两者各自独立 —— 用户按 ⌥Space 只是想找东西，不是想切回 AI 页面。
-        let panel = AIWebViewPanel(
-            contentRect: NSRect(x: 0, y: 0, width: defaultWidth, height: defaultHeight),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
+        // **不是非激活面板。** `.nonactivatingPanel` 是给「不该参与应用激活排序」的浮层用的
+        // （主面板就是），代价是窗口不进 ⌘Tab / Mission Control，切走之后再也找不回来。
+        // AI 窗口是一块用户会持续使用的页面，所以它是**普通窗口**：能成为 key、也能成为 main，
+        // 并随可见窗口暂时占用 Dock 身份（见 `syncDockPresence`）。
+        let panel = Self.makePanel(
+            provider: provider,
+            size: NSSize(width: defaultWidth, height: defaultHeight)
         )
-        panel.title = provider.name
-        panel.titlebarAppearsTransparent = true
-        panel.titleVisibility = .visible
-        panel.isMovableByWindowBackground = true
-        panel.minSize = NSSize(width: 600, height: 400)
-        panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = false
 
         let providerId = provider.id
-        panel.onClose = { [weak panel] in
-            panel?.orderOut(nil)
+        // 点红绿灯只是隐藏：保持登录态与会话历史。走 hideWindow 是为了顺带交还 Dock 身份。
+        panel.onClose = { [weak self] in
+            self?.hideWindow(for: providerId)
         }
 
         // 内容视图布局：WebView 铺满 + 悬浮胶囊叠在上面
@@ -240,5 +305,7 @@ final class AIWebViewPanel: NSPanel {
     /// 非激活面板只需要能拿到键盘输入，不需要成为主窗口 ——
     /// 成为主窗口正是「应用一激活它就被带到前台」的原因。
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
+
+    /// 普通窗口：能成为主窗口，⌘Tab 切回来时才会到它
+    override var canBecomeMain: Bool { true }
 }
