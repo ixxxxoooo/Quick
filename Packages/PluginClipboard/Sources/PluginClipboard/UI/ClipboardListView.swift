@@ -232,15 +232,15 @@ struct ClipboardListView: View {
             // 系统滚动条是为带标题栏的窗口设计的，和面板的玻璃语言冲突（见 docs/ui.md）。
             // 面板高度固定、条目数有限，滚动位置靠键盘导航足够可感。
             .scrollIndicators(.never)
+            // 选中跟随与主搜索列表同一套：碰到边缘才滚，且**不做动画**（见 docs/ui.md）。
+            // 这里的行高还不一样（图片行单行、文本行两行），动画追着变高的行更糊。
             .onChange(of: selectedIndex) { _, newIndex in
                 let entries = currentEntries
                 guard newIndex >= 0, newIndex < entries.count else { return }
-                withAnimation(.easeOut(duration: DesignTokens.Duration.scrollReveal)) {
-                    proxy.scrollTo(
-                        entries[newIndex].id,
-                        anchor: ListScrollFollow.anchor(for: newIndex, count: entries.count)
-                    )
-                }
+                proxy.scrollTo(
+                    entries[newIndex].id,
+                    anchor: ListScrollFollow.anchor(for: newIndex, count: entries.count)
+                )
             }
         }
     }

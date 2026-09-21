@@ -28,8 +28,9 @@
   会留在原地与选中项同时亮着（一层残影）。行只接收 `isHovered`，由列表在
   `moveSelection` / `switchTab` 里整体清空。
 - **滚动跟随只在两端发生**，决策走 `ListScrollFollow.anchor(for:count:)` —— 不要退回
-  `anchor: .center`，那会让每按一下方向键整块列表都滚动。见 [docs/ui.md](../ui.md) 的
-  「列表的滚动跟随与悬停高亮」。
+  `anchor: .center`，那会让每按一下方向键整块列表都滚动。**并且不做动画**（`scrollTo`
+  不包 `withAnimation`）：这里的行高本来就不齐（图片行单行、文本行两行），动画追着变高的
+  行只会更糊。见 [docs/ui.md](../ui.md) 的「列表的滚动跟随与悬停高亮」。
 
 ## 内部结构
 

@@ -242,10 +242,6 @@ public enum DesignTokens {
         public static let tooltip: TimeInterval = 0.15
         /// 悬停高亮
         public static let hover: TimeInterval = 0.12
-        /// 列表滚动定位
-        ///
-        /// 比悬停更快：选中项移动时用户已经知道目标在哪，动画只是消除跳变。
-        public static let scrollReveal: TimeInterval = 0.10
         /// 复制反馈
         public static let copyFeedback: TimeInterval = 1.2
     }

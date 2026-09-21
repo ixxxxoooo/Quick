@@ -98,14 +98,15 @@ public struct ResultListView: View {
             .onChange(of: selection?.hoverDisarmToken) { _, _ in
                 hoveredID = nil
             }
+            // 选中跟随：锚点走 ListScrollFollow（碰到边缘才滚，中间原地不动），
+            // 而且**不做动画** —— 长按方向键会连发按键，每次按键都起一段 0.1 秒的动画，
+            // 列表就一直在追赶按键，体感是卡顿；跨过边缘时直接跳一档反而更稳。
             .onChange(of: selectedIndex) { _, newIndex in
                 guard newIndex >= 0, newIndex < items.count else { return }
-                withAnimation(.easeOut(duration: DesignTokens.Duration.scrollReveal)) {
-                    proxy.scrollTo(
-                        items[newIndex].id,
-                        anchor: ListScrollFollow.anchor(for: newIndex, count: items.count)
-                    )
-                }
+                proxy.scrollTo(
+                    items[newIndex].id,
+                    anchor: ListScrollFollow.anchor(for: newIndex, count: items.count)
+                )
             }
         }
         .edgeDissolve()
