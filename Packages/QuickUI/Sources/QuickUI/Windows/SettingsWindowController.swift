@@ -16,6 +16,10 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private let dataSource: any SettingsDataSource
     private let log = QuickLog.ui
+
+    /// 在 `ActivationPolicyKeeper` 里的持有者标识
+    private static let activationHolder = "settings"
+
     private var window: NSWindow?
     private var navigationState = SettingsNavigationState()
     private var toolbarController: SettingsToolbarController?
@@ -37,9 +41,10 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
         self.window = window
 
         // 打开设置期间切成常规应用：accessory 应用不进 Dock、也不进 ⌘Tab 切换器，
-        // 用户一旦切走就再也找不回来这个窗口。设置窗口是唯一一个「像普通窗口那样被对待」
-        // 的界面，所以只在它开着的时候变成常规应用，关掉就变回去（见 windowWillClose）。
-        NSApp.setActivationPolicy(.regular)
+        // 用户一旦切走就再也找不回来这个窗口。关掉就交还（见 windowWillClose）。
+        // 记账交给 `ActivationPolicyKeeper` —— AI 网页窗口也要 Dock 身份，两边各写一遍
+        // 会互相覆盖。
+        ActivationPolicyKeeper.retain(Self.activationHolder)
 
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -89,7 +94,7 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
     public func windowWillClose(_ notification: Notification) {
         // 关掉设置就回到后台常驻：Dock 图标与 ⌘Tab 条目一起消失，
         // 这样它平时仍然是一个不占位的效率工具
-        NSApp.setActivationPolicy(.accessory)
+        ActivationPolicyKeeper.release(Self.activationHolder)
 
         log.debug("设置窗口已关闭")
     }

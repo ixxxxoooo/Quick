@@ -373,9 +373,11 @@ Debug（`.dev`）与 Release 互不污染。
 
 `SettingsStore`（持久化）由 `AppCore` 持有并注入，**不是单例**。
 
-设置窗口是唯一一个「像普通窗口那样被对待」的界面，所以 `SettingsWindowController` 在显示时
-`NSApp.setActivationPolicy(.regular)`、关闭时切回 `.accessory`。accessory 应用不进 Dock、
-也不进 ⌘Tab 切换器 —— 用户一旦从设置窗口切走，就再也找不回来它。
+设置窗口与 AI 网页窗口是「像普通窗口那样被对待」的两种界面，但**记账只有一处**：
+`ActivationPolicyKeeper`。谁在场谁 `retain`，最后一个人走时恢复 `.accessory`。
+accessory 应用不进 Dock、也不进 ⌘Tab 切换器 —— 用户一旦从这两种窗口切走，就再也找不
+回来它们。按**持有者集合**记账而不是计数器，是因为两者可能同时开着：谁先关都不能把
+对方的 Dock 身份带走。
 
 ### 键盘输入归属
 
@@ -436,32 +438,56 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 
 这一条是行为契约，不是实现细节：
 
-- 唤出主面板（⌥Space）**不会**把分离窗口或 AI 窗口带到前台。用户按快捷键是想找东西，
-  不是想切回某个已经开着的页面。实现上靠 `.nonactivatingPanel`：非激活面板不参与
-  应用激活时的窗口排序，所以 `NSApp.activate` 不会把它们一起抬起来。
+- 唤出主面板（⌥Space）**不会**把分离窗口带到前台。用户按快捷键是想找东西，不是想切回
+  某个已经开着的页面。实现上靠分离窗口的 `.nonactivatingPanel`：非激活面板不参与应用
+  激活时的窗口排序，所以 `NSApp.activate` 不会把它一起抬起来。
+- **AI 网页窗口不适用这一条**，它是刻意的：那块页面是用户会持续使用的东西，必须能在
+  ⌘Tab / Mission Control 里被找回来（详见「AI 网页窗口」一节）。所以唤出主面板时它会
+  一起到前台 —— 面板本身是 `.floating`，仍然盖在它上面。
 - 关掉主面板不影响分离窗口；反之亦然。
-- 也正因为两者独立，**窗口控制必须留在窗口自己身上**（下一小节的悬浮胶囊），
-  不能只挂在主面板的头部 —— 用户不看主面板时那些按钮就够不着了。
+- 也正因为两者独立，**窗口控制必须留在窗口自己身上**，不能只挂在主面板的头部 ——
+  用户不看主面板时那些按钮就够不着了。具体放在哪，见下面两节。
 
 `AppCore` 在退出时统一收掉它们（`closeAll()`）；插件停用时由插件自己收掉，
 `AIPlugin.deactivate()` 就是这样做的。
 
-### 悬浮胶囊：分离窗口唯一的常驻控件
+### 分离窗口的控制在它的标题栏里
+
+分离窗口有自己的自绘标题栏，所以置顶 / 关闭**就长在标题栏右侧**（`BarButton` 的
+`.icon` 样式），刷新保留 ⌘R。不用悬浮胶囊，是因为那个浮层带来的一整套交互
+（可拖、可折叠、位置要持久化）只在「窗口没有自己的边框」时才值得付。
+
+**刷新是真的重建**：`PluginPanelController` 存的是视图工厂（`viewProvider`）而不是
+建好的视图，所以刷新会重新走一遍插件的 `makeView()`，而不是重画一份旧状态。
+
+### AI 网页窗口：普通窗口 + 悬浮胶囊
+
+`AIWebViewWindowManager` 每个 Provider 一个独立窗口，**关闭只是隐藏**（保持登录态与
+会话历史），销毁走显式命令。
+
+- **它是普通窗口，不是非激活面板。** 这一条决定它能不能被找回：非激活面板不进
+  ⌘Tab / Mission Control，用户切走之后只剩「再从面板点一次」这一条路。普通窗口能成为
+  key、也能成为 main。
+- **可见期间占用 Dock 身份**：accessory 应用不在切换器里，所以只要还有一个可见窗口，
+  就通过 `ActivationPolicyKeeper` 暂时变成 `.regular`；最后一个窗口隐藏或销毁时交还。
+  隐藏也要交还 —— 窗口看不见时没有「找回来」的需求，Dock 里挂一个点开什么都没有的图标
+  只会更困惑。
+- **唤起时到最前**要三句一起：`NSApp.activate(ignoringOtherApps:)` +
+  `makeKeyAndOrderFront` + `orderFrontRegardless`。少一句就会「唤醒了却不在最前面」，
+  新建的窗口尤其容易。
+
+窗口里唯一常驻的控件是悬浮胶囊（它的内容是一整块网页，没有自己的边框）：
 
 [`FloatingCapsuleView`](../Packages/QuickUI/Sources/QuickUI/Windows/FloatingCapsuleView.swift)
-是分离窗口右上角的悬浮操作条，参考 Fasty 的 `capsuleInjectionScript`：
+参考 Fasty 的 `capsuleInjectionScript`：
 
 - **收起态**只显示抓手与展开箭头（22px 圆钮、2px 内边距、全圆角），展开后是
-  置顶 / 刷新 / 关闭（关闭前有一条分组线）。默认收起是为了不挡插件内容。
+  置顶 / 刷新 / 外部打开 / 关闭（关闭前有一条分组线）。默认收起是为了不挡页面内容。
 - **可拖拽**：位移超过 3px 才算拖拽，落点夹在窗口内（优先保证左下不出界），
-  松手把位置写进 `UserDefaults`，同一个插件的窗口下次回到原处。
-- **叠在内容之上**，不参与插件视图的布局 —— 否则「每个插件都能拿到窗口控制」
-  就只在插件自己留了白的情况下成立。
-- **刷新是真的重建**：`PluginPanelController` 存的是视图工厂（`viewProvider`）而不是
-  建好的视图，所以刷新会重新走一遍插件的 `makeView()`，而不是重画一份旧状态。
-
-几何与配色全部来自 `DesignTokens.Size.Capsule` / `DesignTokens.Colors.capsule*`。
-插件窗口与 AI 窗口共用同一个实现 —— 想改胶囊的样子，只改一处。
+  松手把位置写进 `UserDefaults`，同一个 Provider 的窗口下次回到原处。
+- **叠在内容之上**，不参与网页的布局 —— 它不能依赖页面 DOM（页面是第三方的，
+  随时会变）。
+- 几何与配色全部来自 `DesignTokens.Size.Capsule` / `DesignTokens.Colors.capsule*`。
 
 ### 不要给协调器加 `@Observable`
 
