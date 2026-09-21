@@ -160,6 +160,7 @@ private struct CustomCommandRow: View {
                 onEdit()
             } label: {
                 Image(systemName: "pencil")
+                    .font(DesignTokens.Typography.inlineIcon)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -169,6 +170,7 @@ private struct CustomCommandRow: View {
                 onDelete()
             } label: {
                 Image(systemName: "trash")
+                    .font(DesignTokens.Typography.inlineIcon)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             .buttonStyle(.plain)

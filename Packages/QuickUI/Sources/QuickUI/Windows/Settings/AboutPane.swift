@@ -89,6 +89,7 @@ struct AboutPane: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Image(systemName: copiedField == field ? "checkmark" : "doc.on.doc")
+                    .font(DesignTokens.Typography.inlineIcon)
             }
         }
         .buttonStyle(.plain)

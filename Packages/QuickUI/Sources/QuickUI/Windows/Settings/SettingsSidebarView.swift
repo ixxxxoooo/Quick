@@ -53,8 +53,11 @@ struct SettingsSidebarView: View {
                             Text(tab.title)
                         } icon: {
                             Image(systemName: tab.systemImage)
-                                .font(.system(size: 13, weight: .regular))
-                                .frame(width: 18, height: 18, alignment: .center)
+                                .font(DesignTokens.Typography.sidebarIcon)
+                                .frame(
+                                    width: DesignTokens.Size.sidebarIconSlot,
+                                    height: DesignTokens.Size.sidebarIconSlot,
+                                    alignment: .center)
                         }
                         .tag(tab)
                     }
@@ -101,8 +104,11 @@ struct SettingsSidebarView: View {
                             }
                         } icon: {
                             Image(systemName: entry.tab.systemImage)
-                                .font(.system(size: 13, weight: .regular))
-                                .frame(width: 18, height: 18, alignment: .center)
+                                .font(DesignTokens.Typography.sidebarIcon)
+                                .frame(
+                                    width: DesignTokens.Size.sidebarIconSlot,
+                                    height: DesignTokens.Size.sidebarIconSlot,
+                                    alignment: .center)
                         }
                         .tag(entry.id)
                     }

@@ -19,6 +19,7 @@ struct SettingsSearchField: View {
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
             Image(systemName: "magnifyingglass")
+                .font(DesignTokens.Typography.inlineIcon)
                 .foregroundStyle(.secondary)
 
             TextField("", text: $query, prompt: Text("Search"))
@@ -31,6 +32,7 @@ struct SettingsSearchField: View {
                     query = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .font(DesignTokens.Typography.inlineIcon)
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)

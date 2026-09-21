@@ -63,7 +63,7 @@ public struct ShortcutRecorder: View {
                             onClear()
                         } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 11))
+                                .font(DesignTokens.Typography.compactIcon)
                                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)

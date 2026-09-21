@@ -100,9 +100,11 @@ private struct ScopeRow: View {
 
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
+            // 前导图标走「行图标」那一档，与同一面板里上下各行对齐到同一列
             Image(systemName: scope.hasSuffix(".app") ? "app" : "folder")
+                .font(DesignTokens.Typography.iconGlyph)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 20)
+                .frame(width: DesignTokens.Size.rowIcon)
 
             Text(scope)
                 .lineLimit(1)
@@ -113,12 +115,14 @@ private struct ScopeRow: View {
 
             if isMissing {
                 Image(systemName: "exclamationmark.triangle.fill")
+                    .font(DesignTokens.Typography.inlineIcon)
                     .foregroundStyle(.orange)
                     .help("该路径当前不存在")
             }
 
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
+                    .font(DesignTokens.Typography.inlineIcon)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             .buttonStyle(.plain)

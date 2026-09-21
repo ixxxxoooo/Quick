@@ -57,6 +57,7 @@ struct ApplicationsSettingsPane: View {
                 // 搜索过滤框
                 HStack(spacing: DesignTokens.Spacing.sm) {
                     Image(systemName: "magnifyingglass")
+                        .font(DesignTokens.Typography.inlineIcon)
                         .foregroundStyle(.secondary)
                     TextField("搜索应用…", text: $query)
                         .textFieldStyle(.plain)
@@ -65,6 +66,7 @@ struct ApplicationsSettingsPane: View {
                             query = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
+                                .font(DesignTokens.Typography.inlineIcon)
                                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)

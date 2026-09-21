@@ -20,6 +20,7 @@ struct SettingsFilterField: View {
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
             Image(systemName: "magnifyingglass")
+                .font(DesignTokens.Typography.inlineIcon)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 
@@ -34,6 +35,7 @@ struct SettingsFilterField: View {
                     query = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .font(DesignTokens.Typography.inlineIcon)
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)

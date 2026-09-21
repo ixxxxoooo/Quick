@@ -259,6 +259,27 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 - **不要用 `.system(size:)` 在视图里现造字号**。图标尺寸不够用就往令牌里加。
 - 字重克制：`regular` / `medium` / `semibold` 足够。不要 `heavy` / `black`。
 
+### 图标尺寸只有四个角色
+
+图标全部来自 **SF Symbols**（`Image(systemName:)`；AppKit 侧是
+`NSImage(systemSymbolName:)`）。仓库没有、也不该有第三方图标库。
+
+| 角色 | 令牌 | 用在哪 |
+| --- | --- | --- |
+| 行图标 | `Typography.iconGlyph`（16pt medium）+ `Size.rowIcon` 槽位 | 列表行的**前导**图标，与标题成列 |
+| 侧边栏图标 | `Typography.sidebarIcon`（13pt regular）+ `Size.sidebarIconSlot` | 设置窗口侧边栏；跟着侧边栏文字走，比行图标小一档 |
+| 行内图标 | `Typography.inlineIcon`（13pt regular） | 与正文同排的图标：搜索框放大镜、清除按钮、警告三角、复制按钮 |
+| 小控件图标 | `Typography.compactIcon`（11pt regular） | 别名框、快捷键录制器里的清除按钮 |
+
+两条纪律：
+
+- **每个图标都要显式指定字号，一个都不许省。** 不给 `.font` 的图标会继承容器字号，
+  于是同一个面板里出现「有的 16、有的 13」—— 这正是这一组令牌要消掉的问题，
+  而它曾经真的发生在设置页里（12 个图标在静默继承）。
+- **槽位宽度也要统一。** 图标尺寸一致但槽位宽度不一致，标题的起始位置照样逐行漂移。
+  行图标统一 24，侧边栏统一 18。
+- 图标是**语义**不是装饰：选 SF Symbol 时挑表意准确的那个，不要为了好看换。
+
 ---
 
 ## 6. 动画

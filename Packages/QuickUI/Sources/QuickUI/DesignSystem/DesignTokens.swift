@@ -131,6 +131,11 @@ public enum DesignTokens {
         public static let settingsDetailMinimum: CGFloat = 420
         /// 设置搜索框高度
         public static let settingsSearchField: CGFloat = 28
+        /// 设置窗口侧边栏图标的槽位宽度
+        ///
+        /// 与 `Typography.sidebarIcon` 配套。槽位宽度统一是「这一页读起来整齐」的关键 ——
+        /// 每行各自 `Image` 会让标题的起始位置逐行漂移。
+        public static let sidebarIconSlot = scaled(18)
 
         // MARK: 搜索结果行
 
@@ -269,6 +274,18 @@ public enum DesignTokens {
         public static let compactKeyCap = scaledStyle(.caption2)
         /// 列表行 / 底栏图标字体（固定尺寸，图标需要与 rowIcon 槽位对齐）
         public static let iconGlyph = Font.system(size: scaled(16), weight: .medium)
+        /// 设置窗口侧边栏的列表图标
+        ///
+        /// 比 `iconGlyph` 小一档：侧边栏的文字是 `.body`，图标跟着文字走而不是跟着行图标走。
+        public static let sidebarIcon = Font.system(size: scaled(13), weight: .regular)
+        /// 与正文同排的行内图标（搜索框的放大镜、清除按钮、警告三角）
+        ///
+        /// 这些图标属于**旁边那行文字**，不属于「行图标」那一列，所以跟着正文字号走。
+        /// 它们的尺寸必须显式指定：不给 `.font` 会继承容器字号，同一个面板里就会出现
+        /// 「有的图标 16、有的 13」——这正是这一组令牌要消掉的问题。
+        public static let inlineIcon = Font.system(size: scaled(13), weight: .regular)
+        /// 小控件内部的图标（别名框、快捷键录制器的清除按钮）
+        public static let compactIcon = Font.system(size: scaled(11), weight: .regular)
         /// 空状态图标字体
         public static let emptyStateIcon = Font.system(size: scaled(32), weight: .light)
         /// HUD 提示的语义图标字体

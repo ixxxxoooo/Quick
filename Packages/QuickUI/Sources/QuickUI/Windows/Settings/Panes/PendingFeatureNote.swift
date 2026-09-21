@@ -18,7 +18,7 @@ struct PendingFeatureNote: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Spacing.sm) {
             Image(systemName: "hammer")
-                .font(DesignTokens.Typography.keyCap)
+                .font(DesignTokens.Typography.inlineIcon)
             Text(detail)
                 .font(DesignTokens.Typography.keyCap)
         }
