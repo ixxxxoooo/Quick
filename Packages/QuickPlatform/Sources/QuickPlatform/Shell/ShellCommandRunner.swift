@@ -67,7 +67,18 @@ public enum ShellCommandRunner {
 
     /// 在用户偏好的终端中打开命令
     ///
-    /// 隐藏面板后直接唤起终端，让用户看到完整的输出和交互。
+    /// ## 为什么是「写一个脚本文件、交给 LaunchServices 打开」而不是 AppleScript
+    ///
+    /// 这里原来用的是 `tell application "Terminal" … do script "…"`，它有两个坑，
+    /// 而且失败时都是**静默**的，表现出来正是「终端打开了、命令没跑」：
+    ///
+    /// 1. **它要「自动化」权限。** 这个权限按代码签名授予，而每重新构建一次 dev 版就换了
+    ///    一份签名，授权随之失效 —— 开发期这个功能基本是坏的。
+    /// 2. **命令文本是拼进 AppleScript 源码里的字符串字面量。** 命令里带 `"` 或换行就会把
+    ///    脚本本身拆坏，`NSAppleScript(source:)` 直接返回 nil，连一条日志都没有。
+    ///
+    /// 交给 LaunchServices 打开 `.command` 文件不需要任何权限；命令也只是文件内容，
+    /// 不再是谁的源码，所以不需要转义。做法与 Tinycast 同向：那条路完全不碰 AppleEvents。
     @MainActor
     public static func runInTerminal(
         _ command: String,
@@ -78,63 +89,104 @@ public enum ShellCommandRunner {
         guard !trimmed.isEmpty else { return }
 
         let cwd = workingDirectory ?? NSHomeDirectory()
-        // 转义单引号
-        let escapedCmd = trimmed.replacingOccurrences(of: "'", with: "'\\''")
-        let escapedCwd = cwd.replacingOccurrences(of: "'", with: "'\\''")
 
-        switch terminal {
-        case .terminal:
-            // 使用 AppleScript 在 Terminal.app 中执行
-            let script = """
-                tell application "Terminal"
-                    activate
-                    do script "cd '\(escapedCwd)' && \(escapedCmd)"
-                end tell
-                """
-            if let appleScript = NSAppleScript(source: script) {
-                var error: NSDictionary?
-                appleScript.executeAndReturnError(&error)
-                if let error {
-                    log.error("Terminal AppleScript 执行失败：\(error, privacy: .public)")
-                }
-            }
-
-        case .iterm:
-            let script = """
-                tell application "iTerm"
-                    activate
-                    set newWindow to (create window with default profile)
-                    tell current session of newWindow
-                        write text "cd '\(escapedCwd)' && \(escapedCmd)"
-                    end tell
-                end tell
-                """
-            if let appleScript = NSAppleScript(source: script) {
-                var error: NSDictionary?
-                appleScript.executeAndReturnError(&error)
-                if let error {
-                    log.error("iTerm AppleScript 执行失败：\(error, privacy: .public)")
-                }
-            }
-
-        default:
-            // 通用方式：用 open 打开终端应用，然后用后台 shell 写入
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: terminal.rawValue) {
-                NSWorkspace.shared.openApplication(
-                    at: url,
-                    configuration: NSWorkspace.OpenConfiguration()
-                )
-                // 对于 Warp/Kitty/Alacritty，回退到后台执行
-                Task {
-                    _ = await run("cd '\(escapedCwd)' && \(trimmed)")
-                }
-            } else {
-                // 终端不存在，回退到默认 Terminal.app
-                runInTerminal(command, workingDirectory: workingDirectory, terminal: .terminal)
-            }
+        guard let script = try? writeScript(command: trimmed, workingDirectory: cwd) else {
+            log.error("终端脚本创建失败，命令未执行")
+            EventBus.shared.post(ShowHUDEvent(message: "无法创建终端脚本，命令未执行", tone: .warning))
+            return
         }
 
-        log.info("命令已发送到终端 \(terminal.displayName, privacy: .public)：\(trimmed.prefix(50), privacy: .public)")
+        open(script: script, in: terminal, command: trimmed)
+    }
+
+    /// 把命令写成一个 `.command` 脚本
+    ///
+    /// 终端是在文件被打开之后才去读它的，所以这里不能删；改为每次写新脚本前先清掉上一个，
+    /// 免得在用户的临时目录里越积越多。
+    private static func writeScript(command: String, workingDirectory: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Quick/TerminalCommands", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let stale =
+            (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))
+            ?? []
+        for url in stale { try? FileManager.default.removeItem(at: url) }
+
+        let script = directory.appendingPathComponent("command.command")
+        try scriptBody(command: command, workingDirectory: workingDirectory)
+            .write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
+        return script
+    }
+
+    /// `.command` 脚本的内容
+    ///
+    /// 抽成纯函数是为了能直接断言它：上一版把命令拼进 AppleScript 源码的字符串字面量，
+    /// 命令里带 `"` 或换行就把整段拆坏 —— 这里不存在那种可能。
+    ///
+    /// - Parameters:
+    ///   - command: 用户输入的命令，**原样**写进脚本
+    ///   - workingDirectory: 工作目录，作为 `cd` 的参数
+    /// - Returns: 脚本全文
+    static func scriptBody(command: String, workingDirectory: String) -> String {
+        // `-l` 起登录 Shell：用户终端里的 PATH 与别名才在
+        """
+        #!/bin/zsh -l
+        cd \(quoted(workingDirectory)) || exit 1
+        \(command)
+        """
+    }
+
+    /// 单引号包裹，只用在脚本里的 `cd`
+    ///
+    /// 命令本身不转义 —— 它写在脚本文件里，不再是被谁解析的字符串。
+    private static func quoted(_ text: String) -> String {
+        "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// 交给指定的终端打开脚本
+    ///
+    /// 没装、或者它不处理 `.command` 文件（Warp / Kitty 之类），就交给系统默认的处理程序 ——
+    /// 命令已经写好在文件里了，不该因为选错终端就把它丢掉。
+    @MainActor
+    private static func open(script: URL, in terminal: PreferredTerminal, command: String) {
+        guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: terminal.rawValue) else {
+            log.notice("未安装 \(terminal.displayName, privacy: .public)，改用系统默认终端")
+            openWithDefaultHandler(script: script, command: command)
+            return
+        }
+
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.open([script], withApplicationAt: app, configuration: configuration) { _, error in
+            guard let error else { return }
+            Task { @MainActor in
+                log.warning(
+                    """
+                    \(terminal.displayName, privacy: .public) 打不开终端脚本，改用默认终端：\
+                    \(error.localizedDescription, privacy: .public)
+                    """)
+                openWithDefaultHandler(script: script, command: command)
+            }
+        }
+    }
+
+    /// 交给系统默认的 `.command` 处理程序
+    @MainActor
+    private static func openWithDefaultHandler(script: URL, command: String) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.open(script, configuration: configuration) { _, error in
+            guard let error else {
+                log.info("命令已交给终端：\(command.prefix(50), privacy: .public)")
+                return
+            }
+            Task { @MainActor in
+                log.error("没有终端能运行脚本：\(error.localizedDescription, privacy: .public)")
+                EventBus.shared.post(ShowHUDEvent(message: "没有可用的终端，命令未执行", tone: .warning))
+            }
+        }
     }
 
     /// 异步运行 shell 命令并返回结果

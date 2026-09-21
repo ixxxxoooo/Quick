@@ -32,6 +32,14 @@
   - 自定义 Shell 命令：`launcher.cmd.<UUID>`
   - Shell 兜底：`launcher.shell.fallback`
 - **直接以 `>` 开头的查询，进入直接 Shell 执行模式。** 单独返回一个 1.0 相关度的条目，回车后异步在 `/bin/zsh -l -c` 下执行并通过 HUD 显示输出反馈。
+- **Shell 兜底走「写脚本文件 + LaunchServices 打开」，不要改回 AppleScript。** 兜底项把命令
+  写进一个 `.command` 文件，再交给用户选定的终端（`ShellCommandRunner.runInTerminal`）。
+  `tell application "Terminal" … do script …` 那条老路有两个静默失败：它要「自动化」权限
+  （按代码签名授予，dev 版每次重新构建都可能失效），而命令文本会被拼进 AppleScript 源码，
+  带 `"` 或换行就把脚本本身拆坏 —— 表现都是「终端打开了、命令没跑」。
+  它与 `>` 模式的区别只是要不要一个真终端：`>` 在后台跑、输出收进 HUD；兜底要让用户看见
+  完整交互，所以交给终端。选定的终端没装或不处理 `.command`（Warp / Kitty 之类）时回落到
+  系统默认终端，而不是把命令丢掉。
 - **支持自定义应用别名与快捷键。** 别名与显示名各算一次匹配分，取二者较高者 ——
   别名完全匹配时就是 1.0，自然排在首位。
 - **支持自定义 Shell 命令库与 Shell 兜底。** 搜索列表底部可展示 `$ <query>` 兜底执行项（受设置开关控制）。
