@@ -30,6 +30,12 @@
          requestWhenInUseAuthorization() 同名，不同系统版本会查其中一个。 -->
     <key>NSLocationUsageDescription</key>
     <string>Quick 只在你主动查看天气时使用你的大致位置（公里级），不会在启动时申请，也不会记录或上传。</string>
+    <!-- 自动化用途说明。控制别的应用（System Events / Finder）要有这条，系统才会弹
+         「Quick 想要控制……」的授权框；缺了它不会询问，而是直接以 -1743
+         「未获得授权将 Apple 事件发送给 System Events」拒绝，用户查不到原因也没法授权。
+         触发点：切换深色模式、睡眠 / 重启 / 关机 / 退出登录、清空废纸篓、推出磁盘。 -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Quick 用 AppleScript 执行你主动选择的系统操作：切换深色模式、睡眠、重启、关机、退出登录、清空废纸篓、推出磁盘。</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Quick 只在你主动查看天气时使用你的大致位置（公里级），不会在启动时申请，也不会记录或上传。</string>
 </dict>
