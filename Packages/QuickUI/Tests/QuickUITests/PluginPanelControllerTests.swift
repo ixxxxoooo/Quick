@@ -157,6 +157,43 @@ struct PluginPanelControllerTests {
         controller.closeAll()
     }
 
+    // MARK: - 标题栏
+
+    /// 回归：分离窗口必须拖得动
+    ///
+    /// `isMovableByWindowBackground` 在 SwiftUI 内容上靠不住（理由见 `WindowDragArea`），
+    /// 所以标题栏里挂了一个真实的拖拽视图。它被删掉、或者被铺到按钮上面（那样会把点击吃掉），
+    /// 表现都是「窗口拖不动 / 按钮点不动」—— 而这两种都只有靠手试才发现。
+    @Test("标题栏挂了拖拽区")
+    func titleBarHasDragArea() {
+        let controller = PluginPanelController()
+        let view = AnyView(Text("测试"))
+
+        controller.detach(
+            pluginID: "drag-test",
+            pluginName: "拖拽测试",
+            icon: "hand.draw",
+            viewProvider: { view },
+            sourceWindow: nil
+        )
+
+        let container = detachedPanel("drag-test")?.contentView
+        container?.layoutSubtreeIfNeeded()
+
+        #expect(container?.firstDescendant(of: WindowDragView.self) != nil)
+
+        // 窗口没被激活时第一次按下也要能拖起来，否则用户得先点一下窗口再拖
+        #expect(WindowDragView().acceptsFirstMouse(for: nil))
+
+        controller.closeAll()
+    }
+
+    /// 回归：标题栏那两个按钮要比底栏按钮小一档
+    @Test("窗口控制按钮比底栏按钮小")
+    func windowControlButtonIsSmaller() {
+        #expect(DesignTokens.Size.windowControlButton < DesignTokens.Size.barButtonHeight)
+    }
+
     // MARK: - 与主面板相互独立
 
     @Test("分离窗口是非激活面板，且失活时不隐藏")
@@ -272,6 +309,19 @@ struct PluginPanelControllerTests {
     private final class Counter {
         private(set) var value = 0
         func increment() { value += 1 }
+    }
+}
+
+// MARK: - 视图树查找
+
+extension NSView {
+    /// 在子树里找第一个指定类型的视图（含自身）
+    func firstDescendant<T: NSView>(of type: T.Type) -> T? {
+        if let match = self as? T { return match }
+        for subview in subviews {
+            if let found = subview.firstDescendant(of: type) { return found }
+        }
+        return nil
     }
 }
 

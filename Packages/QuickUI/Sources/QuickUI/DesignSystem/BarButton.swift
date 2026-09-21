@@ -7,7 +7,8 @@ import SwiftUI
 /// 栏位按钮
 ///
 /// 悬停时出现胶囊底，用在面板底栏与窗口标题栏这两处「栏位」上。
-/// 高度固定在 `Size.barButtonHeight`，这样一排按钮的基线永远对齐。
+/// 两种样式各自固定尺寸（`.titled` 用 `Size.barButtonHeight`、`.icon` 用
+/// `Size.windowControlButton`），这样同一排按钮的基线永远对齐。
 public struct BarButton: View {
 
     /// 按钮样式
@@ -96,10 +97,10 @@ public struct BarButton: View {
 
         case .icon:
             Image(systemName: icon ?? "questionmark")
-                .font(DesignTokens.Typography.iconGlyph)
+                .font(DesignTokens.Typography.windowControlIcon)
                 .frame(
-                    width: DesignTokens.Size.barButtonHeight,
-                    height: DesignTokens.Size.barButtonHeight
+                    width: DesignTokens.Size.windowControlButton,
+                    height: DesignTokens.Size.windowControlButton
                 )
         }
     }

@@ -296,7 +296,8 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | --- | --- | --- |
 | 行图标 | `Typography.iconGlyph`（16pt medium）+ `Size.rowIcon` 槽位 | 列表行的**前导**图标，与标题成列 |
 | 侧边栏图标 | `Typography.sidebarIcon`（13pt regular）+ `Size.sidebarIconSlot` | 设置窗口侧边栏；跟着侧边栏文字走，比行图标小一档 |
-| 行内图标 | `Typography.inlineIcon`（13pt regular） | 与正文同排的图标：搜索框放大镜、清除按钮、警告三角、复制按钮 |
+| 行内图标 | `Typography.inlineIcon`（13pt regular） | 与正文同排的图标：搜索框放大镜、清除按钮、警告三角、复制按钮、分离窗口标题栏的身份图标 |
+| 窗口控制图标 | `Typography.windowControlIcon`（12pt medium）+ `Size.windowControlButton` 槽位 | 分离窗口标题栏右上角的置顶 / 关闭；它跟着 22pt 的方形槽位走，不跟正文 |
 | 小控件图标 | `Typography.compactIcon`（11pt regular） | 别名框、快捷键录制器里的清除按钮 |
 
 两条纪律：
@@ -305,8 +306,10 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
   于是同一个面板里出现「有的 16、有的 13」—— 这正是这一组令牌要消掉的问题，
   而它曾经真的发生在设置页里（12 个图标在静默继承）。
 - **槽位宽度也要统一。** 图标尺寸一致但槽位宽度不一致，标题的起始位置照样逐行漂移。
-  行图标统一 24，侧边栏统一 18。
+  行图标统一 24，侧边栏统一 18，窗口控制统一 22。
 - 图标是**语义**不是装饰：选 SF Symbol 时挑表意准确的那个，不要为了好看换。
+  开关型按钮的激活态用**填充变体**表达（置顶 `pin` → `pin.fill`），而不是只换颜色 ——
+  12pt 下颜色的差别看不清。
 
 ---
 
@@ -369,7 +372,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | 组件 | 职责 |
 | --- | --- |
 | `HUDController` | 屏幕底部轻量提示，`show(message:tone:duration:)` |
-| `PluginPanelController` | 分离窗口管理：创建独立 NSWindow、单例策略、尺寸记忆、关闭。控制长在它自己的标题栏里（置顶 / 关闭 + ⌘R 刷新） |
+| `PluginPanelController` | 分离窗口管理：创建独立 NSWindow、单例策略、尺寸记忆、关闭。控制长在它自己的标题栏里（置顶 / 关闭 + ⌘R 刷新），标题栏带 `WindowDragArea` 负责拖拽 |
 | `FloatingCapsuleView` | 悬浮胶囊：**AI 网页窗口**的常驻控件（内容是一整块网页，没有自己的边框）。可拖、可折叠、位置按窗口持久化 |
 | `ActivationPolicyKeeper` | 应用激活策略的唯一记账处：设置窗口与 AI 窗口在场时 `.regular`，都走了回 `.accessory` |
 

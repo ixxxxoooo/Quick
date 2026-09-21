@@ -93,6 +93,11 @@ public enum DesignTokens {
         public static let bottomBarHeight = scaled(52)
         /// 底栏按钮高度
         public static let barButtonHeight = scaled(28)
+        /// 窗口控制按钮尺寸（分离窗口标题栏右上角的置顶 / 关闭）
+        ///
+        /// 比 `barButtonHeight` 小一档：标题栏本身只有 `detachedTitleBarHeight` 高，
+        /// 按钮占满它就把整条栏位撑满了，两个方块比标题还抢眼。
+        public static let windowControlButton = scaled(22)
         /// 列表行图标尺寸
         public static let rowIcon = scaled(24)
         /// 快捷键帽尺寸
@@ -268,6 +273,11 @@ public enum DesignTokens {
         public static let compactKeyCap = scaledStyle(.caption2)
         /// 列表行 / 底栏图标字体（固定尺寸，图标需要与 rowIcon 槽位对齐）
         public static let iconGlyph = Font.system(size: scaled(16), weight: .medium)
+        /// 窗口控制按钮的图标（分离窗口标题栏的置顶 / 关闭）
+        ///
+        /// 比 `iconGlyph` 小两档、比 `compactIcon` 大一点：它是窗口控制，不是列表行图标，
+        /// 跟着 `windowControlButton` 那个 22pt 的方形槽位走。
+        public static let windowControlIcon = Font.system(size: scaled(12), weight: .medium)
         /// 设置窗口侧边栏的列表图标
         ///
         /// 比 `iconGlyph` 小一档：侧边栏的文字是 `.body`，图标跟着文字走而不是跟着行图标走。

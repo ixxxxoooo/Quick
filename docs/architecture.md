@@ -460,8 +460,16 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 ### 分离窗口的控制在它的标题栏里
 
 分离窗口有自己的自绘标题栏，所以置顶 / 关闭**就长在标题栏右侧**（`BarButton` 的
-`.icon` 样式），刷新保留 ⌘R。不用悬浮胶囊，是因为那个浮层带来的一整套交互
+`.icon` 样式，尺寸走 `Size.windowControlButton` / `Typography.windowControlIcon`，
+比底栏按钮小一档），刷新保留 ⌘R。不用悬浮胶囊，是因为那个浮层带来的一整套交互
 （可拖、可折叠、位置要持久化）只在「窗口没有自己的边框」时才值得付。
+
+**标题栏必须自己实现拖拽。** `isMovableByWindowBackground` 在 SwiftUI 内容上靠不住：
+窗口是看 `hitTest` 命中的那个视图的 `mouseDownCanMoveWindow` 决定拖不拖的，而面板里
+铺满的 vibrancy 背景（一个真实的 `NSVisualEffectView`）与 hosting view 都不返回它 ——
+表现就是**窗口拖不动**。所以标题栏的身份区挂了 `WindowDragArea`（一个只做
+`performDrag` 的真实 `NSView`）。它**只铺在按钮左边**：它是个真实的 `NSView`，
+铺到按钮上面会把点击吃掉。
 
 **刷新是真的重建**：`PluginPanelController` 存的是视图工厂（`viewProvider`）而不是
 建好的视图，所以刷新会重新走一遍插件的 `makeView()`，而不是重画一份旧状态。

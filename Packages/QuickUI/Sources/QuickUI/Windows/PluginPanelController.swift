@@ -181,6 +181,8 @@ public final class PluginPanelController {
         panel.title = pluginName
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
+        // 背景拖动只在「命中的那个视图肯让出按下事件」时才生效，SwiftUI 内容下靠不住：
+        // 标题栏那块是显式的 `WindowDragArea`，两者是互补的，见它的说明。
         panel.isMovableByWindowBackground = true
         panel.backgroundColor = .clear
         panel.hasShadow = true
@@ -427,23 +429,30 @@ private struct DetachedPanelContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
     }
 
-    /// 标题栏：左侧插件身份，右侧窗口控制
+    /// 标题栏：左侧插件身份（整块可拖），右侧窗口控制
     private var titleBar: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
-            Image(systemName: pluginIcon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            // 身份区 + 中间空白整块都是拖拽区。拖拽区**不能铺到按钮上面** ——
+            // 它是一个真实的 `NSView`，盖住按钮会把点击吃掉（见 `WindowDragArea`）。
+            HStack(spacing: DesignTokens.Spacing.sm) {
+                Image(systemName: pluginIcon)
+                    .font(DesignTokens.Typography.inlineIcon)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
 
-            Text(pluginName)
-                .font(DesignTokens.Typography.sectionHeader)
-                .foregroundStyle(DesignTokens.Colors.textPrimary)
-                .lineLimit(1)
+                Text(pluginName)
+                    .font(DesignTokens.Typography.sectionHeader)
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                    .lineLimit(1)
 
-            Spacer(minLength: DesignTokens.Spacing.md)
+                Spacer(minLength: DesignTokens.Spacing.md)
+            }
+            // 撑满标题栏高度，整条栏位都拖得动，而不是只有文字那一行
+            .frame(maxHeight: .infinity)
+            .background(WindowDragArea())
 
             BarButton(
                 title: isPinned ? "取消窗口置顶" : "窗口置顶",
-                icon: "pin",
+                icon: isPinned ? "pin.fill" : "pin",
                 style: .icon,
                 isActive: isPinned,
                 action: onTogglePin
@@ -460,5 +469,36 @@ private struct DetachedPanelContentView: View {
         .padding(.leading, DesignTokens.Spacing.lg)
         .padding(.trailing, DesignTokens.Spacing.md)
         .frame(height: DesignTokens.Size.detachedTitleBarHeight)
+    }
+}
+
+// MARK: - 标题栏拖拽区
+
+/// 标题栏的拖拽区
+///
+/// **为什么需要它：** 窗口是不是「按背景拖动」，取决于 `hitTest` 命中的那个视图有没有
+/// 返回 `mouseDownCanMoveWindow`，而面板里铺满的 vibrancy 背景（一个真实的
+/// `NSVisualEffectView`）与 hosting view 都不返回 —— 于是 `isMovableByWindowBackground`
+/// 在 SwiftUI 内容上靠不住，表现就是**窗口拖不动**。这里放一个只做一件事的 `NSView`：
+/// 按下就 `performDrag`，不依赖上面那套判定。
+///
+/// 它只铺在标题栏的身份区与中间空白上，不盖住右上角的按钮 —— 它是个真实的 `NSView`，
+/// 铺到按钮上面会把点击吃掉。
+struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> WindowDragView { WindowDragView() }
+    func updateNSView(_ nsView: WindowDragView, context: Context) {}
+}
+
+/// 拖拽区背后的视图
+///
+/// 独立类型而不是匿名内部类，是为了让测试能断言它真的挂上去了 ——
+/// 「窗口拖不动」是个只能靠手试才发现的问题，值得一条结构性断言守着。
+final class WindowDragView: NSView {
+
+    /// 窗口没被激活时，第一次按下也要能拖起来
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
     }
 }
