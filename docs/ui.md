@@ -102,7 +102,9 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 ```
 
 - 行高由内容 + `Spacing.md` 上下内边距决定，不写死。
-- **副标题放在右侧，不放标题下方。** 放标题下方会把行高翻倍，一屏能看到的条目少一半。
+- **行内不放描述文字。** 右侧只有类型标签 / 键位提示，与基准一致：一屏能看到的条目数
+  优先于解释文案。插件仍在填 `SearchableItem.subtitle`，但面板没有它的渲染点 ——
+  不要把它加回行里。
 - 选中/悬停用 `Colors.selection` / `Colors.rowHover` 填充，悬停更淡，
   两者视觉上必须可区分。
 
@@ -156,6 +158,17 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 
 拦到的按键写进 `PaletteSelection`（一个**不持有窗口**的 `@Observable` 对象，
 所以被 SwiftUI 观察是安全的；会与 AttributeGraph 死循环的是协调器本身）。
+
+**插件模式下相反：面板一个键都不接。** 那时屏幕上是插件自己的视图，方向键与回车属于
+它（标签栏、列表都是它画的），而搜索结果列表的选中项还停在最后一次搜索上。所以
+`PaletteCoordinator` 在插件模式下让 `onMove` / `onSubmit` 直接返回 `false`：事件沿响应链
+继续走，落到插件的视图上。
+
+代价在插件这一侧：**`onKeyPress` 不会自己收到键**，插件必须让内容成为第一响应者
+（`.focusable()` + `@FocusState` + `onAppear` 里取一次焦点，并用 `.focusEffectDisabled()`
+去掉那圈焦点描边）。漏掉这一步的表现就是「键都写好了，但按下去毫无反应」——剪贴板
+插件正是这样静默失效了很久。另外要显式写 `phases: [.down, .repeat]`：单键重载
+`onKeyPress(.downArrow) { }` 不带 phases，长按不会连续移动。
 
 
 
@@ -315,7 +328,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | `PaletteBackground` | 面板背景：vibrancy + scrim + 边缘高光，一处配置。**不含投影** |
 | `Scrolling/EdgeDissolve` | 滚动内容在浮动栏下方淡出的遮罩，`.edgeDissolve()` 挂载 |
 | `KeyCapChip` | 快捷键帽。`.filled`（底栏）/ `.outline`（列表行）两种样式 |
-| `BarButton` | 底栏按钮：悬停胶囊 + 图标/文字 |
+| `BarButton` | 栏位按钮：悬停胶囊 + 图标/文字。`.titled`（底栏）/ `.icon`（窗口标题栏，此时 `title` 只作无障碍标签）两种样式，`.destructive` 色调给关闭用 |
 | `SectionHeader` | 列表分组标题（当前未使用：我们不做分组，见 §2） |
 
 ### Components/
@@ -340,7 +353,9 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | 组件 | 职责 |
 | --- | --- |
 | `HUDController` | 屏幕底部轻量提示，`show(message:tone:duration:)` |
-| `PluginPanelController` | 分离窗口管理：创建独立 NSWindow、单例策略、尺寸记忆、关闭 |
+| `PluginPanelController` | 分离窗口管理：创建独立 NSWindow、单例策略、尺寸记忆、关闭。控制长在它自己的标题栏里（置顶 / 关闭 + ⌘R 刷新） |
+| `FloatingCapsuleView` | 悬浮胶囊：**AI 网页窗口**的常驻控件（内容是一整块网页，没有自己的边框）。可拖、可折叠、位置按窗口持久化 |
+| `ActivationPolicyKeeper` | 应用激活策略的唯一记账处：设置窗口与 AI 窗口在场时 `.regular`，都走了回 `.accessory` |
 
 ---
 

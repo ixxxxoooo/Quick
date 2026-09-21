@@ -23,6 +23,8 @@ public struct SearchableItem: Identifiable, Sendable {
     public let title: String
 
     /// 副标题（可选，例如应用的路径或工具的描述）
+    ///
+    /// **面板没有它的渲染点**：结果行只画标题与右侧类型标签，见 docs/ui.md §2。
     public let subtitle: String?
 
     /// 图标（SF Symbol 名称）

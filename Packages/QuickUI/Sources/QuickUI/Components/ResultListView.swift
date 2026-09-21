@@ -119,8 +119,9 @@ public struct ResultListView: View {
 
 /// 单行搜索结果
 ///
-/// 单行布局：图标 · 标题 ·（弹性）· 右侧类型标签。参考实现也是这个形状 ——
-/// 副标题放在标题下方会把行高翻倍，一屏能看到的条目就少了一半。
+/// 单行布局：图标 · 标题 ·（弹性）· 右侧类型标签 / 键位提示。参考实现也是这个形状 ——
+/// **行内不放描述文字**，放标题下方还是右侧都不放：一屏能看到的条目数优先。
+/// 插件仍在 `SearchableItem.subtitle` 里提供描述，但面板没有它的渲染点。
 struct ResultRowView: View {
     let item: SearchableItem
     let isSelected: Bool
@@ -141,13 +142,6 @@ struct ResultRowView: View {
 
             if let hint = item.shortcutHint {
                 KeyCapChip(text: hint, style: .outline, scale: .compact)
-            }
-
-            if let subtitle = item.subtitle {
-                Text(subtitle)
-                    .font(DesignTokens.Typography.rowTrailing)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                    .lineLimit(1)
             }
 
             // 来源插件标注：告诉用户这一条命令是哪个插件给的

@@ -455,12 +455,19 @@ public final class PaletteCoordinator {
             return true
         }
 
-        // 上下键与回车在 AppKit 层转给选中状态，见 PalettePanel.sendEvent 的说明
+        // 上下键与回车在 AppKit 层转给选中状态，见 PalettePanel.sendEvent 的说明。
+        //
+        // **插件模式下不接。** 那时屏幕上是插件的视图，方向键与回车属于它 —— 它有焦点、
+        // 有自己的标签栏和列表；而搜索列表的选中项还停在最后一次搜索上，让它接管既吃掉了
+        // 插件该收的键，又可能把回车打到一条用户早已看不见的结果上。返回 false 就是让事件
+        // 继续往响应链上走，由插件的视图处理。
         newPanel.onMove = { [weak self] delta in
-            self?.selection.move(delta) ?? false
+            guard let self, self.activePluginID == nil else { return false }
+            return self.selection.move(delta)
         }
         newPanel.onSubmit = { [weak self] in
-            self?.selection.activateSelection() ?? false
+            guard let self, self.activePluginID == nil else { return false }
+            return self.selection.activateSelection()
         }
         newPanel.onPointerMoved = { [weak self] location in
             self?.selection.notePointerMoved(to: location)
