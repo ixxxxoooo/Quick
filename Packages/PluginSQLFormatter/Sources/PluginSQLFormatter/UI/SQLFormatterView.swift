@@ -16,6 +16,9 @@ struct SQLFormatterView: View {
     @State private var indent = 2
     @State private var statementCount = 0
 
+    /// 粘贴检测跳转时携带的初始文本
+    @Environment(\.pluginContext) private var pluginContext
+
     var body: some View {
         VStack(spacing: 0) {
             toolbar
@@ -40,6 +43,12 @@ struct SQLFormatterView: View {
             statusBar
         }
         .onChange(of: input) { _, _ in autoFormat() }
+        .onAppear {
+            // 从导航上下文读取初始输入（粘贴检测自动跳转场景）
+            if let initialQuery = pluginContext["query"], !initialQuery.isEmpty, input.isEmpty {
+                input = initialQuery
+            }
+        }
     }
 
     // MARK: - 工具栏

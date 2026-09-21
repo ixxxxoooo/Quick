@@ -110,8 +110,33 @@ struct PaletteRootView: View {
                 runSearch(query)
             }
         }
-        .onChange(of: paletteQuery.text) { _, newValue in
+        .onChange(of: paletteQuery.text) { oldValue, newValue in
             query = newValue
+            // 粘贴检测：一次性增量超过阈值时检测内容类型
+            let delta = newValue.count - oldValue.count
+            if delta >= PasteContentDetector.pasteThreshold {
+                let kind = PasteContentDetector.detect(newValue)
+                switch kind {
+                case .json:
+                    log.notice("粘贴检测到 JSON 内容（长度 \(newValue.count, privacy: .public)），自动跳转 JSON 格式化")
+                    EventBus.shared.post(
+                        NavigateEvent(
+                            pluginID: "json-formatter",
+                            context: ["query": newValue]
+                        ))
+                    return
+                case .sql:
+                    log.notice("粘贴检测到 SQL 内容（长度 \(newValue.count, privacy: .public)），自动跳转 SQL 格式化")
+                    EventBus.shared.post(
+                        NavigateEvent(
+                            pluginID: "sql-formatter",
+                            context: ["query": newValue]
+                        ))
+                    return
+                case .unknown:
+                    break
+                }
+            }
             runSearch(newValue)
         }
     }
@@ -250,6 +275,7 @@ struct PaletteRootView: View {
                 let pluginView = pluginViewProvider(pluginID, paletteMode.context)
             {
                 pluginView
+                    .environment(\.pluginContext, paletteMode.context)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
             } else {

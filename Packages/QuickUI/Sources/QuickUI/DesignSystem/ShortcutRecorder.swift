@@ -34,48 +34,44 @@ public struct ShortcutRecorder: View {
         self.onClear = onClear
     }
 
+    /// 是否有已绑定的快捷键
+    private var hasBoundShortcut: Bool {
+        if let keycaps, !keycaps.isEmpty { return true }
+        return false
+    }
+
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
 
-        Group {
-            if isRecording {
-                Text("按下快捷键…")
-                    .font(DesignTokens.Typography.keyCap)
-                    .foregroundStyle(Color.accentColor)
-            } else if let keycaps, !keycaps.isEmpty {
-                HStack(spacing: DesignTokens.Spacing.xxs) {
-                    ForEach(Array(keycaps.enumerated()), id: \.offset) { _, cap in
-                        Text(cap)
-                            .font(DesignTokens.Typography.keyCap)
-                            .foregroundStyle(DesignTokens.Colors.textSecondary)
-                            .padding(.horizontal, DesignTokens.Spacing.xs)
-                            .frame(minWidth: 18, minHeight: 18)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(Color.primary.opacity(0.08))
-                            )
-                    }
-                }
+        HStack(spacing: 0) {
+            // 左侧：录制区域（点击进入录制 / 显示已绑定快捷键）
+            recordingArea
                 .frame(maxWidth: .infinity)
-                .overlay(alignment: .trailing) {
-                    if isHovered {
-                        Button {
-                            onClear()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(DesignTokens.Typography.compactIcon)
-                                .foregroundStyle(DesignTokens.Colors.textTertiary)
-                        }
-                        .buttonStyle(.plain)
-                        .help("清除快捷键")
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if !isRecording {
+                        startRecording()
                     }
                 }
-            } else {
-                Text("点击录制")
-                    .font(DesignTokens.Typography.keyCap)
-                    .foregroundStyle(
-                        isHovered ? DesignTokens.Colors.textSecondary : DesignTokens.Colors.textTertiary
-                    )
+
+            // 右侧：清除按钮 — 已绑定时始终可见，避免仅 hover 时才出现导致难以点击
+            if hasBoundShortcut && !isRecording {
+                Button {
+                    onClear()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(DesignTokens.Typography.compactIcon)
+                        .foregroundStyle(
+                            isHovered
+                                ? DesignTokens.Colors.textSecondary
+                                : DesignTokens.Colors.textTertiary
+                        )
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("清除快捷键")
+                .padding(.trailing, DesignTokens.Spacing.xs)
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.sm)
@@ -86,15 +82,39 @@ public struct ShortcutRecorder: View {
                 isRecording ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: 1)
         )
         .clipShape(shape)
-        .contentShape(shape)
-        .onTapGesture {
-            if !isRecording {
-                startRecording()
-            }
-        }
         .onHover { isHovered = $0 }
         .onDisappear {
             stopRecording()
+        }
+    }
+
+    /// 录制区域的内容
+    @ViewBuilder
+    private var recordingArea: some View {
+        if isRecording {
+            Text("按下快捷键…")
+                .font(DesignTokens.Typography.keyCap)
+                .foregroundStyle(Color.accentColor)
+        } else if let keycaps, !keycaps.isEmpty {
+            HStack(spacing: DesignTokens.Spacing.xxs) {
+                ForEach(Array(keycaps.enumerated()), id: \.offset) { _, cap in
+                    Text(cap)
+                        .font(DesignTokens.Typography.keyCap)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        .padding(.horizontal, DesignTokens.Spacing.xs)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Color.primary.opacity(0.08))
+                        )
+                }
+            }
+        } else {
+            Text("点击录制")
+                .font(DesignTokens.Typography.keyCap)
+                .foregroundStyle(
+                    isHovered ? DesignTokens.Colors.textSecondary : DesignTokens.Colors.textTertiary
+                )
         }
     }
 
