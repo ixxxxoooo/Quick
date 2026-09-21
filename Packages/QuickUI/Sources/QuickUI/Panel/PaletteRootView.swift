@@ -37,6 +37,12 @@ struct PaletteRootView: View {
     /// 焦点在搜索框里，SwiftUI 这一层收不到方向键。
     var selection: PaletteSelection
 
+    /// 搜索框文本（协调器与视图共用的唯一状态）
+    ///
+    /// 用桥接对象而不是 `@State`：协调器需要在面板外面改写它（自动粘贴、自动清空、
+    /// `show(query:)` 预填），`@State` 做不到这件事。
+    var paletteQuery: PaletteQuery
+
     /// 面板模式（搜索 vs 插件）
     ///
     /// 由协调器提供的 `@Observable` 桥接对象，不持有 NSPanel，安全观察。
@@ -50,15 +56,15 @@ struct PaletteRootView: View {
     /// 参数：(pluginID, context) -> 插件视图；返回 nil 表示插件不可用。
     var pluginViewProvider: (String, [String: String]) -> AnyView?
 
+    /// 某条结果被激活（由协调器注入，用于记录最近使用）
+    var onItemActivated: ((String) -> Void)?
+
     /// 返回主搜索（由协调器注入）
     ///
     /// **不能在这里直接改 `paletteMode`**：协调器自己也存着「当前是哪个插件」，
     /// 绕过它会让两边状态不一致（返回之后协调器仍以为插件是激活的），
     /// 而且搜索框的焦点也没人负责还回去。
     var onReturnToSearch: () -> Void
-
-    /// 初始查询
-    var initialQuery: String = ""
 
     @State private var query: String = ""
     @State private var results: [SearchableItem] = []
@@ -86,7 +92,7 @@ struct PaletteRootView: View {
         .background(PaletteBackground())
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
         .onAppear {
-            if !initialQuery.isEmpty { query = initialQuery }
+            query = paletteQuery.text
             log.debug("面板视图已出现，开始首次搜索")
             runSearch(query)
             if appIndexSubscription == nil {
@@ -104,7 +110,8 @@ struct PaletteRootView: View {
                 runSearch(query)
             }
         }
-        .onChange(of: query) { _, newValue in
+        .onChange(of: paletteQuery.text) { _, newValue in
+            query = newValue
             runSearch(newValue)
         }
     }
@@ -122,7 +129,9 @@ struct PaletteRootView: View {
     private var searchHeader: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
             SearchFieldView(
-                query: $query,
+                query: Binding(
+                    get: { paletteQuery.text },
+                    set: { paletteQuery.text = $0 }),
                 placeholder: "搜索应用、命令和工具…",
                 icon: "magnifyingglass"
             )
@@ -290,6 +299,8 @@ struct PaletteRootView: View {
             isSearching = false
             selection.update(count: items.count) { index in
                 guard items.indices.contains(index) else { return }
+                // 记在动作之前：动作可能切走插件、甚至关掉面板
+                onItemActivated?(items[index].id)
                 items[index].action()
             }
         }

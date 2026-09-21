@@ -141,6 +141,8 @@ public final class ClipboardPlugin: QuickPlugin {
     public func activate() {
         monitor.onNewContent = { [weak self] entry in
             self?.store.add(entry)
+            // 广播「刚复制过」：面板的自动粘贴靠它判断时间窗。只发时间点，内容谁要谁去读
+            EventBus.shared.post(ClipboardChangedEvent())
         }
         observeMonitorSetting()
         applyMonitorSetting()

@@ -120,6 +120,12 @@ final class AppCore {
     /// 用户设置存储（插件开关等）
     let settingsStore = SettingsStore()
 
+    /// 键盘布局切换（面板打开时强制到指定布局）
+    let keyboardLayoutService = KeyboardLayoutService()
+
+    /// 面板打开前的键盘布局，用于关闭时还原
+    private var layoutBeforePanel: String?
+
     /// 数据库
     ///
     /// 全应用一个库，插件的批量数据与插件键值都在里面。`lazy` 是因为打开可能失败，
@@ -191,8 +197,15 @@ final class AppCore {
         registerPlugins()
         log.notice("插件注册完成，共 \(self.plugins.count, privacy: .public) 个")
 
-        // 3. 将插件注入到面板协调器
+        // 3. 将插件注入到面板协调器，并接上「最近使用」与键盘布局
         paletteCoordinator.setPlugins(plugins)
+        paletteCoordinator.usageHistory = UsageHistory(database: database)
+        paletteCoordinator.onPanelWillShow = { [weak self] in
+            self?.applyForcedKeyboardLayout()
+        }
+        paletteCoordinator.onPanelDidHide = { [weak self] in
+            self?.restoreKeyboardLayout()
+        }
 
         // 4. 连接事件总线
         wireEventBus()
@@ -337,12 +350,45 @@ final class AppCore {
         paletteCoordinator.hide(restoreFocus: false)
     }
 
+    // MARK: - 键盘布局
+
+    /// 面板打开时切到用户指定的键盘布局
+    ///
+    /// 中文输入法用户按 ⌥Space 时往往还停在拼音状态，输入的其实是拼音串 ——
+    /// 强制切到 ABC 才能直接打命令。关闭面板时还原（见 restoreKeyboardLayout）。
+    private func applyForcedKeyboardLayout() {
+        let configured = UserDefaults.standard.string(forKey: SettingsKey.paletteForceKeyboardLayout) ?? ""
+        guard !configured.isEmpty else { return }
+
+        let current = keyboardLayoutService.currentLayoutID()
+        // 已经在目标布局上就不动：既省一次切换，也保证「还原」不会记错原值
+        guard current != configured else { return }
+
+        layoutBeforePanel = current
+        if keyboardLayoutService.select(layoutID: configured) {
+            log.notice("面板打开，键盘布局已切到 \(configured, privacy: .public)")
+        } else {
+            // 用户可能已经删掉了那个布局：留个 warning，不要静默
+            log.warning("指定的键盘布局不存在，未切换：\(configured, privacy: .public)")
+            layoutBeforePanel = nil
+        }
+    }
+
+    /// 面板关闭时还原原来的键盘布局
+    private func restoreKeyboardLayout() {
+        guard let previous = layoutBeforePanel else { return }
+        layoutBeforePanel = nil
+        if keyboardLayoutService.select(layoutID: previous) {
+            log.debug("面板关闭，键盘布局已还原：\(previous, privacy: .public)")
+        }
+    }
+
     // MARK: - 存储迁移
 
     /// 应用宿主自己的 schema
     private func migrateHostStorage() {
         do {
-            try database.migrate([.corePluginData])
+            try database.migrate([.corePluginData, .coreUsageHistory])
         } catch {
             // 迁移失败不能静默：继续跑下去会以「表不存在」的形式在插件里炸开，
             // 那时已经看不出根因了
@@ -767,6 +813,25 @@ extension AppCore: SettingsDataSource {
     }
 
     // MARK: - 功能插件设置
+
+    /// 系统里可选的键盘布局
+    var keyboardLayouts: [SettingsKeyboardLayout] {
+        keyboardLayoutService.availableLayouts().map {
+            SettingsKeyboardLayout(id: $0.id, name: $0.name)
+        }
+    }
+
+    var forcedKeyboardLayoutID: String? {
+        UserDefaults.standard.string(forKey: SettingsKey.paletteForceKeyboardLayout)
+    }
+
+    func setForcedKeyboardLayout(_ layoutID: String?) {
+        if let layoutID, !layoutID.isEmpty {
+            UserDefaults.standard.set(layoutID, forKey: SettingsKey.paletteForceKeyboardLayout)
+        } else {
+            UserDefaults.standard.removeObject(forKey: SettingsKey.paletteForceKeyboardLayout)
+        }
+    }
 
     /// 窗口管理的布局命令
     ///

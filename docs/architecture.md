@@ -54,6 +54,8 @@
 | `paletteCoordinator` | `PaletteCoordinator` | 面板生命周期、定位、聚合搜索 |
 | `permissionService` | `PermissionService` | 辅助功能 / 屏幕录制权限 |
 | `pasteboardService` | `PasteboardService` | 剪贴板读写 |
+| `settingsStore` | `SettingsStore` | 插件开关之类的偏好 |
+| `keyboardLayoutService` | `KeyboardLayoutService` | 系统输入源枚举与切换（面板打开时强制到指定布局） |
 | `appIndex` | `AppIndex` | 应用清单与模糊搜索 |
 | `hud` | `HUDController` | 底部轻量提示 |
 | `pluginPanelController` | `PluginPanelController` | 分离窗口管理（创建、单例、尺寸记忆） |
@@ -103,6 +105,7 @@ public protocol QuickPlugin: AnyObject, Sendable {
     static var icon: String { get }      // SF Symbol 名
     var isEnabled: Bool { get set }
     func searchItems(query: String) async -> [SearchableItem]
+    func defaultItems() async -> [SearchableItem]  // 首屏（空查询）展示什么
     func makeView() -> AnyView           // 面板内的插件主视图
     func makeSettingsView() -> AnyView?  // 设置页；无设置返回 nil
     func activate()                      // 启动 / 启用时
@@ -111,7 +114,8 @@ public protocol QuickPlugin: AnyObject, Sendable {
 ```
 
 协议提供了默认实现：`isEnabled` 默认 `true`、`makeSettingsView` 默认 `nil`、
-`searchItems` 默认空、`activate`/`deactivate` 默认无操作。**只实现你需要的那些**，
+`searchItems` 默认空、`activate`/`deactivate` 默认无操作、
+`defaultItems` 默认取「触发词裸查询的第一条」。**只实现你需要的那些**，
 不要写空实现占位。
 
 ### 不变量
@@ -120,6 +124,12 @@ public protocol QuickPlugin: AnyObject, Sendable {
   改了等于用户设置丢失。
 - **`searchItems` 必须是纯查询。** 不要在里面激活插件、写盘、发网络请求、改 `isEnabled`。
   它可能在每次按键时被调用（虽然并发，但不是免费的）。要缓存就在 `activate()` 里预热。
+- **`defaultItems()` 在首屏每条最多出一次，而且必须走 `searchItems`。** 空查询时
+  `searchItems(query: "")` 会被插件自己的触发词闸门挡掉、返回空数组，所以首屏不能靠它 ——
+  这就是 `defaultItems()` 存在的原因。默认实现「用触发词当查询词、取第一条」，
+  于是每个插件都自动有一个入口，而不会把首屏铺成插件自己的列表页。走同一条搜索路径的
+  意义在于：首屏那条和搜到的那条是同一份代码产出的，标题、图标、动作永远一致。
+  `LauncherPlugin` 覆盖它返回空 —— 它贡献的应用列表本身就是首屏主体。
 - **`searchItems` 必须尊重防抖与取消。** 调用方（`PaletteCoordinator`）只在防抖后调用，
   但插件内部若有昂贵准备，要检查 `Task.isCancelled`。
 - **`makeView()` 返回的视图不要持有 `AppCore`。** 需要能力就通过插件构造器注入。
@@ -178,6 +188,7 @@ public protocol QuickPlugin: AnyObject, Sendable {
 | `CopyToClipboardEvent` | 请求写剪贴板 |
 | `ShowHUDEvent`（+ `HUDTone`） | 请求弹一条提示 |
 | `DetachPanelEvent` | 请求将当前插件分离为独立窗口 |
+| `ClipboardChangedEvent` | 剪贴板内容变了（剪贴板插件发，宿主订阅）—— 只带时间点，不带内容 |
 
 ### 不变量
 
@@ -219,6 +230,12 @@ public struct SearchableItem: Identifiable, Sendable {
   插件可以在这个基础上叠加自己的权重（`LauncherPlugin` 就是
   `匹配分 * 0.7 + 使用频率 * 0.3`），但**不要所有结果都给 `1.0`** ——
   那等于放弃了排序，列表顺序会变成随机。
+- `withRelevance(_:)` 复制一份、换掉相关度，用于「同一条目在不同场景下权重不同」。
+  它只改这一个字段，`id` / 图标 / 动作原样带过去 —— 换权重不该换掉条目本身。
+- **空查询（首屏）的顺序由协调器最后再排一次。** 聚合、去重、按相关度排序之后，
+  协调器把「最近使用过的」条目提到最前（`PaletteCoordinator.promotingRecents`，
+  取最近 12 条），其余保持原顺序。首屏回答的是「我刚用过什么」，不是「谁的分数高」；
+  **非空查询完全不参与这次重排** —— 那时相关度才是用户要的，按时间插队只会打乱搜索结果。
 - `action` 在按下回车/点击时于主 actor 执行。它应该**只发事件或调用已注入的依赖**，
   不要直接 `NSWorkspace` 之类的全局调用（除了启动应用这种确实没有别的写法的情况）。
 
@@ -255,6 +272,14 @@ Debug（`.dev`）与 Release 互不污染。
    `storage.database` 直接写 SQL，schema 通过 `QuickPlugin.storageMigrations` 声明。
 
 **表结构归插件所有**：宿主只跑一遍声明，不预先建任何插件表，也不读插件表。
+宿主自己也有两份 schema，在 `AppCore.migrateHostStorage()` 里跑：`core.plugin_data`
+（插件的零散键值）与 `core.usage_history`（最近使用过的 `SearchableItem.id`）。
+
+「最近使用」放在宿主层而不是某个插件里，是因为它是**跨插件**的事实：用户可能刚用过一个
+开发工具、再打开一个应用、又用了翻译。每个插件各记各的，宿主就回答不了「按最近使用排序」
+—— 而首屏要的正是这个顺序。它与启动器插件的 `RankingStore` 分工不同：`RankingStore`
+记**使用次数**（与时间无关，用于给搜索结果加权），`UsageHistory` 记**最后一次是什么时候**
+（昨天启动过 20 次的东西，不该排在刚刚用过的翻译前面）。
 
 #### 迁移按 id 记账，不用递增版本号
 
@@ -300,6 +325,31 @@ Debug（`.dev`）与 Release 互不污染。
 
 `PaletteCoordinator` 拥有面板，负责显隐、定位、模式切换，**不含任何业务逻辑**。
 
+### 面板打开时的自动行为
+
+`show()` 在把面板推上前台之前先跑 `applyAutoBehavior()`，处理两件与「用户上次在干什么」
+有关的事。判定与取数据分开：`PaletteAutoBehavior` 里是纯函数（只比较时间点），
+协调器只负责取剪贴板、落结果 —— 于是时间窗的边界（`<` 还是 `<=`）可以直接测。
+
+- **刚复制过东西就填进搜索框**（时间窗 5 / 10 / 30 秒）。复制完立刻唤出面板，
+  多半就是要拿这段内容去搜或去粘。
+- **上次的查询放太久就清掉**（空闲时间 1 / 3 / 10 分钟），否则每次打开都看到残留的关键词。
+
+两个设置都经 `PaletteAutoBehavior.pasteWindow(from:)` / `clearIdle(from:)` 读，
+**出厂默认值定义在那里**，设置页的 `@AppStorage` 引用同一个常量。这不是洁癖：
+`@AppStorage` 的默认值只在键不存在时生效，而 `integer(forKey:)` 在键不存在时读到 0
+（＝关闭），两边各写各的就会出现「设置页写着 5 秒内、实际行为是关闭」。规则见
+[ui.md §11](ui.md#11-设置页的控件必须真的生效)。
+
+搜索框文本由 `PaletteQuery` 持有（不持有窗口的 `@Observable`），**协调器与视图共用同一份**。
+它存在的理由是协调器需要在面板外面改写输入框（自动粘贴、自动清空、`show(query:)` 预填），
+而视图的 `@State` 只在首次出现时读一次初值 —— 面板复用同一个 `NSHostingView`，
+所以「打开时传入的查询」曾经完全到不了输入框。
+
+剪贴板最后一次变化的时刻只有剪贴板插件知道（它在轮询 `NSPasteboard.changeCount`），
+所以它发 `ClipboardChangedEvent`，协调器订阅下来只记一个时间点 —— 事件不带内容，
+免得把可能很大的文本在事件里传一遍。
+
 ### 设置窗口
 
 设置界面在 `QuickUI`，但插件实例与系统能力（登录项、快捷键、权限）只有组装层看得到，
@@ -307,6 +357,10 @@ Debug（`.dev`）与 Release 互不污染。
 也不认识 `QuickPlatform`**，依赖方向保持不变。由 `AppCore` 实现协议。
 
 `SettingsStore`（持久化）由 `AppCore` 持有并注入，**不是单例**。
+
+设置窗口是唯一一个「像普通窗口那样被对待」的界面，所以 `SettingsWindowController` 在显示时
+`NSApp.setActivationPolicy(.regular)`、关闭时切回 `.accessory`。accessory 应用不进 Dock、
+也不进 ⌘Tab 切换器 —— 用户一旦从设置窗口切走，就再也找不回来它。
 
 ### 键盘输入归属
 
@@ -317,6 +371,12 @@ Debug（`.dev`）与 Release 互不污染。
 | 文本输入 | 搜索框（SwiftUI `TextField`） | 它就是焦点 |
 | ⌘A / ⌘C / ⌘V / ⌘X / ⌘Z | 主菜单的编辑菜单项 | **不是文本框自己实现的**：它们是菜单项的 key equivalent，由 AppKit 沿响应链派发 `selectAll:` / `copy:` / `paste:`。没有主菜单这些组合键就没人处理 —— 而 accessory 应用默认没有主菜单，见 `MainMenu` |
 | 点击行 / 悬停 | `ResultListView` | 鼠标路径本来就在 SwiftUI 里 |
+
+中文输入法用户按 ⌥Space 时往往还停在拼音状态，敲出来的是拼音串。设置页的「强制键盘布局」
+让面板打开期间切到指定布局（通常是 ABC）、关闭后还原；切换时机挂在协调器的
+`onPanelWillShow` / `onPanelDidHide` 上，由 `AppCore` 接线。它和 `HotKeyService` 一样
+必须走 Carbon 的 Text Input Source API（`TIS*`）—— AppKit / SwiftUI 里没有任何办法
+枚举或程序化切换系统输入源，理由与全局热键同属「有意的能力缺口依赖」。
 
 `PaletteSelection` 是一个**不持有窗口**的 `@Observable` 对象，所以被 SwiftUI 观察是
 安全的 —— 会与 AttributeGraph 死循环的是持有 `NSPanel` 的协调器本身。

@@ -43,6 +43,20 @@ public enum SettingsKey {
         "quick.alias.\(key)"
     }
 
+    // MARK: - 面板行为
+
+    /// 面板打开时自动把剪贴板内容填进搜索框的时间窗（秒；0 = 关闭）
+    ///
+    /// 语义是「刚复制过东西就打开面板」——复制完立刻唤出面板，多半就是要拿它来搜索或粘贴。
+    /// 超过这个时间窗的旧剪贴板内容不该自己冒出来。
+    public static let paletteAutoPasteSeconds = "quick.palette.autoPasteSeconds"
+
+    /// 搜索框内容自动清空的空闲时间（分钟；0 = 关闭）
+    public static let paletteAutoClearMinutes = "quick.palette.autoClearMinutes"
+
+    /// 面板打开期间强制切换到的键盘布局 id（空 = 不切换）
+    public static let paletteForceKeyboardLayout = "quick.palette.forceKeyboardLayout"
+
     // MARK: - 插件开关前缀
 
     /// 生成插件启用状态的设置键

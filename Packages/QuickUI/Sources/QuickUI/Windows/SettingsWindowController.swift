@@ -36,7 +36,11 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
         let window = self.window ?? makeWindow()
         self.window = window
 
-        // accessory 模式下不显式激活的话，窗口会被推到最前面却拿不到键盘焦点
+        // 打开设置期间切成常规应用：accessory 应用不进 Dock、也不进 ⌘Tab 切换器，
+        // 用户一旦切走就再也找不回来这个窗口。设置窗口是唯一一个「像普通窗口那样被对待」
+        // 的界面，所以只在它开着的时候变成常规应用，关掉就变回去（见 windowWillClose）。
+        NSApp.setActivationPolicy(.regular)
+
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         log.notice("设置窗口已显示：\(self.navigationState.tab.title, privacy: .public)")
@@ -83,6 +87,10 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     public func windowWillClose(_ notification: Notification) {
+        // 关掉设置就回到后台常驻：Dock 图标与 ⌘Tab 条目一起消失，
+        // 这样它平时仍然是一个不占位的效率工具
+        NSApp.setActivationPolicy(.accessory)
+
         log.debug("设置窗口已关闭")
     }
 }

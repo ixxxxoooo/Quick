@@ -143,3 +143,21 @@ public struct AppIndexRefreshedEvent: PluginEvent {
 
     public init() {}
 }
+
+/// 剪贴板内容发生了变化
+///
+/// 由剪贴板插件的监听器发出（它在轮询 `NSPasteboard.changeCount`，是唯一知道
+/// 「刚刚复制过」的地方）。宿主订阅它做两件事：面板打开时判断要不要把内容填进搜索框。
+///
+/// 只带时间点，不带内容：内容谁需要谁去读剪贴板，避免把可能很大的文本在事件里传一遍。
+public struct ClipboardChangedEvent: PluginEvent {
+
+    public static var name: String { "quick.clipboard.changed" }
+
+    /// 变化发生的时刻
+    public let at: Date
+
+    public init(at: Date = Date()) {
+        self.at = at
+    }
+}

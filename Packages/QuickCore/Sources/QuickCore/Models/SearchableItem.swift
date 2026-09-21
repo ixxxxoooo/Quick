@@ -86,6 +86,25 @@ public struct SearchableItem: Identifiable, Sendable {
         self.action = action
     }
 
+    /// 返回一个新实例，换一个相关度
+    ///
+    /// 用于「同一条目在不同场景下权重不同」：例如首屏里的插件命令要排在应用之后，
+    /// 而在按关键词搜索时它应该按自己的匹配分排。
+    public func withRelevance(_ relevance: Double) -> SearchableItem {
+        SearchableItem(
+            id: id,
+            pluginID: pluginID,
+            pluginName: pluginName,
+            title: title,
+            subtitle: subtitle,
+            icon: icon,
+            iconType: iconType,
+            relevance: relevance,
+            shortcutHint: shortcutHint,
+            action: action
+        )
+    }
+
     /// 返回一个新实例，填充 `pluginName`
     public func withPluginName(_ name: String) -> SearchableItem {
         SearchableItem(

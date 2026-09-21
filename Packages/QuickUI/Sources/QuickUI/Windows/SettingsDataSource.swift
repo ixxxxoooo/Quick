@@ -5,6 +5,17 @@
 import Foundation
 import SwiftUI
 
+/// 一个可选的键盘布局
+public struct SettingsKeyboardLayout: Identifiable, Sendable, Equatable {
+    public let id: String
+    public let name: String
+
+    public init(id: String, name: String) {
+        self.id = id
+        self.name = name
+    }
+}
+
 /// 一条窗口布局命令（窗口管理插件提供）
 ///
 /// id 是插件的 `WindowLayout` rawValue，设置页按它写「是否显示」的开关。
@@ -209,6 +220,15 @@ public protocol SettingsDataSource: AnyObject {
     /// 由插件提供而不是设置页自己列一份：设置页按这些 id 写「是否显示」的开关，
     /// 抄一份迟早会和插件里的 id 对不上（这曾经是一次真实缺陷）。
     var windowLayoutCommands: [SettingsWindowLayoutCommand] { get }
+
+    /// 系统里可选的键盘布局
+    ///
+    /// 与窗口布局命令同理：设置页不认识 QuickPlatform，由组装层把系统能力映射过来。
+    var keyboardLayouts: [SettingsKeyboardLayout] { get }
+
+    /// 面板打开时强制切换到的布局 id（nil / 空 = 不切换）
+    var forcedKeyboardLayoutID: String? { get }
+    func setForcedKeyboardLayout(_ layoutID: String?)
 
     var pluginEntries: [SettingsPlugin] { get }
     func isPluginEnabled(_ id: String) -> Bool

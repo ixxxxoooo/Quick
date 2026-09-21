@@ -21,8 +21,17 @@ public final class PaletteCoordinator {
     /// 面板是否可见
     public var isVisible: Bool { panel?.isVisible ?? false }
 
-    /// 搜索文本（双向绑定到搜索框）
-    public var query: String = ""
+    /// 搜索框文本
+    ///
+    /// 转发到 `paletteQuery`：面板内外只有这一份查询状态，避免「协调器以为输入框里是 A、
+    /// 输入框里其实是 B」。
+    public var query: String {
+        get { paletteQuery.text }
+        set { paletteQuery.text = newValue }
+    }
+
+    /// 搜索框文本的持有者（视图与协调器共用）
+    public let paletteQuery = PaletteQuery()
 
     /// 面板模式状态（供 SwiftUI 观察的桥接对象）
     ///
@@ -48,6 +57,24 @@ public final class PaletteCoordinator {
     /// 所以被 SwiftUI 观察是安全的 —— 会死循环的是协调器本身。
     public let selection = PaletteSelection()
 
+    /// 剪贴板最后一次变化的时刻（由剪贴板事件更新）
+    ///
+    /// 自动粘贴只关心「刚刚复制过」，而这个时间点只有剪贴板插件知道（它在轮询变化），
+    /// 所以它发事件、这里记时间。
+    private var lastClipboardChange: Date?
+
+    /// 剪贴板事件的订阅凭证
+    private var clipboardSubscription: EventSubscription?
+
+    /// 面板即将显示 / 已经隐藏（由 AppCore 注入，用于强制键盘布局这类宿主行为）
+    public var onPanelWillShow: (() -> Void)?
+    public var onPanelDidHide: (() -> Void)?
+
+    /// 最近使用（由 AppCore 注入；没有存储时为空实现）
+    ///
+    /// 首屏顺序依赖它，所以它必须是宿主级的：应用、命令、工具条目都在同一张表里。
+    public var usageHistory: UsageHistory?
+
     /// 面板外点击的监视器
     ///
     /// 与协调器同生命周期（进程级），所以不主动摘除 —— 面板一旦创建就一直存在。
@@ -56,7 +83,9 @@ public final class PaletteCoordinator {
     /// 分离面板回调（由 AppCore 注入，协调器不直接持有 PluginPanelController）
     public var onDetach: ((String) -> Void)?
 
-    public init() {}
+    public init() {
+        observeClipboardChanges()
+    }
 
     // MARK: - 插件注册
 
@@ -93,6 +122,12 @@ public final class PaletteCoordinator {
         let interval = signpost.beginInterval("palette.show")
         let started = Date()
 
+        // 面板打开前的自动行为：先按时间窗决定搜索框内容，再显示
+        applyAutoBehavior()
+
+        // 宿主行为（例如强制键盘布局）在面板真正出现之前生效
+        onPanelWillShow?()
+
         previousApp = NSWorkspace.shared.frontmostApplication
         ensurePanel()
         positionOnCursorScreen()
@@ -105,6 +140,52 @@ public final class PaletteCoordinator {
             面板已显示：插件=\(self.activePluginID ?? "主搜索", privacy: .public)，\
             耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
             """)
+    }
+
+    /// 打开面板时的自动行为
+    ///
+    /// 两件事都靠 `PaletteAutoBehavior` 里的纯函数判定，这里只负责取数据与落结果：
+    /// - 刚复制过东西 → 填进搜索框（用户唤出面板多半就是要用它）
+    /// - 上次的查询放太久了 → 清掉（否则每次打开都看到上次残留的关键词）
+    ///
+    /// 两个设置都经 `PaletteAutoBehavior` 读，不直接 `integer(forKey:)` —— 那样会把
+    /// 「没设置过」读成 0（关闭），和设置页显示的默认值对不上。
+    private func applyAutoBehavior() {
+        let defaults = UserDefaults.standard
+        let now = Date()
+
+        // 自动清空先做：清掉之后搜索框是空的，自动粘贴才有机会填进去
+        let clearIdle = PaletteAutoBehavior.clearIdle(from: defaults)
+        if PaletteAutoBehavior.shouldClearStaleQuery(
+            lastEditedAt: paletteQuery.lastEditedAt,
+            now: now,
+            idleMinutes: clearIdle.rawValue,
+            currentQuery: query)
+        {
+            log.debug("搜索框内容已超过 \(clearIdle.rawValue, privacy: .public) 分钟未改动，自动清空")
+            query = ""
+        }
+
+        let pasteWindow = PaletteAutoBehavior.pasteWindow(from: defaults)
+        let clipboardText = NSPasteboard.general.string(forType: .string) ?? ""
+        if PaletteAutoBehavior.shouldPrefillFromClipboard(
+            lastClipboardChange: lastClipboardChange,
+            now: now,
+            window: TimeInterval(pasteWindow.rawValue),
+            clipboardText: clipboardText,
+            currentQuery: query)
+        {
+            log.debug("剪贴板内容在 \(pasteWindow.rawValue, privacy: .public) 秒内变化过，已填入搜索框")
+            query = clipboardText
+        }
+    }
+
+    /// 订阅剪贴板变化事件（只在有需要时记一个时间点）
+    private func observeClipboardChanges() {
+        guard clipboardSubscription == nil else { return }
+        clipboardSubscription = EventBus.shared.on(ClipboardChangedEvent.self) { [weak self] event in
+            self?.lastClipboardChange = event.at
+        }
     }
 
     /// 将面板真正推到前台
@@ -158,6 +239,7 @@ public final class PaletteCoordinator {
             app.activate()
         }
         previousApp = nil
+        onPanelDidHide?()
 
         if wasVisible {
             log.info("面板已隐藏，恢复焦点=\(restoreFocus, privacy: .public)")
@@ -257,8 +339,16 @@ public final class PaletteCoordinator {
         // 只按相关度排的话同分项的顺序由任务完成顺序决定，而常量相关度
         // （0.5 / 0.6 是常态）意味着同分是多数情况 —— 那等于没有顺序保证，
         // 列表每次刷新都可能换一个样子。
-        let sorted = deduped.sorted {
+        var sorted = deduped.sorted {
             $0.relevance == $1.relevance ? $0.id < $1.id : $0.relevance > $1.relevance
+        }
+
+        // 首屏（空查询）把「最近用过的」提到最前。
+        //
+        // 首屏是「我刚用过什么」的入口，不是「谁的分数高」的排行榜 —— 昨天启动过 20 次的
+        // 应用，不该排在刚刚用过的翻译前面。非空查询不动顺序：那时相关度才是用户要的。
+        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sorted = Self.promotingRecents(sorted, recents: usageHistory?.recentItemIDs(limit: 12) ?? [])
         }
 
         let limited = Array(sorted.prefix(Self.resultLimit))
@@ -277,14 +367,41 @@ public final class PaletteCoordinator {
         return limited
     }
 
+    /// 把最近使用过的条目提到前面，其余保持原顺序
+    ///
+    /// 抽成静态函数是为了能单独测：这里只做重排，不碰数据库、不碰插件。
+    static func promotingRecents(
+        _ items: [SearchableItem],
+        recents: [String]
+    ) -> [SearchableItem] {
+        guard !recents.isEmpty else { return items }
+
+        let rank = Dictionary(uniqueKeysWithValues: recents.enumerated().map { ($1, $0) })
+        let (recent, rest) = items.reduce(into: ([SearchableItem](), [SearchableItem]())) {
+            if rank[$1.id] != nil { $0.0.append($1) } else { $0.1.append($1) }
+        }
+        // 按「最近」的顺序排，而不是按它们原来的相关度 —— 这里要的就是时间顺序
+        return recent.sorted { (rank[$0.id] ?? 0) < (rank[$1.id] ?? 0) } + rest
+    }
+
     /// 查询单个插件，超时即放弃
     ///
     /// 竞速两个子任务：插件自己，和一个超时计时器。先完成的那个决定结果。
     /// 注意超时**不会**中断插件内部的同步工作（它在主 actor 上），
     /// 只是让我们不再等它 —— 这正是需要的：面板不能陪一个慢插件等下去。
+    ///
+    /// **空查询走 `defaultItems()` 而不是 `searchItems(query: "")`**：插件在空查询上被
+    /// 触发词闸门挡住，返回的都是空数组 —— 那样首屏就只剩应用，一条命令都没有。
+    /// 首屏该展示什么由插件自己说（见 `QuickPlugin.defaultItems`）。
     private static func search(plugin: any QuickPlugin, query: String) async -> [SearchableItem] {
-        await withTaskGroup(of: [SearchableItem].self) { group in
-            group.addTask { await plugin.searchItems(query: query) }
+        let wantsDefaults = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return await withTaskGroup(of: [SearchableItem].self) { group in
+            group.addTask {
+                if wantsDefaults {
+                    return await plugin.defaultItems()
+                }
+                return await plugin.searchItems(query: query)
+            }
             group.addTask {
                 try? await Task.sleep(for: Self.pluginTimeout)
                 return []
@@ -303,6 +420,7 @@ public final class PaletteCoordinator {
         log.debug("首次创建面板实例")
         let rootView = PaletteRootView(
             selection: selection,
+            paletteQuery: paletteQuery,
             paletteMode: paletteMode,
             searchHandler: { [weak self] query in
                 guard let self else { return [] }
@@ -311,6 +429,9 @@ public final class PaletteCoordinator {
             pluginViewProvider: { [weak self] pluginID, context in
                 guard let self else { return nil }
                 return self.makePluginView(pluginID: pluginID, context: context)
+            },
+            onItemActivated: { [weak self] itemID in
+                self?.usageHistory?.record(itemID: itemID)
             },
             onReturnToSearch: { [weak self] in
                 self?.popToRoot()

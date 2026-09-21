@@ -392,7 +392,11 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
   设置页可以在应用运行期间改它。
 - 默认开启的开关，读取时必须把「键不存在」和「显式关掉」区分开：
   `bool(forKey:)` 会把「没设置过」读成 `false`，等于默认关闭。用
-  `object(forKey:) != nil` 先判断。
+  `object(forKey:) != nil` 先判断。非布尔的默认值同理：`integer(forKey:)` 会把
+  「没设置过」读成 `0`，而 `0` 往往正好是「关闭」。
+- **默认值只能有一份，放在读取方那一侧的常量上，设置页引用它。** 设置页再自己写一遍
+  字面量，两处迟早漂移，表现同样是「设置页写着 5 秒内、实际行为是关闭」。枚举型的偏好
+  也照此办理（见 `PaletteAutoBehavior.defaultPasteWindow` / `defaultClearIdle`）。
 - 功能还没实现的控件：**禁用并标注**（`PendingFeatureNote`），不要让它看起来能用。
   保留控件是为了让路线图可见，但那必须写在界面上。
 - 控件对应的功能如果根本不存在（不是「没接上」而是「没做」），把控件和键一起删掉 ——

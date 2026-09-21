@@ -54,9 +54,9 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 
 | 包 | 测试文件 | 状态 |
 | --- | --- | --- |
-| `QuickCore` | `EventBus`、模糊匹配、SQLite 封装、`PluginStorage`、设置键 | 有覆盖 |
-| `QuickUI` | 面板显隐与模式、分离窗口控制器、悬浮胶囊几何与位置持久化 | 有覆盖 |
-| `QuickPlatform` | 热键注册、应用扫描 | 有覆盖 |
+| `QuickCore` | `EventBus`、模糊匹配与拼音匹配、SQLite 封装、`PluginStorage`、设置键、最近使用 | 有覆盖 |
+| `QuickUI` | 面板显隐与模式、分离窗口控制器、悬浮胶囊几何与位置持久化、面板自动行为与设置读取、首屏按最近使用重排 | 有覆盖 |
+| `QuickPlatform` | 热键注册、应用扫描与条目的匹配形态、键盘布局服务 | 有覆盖 |
 | `PluginLauncher` | 使用频率与收藏的持久化往返 | 有覆盖 |
 | `PluginClipboard` | 去重/排序/剪枝、条数与图片预算、坏行降级 | 有覆盖 |
 | `PluginNotes` · `PluginSnippets` | 表读写往返、排序 | 有覆盖 |
