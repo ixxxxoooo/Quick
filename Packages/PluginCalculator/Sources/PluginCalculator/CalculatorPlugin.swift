@@ -30,7 +30,12 @@ public final class CalculatorPlugin: QuickPlugin {
     // MARK: - QuickPlugin 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        guard let result = engine.evaluate(query) else { return [] }
+        // 每次搜索都重新读设置：用户可能在面板开着的时候刚把小数位数改掉
+        let options = CalcPreferences.displayOptions()
+        guard let result = engine.evaluate(query, options: options) else { return [] }
+
+        // 复制开关决定回车提示写什么，也在构造结果项的这一刻读
+        let autoCopy = CalcPreferences.autoCopy()
 
         return [
             SearchableItem(
@@ -40,11 +45,20 @@ public final class CalculatorPlugin: QuickPlugin {
                 subtitle: query,
                 icon: "equal",
                 relevance: 0.95,  // 计算结果优先级高
-                shortcutHint: "⏎ 复制",
+                shortcutHint: autoCopy ? "⏎ 复制" : "⏎ 完成",
                 action: {
-                    EventBus.shared.post(CopyToClipboardEvent(text: result.formatted))
-                    EventBus.shared.post(HidePaletteEvent())
-                    EventBus.shared.post(ShowHUDEvent(message: "已复制: \(result.formatted)", tone: .success))
+                    // 再读一次：从给出结果到按下回车之间，设置页可能已经改过这个开关
+                    if CalcPreferences.autoCopy() {
+                        EventBus.shared.post(CopyToClipboardEvent(text: result.formatted))
+                        EventBus.shared.post(HidePaletteEvent())
+                        EventBus.shared.post(
+                            ShowHUDEvent(message: "已复制: \(result.formatted)", tone: .success))
+                    } else {
+                        // 关掉自动复制后回车仍然要能关掉面板（那是「确认」本身），
+                        // 但不能再报「已复制」——那会是一句谎话
+                        EventBus.shared.post(HidePaletteEvent())
+                        EventBus.shared.post(ShowHUDEvent(message: result.formatted, tone: .info))
+                    }
                 }
             )
         ]

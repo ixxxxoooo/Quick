@@ -350,3 +350,180 @@ struct ClipboardLimitTests {
         #expect(store.entries.count == 500)
     }
 }
+
+// MARK: - 设置接线
+
+/// 这一组验证设置页上的开关真的改变了行为，而不是只把值写进 `UserDefaults`。
+///
+/// 串行执行的理由和上面那组一样：`UserDefaults` 是进程级的，并行跑会让
+/// 「开关是开还是关」取决于另一个测试的进度。
+@Suite("剪贴板设置接线", .serialized)
+@MainActor
+struct ClipboardSettingWiringTests {
+
+    private func makeDatabase() throws -> SQLiteDatabase {
+        let database = try SQLiteDatabase()
+        try database.migrate(ClipboardPlugin.storageMigrations)
+        return database
+    }
+
+    private func makeStore(database: SQLiteDatabase) -> ClipboardStore {
+        ClipboardStore(storage: PluginStorage(pluginID: ClipboardPlugin.id, database: database))
+    }
+
+    private func makePlugin(database: SQLiteDatabase) -> ClipboardPlugin {
+        ClipboardPlugin(storage: PluginStorage(pluginID: ClipboardPlugin.id, database: database))
+    }
+
+    /// 临时改一个设置键并在结束时还原
+    private func withSetting(
+        _ key: String, value: Any, _ body: () async throws -> Void
+    ) async rethrows {
+        let original = UserDefaults.standard.object(forKey: key)
+        UserDefaults.standard.set(value, forKey: key)
+        defer {
+            if let original {
+                UserDefaults.standard.set(original, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+        try await body()
+    }
+
+    /// 让出一次主 actor，等设置变化的通知投递落地
+    ///
+    /// 观察者是在 main 队列上被回调的，写入之后不保证在同一行代码里就送达。
+    private func settle() async {
+        try? await Task.sleep(for: .milliseconds(50))
+    }
+
+    /// 搜索结果里除「打开剪贴板管理器」之外的那几条
+    private func entryItems(in database: SQLiteDatabase) async -> [SearchableItem] {
+        let items = await makePlugin(database: database).searchItems(query: "剪贴板")
+        return items.filter { $0.id != "clipboard.open-panel" }
+    }
+
+    @Test("开关关着时激活不启动监听，开着时启动")
+    func activationFollowsTheMonitorSetting() async throws {
+        try await withSetting(PluginSettingKey.Clipboard.monitorEnabled, value: false) {
+            let plugin = makePlugin(database: try makeDatabase())
+            plugin.activate()
+            #expect(plugin.isMonitoring == false, "开关关着却启动了监听")
+            plugin.deactivate()
+        }
+
+        try await withSetting(PluginSettingKey.Clipboard.monitorEnabled, value: true) {
+            let plugin = makePlugin(database: try makeDatabase())
+            plugin.activate()
+            #expect(plugin.isMonitoring, "开关开着却没有启动监听")
+            plugin.deactivate()
+        }
+
+        // 没设置过 = 用户没动过，按设置页上的默认值（开）处理
+        UserDefaults.standard.removeObject(forKey: PluginSettingKey.Clipboard.monitorEnabled)
+        let plugin = makePlugin(database: try makeDatabase())
+        plugin.activate()
+        #expect(plugin.isMonitoring, "没有设置过时应当默认开启监听")
+        plugin.deactivate()
+    }
+
+    @Test("运行期关掉开关会停掉监听，再打开会重新启动")
+    func togglingTheMonitorSettingWhileActive() async throws {
+        let plugin = makePlugin(database: try makeDatabase())
+        plugin.activate()
+        #expect(plugin.isMonitoring)
+
+        await withSetting(PluginSettingKey.Clipboard.monitorEnabled, value: false) {
+            await settle()
+            #expect(plugin.isMonitoring == false, "开关关掉后监听器还在跑")
+
+            // 用户又把开关打开：不必重启应用，监听要自己回来
+            UserDefaults.standard.set(true, forKey: PluginSettingKey.Clipboard.monitorEnabled)
+            await settle()
+            #expect(plugin.isMonitoring, "开关重新打开后监听器没有回来")
+
+            // 先摘掉观察者，免得 withSetting 还原键值时又把监听器拉起来
+            plugin.deactivate()
+        }
+    }
+
+    @Test("退出时清除历史：开关打开才清，且保留收藏")
+    func clearOnQuitFollowsTheSetting() async throws {
+        try await withSetting(PluginSettingKey.Clipboard.clearOnQuit, value: false) {
+            let database = try makeDatabase()
+            makeStore(database: database).add(ClipboardEntry(text: "不该被清掉的"))
+
+            let plugin = makePlugin(database: database)
+            plugin.activate()
+            plugin.deactivate()
+
+            #expect(
+                try database.scalarInt("SELECT COUNT(*) AS value FROM clipboard_history") == 1,
+                "开关关着却清空了历史")
+        }
+
+        try await withSetting(PluginSettingKey.Clipboard.clearOnQuit, value: true) {
+            let database = try makeDatabase()
+            let store = makeStore(database: database)
+            let favorite = ClipboardEntry(text: "收藏的")
+            store.add(favorite)
+            store.add(ClipboardEntry(text: "普通条目"))
+            store.toggleFavorite(favorite.id)
+
+            let plugin = makePlugin(database: database)
+            plugin.activate()
+            plugin.deactivate()
+
+            let remaining = try database.query("SELECT text FROM clipboard_history")
+            #expect(remaining.count == 1, "退出时应当清掉普通条目")
+            #expect(remaining.first?.text("text") == "收藏的", "收藏条目不该被清掉")
+        }
+    }
+
+    @Test("关掉预览后搜索结果里不出现剪贴板正文")
+    func previewFollowsTheSetting() async throws {
+        let database = try makeDatabase()
+        makeStore(database: database).add(ClipboardEntry(text: "Hello World"))
+
+        await withSetting(PluginSettingKey.Clipboard.showPreview, value: true) {
+            let items = await entryItems(in: database)
+            #expect(items.count == 1)
+            #expect(items.first?.title.contains("Hello World") == true, "开着预览时标题就该是内容")
+        }
+
+        try await withSetting(PluginSettingKey.Clipboard.showPreview, value: false) {
+            let items = await entryItems(in: database)
+            #expect(items.count == 1, "关掉预览不该把结果一起关掉")
+
+            let item = try #require(items.first)
+            #expect(!item.title.contains("Hello World"), "标题里出现了剪贴板正文")
+            #expect(item.subtitle?.contains("Hello World") == false, "副标题里出现了剪贴板正文")
+            #expect(item.title == ClipboardEntry.ContentType.text.displayName, "标题应当退化成内容类型")
+            #expect(item.subtitle?.contains("文本") == true, "副标题要有内容类型，不能只剩时间戳")
+        }
+    }
+
+    @Test("关掉去重后相同内容各留一条")
+    func deduplicationFollowsTheSetting() async throws {
+        try await withSetting(PluginSettingKey.Clipboard.deduplication, value: true) {
+            let database = try makeDatabase()
+            let store = makeStore(database: database)
+            store.add(ClipboardEntry(text: "重复"))
+            store.add(ClipboardEntry(text: "重复"))
+
+            #expect(store.entries.count == 1, "开着去重时不该留下两条")
+            #expect(try database.scalarInt("SELECT COUNT(*) AS value FROM clipboard_history") == 1)
+        }
+
+        try await withSetting(PluginSettingKey.Clipboard.deduplication, value: false) {
+            let database = try makeDatabase()
+            let store = makeStore(database: database)
+            store.add(ClipboardEntry(text: "重复"))
+            store.add(ClipboardEntry(text: "重复"))
+
+            #expect(store.entries.count == 2, "关掉去重后两条都要留下")
+            #expect(try database.scalarInt("SELECT COUNT(*) AS value FROM clipboard_history") == 2)
+        }
+    }
+}

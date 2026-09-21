@@ -66,14 +66,20 @@ public enum PluginSettingKey {
     }
 
     /// 窗口管理
+    ///
+    /// 只有真的生效的键留在这里：`gap` / `screenMargin` / `snapOnDrag` / `enabled` /
+    /// `cycling` / `showLayoutsInLauncher` 已经删掉了 —— 它们对应的功能
+    /// （窗口间距、拖拽吸附、循环切换、保存布局）都还没有实现，控件也随之从设置页移除。
+    /// 做出来的时候再把键和控件一起加回来。
     public enum WindowManager {
-        public static let gap = "windowManager.gap"
-        public static let screenMargin = "windowManager.screenMargin"
-        public static let snapOnDrag = "windowManager.snapOnDrag"
-        public static let enabled = "windowManager.enabled"
-        public static let cycling = "windowManager.cycling"
         public static let showInLauncher = "windowManager.showInLauncher"
-        public static let showLayoutsInLauncher = "windowManager.showLayoutsInLauncher"
+
+        /// 单个布局命令是否出现在搜索结果里
+        ///
+        /// 键名里带布局的 rawValue（`leftHalf` 等），所以是函数不是常量。
+        public static func commandVisible(_ layoutID: String) -> String {
+            "windowManager.cmd.\(layoutID).visible"
+        }
     }
 
     /// 笔记

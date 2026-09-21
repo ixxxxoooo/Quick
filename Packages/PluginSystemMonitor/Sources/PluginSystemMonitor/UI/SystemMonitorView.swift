@@ -27,8 +27,8 @@ struct SystemMonitorView: View {
             }
         }
         .task {
-            await scanner.refreshProcesses()
-            scanner.refreshSystemInfo()
+            // 按设置里的采样间隔反复刷新：面板关掉时 .task 被取消，采样随之停止
+            await scanner.startSampling()
         }
     }
 

@@ -4,6 +4,7 @@
 
 import Foundation
 import NaturalLanguage
+import QuickCore
 
 /// 翻译服务
 ///
@@ -31,13 +32,27 @@ final class TranslationService {
         isTranslating = true
         defer { isTranslating = false }
 
-        // 语言检测要用 NaturalLanguage，方向判定与查词都是纯逻辑（见 Model/）
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(text)
-        let language = recognizer.dominantLanguage
-        detectedLanguage = language?.rawValue
+        // 两个设置都在翻译这一刻现读：设置页可以在面板开着的时候改，
+        // init 时读一次就再也跟不上那个改动
+        let autoDetect = PluginDefaults.isEnabled(
+            PluginSettingKey.Translator.autoDetect, default: true)
+        let targetLanguage = PluginDefaults.targetLanguage()
 
-        let direction = TranslationDirection.direction(forSourceLanguage: language?.rawValue)
+        // 「自动检测源语言」关掉时不做识别：开关的承诺就是不再识别，
+        // 而识别也正是这一步唯一的环境依赖（会把文本交给 NaturalLanguage）
+        var sourceLanguage: String?
+        if autoDetect {
+            let recognizer = NLLanguageRecognizer()
+            recognizer.processString(text)
+            sourceLanguage = recognizer.dominantLanguage?.rawValue
+        }
+        detectedLanguage = sourceLanguage
+
+        // 方向判定与查词都是纯逻辑（见 Model/），来源与目标的取舍也放在那里
+        let direction = TranslationDirection.direction(
+            sourceLanguage: sourceLanguage,
+            targetLanguage: targetLanguage,
+            autoDetect: autoDetect)
         let result = TranslationDictionary.translate(text, direction: direction)
         lastResult = result
         return result

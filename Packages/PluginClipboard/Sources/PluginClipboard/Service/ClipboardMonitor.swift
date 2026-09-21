@@ -21,20 +21,29 @@ final class ClipboardMonitor {
     /// 上次检测到的变更计数
     private var lastChangeCount: Int = 0
 
+    /// 是否正在监听
+    private(set) var isRunning = false
+
     /// 开始监听
+    ///
+    /// 幂等：设置页每写一次偏好都会让插件重新按开关起停一次，不幂等的话每次都会新建
+    /// 一个定时器并重置变更计数，等于反复丢掉「刚才那半秒里复制的东西」。
     func start() {
+        guard !isRunning else { return }
         lastChangeCount = NSPasteboard.general.changeCount
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkForChanges()
             }
         }
+        isRunning = true
     }
 
     /// 停止监听
     func stop() {
         timer?.invalidate()
         timer = nil
+        isRunning = false
     }
 
     /// 检测剪贴板变化

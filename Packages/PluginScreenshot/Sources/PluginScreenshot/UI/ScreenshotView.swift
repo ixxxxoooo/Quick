@@ -41,7 +41,7 @@ struct ScreenshotView: View {
 
             Spacer()
 
-            Text("截图将保存到桌面")
+            Text(capture.savesToDesktop ? "截图将保存到桌面" : "截图将复制到剪贴板")
                 .font(.caption)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
         }

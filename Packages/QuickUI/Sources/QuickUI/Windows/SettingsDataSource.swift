@@ -5,6 +5,21 @@
 import Foundation
 import SwiftUI
 
+/// 一条窗口布局命令（窗口管理插件提供）
+///
+/// id 是插件的 `WindowLayout` rawValue，设置页按它写「是否显示」的开关。
+public struct SettingsWindowLayoutCommand: Identifiable, Sendable {
+    public let id: String
+    public let name: String
+    public let icon: String
+
+    public init(id: String, name: String, icon: String) {
+        self.id = id
+        self.name = name
+        self.icon = icon
+    }
+}
+
 /// 设置窗口里的一行插件
 public struct SettingsPlugin: Identifiable, Sendable {
     public let id: String
@@ -189,6 +204,12 @@ public protocol SettingsDataSource: AnyObject {
     func clearCustomCommandShortcut(for id: UUID)
 
     // MARK: - 功能插件设置
+    /// 窗口管理的布局命令
+    ///
+    /// 由插件提供而不是设置页自己列一份：设置页按这些 id 写「是否显示」的开关，
+    /// 抄一份迟早会和插件里的 id 对不上（这曾经是一次真实缺陷）。
+    var windowLayoutCommands: [SettingsWindowLayoutCommand] { get }
+
     var pluginEntries: [SettingsPlugin] { get }
     func isPluginEnabled(_ id: String) -> Bool
     func setPluginEnabled(_ id: String, enabled: Bool)

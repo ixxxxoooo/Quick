@@ -42,6 +42,45 @@ public enum TranslationDirection: Sendable, Equatable {
         default: return .toChinese
         }
     }
+
+    /// 从设置页存的目标语言 tag 解析出目标方向
+    ///
+    /// 词表只有中英两向，所以只有 `zh-Hans` / `zh-Hant` / `en` 能被表达成一个方向。
+    /// 设置页里还能选日语、韩语、法语、德语 —— 那四个没有任何词表支撑，这里返回 nil，
+    /// 而不是硬塞成中文或英文方向：那会把结果标成一种它并没有译成的语言。
+    ///
+    /// - Parameter code: `PluginSettingKey.Translator.targetLang` 里存的值
+    /// - Returns: 能被表达成方向的目标语言；词表表达不了或不是语言 tag 时返回 nil
+    public static func target(forLanguageCode code: String?) -> TranslationDirection? {
+        switch code {
+        case "zh-Hans", "zh-Hant": return .toChinese
+        case "en": return .toEnglish
+        default: return nil
+        }
+    }
+
+    /// 这次翻译往哪个方向走
+    ///
+    /// 优先级是「显式配置的目标语言 > 按源语言判定」：用户在设置页选过的目标不该被
+    /// 识别结果盖掉，否则那个选择器就成了摆设。
+    ///
+    /// `autoDetect` 关闭时调用方根本不做语言识别（`sourceLanguage` 只会是 nil），
+    /// 方向因此只由目标语言决定；若目标语言又恰好是词表表达不了的那四个，
+    /// 这里退回 `direction(forSourceLanguage: nil)`，即译成中文。
+    ///
+    /// - Parameters:
+    ///   - sourceLanguage: 识别出的源语言，未识别或未开启识别时为 nil
+    ///   - targetLanguage: 设置页配置的目标语言 tag
+    ///   - autoDetect: 设置页的「自动检测源语言」
+    /// - Returns: 本次要用的翻译方向
+    public static func direction(
+        sourceLanguage: String?,
+        targetLanguage: String?,
+        autoDetect: Bool
+    ) -> TranslationDirection {
+        if let configured = target(forLanguageCode: targetLanguage) { return configured }
+        return direction(forSourceLanguage: autoDetect ? sourceLanguage : nil)
+    }
 }
 
 /// 内置简易中英词典

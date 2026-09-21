@@ -102,11 +102,13 @@ struct CalculatorView: View {
 
     /// 逐行计算
     private func evaluateLines() {
+        // 每轮都从设置里取显示选项：小数位数与千分位开关在面板开着时也能立刻生效
+        let options = CalcPreferences.displayOptions()
         let lines = input.components(separatedBy: "\n")
         lineResults = lines.map { line in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else { return (line: line, result: nil) }
-            let result = engine.evaluate(trimmed)
+            let result = engine.evaluate(trimmed, options: options)
             return (line: line, result: result?.formatted)
         }
     }

@@ -7,155 +7,76 @@ import QuickCore
 import SwiftUI
 
 /// 窗口管理设置面板
+///
+/// 只放**真的生效**的选项。这个面板以前是一份原型：里面有与插件真实启用状态冲突的
+/// 第二个「启用」开关、没有实现支撑的循环切换与窗口间距、函数体为空的「新建布局」
+/// 按钮，以及绑在从不落盘的局部状态上的别名框和回调为空的快捷键录制器。
+/// 能拨动却什么也不做的控件比没有这个控件更糟 —— 用户会以为功能坏了。
+///
+/// 尚未实现的部分（保存布局、循环切换、窗口间距、逐命令快捷键与别名）等真正做出来
+/// 再连控件一起加回来。
 struct WindowManagementSettingsPane: View {
 
     let dataSource: any SettingsDataSource
 
-    @AppStorage(PluginSettingKey.WindowManager.enabled) private var isEnabled = false
     @AppStorage(PluginSettingKey.WindowManager.showInLauncher) private var showInLauncher = true
-    @AppStorage(PluginSettingKey.WindowManager.cycling) private var cycling = "None"
-    @AppStorage(PluginSettingKey.WindowManager.gap) private var gap = 0
-    @AppStorage(PluginSettingKey.WindowManager.showLayoutsInLauncher) private var showLayoutsInLauncher = true
 
     var body: some View {
         Form {
             Section {
-                Toggle(isOn: $isEnabled) {
-                    SettingsRow(
-                        title: "启用窗口管理",
-                        subtitle: "允许 Quick 通过辅助功能权限移动和调整其他应用的窗口大小。",
-                        icon: { SettingsRowIcon(systemImage: "macwindow") }
-                    )
-                }
                 Toggle(isOn: $showInLauncher) {
                     SettingsRow(
                         title: "在启动器中显示",
-                        subtitle: "搜索时展示窗口管理命令。"
+                        subtitle: "搜索时展示窗口管理命令。关闭后这个插件不再出现在搜索结果里。",
+                        icon: { SettingsRowIcon(systemImage: "macwindow") }
                     )
                 }
-                .settingsEnabled(isEnabled)
+            } header: {
+                Text("显示")
+            } footer: {
+                Text("插件本身的启停在上方「窗口管理」那一栏里，这里只管搜索结果的显隐。")
             }
 
-            Group {
-                optionsSection
-                windowLayoutsSection
-                layoutCommandsSection
+            layoutCommandsSection
+
+            Section {
+                SettingsRow(
+                    title: "移动窗口需要辅助功能权限",
+                    subtitle: "首次使用时会请求。系统设置 → 隐私与安全性 → 辅助功能。",
+                    icon: { SettingsRowIcon(systemImage: "lock.shield") }
+                )
+            } header: {
+                Text("权限")
             }
-            .settingsEnabled(isEnabled)
         }
         .formStyle(.grouped)
     }
 
-    private var optionsSection: some View {
-        Section {
-            Picker(selection: $cycling) {
-                Text("无").tag("None")
-                Text("半屏和三分之一").tag("Halves and Thirds")
-                Text("跨显示器").tag("Across Displays")
-            } label: {
-                SettingsRow(
-                    title: "循环切换",
-                    subtitle: cycleDetail(for: cycling),
-                    icon: { SettingsRowIcon(systemImage: "arrow.triangle.2.circlepath") }
-                )
-            }
-
-            SettingsRow(
-                title: "窗口间距",
-                subtitle: "平铺窗口之间以及屏幕边缘留白的像素值。",
-                icon: { SettingsRowIcon(systemImage: "rectangle.split.2x1") }
-            ) {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Text("\(gap) pt")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                    Stepper("窗口间距", value: $gap, in: 0...64, step: 2)
-                        .labelsHidden()
-                }
-            }
-        } header: {
-            Text("选项")
-        }
-    }
-
-    private func cycleDetail(for cycling: String) -> String {
-        switch cycling {
-        case "Halves and Thirds":
-            return "重复触发半屏布局时，依次切换为三分之一和三分之二。"
-        case "Across Displays":
-            return "重复触发半屏布局时，依次移动到下一个显示器的对应位置。"
-        default:
-            return "重复触发相同布局时保持不变。"
-        }
-    }
-
-    private var windowLayoutsSection: some View {
-        Section {
-            Toggle(isOn: $showLayoutsInLauncher) {
-                SettingsRow(
-                    title: "在启动器中显示布局",
-                    subtitle: "搜索时展示你保存的窗口布局。"
-                )
-            }
-
-            Text("保存一次窗口排列，之后用一个快捷键即可恢复全部窗口位置。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Button("新建布局") {
-                // 新建布局
-            }
-
-            Button("从当前窗口创建布局") {
-                // 根据当前窗口创建布局
-            }
-        } header: {
-            Text("窗口布局")
-        } footer: {
-            Text("布局会记住指定应用在指定显示器上的大小和位置，一键还原。")
-        }
-    }
-
+    /// 逐条布局命令的显隐
     private var layoutCommandsSection: some View {
         Section {
-            ForEach(WindowLayoutItem.defaults) { item in
+            ForEach(dataSource.windowLayoutCommands) { item in
                 WindowCommandRow(item: item)
             }
         } header: {
             Text("布局命令")
+        } footer: {
+            Text("关掉的命令不会出现在搜索结果里，快捷键绑定也一并失效。")
         }
     }
 }
 
-private struct WindowLayoutItem: Identifiable {
-    let id: String
-    let name: String
-    let icon: String
-
-    static let defaults: [WindowLayoutItem] = [
-        WindowLayoutItem(id: "leftHalf", name: "左半屏", icon: "rectangle.lefthalf.filled"),
-        WindowLayoutItem(id: "rightHalf", name: "右半屏", icon: "rectangle.righthalf.filled"),
-        WindowLayoutItem(id: "topHalf", name: "上半屏", icon: "rectangle.tophalf.filled"),
-        WindowLayoutItem(id: "bottomHalf", name: "下半屏", icon: "rectangle.bottomhalf.filled"),
-        WindowLayoutItem(id: "maximize", name: "最大化", icon: "arrow.up.left.and.arrow.down.right"),
-        WindowLayoutItem(id: "center", name: "居中", icon: "rectangle.center.inset.filled"),
-        WindowLayoutItem(id: "topLeft", name: "左上角", icon: "rectangle.inset.topleading.filled"),
-        WindowLayoutItem(id: "topRight", name: "右上角", icon: "rectangle.inset.toptrailing.filled"),
-        WindowLayoutItem(id: "bottomLeft", name: "左下角", icon: "rectangle.inset.bottomleading.filled"),
-        WindowLayoutItem(
-            id: "bottomRight", name: "右下角", icon: "rectangle.inset.bottomtrailing.filled")
-    ]
-}
-
+/// 单条布局命令：一个显隐复选框
 private struct WindowCommandRow: View {
-    let item: WindowLayoutItem
+    let item: SettingsWindowLayoutCommand
 
     @AppStorage private var isVisible: Bool
-    @State private var alias: String = ""
 
-    init(item: WindowLayoutItem) {
+    init(item: SettingsWindowLayoutCommand) {
         self.item = item
-        _isVisible = AppStorage(wrappedValue: true, "windowManager.cmd.\(item.id).visible")
+        _isVisible = AppStorage(
+            wrappedValue: true,
+            PluginSettingKey.WindowManager.commandVisible(item.id))
     }
 
     var body: some View {
@@ -169,17 +90,6 @@ private struct WindowCommandRow: View {
                 .lineLimit(1)
 
             Spacer(minLength: DesignTokens.Spacing.md)
-
-            AliasField(
-                placeholder: "设置别名",
-                text: $alias
-            )
-
-            ShortcutRecorder(
-                keycaps: nil,
-                onRecord: { _, _ in },
-                onClear: {}
-            )
 
             Toggle("", isOn: $isVisible)
                 .labelsHidden()

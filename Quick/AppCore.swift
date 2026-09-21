@@ -768,6 +768,19 @@ extension AppCore: SettingsDataSource {
 
     // MARK: - 功能插件设置
 
+    /// 窗口管理的布局命令
+    ///
+    /// 由插件自己报出来：设置页按这些 id 写开关，两边必须同源。
+    var windowLayoutCommands: [SettingsWindowLayoutCommand] {
+        guard
+            let plugin = plugins.first(where: { type(of: $0).id == WindowManagerPlugin.id })
+                as? WindowManagerPlugin
+        else {
+            return []
+        }
+        return plugin.layoutCommands
+    }
+
     /// 全部插件，按显示名排序
     ///
     /// 排序而不是按注册顺序：注册顺序是代码结构，用户不该看到它。

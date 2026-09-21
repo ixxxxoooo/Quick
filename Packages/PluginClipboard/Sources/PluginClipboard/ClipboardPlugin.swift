@@ -29,6 +29,15 @@ public final class ClipboardPlugin: QuickPlugin {
     /// 剪贴板条目存储
     private let store: ClipboardStore
 
+    /// 设置变化的观察者（`activate()` 挂上，`deactivate()` 摘掉）
+    private var settingObserver: NSObjectProtocol?
+
+    /// 剪贴板监听是否正在运行
+    ///
+    /// 由设置页的「启用剪贴板监听」驱动：开关关掉后这里必须是 false，
+    /// 否则用户以为不记录了，剪贴板却还在往历史里写。
+    var isMonitoring: Bool { monitor.isRunning }
+
     /// - Parameter storage: 由 AppCore 注入的存储句柄
     public init(storage: PluginStorage) {
         self.store = ClipboardStore(storage: storage)
@@ -77,6 +86,10 @@ public final class ClipboardPlugin: QuickPlugin {
         let keyword = query.removingTrigger(Self.triggerWords)
         let matches = keyword.isEmpty ? store.entries : store.search(keyword)
 
+        // 关掉「显示内容预览」后标题与副标题都不许出现剪贴板正文 ——
+        // 这条设置就是「别在搜索结果里露出我复制过的东西」
+        let showsPreview = PluginDefaults.isEnabled(PluginSettingKey.Clipboard.showPreview, default: true)
+
         var results: [SearchableItem] = []
 
         // 第一项：打开剪贴板管理器面板（导航到插件模式）
@@ -97,11 +110,13 @@ public final class ClipboardPlugin: QuickPlugin {
         // 最近的几条文本记录，点击直接复制（图片需进入面板操作）
         let textMatches = matches.filter { $0.type != .image }
         results += textMatches.prefix(5).map { entry in
-            SearchableItem(
+            let timestamp = entry.timestamp.formatted(date: .abbreviated, time: .shortened)
+            return SearchableItem(
                 id: "clipboard.\(entry.id)",
                 pluginID: Self.id,
-                title: entry.preview,
-                subtitle: entry.timestamp.formatted(date: .abbreviated, time: .shortened),
+                title: showsPreview ? entry.preview : entry.type.displayName,
+                // 关掉预览时副标题补上内容类型，否则一行结果只剩时间戳，等于什么都没说
+                subtitle: showsPreview ? timestamp : "\(entry.type.displayName) · \(timestamp)",
                 icon: entry.type.icon,
                 relevance: 0.5,
                 action: {
@@ -127,17 +142,70 @@ public final class ClipboardPlugin: QuickPlugin {
         monitor.onNewContent = { [weak self] entry in
             self?.store.add(entry)
         }
-        monitor.start()
+        observeMonitorSetting()
+        applyMonitorSetting()
         log.notice(
             """
             插件已激活：加载 \(self.store.entries.count, privacy: .public) 条历史，\
-            剪贴板监听已启动
+            剪贴板监听\(self.isMonitoring ? "已启动" : "已按设置关闭", privacy: .public)
             """)
     }
 
     public func deactivate() {
+        if let settingObserver {
+            NotificationCenter.default.removeObserver(settingObserver)
+        }
+        settingObserver = nil
         monitor.stop()
+        if clearsHistoryOnQuit {
+            store.clearHistory()
+            log.notice("已按设置清空剪贴板历史，收藏与置顶条目保留")
+        }
         store.save()
         log.notice("插件已停用，剪贴板监听已停止，历史已落盘")
+    }
+
+    // MARK: - 设置
+
+    /// 设置页上的「启用剪贴板监听」
+    private var isMonitorSettingOn: Bool {
+        PluginDefaults.isEnabled(PluginSettingKey.Clipboard.monitorEnabled, default: true)
+    }
+
+    /// 设置页上的「退出时清除历史」
+    private var clearsHistoryOnQuit: Bool {
+        PluginDefaults.isEnabled(PluginSettingKey.Clipboard.clearOnQuit, default: false)
+    }
+
+    // MARK: - 监听起停
+
+    /// 盯着设置变化
+    ///
+    /// 开关是运行期可改的，而监听器不能只在 `activate()` 时决定一次 —— 不盯着
+    /// `UserDefaults` 的话，用户关掉开关之后剪贴板照旧被记录，这正是这类
+    /// 「设置页看着有、实际没人读」缺陷的典型样子。
+    private func observeMonitorSetting() {
+        guard settingObserver == nil else { return }
+        settingObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: UserDefaults.standard,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.applyMonitorSetting()
+            }
+        }
+    }
+
+    /// 按设置起停监听器
+    ///
+    /// `start()` 是幂等的，所以这里不必自己记「现在跑着没有」—— 少一份可能与
+    /// 设置漂移的状态。
+    private func applyMonitorSetting() {
+        if isMonitorSettingOn {
+            monitor.start()
+        } else {
+            monitor.stop()
+        }
     }
 }

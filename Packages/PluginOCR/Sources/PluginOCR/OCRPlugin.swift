@@ -75,12 +75,27 @@ public final class OCRPlugin: QuickPlugin {
 
         // OCR 识别
         let text = await engine.recognize(image: image)
+        deliver(text)
+    }
 
-        if !text.isEmpty {
+    /// 把识别结果交付给用户：是否落到剪贴板由设置里的开关决定
+    ///
+    /// internal 而不是 private：接线测试要在既不跑 Vision、也不起 screencapture 的前提下
+    /// 验证这个开关真的改变了行为，这是唯一能把它钉住的地方。
+    func deliver(_ text: String) {
+        guard !text.isEmpty else {
+            EventBus.shared.post(ShowHUDEvent(message: "未识别到文字", tone: .info))
+            return
+        }
+
+        // 开关在交付这一刻读：设置页改了立刻生效
+        if OCRPreferences.autoCopy() {
             EventBus.shared.post(CopyToClipboardEvent(text: text))
             EventBus.shared.post(ShowHUDEvent(message: "识别完成，已复制到剪贴板", tone: .success))
         } else {
-            EventBus.shared.post(ShowHUDEvent(message: "未识别到文字", tone: .info))
+            // 关掉自动复制后不能再报「已复制到剪贴板」——那会是一句谎话；
+            // 文字仍然在插件面板里，用户想复制还可以按那个按钮
+            EventBus.shared.post(ShowHUDEvent(message: "识别完成", tone: .success))
         }
     }
 

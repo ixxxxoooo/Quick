@@ -28,4 +28,32 @@ public enum FileSearchQuery {
         let keyword = String(raw.dropFirst(prefix.count))
         return keyword.isEmpty ? nil : keyword
     }
+
+    /// Spotlight 谓词的描述：格式串 + 参数
+    ///
+    /// 只描述「搜什么」，由会话交给 `NSPredicate`。抽成纯数据是为了让「搜索文件内容」
+    /// 这个开关的效果能被断言 —— 真正跑查询需要 Spotlight 与整机索引，测试里不允许。
+    struct Predicate: Equatable, Sendable {
+        let format: String
+        let arguments: [String]
+    }
+
+    /// 构造搜索谓词
+    ///
+    /// - Parameters:
+    ///   - keyword: 关键词
+    ///   - includeContents: 为 true 时连文件内的文本内容一起匹配（`kMDItemTextContent` 是 Spotlight 的内容索引）
+    /// - Returns: 谓词描述
+    static func predicate(for keyword: String, includeContents: Bool) -> Predicate {
+        guard includeContents else {
+            return Predicate(
+                format: "kMDItemDisplayName CONTAINS[cd] %@",
+                arguments: [keyword]
+            )
+        }
+        return Predicate(
+            format: "(kMDItemDisplayName CONTAINS[cd] %@) OR (kMDItemTextContent CONTAINS[cd] %@)",
+            arguments: [keyword, keyword]
+        )
+    }
 }

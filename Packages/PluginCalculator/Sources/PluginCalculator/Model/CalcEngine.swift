@@ -18,20 +18,23 @@ final class CalcEngine {
     }
 
     /// 计算表达式
-    /// - Parameter expression: 用户输入的表达式字符串
+    /// - Parameters:
+    ///   - expression: 用户输入的表达式字符串
+    ///   - options: 显示选项（小数位数、千分位）。由调用方从设置里读好再传进来 ——
+    ///     引擎不认识 `UserDefaults`，设置页改了值调用方下次传新的就行
     /// - Returns: 计算结果（无法解析则返回 nil）
-    func evaluate(_ expression: String) -> CalcResult? {
+    func evaluate(_ expression: String, options: CalcDisplayOptions = .default) -> CalcResult? {
         let cleaned = cleanExpression(expression)
         guard !cleaned.isEmpty else { return nil }
         guard looksLikeExpression(cleaned) else { return nil }
 
         // 尝试单位换算
-        if let unitResult = tryUnitConversion(cleaned) {
+        if let unitResult = tryUnitConversion(cleaned, options: options) {
             return unitResult
         }
 
         // 数学表达式计算
-        return tryMathExpression(cleaned)
+        return tryMathExpression(cleaned, options: options)
     }
 
     // MARK: - 表达式清理
@@ -73,16 +76,16 @@ final class CalcEngine {
     // MARK: - 数学表达式
 
     /// 使用纯 Swift 解析并计算数学表达式（杜绝 NSExpression 引发的未捕获异常崩溃）
-    private func tryMathExpression(_ expr: String) -> CalcResult? {
+    private func tryMathExpression(_ expr: String, options: CalcDisplayOptions) -> CalcResult? {
         guard let tokens = MathTokenizer(input: expr).tokenize() else { return nil }
         guard let value = MathParser(tokens: tokens).parse() else { return nil }
-        return CalcResult(value: value, formatted: formatNumber(value))
+        return CalcResult(value: value, formatted: CalcFormatting.string(from: value, options: options))
     }
 
     // MARK: - 单位换算
 
     /// 尝试解析单位换算表达式（如 "100 km to mi"）
-    private func tryUnitConversion(_ expr: String) -> CalcResult? {
+    private func tryUnitConversion(_ expr: String, options: CalcDisplayOptions) -> CalcResult? {
         // 简单的单位换算模式匹配
         let patterns = ["to", "in", "转", "换"]
         for separator in patterns {
@@ -92,7 +95,7 @@ final class CalcEngine {
             let source = parts[0].trimmingCharacters(in: .whitespaces)
             let targetUnit = parts[1].trimmingCharacters(in: .whitespaces)
 
-            if let result = convertUnit(source: source, targetUnit: targetUnit) {
+            if let result = convertUnit(source: source, targetUnit: targetUnit, options: options) {
                 return result
             }
         }
@@ -100,19 +103,25 @@ final class CalcEngine {
     }
 
     /// 执行单位转换
-    private func convertUnit(source: String, targetUnit: String) -> CalcResult? {
+    private func convertUnit(
+        source: String,
+        targetUnit: String,
+        options: CalcDisplayOptions
+    ) -> CalcResult? {
         // 解析数值和单位
         let scanner = Scanner(string: source)
         guard let value = scanner.scanDouble() else { return nil }
         let sourceUnit = String(source[scanner.currentIndex...]).trimmingCharacters(in: .whitespaces)
 
         // 温度换算
-        if let result = convertTemperature(value: value, from: sourceUnit, to: targetUnit) {
+        if let result = convertTemperature(value: value, from: sourceUnit, to: targetUnit, options: options) {
             return result
         }
 
         // 使用 Measurement API 进行通用单位换算
-        if let result = convertMeasurement(value: value, from: sourceUnit, to: targetUnit) {
+        if let result = convertMeasurement(
+            value: value, from: sourceUnit, to: targetUnit, options: options)
+        {
             return result
         }
 
@@ -120,7 +129,12 @@ final class CalcEngine {
     }
 
     /// 温度转换
-    private func convertTemperature(value: Double, from: String, to: String) -> CalcResult? {
+    private func convertTemperature(
+        value: Double,
+        from: String,
+        to: String,
+        options: CalcDisplayOptions
+    ) -> CalcResult? {
         let celsiusNames = ["c", "°c", "摄氏", "celsius"]
         let fahrenheitNames = ["f", "°f", "华氏", "fahrenheit"]
 
@@ -131,18 +145,25 @@ final class CalcEngine {
 
         if fromCelsius && toFahrenheit {
             let result = value * 9 / 5 + 32
-            return CalcResult(value: result, formatted: "\(formatNumber(result))°F")
+            return CalcResult(
+                value: result, formatted: "\(CalcFormatting.string(from: result, options: options))°F")
         }
         if fromFahrenheit && toCelsius {
             let result = (value - 32) * 5 / 9
-            return CalcResult(value: result, formatted: "\(formatNumber(result))°C")
+            return CalcResult(
+                value: result, formatted: "\(CalcFormatting.string(from: result, options: options))°C")
         }
 
         return nil
     }
 
     /// 使用 Measurement API 进行换算
-    private func convertMeasurement(value: Double, from: String, to: String) -> CalcResult? {
+    private func convertMeasurement(
+        value: Double,
+        from: String,
+        to: String,
+        options: CalcDisplayOptions
+    ) -> CalcResult? {
         // 长度单位映射
         let lengthUnits: [String: UnitLength] = [
             "km": .kilometers, "m": .meters, "cm": .centimeters, "mm": .millimeters,
@@ -165,7 +186,7 @@ final class CalcEngine {
             let converted = measurement.converted(to: toUnit)
             return CalcResult(
                 value: converted.value,
-                formatted: "\(formatNumber(converted.value)) \(to)"
+                formatted: "\(CalcFormatting.string(from: converted.value, options: options)) \(to)"
             )
         }
 
@@ -177,25 +198,11 @@ final class CalcEngine {
             let converted = measurement.converted(to: toUnit)
             return CalcResult(
                 value: converted.value,
-                formatted: "\(formatNumber(converted.value)) \(to)"
+                formatted: "\(CalcFormatting.string(from: converted.value, options: options)) \(to)"
             )
         }
 
         return nil
-    }
-
-    // MARK: - 格式化
-
-    /// 格式化数字（去除多余小数位）
-    private func formatNumber(_ value: Double) -> String {
-        if value == value.rounded() && abs(value) < 1e15 {
-            return String(format: "%.0f", value)
-        }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = 10
-        formatter.minimumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 }
 

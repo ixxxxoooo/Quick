@@ -43,7 +43,7 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
-        var style: NSWindow.StyleMask = [
+        let style: NSWindow.StyleMask = [
             .titled, .closable, .miniaturizable, .resizable, .fullSizeContentView
         ]
         let window = SettingsWindow(

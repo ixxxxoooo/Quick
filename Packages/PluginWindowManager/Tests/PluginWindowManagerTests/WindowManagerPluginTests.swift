@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import QuickCore
 import Testing
 
 @testable import PluginWindowManager
@@ -239,5 +240,67 @@ struct WindowManagerPluginTests {
         #expect(await plugin.searchItems(query: "").isEmpty)
         #expect(await plugin.searchItems(query: "天气").isEmpty)
         #expect(await plugin.searchItems(query: "system preferences").isEmpty)
+    }
+}
+
+// MARK: - 搜索结果开关
+
+/// 这一组会改 `UserDefaults`，所以串行执行 —— 它是进程级的，
+/// 并行跑会让「这个开关是什么状态」取决于另一个测试的进度。
+@Suite("窗口管理的显示开关", .serialized)
+@MainActor
+struct WindowManagerVisibilityTests {
+
+    /// 临时改一个键并在结束时还原
+    private func withSetting(_ key: String, value: Any, _ body: () async throws -> Void) async rethrows {
+        let original = UserDefaults.standard.object(forKey: key)
+        UserDefaults.standard.set(value, forKey: key)
+        defer {
+            if let original {
+                UserDefaults.standard.set(original, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+        try await body()
+    }
+
+    @Test("「在启动器中显示」关掉后整个插件不出现在搜索结果里")
+    func showInLauncherGatesEverything() async {
+        let plugin = WindowManagerPlugin()
+
+        await withSetting(PluginSettingKey.WindowManager.showInLauncher, value: false) {
+            #expect(await plugin.searchItems(query: "窗口").isEmpty)
+        }
+
+        await withSetting(PluginSettingKey.WindowManager.showInLauncher, value: true) {
+            #expect(await plugin.searchItems(query: "窗口").count == 10)
+        }
+    }
+
+    @Test("没设置过时按默认开启处理")
+    func unsetMeansVisible() async {
+        // 用 bool(forKey:) 读会把「没设置过」当成 false，等于默认关闭 —— 这条就是防这个
+        UserDefaults.standard.removeObject(forKey: PluginSettingKey.WindowManager.showInLauncher)
+        let plugin = WindowManagerPlugin()
+        #expect(await plugin.searchItems(query: "窗口").count == 10)
+    }
+
+    @Test("关掉单条布局命令后它不再出现，其余不受影响")
+    func perCommandVisibility() async {
+        let plugin = WindowManagerPlugin()
+        // 键里用的是 WindowLayout 的 rawValue（leftHalf 的 rawValue 是 "left"），
+        // 不是枚举 case 名 —— 设置页曾经按 case 名写键，于是那 4 个开关永远不生效
+        let key = PluginSettingKey.WindowManager.commandVisible("left")
+
+        await withSetting(key, value: false) {
+            let results = await plugin.searchItems(query: "窗口")
+            #expect(!results.contains { $0.id == "windowmanager.left" })
+            #expect(results.count == 9, "其余九条布局命令不受影响")
+        }
+
+        await withSetting(key, value: true) {
+            #expect(await plugin.searchItems(query: "窗口").count == 10)
+        }
     }
 }

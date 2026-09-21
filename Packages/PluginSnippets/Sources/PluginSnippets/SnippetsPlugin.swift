@@ -66,6 +66,11 @@ public final class SnippetsPlugin: QuickPlugin {
     // MARK: - QuickPlugin 协议
 
     public func searchItems(query: String) async -> [SearchableItem] {
+        // 触发提示是结果项的一部分，所以在构造结果项这一刻现读：
+        // 设置页可以在面板开着的时候改这个开关，init 里读一次就再也跟不上
+        let showsHint = PluginDefaults.isEnabled(
+            PluginSettingKey.Snippets.showSnippetHint, default: true)
+
         let matches = store.search(query)
         return matches.prefix(10).map { snippet in
             SearchableItem(
@@ -75,11 +80,16 @@ public final class SnippetsPlugin: QuickPlugin {
                 subtitle: snippet.preview,
                 icon: "curlybraces",
                 relevance: query.isEmpty ? Self.defaultRelevance : snippet.title.fuzzyScore(query) * 0.8,
-                shortcutHint: snippet.keyword.flatMap { ":\($0)" },
+                shortcutHint: showsHint ? snippet.keyword.flatMap { ":\($0)" } : nil,
                 action: { [weak self] in
                     guard let self else { return }
-                    let expanded = self.templateEngine.expand(snippet.content)
-                    EventBus.shared.post(CopyToClipboardEvent(text: expanded))
+                    // 再读一次「自动展开」：从列出片段到按下回车之间，设置页可能已经改过它。
+                    // 关掉开关的用户要的是原文，模板变量替换属于「展开」承诺的一部分，一并省掉。
+                    let text =
+                        PluginDefaults.isEnabled(PluginSettingKey.Snippets.autoExpand, default: true)
+                        ? self.templateEngine.expand(snippet.content)
+                        : snippet.content
+                    EventBus.shared.post(CopyToClipboardEvent(text: text))
                     EventBus.shared.post(HidePaletteEvent())
                 }
             )

@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import Foundation
 
 /// Spotlight 文件搜索会话
 ///
@@ -27,22 +28,46 @@ final class FileSearchSession {
     /// 搜索完成的 continuation
     private var searchContinuation: CheckedContinuation<[FileResult], Never>?
 
+    /// 偏好存储。注入是为了让结果上限与两个开关能被测试固定住 —— 默认就是标准偏好
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    /// 当前设置
+    ///
+    /// internal 而不是 private：查询本身要跑 Spotlight，测试里不允许，
+    /// 设置因此只能在这里被断言。
+    var configuredSettings: FileSearchSettings {
+        FileSearchPreferences.current(defaults: defaults)
+    }
+
     /// 搜索文件
     /// - Parameter query: 搜索关键词
-    /// - Returns: 匹配的文件列表
+    /// - Returns: 匹配的文件列表（已按设置过滤隐藏文件并截断到上限）
     func search(query searchText: String) async -> [FileResult] {
         stopCurrentQuery()
 
         return await withCheckedContinuation { continuation in
             self.searchContinuation = continuation
 
+            // 设置只在开始搜索时读一次：这一次查询的谓词与上限要相互一致
+            let settings = configuredSettings
+
             let metadataQuery = NSMetadataQuery()
             metadataQuery.searchScopes = [
                 NSMetadataQueryLocalComputerScope
             ]
+            // 谓词是纯映射（见 FileSearchQuery.predicate）：「搜索文件内容」打开时
+            // 除了文件名还匹配 kMDItemTextContent
+            let predicate = FileSearchQuery.predicate(
+                for: searchText,
+                includeContents: settings.includeContents
+            )
             metadataQuery.predicate = NSPredicate(
-                format: "kMDItemDisplayName CONTAINS[cd] %@",
-                searchText
+                format: predicate.format,
+                argumentArray: predicate.arguments
             )
             metadataQuery.sortDescriptors = [
                 NSSortDescriptor(key: NSMetadataItemFSNameKey, ascending: true)
@@ -81,8 +106,12 @@ final class FileSearchSession {
 
         query.stop()
 
-        var results: [FileResult] = []
-        for i in 0..<min(query.resultCount, 20) {
+        let settings = configuredSettings
+
+        // 上限决定「读多少条」：读进来之后再按隐藏文件过滤，两者都用同一个上限，
+        // 于是「最多返回 N 条」对用户始终成立
+        var collected: [FileResult] = []
+        for i in 0..<min(query.resultCount, settings.maxResults) {
             guard let item = query.result(at: i) as? NSMetadataItem else { continue }
             guard let name = item.value(forAttribute: NSMetadataItemFSNameKey) as? String,
                 let path = item.value(forAttribute: NSMetadataItemPathKey) as? String
@@ -92,7 +121,7 @@ final class FileSearchSession {
             let modified = item.value(forAttribute: NSMetadataItemFSContentChangeDateKey) as? Date
 
             let icon = FileIconMapper.icon(forFileName: name)
-            results.append(
+            collected.append(
                 FileResult(
                     id: path,
                     name: name,
@@ -102,6 +131,14 @@ final class FileSearchSession {
                     modifiedDate: modified
                 ))
         }
+
+        // 过滤与截断是纯逻辑（见 FileSearchFiltering）：隐藏文件开关与结果上限都在这里生效
+        let results = FileSearchFiltering.applying(
+            ignoringHidden: settings.ignoreHidden,
+            limit: settings.maxResults,
+            to: collected,
+            path: { $0.path }
+        )
 
         NotificationCenter.default.removeObserver(
             self, name: .NSMetadataQueryDidFinishGathering, object: query)

@@ -14,6 +14,10 @@ let package = Package(
     ],
     targets: [
         .target(name: "PluginCalculator", dependencies: ["QuickCore", "QuickUI"]),
-        .testTarget(name: "PluginCalculatorTests", dependencies: ["PluginCalculator"])
+        // QuickCore 是必需的：接线测试要按 PluginSettingKey 里的键写偏好
+        .testTarget(
+            name: "PluginCalculatorTests",
+            dependencies: ["PluginCalculator", "QuickCore"]
+        )
     ]
 )

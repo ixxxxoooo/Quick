@@ -7,7 +7,8 @@ import QuickCore
 
 /// 剪贴板历史存储
 ///
-/// 管理剪贴板历史条目的内存缓存和数据库持久化。自动去重、限制条目数量与图片占用。
+/// 管理剪贴板历史条目的内存缓存和数据库持久化。按设置去重、限制条目数量与图片占用。
+/// 三个开关（去重、条数上限、图片预算）都在用到的那一刻读设置页的键，不缓存。
 ///
 /// ## 为什么每次改动都直接落库，而没有防抖
 ///
@@ -65,11 +66,15 @@ final class ClipboardStore {
     /// 或「插了一半」的状态。
     /// - Parameter entry: 剪贴板条目
     func add(_ entry: ClipboardEntry) {
+        let deduplicates = PluginDefaults.isEnabled(PluginSettingKey.Clipboard.deduplication, default: true)
+
         // 去重：相同内容不重复记录（图片按数据内容，文本按文本）
-        if entry.type == .image {
-            entries.removeAll { $0.type == .image && $0.imageData == entry.imageData }
-        } else {
-            entries.removeAll { $0.text == entry.text }
+        if deduplicates {
+            if entry.type == .image {
+                entries.removeAll { $0.type == .image && $0.imageData == entry.imageData }
+            } else {
+                entries.removeAll { $0.text == entry.text }
+            }
         }
         entries.insert(entry, at: 0)
 
@@ -77,10 +82,12 @@ final class ClipboardStore {
         // 反过来的话，去重那一步会把刚插进去的这条按「相同文本」删掉 ——
         // 表现是「复制了但历史里没有」，而且没有任何报错。
         var statements: [SQLiteStatement] = []
-        if entry.type == .image {
-            statements.append(Self.deleteDuplicateImageStatement(for: entry.imageData ?? Data()))
-        } else {
-            statements.append(Self.deleteDuplicateTextStatement(for: entry.text))
+        if deduplicates {
+            if entry.type == .image {
+                statements.append(Self.deleteDuplicateImageStatement(for: entry.imageData ?? Data()))
+            } else {
+                statements.append(Self.deleteDuplicateTextStatement(for: entry.text))
+            }
         }
         statements.append(Self.insertStatement(for: entry))
         statements.append(contentsOf: ClipboardStore.pruneStatements(maxEntries: maxEntries))

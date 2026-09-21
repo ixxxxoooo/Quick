@@ -72,7 +72,7 @@ public final class ScreenshotPlugin: QuickPlugin {
         try? await Task.sleep(for: .milliseconds(200))
 
         if await capture.captureArea() {
-            EventBus.shared.post(ShowHUDEvent(message: "截图已保存到桌面", tone: .success))
+            EventBus.shared.post(ShowHUDEvent(message: successMessage, tone: .success))
         }
     }
 
@@ -82,7 +82,14 @@ public final class ScreenshotPlugin: QuickPlugin {
         try? await Task.sleep(for: .milliseconds(200))
 
         if await capture.captureFullScreen() {
-            EventBus.shared.post(ShowHUDEvent(message: "截图已保存到桌面", tone: .success))
+            EventBus.shared.post(ShowHUDEvent(message: successMessage, tone: .success))
         }
+    }
+
+    /// 截图成功后的提示语
+    ///
+    /// 只进剪贴板的截图没有文件，这时还说「已保存到桌面」会让用户去桌面找一个不存在的文件。
+    private var successMessage: String {
+        capture.lastCapturePath == nil ? "截图已复制到剪贴板" : "截图已保存到桌面"
     }
 }

@@ -29,7 +29,11 @@ struct NetworkToolsView: View {
             } else if let info = service.networkInfo {
                 VStack(spacing: DesignTokens.Spacing.md) {
                     infoRow("本机 IP", value: info.localIP)
-                    infoRow("公网 IP", value: info.publicIP ?? "无法获取")
+                    // 公网 IP 那一行跟着设置走：关掉时连请求都没发出去，
+                    // 自然也没有什么可显示的 —— 留着「无法获取」只会误导用户以为查询失败
+                    if service.showsExternalIP {
+                        infoRow("公网 IP", value: info.publicIP ?? "无法获取")
+                    }
                     infoRow("DNS 服务器", value: info.dns.joined(separator: ", "))
                 }
 

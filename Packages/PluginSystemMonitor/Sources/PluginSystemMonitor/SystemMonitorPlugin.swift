@@ -22,7 +22,11 @@ public final class SystemMonitorPlugin: QuickPlugin {
 
     private let log = QuickLog.plugin(SystemMonitorPlugin.id)
 
-    private let scanner = ProcessScanner()
+    /// 进程扫描器。
+    ///
+    /// internal 而不是 private：采样间隔由扫描器从设置读出来（见 `ProcessScanner.samplingInterval`），
+    /// 接线测试要能从这里拿到它验证设置确实传到了采样循环。
+    let scanner = ProcessScanner()
 
     public init() {}
 

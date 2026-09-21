@@ -207,8 +207,6 @@ struct FeatureSettingsPane: View {
             FileSearchFeatureSection()
         case .snippets:
             SnippetsFeatureSection()
-        case .windowManagement:
-            WindowManagerFeatureSection()
         case .notes:
             NotesFeatureSection()
         case .calendar:
@@ -458,42 +456,6 @@ private struct SnippetsFeatureSection: View {
     }
 }
 
-private struct WindowManagerFeatureSection: View {
-    @AppStorage(PluginSettingKey.WindowManager.gap) private var gap = 8
-    @AppStorage(PluginSettingKey.WindowManager.screenMargin) private var margin = 8
-    @AppStorage(PluginSettingKey.WindowManager.snapOnDrag) private var snapOnDrag = true
-
-    var body: some View {
-        Section {
-            SettingsRow(
-                title: "窗口间距",
-                subtitle: "平铺时窗口之间的像素间隙。",
-                icon: { SettingsRowIcon(systemImage: "rectangle.split.2x1") }
-            ) {
-                Stepper("\(gap) px", value: $gap, in: 0...32, step: 2)
-                    .frame(width: 100)
-            }
-
-            SettingsRow(
-                title: "屏幕边距",
-                subtitle: "窗口与屏幕边缘的像素间隙。"
-            ) {
-                Stepper("\(margin) px", value: $margin, in: 0...32, step: 2)
-                    .frame(width: 100)
-            }
-
-            Toggle(isOn: $snapOnDrag) {
-                SettingsRow(
-                    title: "拖拽吸附",
-                    subtitle: "拖动窗口到屏幕边缘时自动吸附到对应布局。"
-                )
-            }
-        } header: {
-            Text("布局选项")
-        }
-    }
-}
-
 private struct NotesFeatureSection: View {
     @AppStorage(PluginSettingKey.Notes.autoSave) private var autoSave = true
     @AppStorage(PluginSettingKey.Notes.defaultFormat) private var defaultFormat = "plain"
@@ -519,7 +481,10 @@ private struct NotesFeatureSection: View {
             }
         } header: {
             Text("便签存储")
+        } footer: {
+            PendingFeatureNote(detail: "「默认格式」还没有实现：笔记模型里没有格式字段。「自动保存」一直是开着的，关掉它也不会变成手动保存。")
         }
+        .disabled(true)
     }
 }
 
@@ -558,7 +523,10 @@ private struct CalendarFeatureSection: View {
             }
         } header: {
             Text("日程与提醒")
+        } footer: {
+            PendingFeatureNote(detail: "这三项还没有实现：EventKit 只用来读日程，提醒、会议链接提取和周数都还没有接上。")
         }
+        .disabled(true)
     }
 }
 
@@ -603,7 +571,10 @@ private struct WeatherFeatureSection: View {
             }
         } header: {
             Text("天气偏好")
+        } footer: {
+            PendingFeatureNote(detail: "这三项还没有实现：天气服务目前是占位实现（未接入 WeatherKit），返回的是固定内容。")
         }
+        .disabled(true)
     }
 }
 
@@ -801,8 +772,11 @@ private struct SystemMonitorFeatureSection: View {
                     subtitle: "在菜单栏图标旁实时展示系统负载。"
                 )
             }
+            .disabled(true)
         } header: {
             Text("监控设置")
+        } footer: {
+            PendingFeatureNote(detail: "「菜单栏显示 CPU/内存」还没有实现：插件面板里的采样是真的，菜单栏那块还没接。")
         }
     }
 }
@@ -845,6 +819,8 @@ private struct NetworkToolsFeatureSection: View {
             }
         } header: {
             Text("网络诊断")
+        } footer: {
+            PendingFeatureNote(detail: "Ping 测试次数与超时还没有实现：这个插件目前只做本机地址、DNS 和公网 IP，没有 ping 功能。")
         }
     }
 }

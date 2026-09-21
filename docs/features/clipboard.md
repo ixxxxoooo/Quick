@@ -4,10 +4,11 @@
 
 ## 不变量
 
-- **相同内容的条目不会重复记录。** `add(_:)` 先 `removeAll` 掉同 `text` 的旧条目再插入
-  新的，所以「复制同一段文字两次」在历史里只有一条，且 `id` 与时间戳是**后一次**的。
-  这依赖 `text` 完全相等 —— 不要把比较改成 `preview` 或前缀比较，
-  那会把两段前缀相同的内容误判为重复。
+- **相同内容的条目不会重复记录（`clipboard.deduplication` 打开时，默认打开）。**
+  `add(_:)` 先 `removeAll` 掉同 `text` 的旧条目再插入新的，所以「复制同一段文字两次」
+  在历史里只有一条，且 `id` 与时间戳是**后一次**的。这依赖 `text` 完全相等 ——
+  不要把比较改成 `preview` 或前缀比较，那会把两段前缀相同的内容误判为重复。
+  关掉这个开关时不发去重语句，两条都留下（顺序仍是新的在前）。
 - **历史上限 500 条，且裁剪时保留置顶与收藏。** 裁剪逻辑是
   「所有 pinned/favorite + 未被标记的前 500 条」，所以**收藏条目不计入上限**，
   理论上总数可以超过 500。这是刻意的：不能因为历史满了就把用户主动收藏的东西删掉。
@@ -64,6 +65,25 @@
 
 条数上限以前硬编码在 store 里，设置页那个 Stepper 改了没有任何效果 —— 现在两边读同一个键。
 图片预算用一条带窗口函数的 SQL 算「从最新往回累加，累到超预算为止」，超出的部分即剪枝对象。
+
+### 四个开关
+
+开关都在**用到的那一刻**读 `UserDefaults`，不缓存：设置页可以在运行期改，缓存下来的值
+迟早和真实设置漂移，表现就是「改了没反应」。读取统一走 `PluginDefaults.isEnabled(_:default:)`
+—— 它把「用户没动过」和「用户关掉了」区分开（`bool(forKey:)` 直读会把前者读成 `false`）。
+
+| 开关 | 键 | 默认 | 读的地方 |
+| --- | --- | --- | --- |
+| 启用剪贴板监听 | `clipboard.monitorEnabled` | 开 | `ClipboardPlugin.applyMonitorSetting()` |
+| 退出时清除历史 | `clipboard.clearOnQuit` | 关 | `ClipboardPlugin.deactivate()` |
+| 显示内容预览 | `clipboard.showPreview` | 开 | `ClipboardPlugin.searchItems(query:)` |
+| 自动去重 | `clipboard.deduplication` | 开 | `ClipboardStore.add(_:)` |
+
+「启用剪贴板监听」是唯一一个**必须即时生效**的：关掉之后还在记录剪贴板等于骗用户。
+它在 `activate()` 与 `deactivate()` 之外还观察 `UserDefaults.didChangeNotification`，
+所以 `ClipboardMonitor.start()` 必须是幂等的 —— 每次设置写入都会触发一次重新判定。
+「显示内容预览」关掉时结果仍在，只是标题退化成内容类型、副标题带上类型名，
+**标题与副标题都不许出现剪贴板正文**。
 
 ## 已知限制
 
