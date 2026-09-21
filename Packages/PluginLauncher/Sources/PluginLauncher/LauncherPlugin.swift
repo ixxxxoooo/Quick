@@ -100,8 +100,9 @@ public final class LauncherPlugin: QuickPlugin {
                     id: "launcher.\(entry.id)",
                     pluginID: Self.id,
                     title: entry.name,
-                    subtitle: favorites.contains(entry.bundleID)
-                        ? "★ 收藏应用" : (entry.isSystemApp ? "系统应用" : "应用程序"),
+                    // 副标题只留**额外信息**（收藏标记）。「应用程序」这类说明与右侧的
+                    // 「应用启动器」徽章是同一件事，一行里写两遍只是噪音
+                    subtitle: favorites.contains(entry.bundleID) ? "★ 收藏应用" : nil,
                     icon: "app",
                     iconType: .appIcon(entry.path),
                     relevance: favorites.contains(entry.bundleID) ? 1.0 : 0.5,
@@ -145,72 +146,59 @@ public final class LauncherPlugin: QuickPlugin {
 
         var items: [SearchableItem] = []
 
+        // 一个查询词只折叠一次，下面两轮搜索都复用它
+        let matchQuery = MatchQuery(trimmed)
+
         // 2. 自定义命令搜索
         if let customCommandsData = settingsStore?.customCommandsData,
             let customCommands = try? JSONDecoder().decode([CustomCommand].self, from: customCommandsData)
         {
             for cmd in customCommands where cmd.isEnabled {
-                var score: Double = 0
+                var score = matchQuery.score(cmd.name.matchText)
                 if let alias = cmd.alias, !alias.isEmpty {
-                    if alias.caseInsensitiveCompare(trimmed) == .orderedSame {
-                        score = 1.0
-                    } else if alias.fuzzyMatch(trimmed) {
-                        score = max(score, alias.fuzzyScore(trimmed))
-                    }
+                    score = max(score, matchQuery.score(alias.matchText))
                 }
-                if cmd.name.caseInsensitiveCompare(trimmed) == .orderedSame {
-                    score = max(score, 0.95)
-                } else if cmd.name.fuzzyMatch(trimmed) {
-                    score = max(score, cmd.name.fuzzyScore(trimmed))
-                }
+                guard score > 0 else { continue }
 
-                if score > 0 {
-                    items.append(
-                        SearchableItem(
-                            id: "launcher.cmd.\(cmd.id.uuidString)",
-                            pluginID: Self.id,
-                            title: cmd.name,
-                            subtitle: cmd.alias != nil ? "别名: \(cmd.alias!) · \(cmd.command)" : cmd.command,
-                            icon: "terminal",
-                            relevance: score,
-                            action: {
-                                EventBus.shared.post(HidePaletteEvent())
-                                Task {
-                                    let result = await ShellCommandRunner.run(
-                                        cmd.command,
-                                        workingDirectory: cmd.workingDirectory
+                items.append(
+                    SearchableItem(
+                        id: "launcher.cmd.\(cmd.id.uuidString)",
+                        pluginID: Self.id,
+                        title: cmd.name,
+                        subtitle: cmd.alias != nil ? "别名: \(cmd.alias!) · \(cmd.command)" : cmd.command,
+                        icon: "terminal",
+                        relevance: score,
+                        action: {
+                            EventBus.shared.post(HidePaletteEvent())
+                            Task {
+                                let result = await ShellCommandRunner.run(
+                                    cmd.command,
+                                    workingDirectory: cmd.workingDirectory
+                                )
+                                EventBus.shared.post(
+                                    ShowHUDEvent(
+                                        message: String(result.summary.prefix(80)),
+                                        tone: result.succeeded ? .success : .warning
                                     )
-                                    EventBus.shared.post(
-                                        ShowHUDEvent(
-                                            message: String(result.summary.prefix(80)),
-                                            tone: result.succeeded ? .success : .warning
-                                        )
-                                    )
-                                }
+                                )
                             }
-                        )
+                        }
                     )
-                }
+                )
             }
         }
 
         // 3. 应用搜索（支持自定义别名优先匹配）
         for entry in appIndex.apps {
             let alias = settingsStore?.alias(for: "app." + entry.bundleID)
-            var matchScore: Double = 0
+            var matchScore = matchQuery.score(entry.matchText)
             if let alias, !alias.isEmpty {
-                if alias.caseInsensitiveCompare(trimmed) == .orderedSame {
-                    matchScore = 1.0
-                } else if alias.fuzzyMatch(trimmed) {
-                    matchScore = alias.fuzzyScore(trimmed)
-                }
+                matchScore = max(matchScore, matchQuery.score(alias.matchText))
             }
-            let nameScore = entry.name.fuzzyScore(trimmed)
-            let baseScore = max(matchScore, nameScore)
-            guard baseScore > 0 else { continue }
+            guard matchScore > 0 else { continue }
 
             let ranking = rankingStore.score(for: entry.bundleID)
-            let finalScore = baseScore * 0.7 + ranking * 0.3
+            let finalScore = matchScore * 0.7 + ranking * 0.3
 
             let subtitle =
                 (alias != nil && !alias!.isEmpty)
@@ -266,6 +254,9 @@ public final class LauncherPlugin: QuickPlugin {
 
         return Array(results.prefix(20))
     }
+
+    /// 首屏不额外贡献条目：它提供的应用列表本身就是首屏主体
+    public func defaultItems() async -> [SearchableItem] { [] }
 
     public func makeView() -> AnyView {
         AnyView(LauncherView(plugin: self))

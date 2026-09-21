@@ -114,8 +114,10 @@ self.entries = entries
 硬性规则：
 
 - **不要在 `body` 里做 IO。** 不要读文件、不要查磁盘、不要发网络请求、不要创建 `NSImage`。
-- **不要在循环里做模糊匹配。** 名称规范化、`lowercased()` 这类结果要么预处理时算好，
-  要么每次刷新算一次，绝不要每次按键重算。
+- **不要在循环里做模糊匹配。** 名称规范化（折叠大小写/变音符号/全角）与拼音转写都有成本，
+  要么预处理时算好，要么每次刷新算一次，绝不要每次按键重算。候选多的时候用
+  `MatchQuery` + `MatchText` 把两边各准备一遍：查询词每次按键折叠一次，候选跟着数据一起存
+  （`AppEntry.matchText` 就是这么做的）。候选只有个位数时，`String.fuzzyScore` 就够了。
 - **图标走 `IconCache`。** 不要直接 `NSWorkspace.shared.icon(forFile:)` 到视图里 ——
   每次都新建 `NSImage`，既慢又会触发上一节的死循环。
 - **列表用 `LazyVStack` / `LazyHStack`。** 不要用 `VStack` 铺可能变长的集合。

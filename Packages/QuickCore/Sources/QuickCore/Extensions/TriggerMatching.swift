@@ -91,6 +91,22 @@ public extension String {
         return false
     }
 
+    /// 是否含汉字
+    ///
+    /// 比 `containsCJK` 窄：假名与谚文也算东亚文字，但转不成拼音，所以不算汉字。
+    var containsHan: Bool {
+        unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0x3400...0x4DBF,  // 扩展 A
+                0x4E00...0x9FFF,  // 基本区
+                0xF900...0xFAFF:  // 兼容表意
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
     /// 是否含中日韩字符
     var containsCJK: Bool {
         unicodeScalars.contains { scalar in

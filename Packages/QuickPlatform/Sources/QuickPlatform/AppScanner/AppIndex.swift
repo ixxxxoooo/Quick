@@ -8,7 +8,7 @@ import QuickCore
 /// 已安装应用索引
 ///
 /// 扫描系统中已安装的应用程序，建立搜索索引。
-/// 支持按名称、Bundle ID 搜索，以及拼音首字母匹配。
+/// 按名称搜索，支持模糊匹配与拼音（全拼、首字母）。
 @MainActor
 public final class AppIndex {
 
@@ -141,10 +141,12 @@ public final class AppIndex {
     /// - Parameter query: 搜索关键词
     /// - Returns: 匹配的应用条目（按相关度排序）
     public func search(query: String) -> [AppEntry] {
-        guard !query.isEmpty else { return apps }
+        let matchQuery = MatchQuery(query)
+        guard !matchQuery.isEmpty else { return apps }
+
         return
             apps
-            .map { ($0, $0.name.fuzzyScore(query)) }
+            .map { ($0, matchQuery.score($0.matchText)) }
             .filter { $0.1 > 0 }
             .sorted { $0.1 > $1.1 }
             .map(\.0)
@@ -163,6 +165,20 @@ public struct AppEntry: Identifiable, Sendable {
     public let bundleID: String
     public let path: String
     public let isSystemApp: Bool
+
+    /// 名称的匹配形态
+    ///
+    /// 折叠与拼音转写在扫描时算好一次 —— 索引有上百条，每次按键都重算一遍是浪费。
+    public let matchText: MatchText
+
+    public init(id: String, name: String, bundleID: String, path: String, isSystemApp: Bool) {
+        self.id = id
+        self.name = name
+        self.bundleID = bundleID
+        self.path = path
+        self.isSystemApp = isSystemApp
+        self.matchText = MatchText(name)
+    }
 
     /// 启动此应用
     @MainActor

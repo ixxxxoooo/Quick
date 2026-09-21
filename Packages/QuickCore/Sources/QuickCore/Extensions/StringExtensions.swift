@@ -6,42 +6,28 @@ import Foundation
 
 public extension String {
 
-    /// 模糊匹配：判断 self 是否包含 query 的所有字符（按顺序）
+    /// 匹配形态：折叠过的原文 + 拼音转写
+    var matchText: MatchText { MatchText(self) }
+
+    /// 模糊匹配：判断 self 是否能对应到 query
+    ///
+    /// 空查询按「匹配」处理 —— 调用方用空查询表示「没有筛选条件」。
+    ///
     /// - Parameter query: 搜索关键词
     /// - Returns: 是否匹配
     func fuzzyMatch(_ query: String) -> Bool {
         guard !query.isEmpty else { return true }
-        var remaining = query.lowercased().makeIterator()
-        guard var target = remaining.next() else { return true }
-        for char in self.lowercased() {
-            if char == target {
-                guard let next = remaining.next() else { return true }
-                target = next
-            }
-        }
-        return false
+        return fuzzyScore(query) > 0
     }
 
-    /// 计算模糊匹配的相关度评分
+    /// 模糊匹配的相关度评分（0.0 ~ 1.0，越高越靠前）
+    ///
+    /// 每次调用都会重新折叠候选、重新取拼音。候选多的时候（应用索引）别用它 ——
+    /// 用 `MatchQuery` + `MatchText` 把两边各预处理一遍，别在循环里重复折叠。
+    ///
     /// - Parameter query: 搜索关键词
-    /// - Returns: 相关度（0.0 ~ 1.0，越高越相关）
+    /// - Returns: 相关度（0 表示不匹配）
     func fuzzyScore(_ query: String) -> Double {
-        guard !query.isEmpty else { return 0 }
-        let lower = self.lowercased()
-        let queryLower = query.lowercased()
-
-        // 完全匹配 → 最高分
-        if lower == queryLower { return 1.0 }
-
-        // 前缀匹配 → 高分
-        if lower.hasPrefix(queryLower) { return 0.9 }
-
-        // 包含匹配 → 中高分
-        if lower.contains(queryLower) { return 0.7 }
-
-        // 模糊匹配 → 中分
-        if fuzzyMatch(query) { return 0.4 }
-
-        return 0
+        MatchQuery(query).score(matchText)
     }
 }
