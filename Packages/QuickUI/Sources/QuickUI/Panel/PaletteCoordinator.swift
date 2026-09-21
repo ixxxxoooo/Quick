@@ -567,11 +567,9 @@ public final class PaletteCoordinator {
     /// 将面板定位到光标所在屏幕的中上方
     private func positionOnCursorScreen() {
         guard let panel else { return }
-        let mouseLocation = NSEvent.mouseLocation
-        let screen =
-            NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
-            ?? NSScreen.main
-            ?? NSScreen.screens.first
+        // 屏幕按鼠标位置选：多显示器下这是唯一能反映「用户此刻在看哪块屏」的信号，
+        // 见 `ScreenPlacement`。
+        let screen = ScreenPlacement.screen() ?? NSScreen.main ?? NSScreen.screens.first
 
         guard let screen else {
             log.warning("找不到可用屏幕，面板位置未调整")

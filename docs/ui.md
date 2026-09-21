@@ -348,6 +348,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | `KeyCapChip` | 快捷键帽。`.filled`（底栏）/ `.outline`（列表行）两种样式 |
 | `BarButton` | 栏位按钮：悬停胶囊 + 图标/文字。`.titled`（底栏）/ `.icon`（窗口标题栏，此时 `title` 只作无障碍标签）两种样式，`.destructive` 色调给关闭用 |
 | `SectionHeader` | 列表分组标题（当前未使用：我们不做分组，见 §2） |
+| `ScreenPlacement` | 按指针位置挑屏幕（纯函数）。主面板与分离窗口共用，**不要各自去查 `NSScreen.main`** |
 
 ### Components/
 

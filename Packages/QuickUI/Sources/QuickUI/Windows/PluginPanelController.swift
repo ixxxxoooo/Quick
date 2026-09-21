@@ -226,19 +226,73 @@ public final class PluginPanelController {
         return panel
     }
 
-    /// 将分离窗口定位到源面板附近（偏移 +30, -30）
+    /// 将分离窗口放到**鼠标所在的那块屏幕**上
+    ///
+    /// **不能用 `NSWindow.center()`。** 它落在主屏上，而主屏是系统设置里指定的那一块，
+    /// 跟用户此刻在看哪块屏没有关系 —— 鼠标在内建屏上、主屏是外接显示器时，窗口就会
+    /// 凭空跳到外接屏去。面板自己就是按鼠标所在屏定位的（`PaletteCoordinator`），
+    /// 分离窗口必须落在同一块屏上，否则「从这里分离出来」这件事就断了。
     private func positionRelativeTo(_ sourceWindow: NSWindow?, window: NSWindow) {
-        if let source = sourceWindow {
-            let origin = source.frame.origin
-            window.setFrameOrigin(
-                NSPoint(
-                    x: origin.x + 30,
-                    y: origin.y - 30
-                ))
-        } else {
+        let screen =
+            ScreenPlacement.screen() ?? sourceWindow?.screen ?? NSScreen.main
+            ?? NSScreen.screens.first
+        guard let screen else {
+            log.warning("找不到可用屏幕，分离窗口位置未调整")
             window.center()
+            return
         }
+
+        // 源窗口不在目标屏上时按「没有源窗口」处理：宁可居中，也不要贴着别的屏上的窗口放
+        let sourceFrame = sourceWindow.flatMap { $0.screen === screen ? $0.frame : nil }
+        window.setFrameOrigin(
+            Self.detachedOrigin(
+                size: window.frame.size,
+                sourceFrame: sourceFrame,
+                visibleFrame: screen.visibleFrame
+            ))
+        log.debug("分离窗口定位完成，屏幕=\(screen.localizedName, privacy: .public)")
     }
+
+    /// 分离窗口的落点
+    ///
+    /// 抽成纯函数：两端（贴着源窗口时的越界、窗口比屏幕还大时的夹取）都只在这里出错，
+    /// 而它们又只在特定的显示器摆法下才显形。
+    ///
+    /// - Parameters:
+    ///   - size: 窗口尺寸
+    ///   - sourceFrame: 源面板的 frame（已在目标屏上）；`nil` 表示没有源窗口，居中
+    ///   - visibleFrame: 目标屏的可用区域
+    /// - Returns: 窗口原点（全局坐标）
+    static func detachedOrigin(
+        size: CGSize,
+        sourceFrame: NSRect?,
+        visibleFrame: NSRect
+    ) -> NSPoint {
+        let origin: NSPoint
+        if let sourceFrame {
+            origin = NSPoint(
+                x: sourceFrame.origin.x + detachOffset,
+                y: sourceFrame.origin.y - detachOffset
+            )
+        } else {
+            origin = NSPoint(
+                x: visibleFrame.midX - size.width / 2,
+                y: visibleFrame.midY - size.height / 2
+            )
+        }
+
+        // 夹进这块屏：源窗口贴着边缘时那个 +30/-30 会把窗口推出去；
+        // 窗口比屏幕还大时退化成「贴住最小边」，而不是让它跑到屏外看不见。
+        let maxX = visibleFrame.maxX - size.width
+        let maxY = visibleFrame.maxY - size.height
+        return NSPoint(
+            x: min(max(origin.x, visibleFrame.minX), max(maxX, visibleFrame.minX)),
+            y: min(max(origin.y, visibleFrame.minY), max(maxY, visibleFrame.minY))
+        )
+    }
+
+    /// 贴着源面板分离时的偏移量
+    private static let detachOffset: CGFloat = 30
 
     // MARK: - 尺寸记忆
 

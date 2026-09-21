@@ -435,6 +435,10 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 
 - **单例**：同一插件只允许一个分离窗口，再次分离时聚焦已有窗口。
 - **尺寸记忆**：关闭时保存到 `UserDefaults`，下次打开恢复。
+- **落在鼠标所在的那块屏上**：屏幕按 `NSEvent.mouseLocation` 选（`ScreenPlacement`），
+  与主面板同一套判定。**不要用 `NSWindow.center()`** —— 它落在主屏，而主屏是系统设置里
+  指定的那一块，鼠标在内建屏上、主屏是外接显示器时窗口就会凭空跳过去。
+  有源窗口且源窗口也在这块屏上时贴着它偏移 30，否则居中；两种落点都夹在这块屏的可用区域内。
 - **主面板行为**：分离后主面板 `popToRoot()` 回到搜索模式并隐藏。
 
 分离事件通过 `DetachPanelEvent` → `EventBus` → `AppCore.detachPlugin()` 路由，
@@ -513,6 +517,10 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 
 面板定位到**光标所在屏幕**（不是主屏）的中上方，距可见区顶部
 `DesignTokens.Size.paletteTopMarginFraction`（0.18）比例处，水平居中。
+
+「光标在哪块屏」的判定只有一处实现：`ScreenPlacement`。主面板与分离窗口都用它 ——
+`NSScreen.main` 是系统设置里指定的主屏，跟用户此刻在看哪块屏没有关系，谁拿它定位，
+谁就会在双屏下把窗口开到另一块屏上去。
 
 ---
 
