@@ -426,6 +426,50 @@ public enum DesignTokens {
         /// 进度色
         public static let progress = Color.blue
 
+        // MARK: 语法高亮
+
+        /// 语法高亮的配色
+        ///
+        /// 只在「代码编辑器」这一处用。深浅两套都取自同一组色相，保证在明暗模式下
+        /// 都能互相区分（键 / 字符串 / 数字 / 关键字 / 注释五种要一眼分得开）。
+        public enum Syntax {
+            /// 对象的键、被引号括起来的标识符
+            public static let key = adaptive(
+                dark: NSColor(srgbRed: 130 / 255, green: 170 / 255, blue: 255 / 255, alpha: 1),
+                light: NSColor(srgbRed: 0 / 255, green: 92 / 255, blue: 197 / 255, alpha: 1)
+            )
+
+            /// 字符串字面量
+            public static let string = adaptive(
+                dark: NSColor(srgbRed: 152 / 255, green: 195 / 255, blue: 121 / 255, alpha: 1),
+                light: NSColor(srgbRed: 12 / 255, green: 125 / 255, blue: 60 / 255, alpha: 1)
+            )
+
+            /// 数字字面量
+            public static let number = adaptive(
+                dark: NSColor(srgbRed: 209 / 255, green: 154 / 255, blue: 102 / 255, alpha: 1),
+                light: NSColor(srgbRed: 168 / 255, green: 76 / 255, blue: 0 / 255, alpha: 1)
+            )
+
+            /// 字面量常量（true / false / null）
+            public static let literal = adaptive(
+                dark: NSColor(srgbRed: 197 / 255, green: 134 / 255, blue: 192 / 255, alpha: 1),
+                light: NSColor(srgbRed: 133 / 255, green: 0 / 255, blue: 122 / 255, alpha: 1)
+            )
+
+            /// 语言关键字
+            public static let keyword = adaptive(
+                dark: NSColor(srgbRed: 198 / 255, green: 120 / 255, blue: 221 / 255, alpha: 1),
+                light: NSColor(srgbRed: 116 / 255, green: 0 / 255, blue: 158 / 255, alpha: 1)
+            )
+
+            /// 注释
+            public static let comment = adaptive(
+                dark: NSColor(srgbRed: 122 / 255, green: 134 / 255, blue: 148 / 255, alpha: 1),
+                light: NSColor(srgbRed: 112 / 255, green: 124 / 255, blue: 137 / 255, alpha: 1)
+            )
+        }
+
         /// 结果行来源徽章的底色
         public static let sourceBadgeFill = ramp(dark: 0.10, light: 0.06)
 

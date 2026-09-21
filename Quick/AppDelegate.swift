@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import QuickUI
 
 /// AppKit 生命周期代理
 ///
@@ -12,10 +13,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 应用完成启动
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 主菜单要在任何窗口出现之前装好：⌘A / ⌘C / ⌘V 这些靠它的菜单项派发，
+        // 没有菜单就完全没人处理（见 MainMenu 的说明）
+        MainMenu.install()
+
         // accessory 模式已在 QuickMain 中设置；此处仅启动核心
         AppCore.shared.start()
 
-        if CommandLine.arguments.contains("-showSettings") {
+        // 开发参数：直接打开某个插件的面板（验收用，和 -showPalette / -showSettings 同类）
+        if let index = CommandLine.arguments.firstIndex(of: "-showPlugin"),
+            index + 1 < CommandLine.arguments.count
+        {
+            let pluginID = CommandLine.arguments[index + 1]
+            AppCore.shared.paletteCoordinator.show(pluginID: pluginID)
+        } else if CommandLine.arguments.contains("-showSettings") {
             AppCore.shared.settingsWindowController.show(tab: .applications)
         } else if CommandLine.arguments.contains("-showPalette") {
             AppCore.shared.paletteCoordinator.show()

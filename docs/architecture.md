@@ -313,6 +313,7 @@ Debug（`.dev`）与 Release 互不污染。
 | Esc / 裸退格 / ⌘ 组合键 | `PalettePanel.sendEvent` | 要在 field editor 之前拦下 |
 | ↑ ↓ / 回车 | `PalettePanel.sendEvent` → `PaletteSelection` | 同上：焦点在搜索框里，SwiftUI 层收不到 |
 | 文本输入 | 搜索框（SwiftUI `TextField`） | 它就是焦点 |
+| ⌘A / ⌘C / ⌘V / ⌘X / ⌘Z | 主菜单的编辑菜单项 | **不是文本框自己实现的**：它们是菜单项的 key equivalent，由 AppKit 沿响应链派发 `selectAll:` / `copy:` / `paste:`。没有主菜单这些组合键就没人处理 —— 而 accessory 应用默认没有主菜单，见 `MainMenu` |
 | 点击行 / 悬停 | `ResultListView` | 鼠标路径本来就在 SwiftUI 里 |
 
 `PaletteSelection` 是一个**不持有窗口**的 `@Observable` 对象，所以被 SwiftUI 观察是

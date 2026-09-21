@@ -50,6 +50,13 @@ struct PaletteRootView: View {
     /// 参数：(pluginID, context) -> 插件视图；返回 nil 表示插件不可用。
     var pluginViewProvider: (String, [String: String]) -> AnyView?
 
+    /// 返回主搜索（由协调器注入）
+    ///
+    /// **不能在这里直接改 `paletteMode`**：协调器自己也存着「当前是哪个插件」，
+    /// 绕过它会让两边状态不一致（返回之后协调器仍以为插件是激活的），
+    /// 而且搜索框的焦点也没人负责还回去。
+    var onReturnToSearch: () -> Void
+
     /// 初始查询
     var initialQuery: String = ""
 
@@ -223,9 +230,7 @@ struct PaletteRootView: View {
             PluginHeaderView(
                 pluginName: paletteMode.activePluginName ?? "",
                 pluginIcon: paletteMode.activePluginIcon ?? "questionmark",
-                onBack: {
-                    paletteMode.popToRoot()
-                },
+                onBack: onReturnToSearch,
                 onDetach: {
                     guard let pluginID = paletteMode.activePluginID else { return }
                     EventBus.shared.post(DetachPanelEvent(pluginID: pluginID))

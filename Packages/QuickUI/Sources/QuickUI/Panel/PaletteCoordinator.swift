@@ -179,10 +179,20 @@ public final class PaletteCoordinator {
     }
 
     /// 返回主搜索模式
+    ///
+    /// 从插件退回主搜索时**必须把焦点交还搜索框**：插件视图被销毁后第一响应者也随之消失，
+    /// 不重新指定的话用户接下来打的字没有任何地方接收 —— 看起来像输入框坏了。
+    /// 焦点要等 SwiftUI 把搜索模式的视图重建出来之后再设，所以延到下一轮 runloop。
     public func popToRoot() {
         activePluginID = nil
         query = ""
         paletteMode.popToRoot()
+
+        guard let panel else { return }
+        Task { @MainActor [weak self, weak panel] in
+            guard let panel else { return }
+            self?.focusSearchField(in: panel)
+        }
     }
 
     /// 将协调器的插件状态同步到 PaletteMode
@@ -301,6 +311,9 @@ public final class PaletteCoordinator {
             pluginViewProvider: { [weak self] pluginID, context in
                 guard let self else { return nil }
                 return self.makePluginView(pluginID: pluginID, context: context)
+            },
+            onReturnToSearch: { [weak self] in
+                self?.popToRoot()
             }
         )
         let newPanel = PalettePanel(rootView: rootView)
