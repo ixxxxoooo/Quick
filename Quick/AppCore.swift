@@ -242,8 +242,11 @@ final class AppCore {
             let list = self.loadCustomCommands()
             if let cmd = list.first(where: { $0.id == id && $0.isEnabled }) {
                 Task {
+                    // 与面板里触发同一条命令，选项必须一致，否则两条入口行为不一样
                     let result = await ShellCommandRunner.run(
-                        cmd.command, workingDirectory: cmd.workingDirectory)
+                        cmd.command,
+                        workingDirectory: cmd.workingDirectory,
+                        loadingShellEnvironment: cmd.loadsShellEnvironment)
                     EventBus.shared.post(
                         ShowHUDEvent(
                             message: String(result.summary.prefix(80)),
@@ -806,19 +809,23 @@ extension AppCore: SettingsDataSource {
                 isEnabled: cmd.isEnabled,
                 alias: cmd.alias,
                 shortcutKeycaps: shortcut?.keycaps,
-                workingDirectory: cmd.workingDirectory
+                workingDirectory: cmd.workingDirectory,
+                loadsShellEnvironment: cmd.loadsShellEnvironment
             )
         }
         cachedCustomCommands = items
         return items
     }
 
-    func addCustomCommand(name: String, command: String, workingDirectory: String?) {
+    func addCustomCommand(
+        name: String, command: String, workingDirectory: String?, loadsShellEnvironment: Bool
+    ) {
         var list = loadCustomCommands()
         let item = CustomCommand(
             name: name,
             command: command,
             isEnabled: true,
+            loadsShellEnvironment: loadsShellEnvironment,
             workingDirectory: workingDirectory
         )
         list.append(item)
@@ -831,7 +838,8 @@ extension AppCore: SettingsDataSource {
         command: String,
         isEnabled: Bool,
         alias: String?,
-        workingDirectory: String?
+        workingDirectory: String?,
+        loadsShellEnvironment: Bool
     ) {
         var list = loadCustomCommands()
         guard let index = list.firstIndex(where: { $0.id == id }) else { return }
@@ -840,6 +848,7 @@ extension AppCore: SettingsDataSource {
         list[index].isEnabled = isEnabled
         list[index].alias = alias
         list[index].workingDirectory = workingDirectory
+        list[index].loadsShellEnvironment = loadsShellEnvironment
         saveCustomCommands(list)
     }
 

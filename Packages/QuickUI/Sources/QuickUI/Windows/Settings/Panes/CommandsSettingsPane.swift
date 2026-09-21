@@ -141,7 +141,8 @@ private struct CustomCommandRow: View {
                         command: command.command,
                         isEnabled: command.isEnabled,
                         alias: newValue,
-                        workingDirectory: command.workingDirectory
+                        workingDirectory: command.workingDirectory,
+                        loadsShellEnvironment: command.loadsShellEnvironment
                     )
                 }
 
@@ -190,6 +191,7 @@ private struct CommandEditorSheet: View {
     @State private var name: String = ""
     @State private var command: String = ""
     @State private var workingDirectory: String = ""
+    @State private var loadsShellEnvironment = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.lg) {
@@ -220,6 +222,16 @@ private struct CommandEditorSheet: View {
                     .textFieldStyle(.roundedBorder)
             }
 
+            Toggle(isOn: $loadsShellEnvironment) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("加载 Shell 配置（.zshrc）")
+                    Text("打开后别名与 .zshrc 里的 PATH 才生效，代价是每次执行多一份加载时间。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.checkbox)
+
             HStack {
                 Spacer()
                 Button("取消") {
@@ -244,6 +256,7 @@ private struct CommandEditorSheet: View {
                 name = existingCommand.name
                 command = existingCommand.command
                 workingDirectory = existingCommand.workingDirectory ?? ""
+                loadsShellEnvironment = existingCommand.loadsShellEnvironment
             }
         }
     }
@@ -257,13 +270,15 @@ private struct CommandEditorSheet: View {
                 command: command,
                 isEnabled: existingCommand.isEnabled,
                 alias: existingCommand.alias,
-                workingDirectory: dir
+                workingDirectory: dir,
+                loadsShellEnvironment: loadsShellEnvironment
             )
         } else {
             dataSource.addCustomCommand(
                 name: name,
                 command: command,
-                workingDirectory: dir
+                workingDirectory: dir,
+                loadsShellEnvironment: loadsShellEnvironment
             )
         }
     }

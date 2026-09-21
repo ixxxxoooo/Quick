@@ -110,6 +110,8 @@ public struct SettingsCustomCommandItem: Identifiable, Sendable {
     public let alias: String?
     public let shortcutKeycaps: [String]?
     public let workingDirectory: String?
+    /// 是否用交互式 shell 执行（`.zshrc` 里的别名与 PATH 才在）
+    public let loadsShellEnvironment: Bool
 
     public init(
         id: UUID,
@@ -118,7 +120,8 @@ public struct SettingsCustomCommandItem: Identifiable, Sendable {
         isEnabled: Bool,
         alias: String? = nil,
         shortcutKeycaps: [String]? = nil,
-        workingDirectory: String? = nil
+        workingDirectory: String? = nil,
+        loadsShellEnvironment: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -127,6 +130,7 @@ public struct SettingsCustomCommandItem: Identifiable, Sendable {
         self.alias = alias
         self.shortcutKeycaps = shortcutKeycaps
         self.workingDirectory = workingDirectory
+        self.loadsShellEnvironment = loadsShellEnvironment
     }
 }
 
@@ -207,9 +211,11 @@ public protocol SettingsDataSource: AnyObject {
     var isRunShellFallbackEnabled: Bool { get }
     func setRunShellFallbackEnabled(_ enabled: Bool)
     var customCommands: [SettingsCustomCommandItem] { get }
-    func addCustomCommand(name: String, command: String, workingDirectory: String?)
+    func addCustomCommand(
+        name: String, command: String, workingDirectory: String?, loadsShellEnvironment: Bool)
     func updateCustomCommand(
-        id: UUID, name: String, command: String, isEnabled: Bool, alias: String?, workingDirectory: String?)
+        id: UUID, name: String, command: String, isEnabled: Bool, alias: String?,
+        workingDirectory: String?, loadsShellEnvironment: Bool)
     func deleteCustomCommand(id: UUID)
     func setCustomCommandShortcut(keyCode: Int, carbonModifiers: Int, for id: UUID)
     func clearCustomCommandShortcut(for id: UUID)

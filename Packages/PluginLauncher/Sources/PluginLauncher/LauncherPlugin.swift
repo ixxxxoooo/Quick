@@ -124,13 +124,15 @@ public final class LauncherPlugin: QuickPlugin {
                         id: "launcher.shell.direct",
                         pluginID: Self.id,
                         title: "运行 Shell: \(cmd)",
-                        subtitle: "在 /bin/zsh 中执行",
+                        subtitle: "在 /bin/zsh -ilc 中执行",
                         icon: "terminal",
                         relevance: 1.0,
                         action: {
                             EventBus.shared.post(HidePaletteEvent())
                             Task {
-                                let result = await ShellCommandRunner.run(cmd)
+                                // 用户当场打的一句话，走交互式 shell：他打的别名要生效
+                                let result = await ShellCommandRunner.run(
+                                    cmd, loadingShellEnvironment: true)
                                 EventBus.shared.post(
                                     ShowHUDEvent(
                                         message: String(result.summary.prefix(80)),
@@ -173,7 +175,8 @@ public final class LauncherPlugin: QuickPlugin {
                             Task {
                                 let result = await ShellCommandRunner.run(
                                     cmd.command,
-                                    workingDirectory: cmd.workingDirectory
+                                    workingDirectory: cmd.workingDirectory,
+                                    loadingShellEnvironment: cmd.loadsShellEnvironment
                                 )
                                 EventBus.shared.post(
                                     ShowHUDEvent(

@@ -31,7 +31,20 @@
   - 直接 Shell：`launcher.shell.direct`
   - 自定义 Shell 命令：`launcher.cmd.<UUID>`
   - Shell 兜底：`launcher.shell.fallback`
-- **直接以 `>` 开头的查询，进入直接 Shell 执行模式。** 单独返回一个 1.0 相关度的条目，回车后异步在 `/bin/zsh -l -c` 下执行并通过 HUD 显示输出反馈。
+- **直接以 `>` 开头的查询，进入直接 Shell 执行模式。** 单独返回一个 1.0 相关度的条目，回车后异步执行并通过 HUD 显示输出反馈。
+- **收 stdout/stderr 用临时文件，不能用 `Pipe`。** 执行流程是 `run()` → `waitUntilExit()` → 读输出，
+  管道在这个顺序下必然死锁：读端一直没人在读，子进程写满管道缓冲区（macOS 上 64 KiB）就阻塞在
+  write 上，而父进程正等着它退出。任何输出超过 64 KiB 的命令都会把这次执行永久挂住，且不留日志。
+  临时文件没有这个上限，退出后按上限读尾部即可（`StreamCapture`，与 Tinycast 同向）。
+- **执行放在专用并发队列上，不要用 `Task.detached`。** `waitUntilExit` 会阻塞线程，而 Swift
+  协作线程池只有核心数个线程，一条卡住的命令会让面板的其他异步活一起排队。
+- **`-lc` 只读 `.zprofile`；要别名或 `.zshrc` 里的 PATH 就必须 `-ilc`。** zsh 只让交互式 shell
+  source `.zshrc`，所以别名和 nvm / pyenv 那类 PATH 段默认都不在 —— 用户在自己终端里好好的命令
+  会退化成「command not found」。分界线是「这句话是谁说的」：用户当场敲的（`>` 直执行、终端兜底）
+  走 `-ilc`，他打的 `ll` 指的就是自己的别名；存下来的自定义命令默认 `-lc`，由用户在编辑那条命令时
+  用 `loadsShellEnvironment` 自己决定值不值那份配置加载时间。
+- **工作目录不存在就拒绝执行。** 在一个意料之外的地方跑用户的命令，比不跑更糟。`~` 要展开，
+  目录要校验（`resolvedWorkingDirectory`），`cd` 那行照旧 `|| exit 1`。
 - **Shell 兜底走「写脚本文件 + LaunchServices 打开」，不要改回 AppleScript。** 兜底项把命令
   写进一个 `.command` 文件，再交给用户选定的终端（`ShellCommandRunner.runInTerminal`）。
   `tell application "Terminal" … do script …` 那条老路有两个静默失败：它要「自动化」权限
@@ -40,6 +53,11 @@
   它与 `>` 模式的区别只是要不要一个真终端：`>` 在后台跑、输出收进 HUD；兜底要让用户看见
   完整交互，所以交给终端。选定的终端没装或不处理 `.command`（Warp / Kitty 之类）时回落到
   系统默认终端，而不是把命令丢掉。
+- **终端脚本末尾必须把会话交给交互式 shell（`if [ -t 0 ]; then exec /bin/zsh -il; fi`）。**
+  没有这一句，命令一返回登录 shell 就退出，终端随即结束会话（默认配置是「干净退出即关窗」），
+  用户连输出都来不及看 —— 表现是窗口一闪就没，看起来像功能坏了。脚本 shebang 也用 `-il`
+  而不是 `-l`，理由同上一条。`-t 0` 守卫保证只有真的挂在终端上时才交接：非终端调用
+  （测试、被别的程序打开）仍然一次性执行，退出码不受影响。
 - **支持自定义应用别名与快捷键。** 别名与显示名各算一次匹配分，取二者较高者 ——
   别名完全匹配时就是 1.0，自然排在首位。
 - **支持自定义 Shell 命令库与 Shell 兜底。** 搜索列表底部可展示 `$ <query>` 兜底执行项（受设置开关控制）。
@@ -53,7 +71,7 @@
 | `RankingStore` | 使用次数记录（bundleID → 次数），归一化成 0…1 的评分 |
 | `FavoritesStore` | 收藏的 bundleID 列表，保持插入顺序 |
 | `AppIndex` | 应用程序索引与扫描，支持动态自定义搜索范围配置；每个条目在构造时算好名称的匹配形态 |
-| `ShellCommandRunner` | 结构化后台异步执行 Shell 脚本并捕获 stdout/stderr/退出码 |
+| `ShellCommandRunner` | 后台执行 Shell 命令（临时文件收 stdout/stderr）、打开终端执行 |
 | `CustomCommand` | 用户自定义 Shell 命令数据结构 |
 | `KeyShortcut` / `HotKeyService` | 全局热键与应用/操作绑定服务 |
 | `LauncherView` | 插件在面板内的主视图 |
