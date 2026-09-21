@@ -170,6 +170,21 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 插件正是这样静默失效了很久。另外要显式写 `phases: [.down, .repeat]`：单键重载
 `onKeyPress(.downArrow) { }` 不带 phases，长按不会连续移动。
 
+### 列表的滚动跟随与悬停高亮
+
+两条规则，主搜索列表（`ResultListView`）与插件里的列表都必须遵守。
+
+- **只有选中项碰到视口边缘才滚动，中间一个像素都不滚。** 决策统一走
+  `ListScrollFollow.anchor(for:count:)`：两端给 `.top` / `.bottom`，中间返回 `nil`
+  （交给 SwiftUI 做最小幅度滚动，已可见就原地不动）。
+  **不要用 `anchor: .center` 把选中项一直摆在视口中央** —— 那是每按一下方向键整块列表
+  都在动，眼睛要一直追着移动的目标；长按方向键时动画被反复打断，糊成一片。
+  边缘跟随的手感是「选中框在列表里走，走到边上列表才跟上」。
+- **悬停高亮由列表持有，行只读。** 行各自记 `@State isHovered` 时，键盘移动导致列表
+  滚动，而滚动不会给指针底下那一行补一次 `onHover(false)` —— 旧的灰色高亮留在原地，
+  和键盘选中项同时亮着，看起来就是一层残影。列表统一持有 `hoveredID`（见
+  `ResultListView.hoveredID` / `ClipboardListView.hoveredID`），**键盘一移动就整体清空**。
+
 
 
 ---
@@ -337,6 +352,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | --- | --- |
 | `SearchFieldView` | 统一搜索输入框（图标固定槽位 + 20pt 输入） |
 | `ResultListView` | 统一结果列表（键盘导航 + 悬停 + 滚动跟随）。`ResultRowView` 是它的行 |
+| `ListScrollFollow` | 列表滚动跟随的锚点决策：只有选中项碰到视口边缘才滚（纯函数） |
 
 ### Panel/
 

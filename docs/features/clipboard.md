@@ -23,6 +23,13 @@
 - **落盘是防抖 2 秒的，不是即时的。** 剪贴板可能连续变化多次，每次都写盘既浪费又会
   互相打断。所以**进程被强杀时最后 2 秒的内容会丢**，这是接受的代价。
   `deactivate()` 里的 `save()` 是唯一的即时落盘点。
+- **列表的悬停高亮归 `ClipboardListView` 持有，`ClipboardRowView` 无状态。**
+  行自己记 `@State isHovered` 的话，键盘移动导致列表滚动时没人来清它，旧的灰色高亮
+  会留在原地与选中项同时亮着（一层残影）。行只接收 `isHovered`，由列表在
+  `moveSelection` / `switchTab` 里整体清空。
+- **滚动跟随只在两端发生**，决策走 `ListScrollFollow.anchor(for:count:)` —— 不要退回
+  `anchor: .center`，那会让每按一下方向键整块列表都滚动。见 [docs/ui.md](../ui.md) 的
+  「列表的滚动跟随与悬停高亮」。
 
 ## 内部结构
 

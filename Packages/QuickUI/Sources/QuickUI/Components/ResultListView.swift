@@ -101,13 +101,10 @@ public struct ResultListView: View {
             .onChange(of: selectedIndex) { _, newIndex in
                 guard newIndex >= 0, newIndex < items.count else { return }
                 withAnimation(.easeOut(duration: DesignTokens.Duration.scrollReveal)) {
-                    if newIndex == 0 {
-                        proxy.scrollTo(items[0].id, anchor: .top)
-                    } else if newIndex == items.count - 1 {
-                        proxy.scrollTo(items[newIndex].id, anchor: .bottom)
-                    } else {
-                        proxy.scrollTo(items[newIndex].id, anchor: nil)
-                    }
+                    proxy.scrollTo(
+                        items[newIndex].id,
+                        anchor: ListScrollFollow.anchor(for: newIndex, count: items.count)
+                    )
                 }
             }
         }

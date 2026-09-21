@@ -20,6 +20,14 @@ struct ClipboardListView: View {
     /// 当前选中条目索引
     @State private var selectedIndex: Int = 0
 
+    /// 悬停高亮的条目 ID
+    ///
+    /// **放在列表这一层，不放在行里。** 行各自持有 `@State isHovered` 时，键盘一动
+    /// 列表就滚，而滚动不会给指针底下那一行补一次 `onHover(false)` —— 旧的灰色高亮
+    /// 留在原地，和键盘选中项同时亮着，看起来就是一层残影。列表统一持有，
+    /// 键盘一移动就能一次全清掉。
+    @State private var hoveredID: UUID?
+
     /// 搜索文本
     @State private var searchText = ""
 
@@ -197,6 +205,7 @@ struct ClipboardListView: View {
                         ClipboardRowView(
                             entry: entry,
                             isSelected: index == selectedIndex,
+                            isHovered: hoveredID == entry.id,
                             onSelect: {
                                 selectAndCopy(entry)
                             },
@@ -205,6 +214,13 @@ struct ClipboardListView: View {
                             },
                             onDelete: {
                                 store.remove(entry.id)
+                            },
+                            onHoverChange: { hovering in
+                                if hovering {
+                                    hoveredID = entry.id
+                                } else if hoveredID == entry.id {
+                                    hoveredID = nil
+                                }
                             }
                         )
                         .id(entry.id)
@@ -213,12 +229,17 @@ struct ClipboardListView: View {
                 .padding(.horizontal, DesignTokens.Spacing.md)
                 .padding(.vertical, DesignTokens.Spacing.xs)
             }
+            // 系统滚动条是为带标题栏的窗口设计的，和面板的玻璃语言冲突（见 docs/ui.md）。
+            // 面板高度固定、条目数有限，滚动位置靠键盘导航足够可感。
+            .scrollIndicators(.never)
             .onChange(of: selectedIndex) { _, newIndex in
                 let entries = currentEntries
-                if newIndex >= 0, newIndex < entries.count {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        proxy.scrollTo(entries[newIndex].id, anchor: .center)
-                    }
+                guard newIndex >= 0, newIndex < entries.count else { return }
+                withAnimation(.easeOut(duration: DesignTokens.Duration.scrollReveal)) {
+                    proxy.scrollTo(
+                        entries[newIndex].id,
+                        anchor: ListScrollFollow.anchor(for: newIndex, count: entries.count)
+                    )
                 }
             }
         }
@@ -256,10 +277,14 @@ struct ClipboardListView: View {
         if newIndex >= 0, newIndex < tabs.count {
             selectedTab = tabs[newIndex]
             selectedIndex = 0
+            hoveredID = nil
         }
     }
 
     private func moveSelection(direction: Int) {
+        // 键盘一动就把悬停高亮清掉：指针没动，底下那一行已经换人了，
+        // 留着就是和选中项抢眼的一层残影。
+        hoveredID = nil
         selectedIndex = ClipboardListNavigation.step(
             from: selectedIndex,
             direction: direction,
@@ -290,14 +315,18 @@ struct ClipboardListView: View {
 // MARK: - 行视图
 
 /// 剪贴板条目行视图
+///
+/// **无状态：悬停与否由列表传入，不在行里记。** 行自己记 `@State isHovered` 的话，
+/// 键盘移动导致列表滚动时没人来清它，旧的灰色高亮会留在原地（见 `ClipboardListView.hoveredID`）。
 struct ClipboardRowView: View {
     let entry: ClipboardEntry
     let isSelected: Bool
+    let isHovered: Bool
     let onSelect: () -> Void
     let onToggleFavorite: () -> Void
     let onDelete: () -> Void
-
-    @State private var isHovered = false
+    /// 指针进出这一行（由列表统一记录）
+    let onHoverChange: (Bool) -> Void
 
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
@@ -361,7 +390,7 @@ struct ClipboardRowView: View {
                     .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
             }
         }
-        .onHover { isHovered = $0 }
+        .onHover(perform: onHoverChange)
         .onTapGesture { onSelect() }
         .contentShape(Rectangle())
         .contextMenu {
