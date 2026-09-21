@@ -100,6 +100,49 @@ struct TriggerMatchingTests {
         #expect("北京".matchedTrigger(in: ["天气", "weather"]).isEmpty)
     }
 
+    // MARK: - 前缀变体（AI 聚合的 Provider 名要用）
+
+    @Test("前缀变体认「触发词以查询词开头」")
+    func prefixVariantAcceptsTriggerPrefix() {
+        let triggers = ["deepseek", "chatgpt", "claude", "ai"]
+        #expect("deep".matchesAnyTriggerIncludingPrefix(triggers), "deep 应当能命中 deepseek")
+        #expect("deepse".matchesAnyTriggerIncludingPrefix(triggers))
+        #expect("chatgp".matchesAnyTriggerIncludingPrefix(triggers))
+        #expect("DEEP".matchesAnyTriggerIncludingPrefix(triggers), "大小写不敏感")
+    }
+
+    @Test("前缀变体仍然接受整词命中")
+    func prefixVariantStillAcceptsWholeWords() {
+        let triggers = ["deepseek", "ai", "ds"]
+        #expect("deepseek".matchesAnyTriggerIncludingPrefix(triggers))
+        #expect("ds".matchesAnyTriggerIncludingPrefix(triggers), "自己的关键词无论多短都放行")
+    }
+
+    /// 没有长度下限的话，打一个字母就会命中一片
+    @Test("前缀变体不放行过短的查询词")
+    func prefixVariantRejectsShortQueries() {
+        let triggers = ["deepseek", "chatgpt", "ai"]
+        #expect("de".matchesAnyTriggerIncludingPrefix(triggers) == false)
+        #expect("d".matchesAnyTriggerIncludingPrefix(triggers) == false)
+        #expect("de".matchesAnyTriggerIncludingPrefix(triggers, minimumPrefix: 2), "下限可以调")
+    }
+
+    /// 前缀是「以触发词**开头**」，不是「是触发词的一部分」
+    @Test("前缀变体不接受中间片段")
+    func prefixVariantRejectsInfix() {
+        let triggers = ["deepseek", "chatgpt"]
+        #expect("seek".matchesAnyTriggerIncludingPrefix(triggers) == false)
+        #expect("gpt".matchesAnyTriggerIncludingPrefix(triggers) == false)
+    }
+
+    /// 前缀变体只放宽「开头」，整词规则挡住的那些子串噪音一个都不许回来
+    @Test("前缀变体不引入子串误触发")
+    func prefixVariantKeepsSubstringNoiseOut() {
+        #expect("email".matchesAnyTriggerIncludingPrefix(["ai"]) == false)
+        #expect("memory".matchesAnyTriggerIncludingPrefix(["memo"]) == false)
+        #expect("clipboard".matchesAnyTriggerIncludingPrefix(["ip"]) == false)
+    }
+
     // MARK: - CJK 判定
 
     @Test("CJK 判定覆盖中日韩")

@@ -17,6 +17,10 @@ import Foundation
 /// 所以拉丁字母触发词按**整词**匹配，中文触发词按**前缀**匹配 ——
 /// 中文没有词边界，`天气北京` 必须能命中 `天气`；拉丁字母有词边界，
 /// `memory` 不该命中 `memo`。
+///
+/// 整词规则的代价是「打一半进不来」：`deep` 到不了触发词 `deepseek`。要边打边收窄的插件
+/// （AI 聚合的 Provider 名就是典型）用 `matchesAnyTriggerIncludingPrefix(_:minimumPrefix:)`，
+/// 它额外放行前缀，但要求查询词够长，见那个方法的说明。
 public extension String {
 
     /// 是否命中任一触发词
@@ -25,6 +29,29 @@ public extension String {
     /// - Returns: 是否命中
     func matchesAnyTrigger(_ triggers: [String]) -> Bool {
         !matchedTrigger(in: triggers).isEmpty
+    }
+
+    /// 是否命中任一触发词，**或者**是某个触发词的开头
+    ///
+    /// 给「查询词本身就是名字的一部分」的插件用：AI 聚合要能打 `deep` 就找到 DeepSeek、
+    /// 打 `chatgp` 就找到 ChatGPT。整词规则（`matchesAnyTrigger`）做不到这件事 ——
+    /// 它为了保护 `ai` / `memo` 这类短触发词而不接受前缀。
+    ///
+    /// **长度下限不能去掉。** 没有 `minimumPrefix` 的话，打一个字母就会命中一片
+    /// （`a` → `ai`、`g` → `gpt`、`d` → `deepseek`），首屏立刻变成噪音。
+    /// 三个字符是「用户已经知道自己在找哪个名字」的下限。
+    ///
+    /// - Parameters:
+    ///   - triggers: 触发词列表（大小写不敏感）
+    ///   - minimumPrefix: 前缀匹配所需的最少字符数，默认 3
+    /// - Returns: 是否命中
+    func matchesAnyTriggerIncludingPrefix(_ triggers: [String], minimumPrefix: Int = 3) -> Bool {
+        if matchesAnyTrigger(triggers) { return true }
+
+        let query = trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard query.count >= minimumPrefix else { return false }
+
+        return triggers.contains { $0.lowercased().hasPrefix(query) }
     }
 
     /// 命中并剥离触发词后剩下的查询词

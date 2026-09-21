@@ -41,7 +41,13 @@ public final class AIPlugin: QuickPlugin {
     // MARK: - 搜索
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(AIProviderRegistry.allKeywords) else { return [] }
+        // 闸门要认前缀：Provider 名是「用户打一半就该收窄」的东西 —— 打 `deep` 得能出
+        // DeepSeek、打 `chatgp` 得能出 ChatGPT。整词规则做不到这件事（它保护的是
+        // `ai` / `memo` 这类短触发词），所以这里用带长度下限的前缀变体，
+        // 而下面那段模糊打分早就为此准备好了。
+        guard query.matchesAnyTriggerIncludingPrefix(AIProviderRegistry.allKeywords) else {
+            return []
+        }
 
         var results: [SearchableItem] = []
 

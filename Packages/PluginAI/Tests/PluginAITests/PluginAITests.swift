@@ -182,6 +182,36 @@ struct AIPluginTests {
         #expect(await plugin.searchItems(query: "").isEmpty)
     }
 
+    // MARK: - 前缀查询
+
+    /// 回归测试：闸门原来只认整词，`deep` 进不来，下面那段模糊打分再准也没机会跑
+    @Test("打一半也能找到 Provider")
+    func prefixQueryFindsProvider() async {
+        let plugin = AIPlugin()
+
+        let deep = await plugin.searchItems(query: "deep")
+        #expect(deep.map(\.id) == ["ai.portal", "ai.deepseek"])
+        #expect(deep[1].relevance == 0.9 * 0.8, "前缀命中按 0.9 折算")
+
+        #expect(
+            await plugin.searchItems(query: "chatgp").map(\.id) == ["ai.portal", "ai.chatgpt"])
+    }
+
+    /// 前缀是「以触发词开头」：`seek` 是 deepseek 的中间片段，不该放行
+    @Test("中间片段不算前缀")
+    func infixQueryReturnsNothing() async {
+        let plugin = AIPlugin()
+        #expect(await plugin.searchItems(query: "seek").isEmpty)
+    }
+
+    /// 闸门有长度下限：一两个字母会把 `ai` / `gpt` 这类短触发词变成噪音源
+    @Test("太短的前缀不放行")
+    func tooShortPrefixReturnsNothing() async {
+        let plugin = AIPlugin()
+        #expect(await plugin.searchItems(query: "de").isEmpty)
+        #expect(await plugin.searchItems(query: "d").isEmpty)
+    }
+
     /// 命中的 Provider 必须能被窗口管理器认出来：id 就是注册表里的 id
     @Test("返回项的 pluginID 一律是插件 id")
     func pluginIDStamped() async {
