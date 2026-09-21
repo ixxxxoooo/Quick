@@ -350,6 +350,21 @@ Debug（`.dev`）与 Release 互不污染。
 所以它发 `ClipboardChangedEvent`，协调器订阅下来只记一个时间点 —— 事件不带内容，
 免得把可能很大的文本在事件里传一遍。
 
+### 外观
+
+`AppCore.applyAppearance()` **是唯一给 `NSApp.appearance` 赋值的地方**。`AppAppearance`
+（跟随系统 / 浅色 / 深色）存在 `SettingsKey.appearance` 里，`.system` 映射成 `nil`，
+把选择权交回 AppKit —— 系统换外观时它自己跟进，我们不必轮询，也不必为「跟随系统」
+单写一条路径。
+
+只赋这一处，是因为它是应用级的：面板、设置窗口、分离窗口、HUD 一起跟着变，逐个窗口设置
+迟早会漏掉一个。`DesignTokens` 里的颜色又都是 `NSColor(name:) { appearance in … }` 这类
+动态颜色，**在绘制时**才按当前外观解析，所以改完不需要重建任何视图。
+
+图标缓存是唯一的例外：位图是按外观出图的，翻了面要让它重来（`IconCache.setDarkSurface`）。
+它挂在 `NSApp.effectiveAppearance` 上而不是 `applyAppearance()` 里 —— 「跟随系统」时我们
+从不赋值，那条路只有这里收得到。
+
 ### 设置窗口
 
 设置界面在 `QuickUI`，但插件实例与系统能力（登录项、快捷键、权限）只有组装层看得到，

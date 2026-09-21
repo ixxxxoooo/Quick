@@ -20,6 +20,13 @@ enum SettingsSearchCatalog {
         .init(
             id: "general.launchAtLogin", tab: .general, title: "Launch at Login / 开机启动", subtitle: "General"),
         .init(id: "general.hotkey", tab: .general, title: "Global Hotkey / 全局快捷键", subtitle: "General"),
+        .init(id: "general.appearance", tab: .general, title: "Theme / 主题与外观", subtitle: "General"),
+        .init(
+            id: "general.paletteBehavior", tab: .general, title: "Panel Behaviour / 面板行为",
+            subtitle: "General"),
+        .init(
+            id: "general.keyboardLayout", tab: .general, title: "Keyboard Layout / 强制键盘布局",
+            subtitle: "General"),
         .init(id: "permissions", tab: .permissions, title: "Permissions / 系统权限", subtitle: "General"),
         .init(
             id: "launcher.applications", tab: .applications, title: "Applications / 应用程序",

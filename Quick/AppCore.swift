@@ -173,6 +173,12 @@ final class AppCore {
     /// 调试唤醒通知观察者（必须强引用，否则立即失效）
     private var debugWakeObserver: NSObjectProtocol?
 
+    /// 外观设置变化的观察者（必须强引用）
+    private var appearanceSettingObserver: NSObjectProtocol?
+
+    /// 实际生效外观的观察者（必须强引用）
+    private var effectiveAppearanceObserver: NSKeyValueObservation?
+
     /// 设置数据源缓存（避免设置面板切换时重复全量计算与反序列化）
     private var cachedIndexedApps: [SettingsAppItem]?
     private var cachedCustomCommands: [SettingsCustomCommandItem]?
@@ -262,6 +268,8 @@ final class AppCore {
 
         statusItemController.install()
         observeDebugWakeSignals()
+        applyAppearance()
+        observeAppearance()
 
         // 7. 读取持久化的搜索范围并在后台刷新应用索引
         let initialScopes = settingsStore.searchScopes(defaultScopes: SearchScopes.defaults)
@@ -380,6 +388,47 @@ final class AppCore {
         layoutBeforePanel = nil
         if keyboardLayoutService.select(layoutID: previous) {
             log.debug("面板关闭，键盘布局已还原：\(previous, privacy: .public)")
+        }
+    }
+
+    // MARK: - 外观
+
+    /// 应用外观设置
+    ///
+    /// **全仓只有这一处给 `NSApp.appearance` 赋值。** 它是应用级的，所以面板、设置窗口、
+    /// 分离窗口一起跟着变 —— 逐个窗口设置迟早会漏掉一个（HUD、分离窗口、设置窗口各一份），
+    /// 而 `.system` 映射成 `nil` 之后，系统切换外观由 AppKit 自己跟进，不需要我们监听什么。
+    private func applyAppearance() {
+        let appearance = AppAppearance.stored()
+        NSApp.appearance = appearance.nsAppearance
+        log.debug("外观已应用：\(appearance.rawValue, privacy: .public)")
+    }
+
+    /// 外观设置改了要立刻生效：不该为了换个主题重启应用
+    ///
+    /// 用 `UserDefaults.didChangeNotification` 而不是 `@AppStorage`：设置页写在
+    /// `QuickUI` 里，这里只该知道「偏好变了」，不该认识那个视图。
+    private func observeAppearance() {
+        if appearanceSettingObserver == nil {
+            appearanceSettingObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification,
+                object: UserDefaults.standard,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.applyAppearance()
+                }
+            }
+        }
+
+        guard effectiveAppearanceObserver == nil else { return }
+        // 图标缓存是按外观出的位图，翻了面要让它重来。
+        // 挂在 `NSApp.effectiveAppearance` 上而不是 `applyAppearance()` 里：
+        // 「跟随系统」时我们从不赋值，那条路只有这里能收到。
+        effectiveAppearanceObserver = NSApp.observe(\.effectiveAppearance, options: [.initial]) { app, _ in
+            MainActor.assumeIsolated {
+                IconCache.setDarkSurface(app.effectiveAppearance.isDark)
+            }
         }
     }
 
