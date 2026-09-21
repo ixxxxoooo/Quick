@@ -59,10 +59,9 @@ import PluginUUIDGenerator
 import PluginWeather
 import PluginWeather
 
-import PluginWindowManager
-import PluginWindowManager
-
 import PluginWordCounter
+
+import PluginSuperPanel
 
 import Carbon.HIToolbox
 import Foundation
@@ -304,10 +303,10 @@ final class AppCore {
 
     /// 监听开发调试唤醒信号（分布式通知）
     ///
-    /// 用法：`notifyutil -p com.ygw.quick.togglePalette`
+    /// 用法：`notifyutil -p com.ixxxxoooo.quick.togglePalette`
     private func observeDebugWakeSignals() {
         debugWakeObserver = DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("com.ygw.quick.togglePalette"),
+            forName: Notification.Name("com.ixxxxoooo.quick.togglePalette"),
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -519,10 +518,12 @@ final class AppCore {
             (WeatherPlugin.self, { WeatherPlugin() }),
             (NotesPlugin.self, { NotesPlugin(storage: self.storage(for: NotesPlugin.id)) }),
             (AIPlugin.self, { AIPlugin() }),
-            (WindowManagerPlugin.self, { WindowManagerPlugin() }),
             (SystemMonitorPlugin.self, { SystemMonitorPlugin() }),
             (NetworkToolsPlugin.self, { NetworkToolsPlugin() }),
-            (ScreenshotPlugin.self, { ScreenshotPlugin() })
+            (ScreenshotPlugin.self, { ScreenshotPlugin() }),
+
+            // Phase 5: 超级面板
+            (SuperPanelPlugin.self, { SuperPanelPlugin() })
         ]
     }
 
@@ -891,19 +892,6 @@ extension AppCore: SettingsDataSource {
         }
     }
 
-    /// 窗口管理的布局命令
-    ///
-    /// 由插件自己报出来：设置页按这些 id 写开关，两边必须同源。
-    var windowLayoutCommands: [SettingsWindowLayoutCommand] {
-        guard
-            let plugin = plugins.first(where: { type(of: $0).id == WindowManagerPlugin.id })
-                as? WindowManagerPlugin
-        else {
-            return []
-        }
-        return plugin.layoutCommands
-    }
-
     /// 全部插件，按显示名排序
     ///
     /// 排序而不是按注册顺序：注册顺序是代码结构，用户不该看到它。
@@ -914,6 +902,7 @@ extension AppCore: SettingsDataSource {
                     id: type(of: $0).id,
                     name: type(of: $0).name,
                     icon: type(of: $0).icon,
+                    description: type(of: $0).description,
                     triggerWords: type(of: $0).triggerWords
                 )
             }

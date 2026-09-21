@@ -25,19 +25,20 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
     public var tabs: [SettingsTab] {
         switch self {
         case .general:
-            return [.general, .permissions]
+            return [.general, .appearance, .shortcuts, .permissions]
         case .launcher:
             return [.applications, .systemActions, .commands]
         case .features:
             return [
                 .clipboard, .calculator, .fileSearch, .snippets,
-                .windowManagement, .notes, .calendar, .weather,
+                .notes, .calendar, .weather,
                 .ai, .translator, .systemMonitor,
                 .networkTools, .ocr, .screenshot,
                 // 开发者工具：原先是一个 devtools 容器，现在每个工具都是独立插件
                 .jsonFormatter, .sqlFormatter, .base64Codec, .urlCodec,
                 .uuidGenerator, .hashCalculator, .timestampConverter,
-                .wordCounter, .textDiff, .markdownPreview, .colorCompare
+                .wordCounter, .textDiff, .markdownPreview, .colorCompare,
+                .superPanel
             ]
         case .advanced:
             return [.about]
@@ -50,6 +51,8 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 
     // MARK: - 通用
     case general
+    case appearance
+    case shortcuts
     case plugins
     case permissions
 
@@ -63,7 +66,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case calculator
     case fileSearch
     case snippets
-    case windowManagement
     case notes
     case calendar
     case weather
@@ -84,6 +86,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case networkTools
     case ocr
     case screenshot
+    case superPanel
 
     // MARK: - 高级
     case about
@@ -94,6 +97,8 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     public var title: String {
         switch self {
         case .general: "通用设置"
+        case .appearance: "外观"
+        case .shortcuts: "快捷键"
         case .plugins: "插件管理"
         case .permissions: "权限"
 
@@ -105,7 +110,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .calculator: "计算器"
         case .fileSearch: "文件搜索"
         case .snippets: "文本片段"
-        case .windowManagement: "窗口管理"
         case .notes: "笔记"
         case .calendar: "日历"
         case .weather: "天气"
@@ -126,6 +130,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .networkTools: "网络工具"
         case .ocr: "文字识别"
         case .screenshot: "截图工具"
+        case .superPanel: "超级面板"
 
         case .about: "关于"
         }
@@ -135,6 +140,8 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     public var systemImage: String {
         switch self {
         case .general: "switch.2"
+        case .appearance: "paintbrush"
+        case .shortcuts: "command"
         case .plugins: "square.grid.2x2"
         case .permissions: "lock.shield"
 
@@ -146,7 +153,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .calculator: "plus.forwardslash.minus"
         case .fileSearch: "doc.text.magnifyingglass"
         case .snippets: "curlybraces"
-        case .windowManagement: "macwindow"
         case .notes: "text.page"
         case .calendar: "calendar"
         case .weather: "cloud.sun"
@@ -167,6 +173,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .networkTools: "network"
         case .ocr: "text.viewfinder"
         case .screenshot: "camera"
+        case .superPanel: "bolt.square"
 
         case .about: "info.circle"
         }
@@ -181,7 +188,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .calculator: "calculator"
         case .fileSearch: "filesearch"
         case .snippets: "snippets"
-        case .windowManagement: "windowmanager"
         case .notes: "notes"
         case .calendar: "calendar"
         case .weather: "weather"
@@ -202,6 +208,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .networkTools: "networktools"
         case .ocr: "ocr"
         case .screenshot: "screenshot"
+        case .superPanel: "superPanel"
         default: nil
         }
     }

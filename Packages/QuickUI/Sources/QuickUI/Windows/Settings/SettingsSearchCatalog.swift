@@ -19,8 +19,12 @@ enum SettingsSearchCatalog {
     private static let staticEntries: [SettingsSearchEntry] = [
         .init(
             id: "general.launchAtLogin", tab: .general, title: "Launch at Login / 开机启动", subtitle: "General"),
-        .init(id: "general.hotkey", tab: .general, title: "Global Hotkey / 全局快捷键", subtitle: "General"),
-        .init(id: "general.appearance", tab: .general, title: "Theme / 主题与外观", subtitle: "General"),
+        .init(
+            id: "general.appearance", tab: .appearance, title: "Appearance & Theme / 外观与主题",
+            subtitle: "General"),
+        .init(
+            id: "general.shortcuts", tab: .shortcuts, title: "Shortcuts & Hotkeys / 全局快捷键与命令唤醒",
+            subtitle: "General"),
         .init(
             id: "general.paletteBehavior", tab: .general, title: "Panel Behaviour / 面板行为",
             subtitle: "General"),
@@ -40,9 +44,6 @@ enum SettingsSearchCatalog {
         .init(id: "features.calculator", tab: .calculator, title: "Calculator / 计算器", subtitle: "Features"),
         .init(id: "features.filesearch", tab: .fileSearch, title: "File Search / 文件搜索", subtitle: "Features"),
         .init(id: "features.snippets", tab: .snippets, title: "Snippets / 代码片段", subtitle: "Features"),
-        .init(
-            id: "features.windowmanager", tab: .windowManagement, title: "Window Management / 窗口管理",
-            subtitle: "Features"),
         .init(id: "features.notes", tab: .notes, title: "Notes / 便签备忘", subtitle: "Features"),
         .init(id: "features.calendar", tab: .calendar, title: "Calendar / 日历日程", subtitle: "Features"),
         .init(id: "features.weather", tab: .weather, title: "Weather / 实时天气", subtitle: "Features"),
@@ -89,6 +90,9 @@ enum SettingsSearchCatalog {
             subtitle: "Features"),
         .init(id: "features.ocr", tab: .ocr, title: "OCR / 文字识别", subtitle: "Features"),
         .init(id: "features.screenshot", tab: .screenshot, title: "Screenshot / 截图工具", subtitle: "Features"),
+        .init(
+            id: "features.superpanel", tab: .superPanel, title: "Super Panel / 超级面板",
+            subtitle: "Features"),
         .init(id: "about.version", tab: .about, title: "About / 关于 Quick", subtitle: "Advanced")
     ]
 

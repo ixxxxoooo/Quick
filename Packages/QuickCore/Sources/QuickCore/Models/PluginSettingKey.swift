@@ -65,23 +65,6 @@ public enum PluginSettingKey {
         public static let showSnippetHint = "snippets.showSnippetHint"
     }
 
-    /// 窗口管理
-    ///
-    /// 只有真的生效的键留在这里：`gap` / `screenMargin` / `snapOnDrag` / `enabled` /
-    /// `cycling` / `showLayoutsInLauncher` 已经删掉了 —— 它们对应的功能
-    /// （窗口间距、拖拽吸附、循环切换、保存布局）都还没有实现，控件也随之从设置页移除。
-    /// 做出来的时候再把键和控件一起加回来。
-    public enum WindowManager {
-        public static let showInLauncher = "windowManager.showInLauncher"
-
-        /// 单个布局命令是否出现在搜索结果里
-        ///
-        /// 键名里带布局的 rawValue（`leftHalf` 等），所以是函数不是常量。
-        public static func commandVisible(_ layoutID: String) -> String {
-            "windowManager.cmd.\(layoutID).visible"
-        }
-    }
-
     /// 笔记
     public enum Notes {
         public static let autoSave = "notes.autoSave"
@@ -154,8 +137,76 @@ public enum PluginSettingKey {
         public static let removeDashes = "uuidGenerator.removeDashes"
     }
 
+    /// SQL 格式化
+    public enum SQLFormatter {
+        public static let keywordCase = "sqlFormatter.keywordCase"
+        public static let indent = "sqlFormatter.indent"
+    }
+
+    /// Base64 编解码
+    public enum Base64Codec {
+        public static let urlSafe = "base64Codec.urlSafe"
+        public static let wrapLines = "base64Codec.wrapLines"
+    }
+
+    /// URL 编解码
+    public enum URLCodec {
+        public static let encodeSpacesAsPluses = "urlCodec.encodeSpacesAsPluses"
+        public static let encodeFullUrl = "urlCodec.encodeFullUrl"
+    }
+
+    /// Hash 计算器
+    public enum HashCalculator {
+        public static let uppercase = "hashCalculator.uppercase"
+        public static let autoCopy = "hashCalculator.autoCopy"
+    }
+
+    /// 时间戳转换
+    public enum TimestampConverter {
+        public static let defaultUnit = "timestampConverter.defaultUnit"
+        public static let timeZone = "timestampConverter.timeZone"
+    }
+
+    /// 字数统计
+    public enum WordCounter {
+        public static let ignoreWhitespace = "wordCounter.ignoreWhitespace"
+        public static let readingSpeedWPM = "wordCounter.readingSpeedWPM"
+    }
+
+    /// 文本对比
+    public enum TextDiff {
+        public static let ignoreWhitespace = "textDiff.ignoreWhitespace"
+        public static let ignoreCase = "textDiff.ignoreCase"
+    }
+
+    /// Markdown 预览
+    public enum MarkdownPreview {
+        public static let showLineNumbers = "markdownPreview.showLineNumbers"
+        public static let enableMathJax = "markdownPreview.enableMathJax"
+    }
+
+    /// 颜色工具
+    public enum ColorCompare {
+        public static let defaultFormat = "colorCompare.defaultFormat"
+        public static let uppercaseHex = "colorCompare.uppercaseHex"
+    }
+
     /// 终端
     public enum Shell {
         public static let preferredTerminal = "shell.preferredTerminal"
+    }
+
+    /// 超级面板
+    public enum SuperPanel {
+        /// 是否自动检测前台应用的项目
+        public static let autoDetect = "superPanel.autoDetect"
+        /// 是否显示 Git 操作
+        public static let showGitActions = "superPanel.showGitActions"
+        /// 是否显示构建操作
+        public static let showBuildActions = "superPanel.showBuildActions"
+        /// 是否显示文件导航
+        public static let showFileNav = "superPanel.showFileNav"
+        /// 首选终端应用
+        public static let preferredTerminal = "superPanel.preferredTerminal"
     }
 }

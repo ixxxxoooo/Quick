@@ -1,6 +1,6 @@
 name: Quick
 options:
-  bundleIdPrefix: com.ygw
+  bundleIdPrefix: com.ixxxxoooo
   deploymentTarget:
     macOS: "26.0"
   xcodeVersion: "16.0"
@@ -45,8 +45,6 @@ packages:
     path: Packages/PluginNotes
   PluginAI:
     path: Packages/PluginAI
-  PluginWindowManager:
-    path: Packages/PluginWindowManager
   PluginSystemMonitor:
     path: Packages/PluginSystemMonitor
   PluginNetworkTools:
@@ -75,6 +73,8 @@ packages:
     path: Packages/PluginColorCompare
   PluginMarkdownPreview:
     path: Packages/PluginMarkdownPreview
+  PluginSuperPanel:
+    path: Packages/PluginSuperPanel
 
 targets:
   Quick:
@@ -84,7 +84,7 @@ targets:
       - Quick
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ygw.quick
+        PRODUCT_BUNDLE_IDENTIFIER: com.ixxxxoooo.quick
         INFOPLIST_FILE: Quick/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Quick/Quick.entitlements
         # 自签名身份「Quick」：TCC 按 certificate leaf 认 App，必须稳定（见 Scripts/generate-signing-cert.sh）
@@ -101,12 +101,12 @@ targets:
         Debug:
           # 独立开发频道：与正式版隔离 TCC / 偏好 / 日志子系统
           PRODUCT_NAME: Quick Dev
-          PRODUCT_BUNDLE_IDENTIFIER: com.ygw.quick.dev
+          PRODUCT_BUNDLE_IDENTIFIER: com.ixxxxoooo.quick.dev
           # Xcode 16+ 默认把 Debug 代码放进 .debug.dylib，主可执行只剩壳 → TCC 认不出稳定身份
           ENABLE_DEBUG_DYLIB: NO
         Release:
           PRODUCT_NAME: Quick
-          PRODUCT_BUNDLE_IDENTIFIER: com.ygw.quick
+          PRODUCT_BUNDLE_IDENTIFIER: com.ixxxxoooo.quick
           DEPLOYMENT_POSTPROCESSING: YES
           STRIP_INSTALLED_PRODUCT: YES
           COPY_PHASE_STRIP: YES
@@ -126,7 +126,6 @@ targets:
       - package: PluginWeather
       - package: PluginNotes
       - package: PluginAI
-      - package: PluginWindowManager
       - package: PluginSystemMonitor
       - package: PluginNetworkTools
       - package: PluginScreenshot
@@ -141,3 +140,4 @@ targets:
       - package: PluginTextDiff
       - package: PluginColorCompare
       - package: PluginMarkdownPreview
+      - package: PluginSuperPanel
