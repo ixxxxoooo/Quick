@@ -148,10 +148,18 @@ struct CalculatorPluginSettingsTests {
         try await body()
     }
 
+    /// 用例只关心设置接线，历史表随便建一个内存库；建表是为了让回车记录那一步不报错
+    private static func makePlugin() throws -> CalculatorPlugin {
+        let database = try SQLiteDatabase()
+        try database.migrate(CalculatorPlugin.storageMigrations)
+        return CalculatorPlugin(
+            storage: PluginStorage(pluginID: CalculatorPlugin.id, database: database))
+    }
+
     @Test("小数位数真的改变了结果项标题")
     func precisionReachesTheResultTitle() async throws {
         try await Self.withStandardDefaults {
-            let plugin = CalculatorPlugin()
+            let plugin = try Self.makePlugin()
 
             UserDefaults.standard.set(2, forKey: PluginSettingKey.Calculator.precision)
             #expect(await plugin.searchItems(query: "2/3").first?.title == "0.67")
@@ -166,14 +174,15 @@ struct CalculatorPluginSettingsTests {
         try await Self.withStandardDefaults {
             UserDefaults.standard.removeObject(forKey: PluginSettingKey.Calculator.precision)
 
-            #expect(await CalculatorPlugin().searchItems(query: "2/3").first?.title == "0.6667")
+            let plugin = try Self.makePlugin()
+            #expect(await plugin.searchItems(query: "2/3").first?.title == "0.6667")
         }
     }
 
     @Test("千分位开关真的改变了结果项标题")
     func groupingSeparatorReachesTheResultTitle() async throws {
         try await Self.withStandardDefaults {
-            let plugin = CalculatorPlugin()
+            let plugin = try Self.makePlugin()
             let separator = Locale.current.groupingSeparator ?? ","
 
             UserDefaults.standard.set(false, forKey: PluginSettingKey.Calculator.useGroupingSeparator)
@@ -194,7 +203,7 @@ struct CalculatorPluginSettingsTests {
             defer { subscription.cancel() }
 
             UserDefaults.standard.set(true, forKey: PluginSettingKey.Calculator.autoCopy)
-            let items = await CalculatorPlugin().searchItems(query: "6*7")
+            let items = await (try Self.makePlugin()).searchItems(query: "6*7")
             let copying = try #require(items.first)
             #expect(copying.shortcutHint == "⏎ 复制")
             copying.action()
@@ -202,7 +211,7 @@ struct CalculatorPluginSettingsTests {
 
             // 关掉之后同一个动作不能再往剪贴板里写东西
             UserDefaults.standard.set(false, forKey: PluginSettingKey.Calculator.autoCopy)
-            let silentItems = await CalculatorPlugin().searchItems(query: "6*7")
+            let silentItems = await (try Self.makePlugin()).searchItems(query: "6*7")
             let silent = try #require(silentItems.first)
             #expect(silent.shortcutHint == "⏎ 完成")
             silent.action()

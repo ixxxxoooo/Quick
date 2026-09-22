@@ -10,6 +10,8 @@ import SwiftUI
 ///
 /// 在搜索框中直接输入数学表达式即可计算。
 /// 支持基础四则运算、括号、百分比、单位换算和货币转换。
+///
+/// 每次提交的算式都会落进「计算稿纸」（持久化历史），面板视图里可以看到逐条记录。
 @MainActor
 public final class CalculatorPlugin: QuickPlugin {
 
@@ -26,7 +28,37 @@ public final class CalculatorPlugin: QuickPlugin {
     /// 计算引擎
     private let engine = CalcEngine()
 
-    public init() {}
+    /// 计算历史（计算稿纸）
+    private let store: CalcHistoryStore
+
+    /// - Parameter storage: 由 AppCore 注入的存储句柄
+    public init(storage: PluginStorage) {
+        self.store = CalcHistoryStore(storage: storage)
+    }
+
+    // MARK: - 存储 schema
+
+    /// 计算历史表
+    ///
+    /// 表结构归插件所有：宿主只负责把它跑一遍，不读这张表。
+    public static var storageMigrations: [SQLiteMigration] {
+        [
+            SQLiteMigration(
+                id: "calculator.history",
+                statements: [
+                    """
+                    CREATE TABLE IF NOT EXISTS calc_history (
+                        id TEXT PRIMARY KEY,
+                        expression TEXT NOT NULL,
+                        result TEXT NOT NULL,
+                        created_at REAL NOT NULL
+                    )
+                    """,
+                    "CREATE INDEX IF NOT EXISTS idx_calc_history_created ON calc_history(created_at DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_calc_history_expression ON calc_history(expression)"
+                ])
+        ]
+    }
 
     // MARK: - QuickPlugin 协议
 
@@ -46,6 +78,7 @@ public final class CalculatorPlugin: QuickPlugin {
 
         // 复制开关决定回车提示写什么，也在构造结果项的这一刻读
         let autoCopy = CalcPreferences.autoCopy()
+        let store = self.store
 
         return [
             SearchableItem(
@@ -57,6 +90,9 @@ public final class CalculatorPlugin: QuickPlugin {
                 relevance: 0.95,  // 计算结果优先级高
                 shortcutHint: autoCopy ? "⏎ 复制" : "⏎ 完成",
                 action: {
+                    // 提交即记入计算稿纸：主搜索回车与面板视图回车走的是同一条历史
+                    store.record(expression: query, result: result.formatted)
+
                     // 再读一次：从给出结果到按下回车之间，设置页可能已经改过这个开关
                     if CalcPreferences.autoCopy() {
                         EventBus.shared.post(CopyToClipboardEvent(text: result.formatted))
@@ -78,14 +114,15 @@ public final class CalculatorPlugin: QuickPlugin {
     private let buffer = TextBuffer()
 
     public func makeView() -> AnyView {
-        AnyView(CalculatorView(engine: engine, buffer: buffer))
+        AnyView(CalculatorView(engine: engine, store: store, buffer: buffer))
     }
 
     public func activate() {
-        log.notice("插件已激活")
+        log.notice("插件已激活，计算历史 \(self.store.entries.count, privacy: .public) 条")
     }
 
     public func deactivate() {
-        log.notice("插件已停用")
+        store.save()
+        log.notice("插件已停用，计算历史已落盘")
     }
 }
