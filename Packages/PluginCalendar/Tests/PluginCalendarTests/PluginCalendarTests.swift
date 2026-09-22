@@ -167,7 +167,8 @@ struct CalendarPluginTests {
         #expect(CalendarPlugin.id.allSatisfy { $0.isLowercase || $0.isNumber || $0 == "-" })
         #expect(CalendarPlugin.name == "日历")
         #expect(CalendarPlugin.icon == "calendar")
-        #expect(CalendarPlugin.triggerWords == ["日历", "日程", "calendar", "今天", "日期"])
+        #expect(
+            CalendarPlugin.triggerWords == ["日历", "农历", "节气", "节假日", "假期", "calendar", "lunar", "holiday"])
     }
 
     /// 测试进程里没有日历权限，所以 `todayEvents()` 走空分支 —— 插件应给出
@@ -185,14 +186,14 @@ struct CalendarPluginTests {
     }
 
     /// 拉丁触发词按整词匹配，所以 `calendars` 不会误开日历。
-    /// 中文触发词按包含匹配，`我的日历`、`今天有什么日程` 仍然进得来。
+    /// 中文触发词按包含匹配，`我的日历`、`查看节假日` 仍然进得来。
     @Test("触发词按整词或中文包含匹配")
     func triggerGateUsesSharedMatcher() async {
         let plugin = CalendarPlugin()
 
         #expect(!(await plugin.searchItems(query: "calendar")).isEmpty)
         #expect(!(await plugin.searchItems(query: "我的日历")).isEmpty)
-        #expect(!(await plugin.searchItems(query: "今天有什么日程")).isEmpty)
+        #expect(!(await plugin.searchItems(query: "节假日")).isEmpty)
         #expect(await plugin.searchItems(query: "calendars").isEmpty)
     }
 

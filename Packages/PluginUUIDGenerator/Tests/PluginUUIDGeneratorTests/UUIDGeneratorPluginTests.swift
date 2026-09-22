@@ -105,7 +105,7 @@ struct UUIDGeneratorPluginTests {
         #expect(!UUIDGeneratorPlugin.triggerWords.isEmpty)
     }
 
-    @Test("任一触发词都能唤醒插件，且只返回一个入口", arguments: ["uuid", "guid", "生成", "唯一标识"])
+    @Test("任一触发词都能唤醒插件，且只返回一个入口", arguments: ["uuid", "guid", "生成", "UUID 生成器"])
     func searchItemsMatchTrigger(_ trigger: String) async {
         let items = await UUIDGeneratorPlugin().searchItems(query: trigger)
         #expect(items.count == 1)

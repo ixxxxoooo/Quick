@@ -18,7 +18,7 @@ public final class ClipboardPlugin: QuickPlugin {
     public static let name = "剪贴板历史"
     public static let icon = "doc.on.clipboard"
     public static let description = "自动记录系统剪贴板历史，支持文本、代码与图片预览，提供快速搜索、置顶收藏与重新复制。"
-    public static let triggerWords = ["剪贴板", "clipboard", "粘贴", "复制", "历史", "cb"]
+    public static let triggerWords = ["剪贴板历史", "剪贴板", "剪切板", "剪切", "clipboard", "粘贴板", "历史"]
 
     /// 面板头部保留搜索框：输入即过滤剪贴板历史
     public static var supportsPanelSearch: Bool { true }

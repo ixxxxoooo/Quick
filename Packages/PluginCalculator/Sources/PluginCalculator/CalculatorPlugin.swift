@@ -17,7 +17,7 @@ public final class CalculatorPlugin: QuickPlugin {
     public static let name = "计算器"
     public static let icon = "plus.forwardslash.minus"
     public static let description = "在主搜索框中直接输入数学表达式即可快速求值，支持四则运算、函数计算、千分位显示与自动复制结果。"
-    public static let triggerWords = ["计算", "calculator", "calc", "算", "="]
+    public static let triggerWords = ["计算稿纸", "计算", "calculator", "calc"]
 
     public var isEnabled = true
 

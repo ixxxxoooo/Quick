@@ -18,7 +18,10 @@ public final class SystemControlPlugin: QuickPlugin {
     public static let icon = "bolt"
     public static let description = "macOS 系统级快捷指令聚合，支持锁定屏幕、睡眠、重启、关机、清空废纸篓与外观切换等操作。"
     public static let triggerWords = [
-        "锁屏", "lock", "睡眠", "sleep", "重启", "restart", "关机", "shutdown", "推出", "深色", "dark"
+        "系统控制", "system control", "系统命令",
+        "锁屏", "lock", "睡眠", "sleep", "重启", "restart", "关机", "shutdown",
+        "屏保", "screensaver", "废纸篓", "trash", "弹出", "eject",
+        "深色", "dark", "主题", "theme", "注销", "logout"
     ]
 
     public var isEnabled = true
@@ -35,7 +38,7 @@ public final class SystemControlPlugin: QuickPlugin {
     ///
     /// 闸门与评分共用这套词；此前完全没有闸门，打一个 `l` 就会命中 `lock`。
     private static let triggers: [String] =
-        SystemAction.allCases.flatMap(\.keywords) + ["推出", "深色"]
+        SystemAction.allCases.flatMap(\.keywords) + ["系统控制", "system control", "系统命令"]
 
     /// 只打了触发词、没有剩余查询词时的基础相关度
     private static let defaultRelevance = 0.5

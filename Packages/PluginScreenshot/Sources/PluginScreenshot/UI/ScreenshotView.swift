@@ -27,6 +27,9 @@ struct ScreenshotView: View {
                 screenshotButton("全屏截图", icon: "rectangle.on.rectangle") {
                     Task { await capture.captureFullScreen() }
                 }
+                screenshotButton("窗口截图", icon: "macwindow") {
+                    Task { await capture.captureWindow() }
+                }
                 screenshotButton("延时截图 (3s)", icon: "timer") {
                     Task { await capture.captureWithDelay(3) }
                 }

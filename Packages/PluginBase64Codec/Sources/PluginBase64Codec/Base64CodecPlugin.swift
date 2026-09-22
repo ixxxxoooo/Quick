@@ -17,7 +17,7 @@ public final class Base64CodecPlugin: QuickPlugin {
     public static let name = "Base64 编解码"
     public static let icon = "lock.rectangle"
     public static let description = "普通文本与 Base64 互相转换，支持标准 RFC 4648 与 URL-Safe 编码格式。"
-    public static let triggerWords = ["base64", "编码", "解码", "encode", "decode"]
+    public static let triggerWords = ["Base64 编解码", "base64", "编码", "解码"]
 
     public var isEnabled = true
 

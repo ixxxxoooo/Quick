@@ -128,7 +128,7 @@ struct HashCalculatorPluginTests {
         #expect(!HashCalculatorPlugin.triggerWords.isEmpty)
     }
 
-    @Test("任一触发词都能唤醒插件，且只返回一个入口", arguments: ["hash", "md5", "sha256", "哈希"])
+    @Test("任一触发词都能唤醒插件，且只返回一个入口", arguments: ["hash", "md5", "sha", "哈希"])
     func searchItemsMatchTrigger(_ trigger: String) async {
         let items = await HashCalculatorPlugin().searchItems(query: trigger)
         #expect(items.count == 1)

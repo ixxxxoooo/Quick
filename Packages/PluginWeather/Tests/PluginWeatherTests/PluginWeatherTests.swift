@@ -75,7 +75,7 @@ struct WeatherPluginTests {
         #expect(WeatherPlugin.id.allSatisfy { $0.isLowercase || $0.isNumber || $0 == "-" })
         #expect(WeatherPlugin.name == "天气")
         #expect(WeatherPlugin.icon == "cloud.sun")
-        #expect(WeatherPlugin.triggerWords == ["天气", "weather", "温度", "预报"])
+        #expect(WeatherPlugin.triggerWords == ["天气", "weather", "气温", "温度", "天气预报", "下雨", "预报", "空气质量"])
     }
 
     /// 全新实例既没有数据也没有「不可用原因」，走的是「还没取过」那条 ——

@@ -73,7 +73,7 @@ struct MarkdownPreviewPluginTests {
         #expect(MarkdownPreviewPlugin.name == "Markdown 预览")
         #expect(MarkdownPreviewPlugin.icon == "text.badge.checkmark")
         #expect(
-            MarkdownPreviewPlugin.triggerWords == ["markdown", "md", "预览", "标记"]
+            MarkdownPreviewPlugin.triggerWords == ["Markdown 预览", "markdown", "md", "预览"]
         )
     }
 

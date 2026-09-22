@@ -18,7 +18,7 @@ public final class CalendarPlugin: QuickPlugin {
     public static let name = "日历"
     public static let icon = "calendar"
     public static let description = "同步展示系统日历日程与近期事件安排，支持会议链接自动识别与农历视图显示。"
-    public static let triggerWords = ["日历", "日程", "calendar", "今天", "日期"]
+    public static let triggerWords = ["日历", "农历", "节气", "节假日", "假期", "calendar", "lunar", "holiday"]
 
     public var isEnabled = true
 

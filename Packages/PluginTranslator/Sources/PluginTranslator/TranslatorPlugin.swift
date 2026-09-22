@@ -17,7 +17,7 @@ public final class TranslatorPlugin: QuickPlugin {
     public static let name = "翻译"
     public static let icon = "character.book.closed"
     public static let description = "多语言文本实时互译，支持自动识别源语言、词典释义查询与一键复制译文。"
-    public static let triggerWords = ["翻译", "tr", "translate", "translation"]
+    public static let triggerWords = ["翻译助手", "翻译", "translate", "translation"]
 
     public var isEnabled = true
 

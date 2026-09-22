@@ -10,6 +10,8 @@ enum CaptureMode: Sendable, Equatable {
     case area
     /// 整屏
     case fullScreen
+    /// 交互式窗口选择（参考 jietu 的窗口截图功能）
+    case window
     /// 延时若干秒后整屏
     case delayed(seconds: Int)
 }
@@ -120,6 +122,9 @@ enum ScreenshotCommand {
             arguments += ["-i", "-s"]
         case .fullScreen:
             break
+        case .window:
+            // -i 交互式，-w 窗口选择模式（点击选择要截取的窗口，参考 jietu 的窗口截图）
+            arguments += ["-i", "-w"]
         case .delayed(let seconds):
             // -T 后跟秒数；秒数为 0 时也照样传，不做特判
             arguments += ["-T", "\(seconds)"]

@@ -29,7 +29,7 @@ public final class SuperPanelPlugin: QuickPlugin {
     public static let name = "超级面板"
     public static let icon = "bolt.square"
     public static let description = "感知当前项目上下文的命令面板，提供 Git 操作、构建命令、快速导航等项目相关快捷操作。"
-    public static let triggerWords = ["sp", "super", "超级"]
+    public static let triggerWords = ["sp", "super", "超级", "超级面板"]
 
     // MARK: - 状态
 

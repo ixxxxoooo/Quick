@@ -17,7 +17,7 @@ public final class WordCounterPlugin: QuickPlugin {
     public static let name = "字数统计"
     public static let icon = "textformat.123"
     public static let description = "多维度文本字数统计，包括字符总数、无空格字符数、单词数、段落行数与预估阅读耗时。"
-    public static let triggerWords = ["字数", "统计", "word count", "字符数", "行数"]
+    public static let triggerWords = ["字数统计", "word", "count", "字数", "统计", "字符", "wc"]
 
     public var isEnabled = true
 

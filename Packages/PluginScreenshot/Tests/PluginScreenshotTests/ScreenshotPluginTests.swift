@@ -39,6 +39,14 @@ struct ScreenshotCommandTests {
                 == ["-t", "png", path])
     }
 
+    @Test("窗口截图用交互式窗口选择开关")
+    func windowArguments() {
+        #expect(
+            ScreenshotCommand.arguments(
+                mode: .window, destination: .file(path: path), format: .png, includePointer: false)
+                == ["-i", "-w", "-t", "png", path])
+    }
+
     @Test("延时截图把秒数放在 -T 后面，路径仍在最后")
     func delayedArguments() {
         #expect(
@@ -67,7 +75,7 @@ struct ScreenshotCommandTests {
     @Test("所有模式的最后一个参数都是输出路径")
     func outputPathIsAlwaysLast() {
         // screencapture 只认最后一个位置参数作为输出文件，任何模式都不能破坏它
-        let modes: [CaptureMode] = [.area, .fullScreen, .delayed(seconds: 5)]
+        let modes: [CaptureMode] = [.area, .fullScreen, .window, .delayed(seconds: 5)]
 
         for mode in modes {
             #expect(
@@ -117,6 +125,8 @@ struct ScreenshotCommandTests {
         #expect(CaptureMode.delayed(seconds: 3) != .delayed(seconds: 5))
         #expect(CaptureMode.area != .fullScreen)
         #expect(CaptureMode.fullScreen != .delayed(seconds: 0))
+        #expect(CaptureMode.window != .area)
+        #expect(CaptureMode.window != .fullScreen)
     }
 }
 
@@ -195,7 +205,7 @@ struct ScreenshotNamingTests {
         let date = try anchorDate(utc)
         let output = ScreenshotCommand.outputPath(in: "/tmp/shots", for: date, timeZone: utc, format: .png)
 
-        for mode: CaptureMode in [.area, .fullScreen, .delayed(seconds: 3)] {
+        for mode: CaptureMode in [.area, .fullScreen, .window, .delayed(seconds: 3)] {
             #expect(
                 ScreenshotCommand.arguments(
                     mode: mode, destination: .file(path: output), format: .png, includePointer: false
@@ -226,21 +236,27 @@ struct ScreenshotPluginTests {
         #expect(
             ScreenshotPlugin.triggerWords == [
                 "截图工具", "截图", "截屏", "screenshot", "区域截图", "框选",
-                "全屏截图", "全屏", "fullscreen"
+                "全屏截图",
+                "窗口截图",
+                "贴图", "钉在桌面", "pin"
             ])
+        // 各组关键字之间不重叠
         #expect(Set(ScreenshotPlugin.areaKeywords).isDisjoint(with: ScreenshotPlugin.fullKeywords))
+        #expect(Set(ScreenshotPlugin.areaKeywords).isDisjoint(with: ScreenshotPlugin.windowKeywords))
+        #expect(Set(ScreenshotPlugin.areaKeywords).isDisjoint(with: ScreenshotPlugin.pinKeywords))
         #expect(ScreenshotPlugin.triggerWords.allSatisfy { !$0.isEmpty })
     }
 
-    @Test("命中触发词时给出区域与全屏两个入口")
-    func triggerWordYieldsTwoEntries() async {
+    @Test("命中截图触发词时给出区域、全屏与窗口三个入口")
+    func triggerWordYieldsMultipleEntries() async {
         let plugin = ScreenshotPlugin()
         let results = await plugin.searchItems(query: "截图")
 
-        #expect(results.count == 2)
-        #expect(results.map(\.id) == ["screenshot.area", "screenshot.full"])
+        // 「截图」是区域、全屏、窗口三组关键字的子串
+        #expect(results.count == 3)
+        #expect(results.map(\.id) == ["screenshot.area", "screenshot.full", "screenshot.window"])
         #expect(results.allSatisfy { $0.pluginID == ScreenshotPlugin.id })
-        #expect(results.map(\.relevance) == [0.8, 0.7])
+        #expect(results.map(\.relevance) == [0.8, 0.7, 0.7])
         #expect(results.allSatisfy { !$0.title.isEmpty && !$0.icon.isEmpty })
     }
 
@@ -256,9 +272,13 @@ struct ScreenshotPluginTests {
             let results = await plugin.searchItems(query: trigger)
             #expect(results.contains { $0.id == "screenshot.full" }, "触发词「\(trigger)」没有命中全屏截图")
         }
-        for trigger in ["全屏", "fullscreen"] {
+        for trigger in ScreenshotPlugin.windowKeywords {
             let results = await plugin.searchItems(query: trigger)
-            #expect(results.map(\.id) == ["screenshot.full"], "触发词「\(trigger)」应该只打开全屏截图")
+            #expect(results.contains { $0.id == "screenshot.window" }, "触发词「\(trigger)」没有命中窗口截图")
+        }
+        for trigger in ScreenshotPlugin.pinKeywords {
+            let results = await plugin.searchItems(query: trigger)
+            #expect(results.contains { $0.id == "screenshot.pin" }, "触发词「\(trigger)」没有命中贴图")
         }
     }
 
@@ -277,7 +297,22 @@ struct ScreenshotPluginTests {
 
         #expect(await plugin.searchItems(query: "").isEmpty)
         #expect(await plugin.searchItems(query: "天气").isEmpty)
-        #expect(await plugin.searchItems(query: "window").isEmpty)
+    }
+
+    @Test("窗口截图触发词单独命中")
+    func windowTriggerYieldsWindowEntry() async {
+        let plugin = ScreenshotPlugin()
+        let results = await plugin.searchItems(query: "窗口截图")
+
+        #expect(results.contains { $0.id == "screenshot.window" })
+    }
+
+    @Test("贴图触发词单独命中")
+    func pinTriggerYieldsPinEntry() async {
+        let plugin = ScreenshotPlugin()
+        let results = await plugin.searchItems(query: "贴图")
+
+        #expect(results.contains { $0.id == "screenshot.pin" })
     }
 }
 

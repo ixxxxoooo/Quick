@@ -20,7 +20,7 @@ public final class WeatherPlugin: QuickPlugin {
     public static let name = "天气"
     public static let icon = "cloud.sun"
     public static let description = "实时天气概况与气温、湿度、空气质量速查，支持自动定位与常用城市切换。"
-    public static let triggerWords = ["天气", "weather", "温度", "预报"]
+    public static let triggerWords = ["天气", "weather", "气温", "温度", "天气预报", "下雨", "预报", "空气质量"]
 
     public var isEnabled = true
 

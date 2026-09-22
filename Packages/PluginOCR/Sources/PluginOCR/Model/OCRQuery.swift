@@ -12,13 +12,14 @@ import Foundation
 public enum OCRQuery {
 
     /// 触发词列表（插件对外声明的 triggerWords 就是它）
-    public static let triggers = ["ocr", "识别", "文字识别", "截图识别"]
+    public static let triggers = ["OCR", "文字识别", "ocr", "识别", "识别文字", "图片识别", "提取文字", "截图识别", "截图OCR"]
 
     /// 查询是否在问 OCR
     ///
     /// - Parameter query: 用户在搜索框里输入的原文
     /// - Returns: 命中任一触发词时为 true
     public static func isTriggered(by query: String) -> Bool {
-        triggers.contains(where: { query.lowercased().contains($0) })
+        let lower = query.lowercased()
+        return triggers.contains(where: { lower.contains($0.lowercased()) })
     }
 }

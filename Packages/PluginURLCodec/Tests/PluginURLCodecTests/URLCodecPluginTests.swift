@@ -93,7 +93,7 @@ struct URLCodecPluginTests {
         #expect(!URLCodecPlugin.triggerWords.isEmpty)
     }
 
-    @Test("任一触发词都能唤醒插件，且只返回一个入口", arguments: ["url", "编码", "urldecode", "链接"])
+    @Test("任一触发词都能唤醒插件，且只返回一个入口", arguments: ["url", "编码", "解码", "URL 编解码"])
     func searchItemsMatchTrigger(_ trigger: String) async {
         let items = await URLCodecPlugin().searchItems(query: trigger)
         #expect(items.count == 1)

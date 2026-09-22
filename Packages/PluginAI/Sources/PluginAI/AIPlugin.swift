@@ -20,12 +20,14 @@ public final class AIPlugin: QuickPlugin {
     public static let icon = "sparkles"
     public static let description = "一站式直达主流大语言模型官网（DeepSeek、ChatGPT、Claude、Gemini 等），独立轻量窗口运行并保持登录态。"
     public static let triggerWords = [
-        "ai", "AI", "聊天", "对话", "chat",
-        "deepseek", "chatgpt", "gpt", "openai",
-        "gemini", "claude", "anthropic",
+        "AI 聚合", "AI Portal", "ai", "AI", "chat",
+        "deepseek", "DeepSeek", "ds",
+        "chatgpt", "ChatGPT", "gpt", "openai",
+        "gemini", "Gemini",
+        "claude", "Claude", "anthropic",
         "豆包", "doubao", "kimi", "moonshot",
-        "glm", "智谱", "通义", "千问", "tongyi",
-        "ai portal", "ai聚合"
+        "glm", "GLM", "智谱",
+        "AI 官网", "AI 设置"
     ]
 
     public var isEnabled = true

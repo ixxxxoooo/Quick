@@ -256,7 +256,10 @@ struct SystemMonitorPluginTests {
         #expect(SystemMonitorPlugin.icon == "cpu")
         #expect(
             SystemMonitorPlugin.triggerWords
-                == ["进程", "系统信息", "系统监控", "process", "monitor", "端口", "port", "cpu", "内存"])
+                == [
+                    "系统信息", "系统监控", "系统", "system", "信息", "硬件", "进程", "进程管理", "process", "monitor", "端口",
+                    "port", "cpu", "内存"
+                ])
         #expect(SystemMonitorPlugin.triggerWords.allSatisfy { !$0.isEmpty })
     }
 

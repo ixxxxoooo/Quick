@@ -69,6 +69,12 @@ final class ScreenCapture {
         await capture(mode: .fullScreen)
     }
 
+    /// 窗口截图（使用 screencapture -w 交互式选择窗口，参考 jietu 的窗口截图）
+    /// - Returns: 是否成功
+    func captureWindow() async -> Bool {
+        await capture(mode: .window)
+    }
+
     /// 延时截图
     /// - Parameter delay: 延迟秒数
     /// - Returns: 是否成功
