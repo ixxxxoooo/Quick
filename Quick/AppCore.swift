@@ -336,11 +336,13 @@ final class AppCore {
         let viewProvider = { plugin.makeView() }
         let name = type(of: plugin).name
         let icon = type(of: plugin).icon
+        let supportsSearch = type(of: plugin).supportsPanelSearch
 
         pluginPanelController.detach(
             pluginID: pluginID,
             pluginName: name,
             icon: icon,
+            supportsSearch: supportsSearch,
             viewProvider: viewProvider,
             sourceWindow: nil
         )

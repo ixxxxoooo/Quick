@@ -17,14 +17,16 @@
 - **搜索是 `contains` 子串匹配 + 小写化，不是模糊匹配。** 空查询返回全部。
   剪贴板内容是长文本，模糊匹配会返回大量无意义的命中。
 - **搜索框长在面板头部（插件内搜索），不在列表里，且默认不聚焦。** 本插件声明了
-  `supportsPanelSearch`，进入面板后头部是搜索框，但焦点留在列表上（方向键先用得顺手）；
-  按 ⌘F 才把焦点交给搜索框。文本经 `PluginSearchQuery` 环境传进 `ClipboardListView`，
-  视图读 `search?.text` 过滤。分离窗口里没有这个环境，退化成不过滤。
+  `supportsPanelSearch`，主面板与分离窗口的头部都是搜索框，但焦点留在列表上（方向键先用得
+  顺手）；按 ⌘F 才把焦点交给搜索框。文本经 `PluginSearchQuery` 环境传进
+  `ClipboardListView`，视图读 `search?.text` 过滤。没声明搜索的插件拿到的是一份
+  `hasHeaderField = false` 的兜底对象，此时退化成不过滤。
 - **键盘导航在有搜索框时走面板转接。** 搜索框拿到焦点后，列表收不到方向键与回车，
   所以 `ClipboardListView` 在 `onAppear` 置 `search?.wantsNavigation = true`，并消费
-  `PluginSearchQuery.commandToken`：上下移动、左右切标签、回车复制粘贴。分离窗口
-  （没有头部搜索框）则自己 `.focusable()` 取焦点、走 `onKeyPress`。
-  这是 [docs/ui.md](../ui.md) 里「面板里的键盘导航」在插件内搜索下的延伸。
+  `PluginSearchQuery.commandToken`：上下移动、左右切标签、回车复制粘贴。转接方有两处：
+  主面板在 `PalettePanel.sendEvent`、分离窗口在 `DetachedPluginPanel.sendEvent`
+  （`PluginPanelController` 里接线），两条路都在插件没声明要吃按键时返回 false，
+  事件沿响应链继续走。这是 [docs/ui.md](../ui.md) 里「面板里的键盘导航」在插件内搜索下的延伸。
 - **`preview` 必须把三种换行都压平。** 从 Windows / 网页复制来的文本常带 `\r\n`；
   只替换 `\n` 会留下游离的 `\r`，在列表里显示成断行。这也是 `\t` 被转成空格的原因。
 - **图片的 `preview` 返回尺寸描述，不带 emoji、不写「图片」。** 列表用真正的缩略图预览，

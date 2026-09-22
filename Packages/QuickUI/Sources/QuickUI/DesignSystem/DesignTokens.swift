@@ -209,6 +209,15 @@ public enum DesignTokens {
         public static let detachedPanelMinHeight: CGFloat = 300
         /// 分离窗口标题栏高度
         public static let detachedTitleBarHeight = scaled(36)
+        /// 分离窗口标题栏带插件内搜索框时的高度
+        ///
+        /// 搜索框本身有 `headerHeight` 高，标题栏要比普通标题栏（`detachedTitleBarHeight`）
+        /// 再加一档内边距才放得下、且上下留出同样的呼吸空间。
+        public static let detachedSearchTitleBarHeight = headerHeight + headerPadding
+        /// 分离窗口标题栏里插件内搜索框的最大宽度
+        ///
+        /// 搜索框不与窗口等宽：右侧剩下的空白留给标题栏拖拽区，窗口才不会「除了按钮全是输入框」。
+        public static let detachedSearchFieldMaxWidth = scaled(360)
 
         // MARK: 悬浮胶囊
 

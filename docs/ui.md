@@ -166,6 +166,10 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 `wantsNavigation` 为真时把上下键 / 左右键 / 回车记成 `Navigation` 请求，插件用
 `.onChange(of: commandToken)` 取走执行。没有声明搜索（或插件自己把 `wantsNavigation`
 置假，例如 JSON 的代码视图）时，`onMove` / `onSubmit` 返回 `false`：事件沿响应链继续走。
+**分离窗口也保留这个搜索框**，直接长在标题栏里（`DetachedPanelContentView.titleBar`，用搜索框
+替换插件名，带搜索时标题栏加高一档以容纳输入框），转接逻辑在 `DetachedPluginPanel.sendEvent`
+里由 `PluginPanelController` 接线，与主面板共用 `PalettePanel.verticalDelta` / `horizontalDelta`
+的按键判定 —— 两个窗口的键盘手感必须一致。
 
 **为什么是「请求 + 令牌」而不是回调闭包：** 闭包要在插件视图的 `onAppear` 里挂上，
 而视图重建时 `onAppear` / `onDisappear` 的先后顺序不保证 —— 后到的 `onDisappear`
@@ -391,7 +395,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | 组件 | 职责 |
 | --- | --- |
 | `HUDController` | 屏幕底部轻量提示，`show(message:tone:duration:)` |
-| `PluginPanelController` | 分离窗口管理：创建独立 NSWindow、单例策略、尺寸记忆、关闭。控制长在它自己的标题栏里（置顶 / 关闭 + ⌘R 刷新），标题栏带 `WindowDragArea` 负责拖拽 |
+| `PluginPanelController` | 分离窗口管理：创建独立 NSWindow、单例策略、尺寸记忆、关闭。控制长在它自己的标题栏里（置顶 / 关闭 + ⌘R 刷新），标题栏带 `WindowDragArea` 负责拖拽；声明了 `supportsPanelSearch` 的插件在标题栏里直接放搜索框（标题栏加高一档），由 `DetachedPluginPanel` 把方向键 / 回车 / ⌘F 转给 `PluginSearchQuery` |
 | `FloatingCapsuleView` | 悬浮胶囊：**AI 网页窗口**的常驻控件（内容是一整块网页，没有自己的边框）。可拖、可折叠、位置按窗口持久化 |
 | `ActivationPolicyKeeper` | 应用激活策略的唯一记账处：设置窗口与 AI 窗口在场时 `.regular`，都走了回 `.accessory` |
 

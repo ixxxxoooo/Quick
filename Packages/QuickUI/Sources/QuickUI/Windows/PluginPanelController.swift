@@ -19,6 +19,10 @@ import SwiftUI
 /// **它的控制不使用悬浮胶囊**：胶囊是为「内容是一整块网页、没有任何自己的边框」的窗口准备的
 /// （AI 网页窗口正是如此），而分离窗口本来就有一条自绘标题栏，控制放进标题栏比让用户去拖一个
 /// 浮层自然。
+///
+/// **声明了 `supportsPanelSearch` 的插件，标题栏里直接放一个搜索框**（并据此把标题栏加高一档），
+/// 键盘手感与主面板一致：搜索框默认不聚焦（焦点留在插件视图上），⌘F 才聚焦；`wantsNavigation`
+/// 为真时上下 / 左右 / 回车由 `DetachedPluginPanel` 转成 `PluginSearchQuery` 请求交给插件视图。
 @MainActor
 public final class PluginPanelController {
 
@@ -56,12 +60,14 @@ public final class PluginPanelController {
     ///   - pluginID: 插件 ID
     ///   - pluginName: 插件显示名称
     ///   - icon: 插件图标（SF Symbol）
+    ///   - supportsSearch: 该插件是否声明了插件内搜索（决定标题栏下是否保留搜索框）
     ///   - viewProvider: 视图工厂，每次「刷新」都会重新调用
     ///   - sourceWindow: 源面板窗口（用于计算偏移位置）
     public func detach(
         pluginID: String,
         pluginName: String,
         icon: String,
+        supportsSearch: Bool = false,
         viewProvider: @escaping () -> AnyView,
         sourceWindow: NSWindow?
     ) {
@@ -76,10 +82,15 @@ public final class PluginPanelController {
         let width = savedSize?.width ?? DesignTokens.Size.detachedPanelDefaultWidth
         let height = savedSize?.height ?? DesignTokens.Size.detachedPanelDefaultHeight
 
+        // 与主面板一致：只有声明了插件内搜索的插件才拿到真正的头部搜索框，
+        // 其余插件注入一份 `hasHeaderField = false` 的空对象兜底（避免取环境崩掉）。
+        let search = PluginSearchQuery(hasHeaderField: supportsSearch)
+
         let panel = makeDetachedPanel(
             pluginID: pluginID,
             pluginName: pluginName,
             icon: icon,
+            search: search,
             view: viewProvider(),
             width: width,
             height: height
@@ -167,6 +178,7 @@ public final class PluginPanelController {
         pluginID: String,
         pluginName: String,
         icon: String,
+        search: PluginSearchQuery,
         view: AnyView,
         width: CGFloat,
         height: CGFloat
@@ -204,6 +216,7 @@ public final class PluginPanelController {
         let container = DetachedWindowContainer(
             pluginName: pluginName,
             pluginIcon: icon,
+            search: search,
             pluginView: view,
             onTogglePin: { [weak self] in
                 self?.toggleAlwaysOnTop(pluginID)
@@ -215,6 +228,34 @@ public final class PluginPanelController {
         panel.contentView = container
 
         windows[pluginID] = DetachedWindow(panel: panel, container: container)
+
+        // 分离窗口里的插件内搜索：与主面板同一套路由。
+        //
+        // 顶层搜索框拿到焦点后方向键与回车会被 field editor 吃掉，所以声明了要吃导航的插件
+        // （剪贴板列表、JSON 树）必须由窗口在 AppKit 层转成 `PluginSearchQuery` 请求；
+        // 插件没吃（`wantsNavigation` 为假，例如 JSON 代码视图）就返回 false，键沿响应链继续。
+        panel.search = search
+        panel.onMove = { [weak search] delta in
+            guard let search, search.wantsNavigation else { return false }
+            search.request(.move(delta))
+            return true
+        }
+        panel.onTab = { [weak search] delta in
+            guard let search, search.wantsNavigation else { return false }
+            search.request(.tab(delta))
+            return true
+        }
+        panel.onSubmit = { [weak search] in
+            guard let search, search.wantsNavigation else { return false }
+            search.request(.submit)
+            return true
+        }
+        // ⌘F：把焦点交给头部搜索框（默认不聚焦，焦点留在插件视图上）
+        panel.onSearchFocus = { [weak search] in
+            guard let search, search.hasHeaderField else { return false }
+            search.requestFocus()
+            return true
+        }
 
         panel.onClose = { [weak self] in
             self?.close(pluginID)
@@ -353,6 +394,18 @@ final class DetachedPluginPanel: NSPanel {
     var onClose: (() -> Void)?
     var onRefresh: (() -> Void)?
 
+    /// 该窗口的插件内搜索状态（标题栏搜索框与插件视图共用；不声明搜索的插件为兜底对象）
+    var search: PluginSearchQuery?
+
+    /// 上下键回调（`-1` 上移、`+1` 下移），返回 `true` 表示已消费
+    var onMove: ((Int) -> Bool)?
+    /// 左右键回调（`-1` 左移、`+1` 右移），返回 `true` 表示已消费
+    var onTab: ((Int) -> Bool)?
+    /// 回车回调，返回 `true` 表示已消费
+    var onSubmit: (() -> Bool)?
+    /// ⌘F 回调：把焦点交给标题栏搜索框，返回 `true` 表示已消费
+    var onSearchFocus: (() -> Bool)?
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
@@ -376,6 +429,31 @@ final class DetachedPluginPanel: NSPanel {
                     onRefresh?()
                     return
                 }
+                // ⌘F 聚焦搜索框（只有声明了插件内搜索的插件会消费）
+                if key == "f", onSearchFocus?() == true {
+                    return
+                }
+            }
+
+            // 插件内搜索的导航：与主面板一致，只有插件声明要吃（`wantsNavigation`）时才消费，
+            // 否则返回 false 让按键沿响应链继续走（例如 JSON 代码视图要留给编辑器）。
+            if event.modifierFlags.isDisjoint(with: [.command, .option]),
+                let delta = PalettePanel.verticalDelta(for: event),
+                onMove?(delta) == true
+            {
+                return
+            }
+            if event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
+                let delta = PalettePanel.horizontalDelta(for: event),
+                onTab?(delta) == true
+            {
+                return
+            }
+            if Int(event.keyCode) == kVK_Return || Int(event.keyCode) == kVK_ANSI_KeypadEnter,
+                event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
+                onSubmit?() == true
+            {
+                return
             }
         }
         super.sendEvent(event)
@@ -395,6 +473,8 @@ final class DetachedWindowContainer: NSView {
     private let hosting: NSHostingView<DetachedPanelContentView>
     private let pluginName: String
     private let pluginIcon: String
+    /// 插件内搜索状态（标题栏搜索框与插件视图共用，重建根视图时保持不变）
+    private let search: PluginSearchQuery
     private let onTogglePin: () -> Void
     private let onClose: () -> Void
 
@@ -404,18 +484,21 @@ final class DetachedWindowContainer: NSView {
     init(
         pluginName: String,
         pluginIcon: String,
+        search: PluginSearchQuery,
         pluginView: AnyView,
         onTogglePin: @escaping () -> Void,
         onClose: @escaping () -> Void
     ) {
         self.pluginName = pluginName
         self.pluginIcon = pluginIcon
+        self.search = search
         self.onTogglePin = onTogglePin
         self.onClose = onClose
         self.hosting = NSHostingView(
             rootView: DetachedPanelContentView(
                 pluginName: pluginName,
                 pluginIcon: pluginIcon,
+                search: search,
                 pluginView: pluginView,
                 isPinned: false,
                 onTogglePin: onTogglePin,
@@ -449,6 +532,7 @@ final class DetachedWindowContainer: NSView {
         hosting.rootView = DetachedPanelContentView(
             pluginName: pluginName,
             pluginIcon: pluginIcon,
+            search: search,
             pluginView: pluginView,
             isPinned: isPinned,
             onTogglePin: onTogglePin,
@@ -467,47 +551,64 @@ private struct DetachedPanelContentView: View {
 
     let pluginName: String
     let pluginIcon: String
+    /// 插件内搜索状态。声明了 `supportsPanelSearch` 的插件，标题栏里直接放一个搜索框
+    /// （并据此把标题栏加高一档）；其余插件拿到的是一份 `hasHeaderField = false` 的兜底对象
+    /// （避免插件取环境崩掉）。
+    let search: PluginSearchQuery
     let pluginView: AnyView
     let isPinned: Bool
     let onTogglePin: () -> Void
     let onClose: () -> Void
-
-    /// 分离窗口没有头部搜索框，但插件视图可能用非可选的方式读这个环境；
-    /// 给一份 `hasHeaderField = false` 的空对象，既避免取环境崩掉，也让插件知道这里没有搜索框。
-    @State private var pluginSearch = PluginSearchQuery(hasHeaderField: false)
 
     var body: some View {
         VStack(spacing: 0) {
             titleBar
 
             pluginView
-                .environment(pluginSearch)
+                .environment(search)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(PaletteBackground())
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
     }
 
-    /// 标题栏：左侧插件身份（整块可拖），右侧窗口控制
+    /// 标题栏：左侧插件身份或插件内搜索框（整块可拖），右侧窗口控制
+    ///
+    /// 声明了 `supportsPanelSearch` 的插件用搜索框替换插件名 —— 与主面板 PluginHeaderView
+    /// 同一套做法，插件身份由占位符「在 X 中搜索…」交代。搜索框比插件名高，所以标题栏也跟着
+    /// 加高一档（`titleBarHeight`），否则 20pt 的输入框会把整条栏位顶满。
     private var titleBar: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
-            // 身份区 + 中间空白整块都是拖拽区。拖拽区**不能铺到按钮上面** ——
-            // 它是一个真实的 `NSView`，盖住按钮会把点击吃掉（见 `WindowDragArea`）。
-            HStack(spacing: DesignTokens.Spacing.sm) {
-                Image(systemName: pluginIcon)
-                    .font(DesignTokens.Typography.inlineIcon)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            Image(systemName: pluginIcon)
+                .font(DesignTokens.Typography.inlineIcon)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
 
+            if search.hasHeaderField {
+                SearchFieldView(
+                    query: Binding(
+                        get: { search.text },
+                        set: { search.text = $0 }
+                    ),
+                    placeholder: "在 \(pluginName) 中搜索…",
+                    // 与主面板插件头部一致：不再叠一个放大镜，行首的视觉锚点已由插件身份占住
+                    icon: nil,
+                    autoFocus: false,
+                    focusTrigger: search.focusToken
+                )
+                .frame(maxWidth: DesignTokens.Size.detachedSearchFieldMaxWidth)
+            } else {
                 Text(pluginName)
                     .font(DesignTokens.Typography.sectionHeader)
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
                     .lineLimit(1)
-
-                Spacer(minLength: DesignTokens.Spacing.md)
             }
-            // 撑满标题栏高度，整条栏位都拖得动，而不是只有文字那一行
-            .frame(maxHeight: .infinity)
-            .background(WindowDragArea())
+
+            // 剩余空白整块是拖拽区。拖拽区**不能铺到按钮上面** ——
+            // 它是一个真实的 `NSView`，盖住按钮会把点击吃掉（见 `WindowDragArea`）。
+            // 撑满标题栏高度，整条栏位都拖得动，而不是只有中间那一行。
+            Spacer(minLength: DesignTokens.Spacing.md)
+                .frame(maxHeight: .infinity)
+                .background(WindowDragArea())
 
             BarButton(
                 title: isPinned ? "取消窗口置顶" : "窗口置顶",
@@ -527,7 +628,14 @@ private struct DetachedPanelContentView: View {
         }
         .padding(.leading, DesignTokens.Spacing.lg)
         .padding(.trailing, DesignTokens.Spacing.md)
-        .frame(height: DesignTokens.Size.detachedTitleBarHeight)
+        .frame(height: titleBarHeight)
+    }
+
+    /// 标题栏高度：带搜索框时占满搜索框并留出上下留白，其余情况保持紧凑
+    private var titleBarHeight: CGFloat {
+        search.hasHeaderField
+            ? DesignTokens.Size.detachedSearchTitleBarHeight
+            : DesignTokens.Size.detachedTitleBarHeight
     }
 }
 

@@ -26,9 +26,11 @@
 - **树是拍平成行再渲染的**（`JSONTreeLayout.rows` + `LazyVStack`），不是递归视图 ——
   只渲染可见行，深/大的 JSON 才不会卡。
 - **树的键盘导航走面板的插件内搜索**（`PluginSearchQuery.wantsNavigation` + `commandToken`）。
-  头部搜索框默认不聚焦，按 ⌘F 才聚焦；聚焦后方向键会被 field editor 吃掉，与主搜索是
-  同一个坑（见 [docs/ui.md](../ui.md)）。**只有树视图置 `wantsNavigation = true`**：
-  代码视图要保留方向键给光标、回车给换行。
+  头部搜索框在主面板与分离窗口里都保留（本插件声明了 `supportsPanelSearch`），默认不聚焦，
+  按 ⌘F 才聚焦；聚焦后方向键会被 field editor 吃掉，与主搜索是同一个坑
+  （见 [docs/ui.md](../ui.md)）。转接方在 `PalettePanel.sendEvent`（主面板）与
+  `DetachedPluginPanel.sendEvent`（分离窗口）各有一份。
+  **只有树视图置 `wantsNavigation = true`**：代码视图要保留方向键给光标、回车给换行。
 
 ## 内部结构
 

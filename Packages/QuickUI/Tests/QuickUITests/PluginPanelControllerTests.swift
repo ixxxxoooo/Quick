@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 import Testing
 
@@ -192,6 +193,154 @@ struct PluginPanelControllerTests {
     @Test("窗口控制按钮比底栏按钮小")
     func windowControlButtonIsSmaller() {
         #expect(DesignTokens.Size.windowControlButton < DesignTokens.Size.barButtonHeight)
+    }
+
+    // MARK: - 插件内搜索
+
+    /// 分离窗口的搜索框归属与主面板一致：只有声明 `supportsPanelSearch` 的插件才有。
+    @Test("分离窗口按 supportsSearch 决定是否保留搜索框")
+    func detachedSearchFollowsSupportsPanelSearch() {
+        let controller = PluginPanelController()
+        let view = AnyView(Text("测试"))
+
+        controller.detach(
+            pluginID: "search-off",
+            pluginName: "无搜索",
+            icon: "doc",
+            viewProvider: { view },
+            sourceWindow: nil
+        )
+        controller.detach(
+            pluginID: "search-on",
+            pluginName: "有搜索",
+            icon: "doc.on.clipboard",
+            supportsSearch: true,
+            viewProvider: { view },
+            sourceWindow: nil
+        )
+
+        #expect((detachedPanel("search-off") as? DetachedPluginPanel)?.search?.hasHeaderField == false)
+        #expect((detachedPanel("search-on") as? DetachedPluginPanel)?.search?.hasHeaderField == true)
+
+        // 搜索框放进标题栏后，标题栏仍要留着拖拽区（否则窗口拖不动）
+        let onContainer = detachedPanel("search-on")?.contentView
+        onContainer?.layoutSubtreeIfNeeded()
+        #expect(onContainer?.firstDescendant(of: WindowDragView.self) != nil)
+
+        controller.closeAll()
+    }
+
+    /// 带搜索框的标题栏必须比普通标题栏高，且容得下标准搜索框
+    @Test("带搜索的分离窗口标题栏高度放得下搜索框")
+    func detachedSearchTitleBarFitsSearchField() {
+        #expect(DesignTokens.Size.detachedSearchTitleBarHeight >= DesignTokens.Size.headerHeight)
+        #expect(DesignTokens.Size.detachedSearchTitleBarHeight > DesignTokens.Size.detachedTitleBarHeight)
+    }
+
+    /// 回归：分离窗口里声明了要吃方向键的插件，必须由窗口在 AppKit 层转成 `PluginSearchQuery` 请求。
+    ///
+    /// 没有这段路由时，搜索框一拿到焦点，field editor 就把方向键与回车吃掉，插件列表一个键都收不到 ——
+    /// 这正是主搜索踩过的坑（见 docs/ui.md §2b）。
+    @Test("分离窗口把导航键转成插件内搜索请求")
+    func detachedRoutesNavigationToPluginSearch() {
+        let controller = PluginPanelController()
+        let view = AnyView(Text("测试"))
+
+        controller.detach(
+            pluginID: "route-test",
+            pluginName: "路由",
+            icon: "list.bullet",
+            supportsSearch: true,
+            viewProvider: { view },
+            sourceWindow: nil
+        )
+
+        guard let panel = detachedPanel("route-test") as? DetachedPluginPanel,
+            let search = panel.search
+        else {
+            Issue.record("没有拿到分离面板或其搜索对象")
+            controller.closeAll()
+            return
+        }
+
+        // 插件没声明要吃按键时，三个键都必须放行
+        #expect(panel.onMove?(1) == false)
+        #expect(panel.onSubmit?() == false)
+        #expect(search.lastCommand == nil)
+
+        search.wantsNavigation = true
+        #expect(panel.onMove?(1) == true)
+        #expect(search.lastCommand == .move(1))
+        #expect(panel.onTab?(-1) == true)
+        #expect(search.lastCommand == .tab(-1))
+        #expect(panel.onSubmit?() == true)
+        #expect(search.lastCommand == .submit)
+
+        // ⌘F 只有真正有搜索框时才消费
+        let before = search.focusToken
+        #expect(panel.onSearchFocus?() == true)
+        #expect(search.focusToken == before + 1)
+
+        controller.closeAll()
+    }
+
+    /// 回车（含小键盘回车）在分离窗口里也走同一条搜索请求
+    @Test("分离窗口拦截回车并交给插件内搜索")
+    func detachedConsumesReturnKey() {
+        let controller = PluginPanelController()
+        let view = AnyView(Text("测试"))
+
+        controller.detach(
+            pluginID: "return-test",
+            pluginName: "回车",
+            icon: "return",
+            supportsSearch: true,
+            viewProvider: { view },
+            sourceWindow: nil
+        )
+
+        guard let panel = detachedPanel("return-test") as? DetachedPluginPanel,
+            let search = panel.search
+        else {
+            Issue.record("没有拿到分离面板或其搜索对象")
+            controller.closeAll()
+            return
+        }
+
+        search.wantsNavigation = true
+        guard
+            let returnKey = Self.keyDown(
+                keyCode: kVK_Return, modifiers: [], characters: "\r")
+        else {
+            Issue.record("无法构造合成按键事件")
+            controller.closeAll()
+            return
+        }
+
+        panel.sendEvent(returnKey)
+        #expect(search.lastCommand == .submit)
+
+        controller.closeAll()
+    }
+
+    /// 合成一个按下事件（与 PalettePanelTests 同款：返回 nil 时由调用方记一条失败，而不是崩掉）
+    private static func keyDown(
+        keyCode: Int,
+        modifiers: NSEvent.ModifierFlags,
+        characters: String
+    ) -> NSEvent? {
+        NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: modifiers,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: UInt16(keyCode)
+        )
     }
 
     // MARK: - 与主面板相互独立
