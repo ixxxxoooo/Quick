@@ -16,6 +16,7 @@ public final class SystemControlPlugin: QuickPlugin {
     public static let id = "systemcontrol"
     public static let name = "系统控制"
     public static let icon = "bolt"
+    public static let description = "macOS 系统级快捷指令聚合，支持锁定屏幕、睡眠、重启、关机、清空废纸篓与外观切换等操作。"
     public static let triggerWords = [
         "锁屏", "lock", "睡眠", "sleep", "重启", "restart", "关机", "shutdown", "推出", "深色", "dark"
     ]
@@ -41,6 +42,38 @@ public final class SystemControlPlugin: QuickPlugin {
 
     public init(settingsStore: SettingsStore? = nil) {
         self.settingsStore = settingsStore
+    }
+
+    /// 每条系统操作都是一条命令。锁屏作为空查询时的那一条入口
+    public static var commands: [CommandDescriptor] {
+        SystemAction.allCases.map { action in
+            CommandDescriptor(
+                id: CommandID.systemAction(action.rawValue),
+                pluginID: id,
+                pluginName: name,
+                title: action.title,
+                subtitle: action.description,
+                keywords: action.keywords,
+                icon: action.icon,
+                showsWhenQueryEmpty: action == .lockScreen,
+                aliasKey: "system.\(action.rawValue)"
+            )
+        }
+    }
+
+    /// 热键和搜索走同一个入口。命令关闭时直接拒绝
+    public func perform(commandID: String) {
+        let prefix = "systemcontrol."
+        guard commandID.hasPrefix(prefix) else { return }
+        let raw = String(commandID.dropFirst(prefix.count))
+        guard let action = SystemAction(rawValue: raw) else { return }
+        if let settingsStore, !settingsStore.isCommandEnabled(commandID) {
+            log.notice("命令已关闭，拒绝执行 \(commandID, privacy: .public)")
+            return
+        }
+        log.notice("执行系统命令 \(commandID, privacy: .public)")
+        runner.execute(action)
+        EventBus.shared.post(HidePaletteEvent())
     }
 
     /// 供外部直接调用执行指定系统操作（例如热键分发）

@@ -15,8 +15,6 @@ struct GeneralPane: View {
     private var autoPasteSeconds = PaletteAutoBehavior.defaultPasteWindow.rawValue
     @AppStorage(SettingsKey.paletteAutoClearMinutes)
     private var autoClearMinutes = PaletteAutoBehavior.defaultClearIdle.rawValue
-    @AppStorage(SettingsKey.appearance)
-    private var appearance = AppAppearance.system.rawValue
 
     init(dataSource: any SettingsDataSource) {
         self.dataSource = dataSource
@@ -38,26 +36,10 @@ struct GeneralPane: View {
                 }
             }
 
-            Section("唤出") {
-                SettingsRow(
-                    title: "全局快捷键",
-                    subtitle: "在任何应用里按下即可唤出/隐藏面板。",
-                    icon: { SettingsRowIcon(systemImage: "keyboard") }
-                ) {
-                    ShortcutRecorder(
-                        keycaps: dataSource.globalShortcutKeycaps,
-                        onRecord: { keyCode, modifiers in
-                            dataSource.setGlobalShortcut(keyCode: keyCode, carbonModifiers: modifiers)
-                        },
-                        onClear: {
-                            dataSource.clearGlobalShortcut()
-                        }
-                    )
-                }
-
+            Section("面板") {
                 SettingsRow(
                     title: "关闭面板",
-                    subtitle: "按 Esc，或点击面板以外的任意位置。",
+                    subtitle: "按 Esc，或点击面板以外的任意位置。唤出快捷键在「快捷键」页设置。",
                     icon: { SettingsRowIcon(systemImage: "escape") }
                 ) {
                     KeyCapChip(text: "Esc", style: .outline)
@@ -95,34 +77,8 @@ struct GeneralPane: View {
             }
 
             keyboardLayoutSection
-
-            appearanceSection
         }
         .formStyle(.grouped)
-    }
-
-    /// 外观
-    ///
-    /// 只写偏好，真正的应用在 `AppCore.applyAppearance()` —— `NSApp.appearance` 是应用级
-    /// 的，由那里一处负责，面板、设置窗口、分离窗口才不会各说各话。
-    private var appearanceSection: some View {
-        Section {
-            Picker(selection: $appearance) {
-                ForEach(AppAppearance.allCases) { option in
-                    Text(option.title).tag(option.rawValue)
-                }
-            } label: {
-                SettingsRow(
-                    title: "主题",
-                    subtitle: "跟随系统，或把 Quick 固定在浅色 / 深色。",
-                    icon: { SettingsRowIcon(systemImage: "circle.lefthalf.filled") }
-                )
-            }
-        } header: {
-            Text("外观")
-        } footer: {
-            Text("面板、设置窗口与分离窗口一起生效，不必重启。")
-        }
     }
 
     /// 强制键盘布局

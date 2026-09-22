@@ -106,6 +106,24 @@ public enum DesignTokens {
         public static let compactKeyCap = scaled(15)
         /// 设置项别名框与快捷键录制框标准宽度（参考 Tinycast）
         public static let shortcutRecorder: CGFloat = 120
+        /// 拖拽授权面板宽度。贴在系统设置右侧内容区下面，不跟主面板缩放
+        public static let permissionPanelWidth: CGFloat = 460
+        /// 系统设置左侧栏宽度，用来把授权面板和右侧列表对齐
+        public static let systemSettingsSidebar: CGFloat = 230
+        /// 主面板允许拖到的最矮高度
+        public static let panelMinHeight: CGFloat = panelHeight * 0.6
+        /// 主面板底部用来拖高矮的热区
+        public static let resizeGrip = scaled(8)
+        /// 引导页步骤圆点
+        public static let onboardingDot = scaled(7)
+        /// 引导页宽度。系统窗口，不跟主面板缩放
+        public static let onboardingWidth: CGFloat = 520
+        /// 引导页第一次布局前的高度，内容量完之后窗口会再收一收
+        public static let onboardingMinHeight: CGFloat = 420
+        /// 引导页顶部图标
+        public static let onboardingHero = scaled(60)
+        /// 拖拽授权面板量不到内容时的保底高度
+        public static let permissionPanelMinHeight: CGFloat = 168
         /// 一像素细线（分隔线、卡片描边）
         ///
         /// **不随 `panelScale` 缩放**：它是物理像素级的东西，放大只会变成一条粗边。

@@ -77,6 +77,23 @@ struct PaletteRootView: View {
     /// 搜索防抖时长
     private static let searchDebounce = Duration.milliseconds(80)
 
+    @AppStorage(SettingsKey.showResultIcons) private var showResultIcons = true
+    @AppStorage(SettingsKey.showBottomBarHints) private var showBottomBarHints = true
+    @AppStorage(SettingsKey.panelTransparency) private var panelTransparency = 0
+
+    /// 搜索栏左侧的拖动手柄。搜索框本身要打字，不能整条栏都拿去拖窗口
+    private var dragHandle: some View {
+        WindowDragArea()
+            .frame(width: DesignTokens.Size.headerIconSlot, height: DesignTokens.Size.headerHeight)
+            .overlay {
+                Image(systemName: "line.3.horizontal")
+                    .font(DesignTokens.Typography.compactIcon)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .allowsHitTesting(false)
+            }
+            .help("拖动面板")
+    }
+
     var body: some View {
         ZStack {
             if paletteMode.isPluginMode {
@@ -85,12 +102,12 @@ struct PaletteRootView: View {
                 searchContent
             }
         }
-        .frame(
-            width: DesignTokens.Size.panelWidth,
-            height: DesignTokens.Size.panelHeight
-        )
-        .background(PaletteBackground())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(PaletteBackground(scrimBoost: Double(panelTransparency) / 100))
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
+        .overlay(alignment: .bottom) {
+            PaletteResizeGrip()
+        }
         .onAppear {
             query = paletteQuery.text
             log.debug("面板视图已出现，开始首次搜索")
@@ -153,6 +170,7 @@ struct PaletteRootView: View {
     /// 搜索栏
     private var searchHeader: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
+            dragHandle
             SearchFieldView(
                 query: Binding(
                     get: { paletteQuery.text },
@@ -216,7 +234,8 @@ struct PaletteRootView: View {
             ResultListView(
                 items: results,
                 selectedIndex: selectionBinding,
-                selection: selection
+                selection: selection,
+                showsIcons: showResultIcons
             )
         }
     }
@@ -234,7 +253,7 @@ struct PaletteRootView: View {
         HStack(spacing: 0) {
             Spacer(minLength: DesignTokens.Spacing.md)
 
-            if !results.isEmpty {
+            if showBottomBarHints && !results.isEmpty {
                 primaryActionPill
             }
         }
@@ -330,5 +349,51 @@ struct PaletteRootView: View {
                 items[index].action()
             }
         }
+    }
+}
+
+/// 主面板底边的拉高热区。高度记在设置里，下次打开还是这个高度
+struct PaletteResizeGrip: NSViewRepresentable {
+
+    func makeNSView(context: Context) -> PaletteResizeView {
+        PaletteResizeView()
+    }
+
+    func updateNSView(_ nsView: PaletteResizeView, context: Context) {}
+}
+
+/// 拖底边时顶边不动，只改高度
+final class PaletteResizeView: NSView {
+
+    /// 按下时的窗口框和鼠标位置
+    private var startFrame: NSRect = .zero
+    private var startMouseY: CGFloat = 0
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .resizeUpDown)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        startFrame = window.frame
+        startMouseY = NSEvent.mouseLocation.y
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let window else { return }
+        let delta = startMouseY - NSEvent.mouseLocation.y
+        let screen = window.screen ?? NSScreen.main
+        let maxHeight = screen?.visibleFrame.height ?? startFrame.height
+        let height = PalettePreferences.clampedPanelHeight(startFrame.height + delta, maxHeight: maxHeight)
+        let top = startFrame.maxY
+        var frame = startFrame
+        frame.size.height = height
+        frame.origin.y = top - height
+        window.setFrame(frame, display: true)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard let window else { return }
+        PalettePreferences.setPanelHeight(window.frame.height)
     }
 }

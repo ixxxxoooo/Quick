@@ -5,283 +5,267 @@
 import QuickCore
 import SwiftUI
 
-/// 快捷键设置面板
+/// 全局快捷键
 ///
-/// 参考 Fasty / Raycast 设计：
-/// - 顶部为主面板全局唤出快捷键（默认 ⌥Space）
-/// - 支持按类别浏览与搜索全部插件、系统操作与自定义终端命令
-/// - 每项均支持录制独立全局快捷键，按下即可直接唤醒或置顶打开对应插件/执行命令
+/// 上面是面板自己的系统键，只有「打开 / 隐藏面板」可以改，清空后退回 ⌥Space。
+/// 下面是用户添加的命令绑定：左边录按键，右边选命令。没有添加过就空着，不把全部命令铺开。
 struct ShortcutsPane: View {
 
     let dataSource: any SettingsDataSource
 
-    enum ItemCategory: String, CaseIterable, Identifiable {
-        case all = "全部"
-        case plugins = "插件"
-        case systemActions = "系统操作"
-        case customCommands = "终端命令"
-
-        var id: Self { self }
-    }
-
-    @State private var query = ""
-    @State private var selectedCategory: ItemCategory = .all
-    @State private var showOnlyBound = false
+    @State private var bindings: [SettingsCommandBinding] = []
+    @State private var drafts: [DraftBinding] = []
+    @State private var conflictNote: String?
+    @State private var paletteKeycaps: [String] = []
 
     var body: some View {
         Form {
-            globalSection
-            bindingsSection
+            Section {
+                rebindableRow
+                fixedRow("打开设置", keycaps: ["⌘", ","])
+                fixedRow("关闭 / 返回", keycaps: ["Esc"])
+                fixedRow("分离插件窗口", keycaps: ["⌘", "D"])
+            } header: {
+                Text("系统")
+            } footer: {
+                Text("录制时全局快捷键会暂时停用，避免误触发。Esc、方向键、回车、⌘W 和 ⌘, 是面板内部的键，不能改。")
+            }
+
+            Section {
+                if bindings.isEmpty && drafts.isEmpty {
+                    Text("暂无绑定。例：⌥B + 「百度搜索」→ 选中文字后一键搜索。")
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                }
+                ForEach(bindings) { row in
+                    boundRow(row)
+                }
+                ForEach(drafts) { draft in
+                    draftRow(draft)
+                }
+            } header: {
+                HStack {
+                    Text("插件绑定")
+                    Spacer()
+                    Button {
+                        drafts.append(DraftBinding())
+                    } label: {
+                        Label("添加", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderless)
+                }
+            } footer: {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                    Text("快捷键 + 关键字。关键字就是功能本身，例如「剪贴板」「锁定屏幕」。一个插件可以有多条关键字，分别唤醒不同功能。")
+                    if let conflictNote {
+                        Text(conflictNote)
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
+        .onAppear(perform: reload)
     }
 
-    /// 主面板全局快捷键
-    private var globalSection: some View {
-        Section {
-            SettingsRow(
-                title: "唤出主面板",
-                subtitle: "在任何应用中按下即可显示或隐藏 Quick 命令面板。",
-                icon: { SettingsRowIcon(systemImage: "keyboard") }
-            ) {
-                ShortcutRecorder(
-                    keycaps: dataSource.globalShortcutKeycaps,
-                    onRecord: { keyCode, modifiers in
-                        dataSource.setGlobalShortcut(keyCode: keyCode, carbonModifiers: modifiers)
-                    },
-                    onClear: {
-                        dataSource.clearGlobalShortcut()
-                    }
-                )
-            }
-        } header: {
-            Text("主面板快捷键")
-        } footer: {
-            Text("默认快捷键为 ⌥Space (Option+Space)。")
-        }
-    }
-
-    /// 快捷唤醒命令绑定
-    private var bindingsSection: some View {
-        Section {
-            // 搜索与过滤筛选行
-            VStack(spacing: DesignTokens.Spacing.sm) {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Image(systemName: "magnifyingglass")
-                        .font(DesignTokens.Typography.inlineIcon)
-                        .foregroundStyle(.secondary)
-                    TextField("搜索命令或插件…", text: $query)
-                        .textFieldStyle(.plain)
-                    if !query.isEmpty {
-                        Button {
-                            query = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(DesignTokens.Typography.inlineIcon)
-                                .foregroundStyle(DesignTokens.Colors.textTertiary)
-                        }
-                        .buttonStyle(.plain)
-                    }
+    /// 唤出主面板，清空会写回默认的 ⌥Space
+    private var rebindableRow: some View {
+        HStack {
+            Text("打开 / 隐藏面板")
+                .font(DesignTokens.Typography.rowTitle)
+            Spacer()
+            ShortcutRecorder(
+                keycaps: paletteKeycaps,
+                onRecord: { keyCode, modifiers in
+                    let applied = dataSource.setCommandShortcut(
+                        keyCode: keyCode,
+                        carbonModifiers: modifiers,
+                        for: CommandID.togglePalette
+                    )
+                    conflictNote = applied ? nil : "这个组合键已经绑给别的命令，没有改动。"
+                    reload()
+                },
+                onClear: {
+                    dataSource.clearCommandShortcut(for: CommandID.togglePalette)
+                    conflictNote = nil
+                    reload()
                 }
-                .padding(.vertical, DesignTokens.Spacing.xs)
-
-                HStack {
-                    Picker("分类", selection: $selectedCategory) {
-                        ForEach(ItemCategory.allCases) { cat in
-                            Text(cat.rawValue).tag(cat)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    Toggle("仅已绑定", isOn: $showOnlyBound)
-                        .toggleStyle(.checkbox)
-                        .font(.caption)
-                }
-            }
-
-            // 渲染过滤后的条目
-            let items = filteredItems
-            if items.isEmpty {
-                Text("未找到匹配的命令或插件。")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, DesignTokens.Spacing.md)
-            } else {
-                ForEach(items) { item in
-                    ShortcutItemRow(item: item, dataSource: dataSource)
-                }
-            }
-        } header: {
-            Text("命令与插件独立快捷键 (\(filteredItems.count))")
-        } footer: {
-            Text("为指定插件或命令绑定全局快捷键后，可在任意应用中按下快捷键直接唤醒并置顶打开该插件或运行命令，无需先打开搜索框。")
-        }
-    }
-
-    /// 统一列表项结构
-    struct BindableItem: Identifiable {
-        enum Kind {
-            case plugin(id: String)
-            case systemAction(id: String)
-            case customCommand(id: UUID)
-        }
-
-        let id: String
-        let name: String
-        let subtitle: String
-        let icon: String
-        let category: ItemCategory
-        let kind: Kind
-        let shortcutKeycaps: [String]?
-    }
-
-    private var allItems: [BindableItem] {
-        var result: [BindableItem] = []
-
-        // 1. 插件
-        for p in dataSource.pluginEntries {
-            let keycaps = dataSource.pluginShortcutKeycaps(for: p.id)
-            let sub =
-                p.triggerWords.isEmpty ? p.description : "唤醒词: \(p.triggerWords.joined(separator: ", "))"
-            result.append(
-                BindableItem(
-                    id: "plugin.\(p.id)",
-                    name: p.name,
-                    subtitle: sub,
-                    icon: p.icon,
-                    category: .plugins,
-                    kind: .plugin(id: p.id),
-                    shortcutKeycaps: keycaps
-                )
             )
         }
-
-        // 2. 系统操作
-        for a in dataSource.systemActions {
-            result.append(
-                BindableItem(
-                    id: "sys.\(a.id)",
-                    name: a.title,
-                    subtitle: "系统控制",
-                    icon: a.icon,
-                    category: .systemActions,
-                    kind: .systemAction(id: a.id),
-                    shortcutKeycaps: a.shortcutKeycaps
-                )
-            )
-        }
-
-        // 3. 终端命令
-        for c in dataSource.customCommands {
-            result.append(
-                BindableItem(
-                    id: "cmd.\(c.id.uuidString)",
-                    name: c.name,
-                    subtitle: c.command,
-                    icon: "terminal",
-                    category: .customCommands,
-                    kind: .customCommand(id: c.id),
-                    shortcutKeycaps: c.shortcutKeycaps
-                )
-            )
-        }
-
-        return result
     }
 
-    private var filteredItems: [BindableItem] {
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        return allItems.filter { item in
-            // 分类过滤
-            if selectedCategory != .all && item.category != selectedCategory {
-                return false
-            }
-            // 仅已绑定过滤
-            if showOnlyBound && (item.shortcutKeycaps == nil || item.shortcutKeycaps?.isEmpty == true) {
-                return false
-            }
-            // 搜索过滤
-            if !trimmed.isEmpty {
-                return item.name.localizedCaseInsensitiveContains(trimmed)
-                    || item.subtitle.localizedCaseInsensitiveContains(trimmed)
-            }
-            return true
+    /// 写死的面板键，只展示，不录制
+    private func fixedRow(_ title: String, keycaps: [String]) -> some View {
+        HStack {
+            Text(title)
+                .font(DesignTokens.Typography.rowTitle)
+            Spacer()
+            Text(keycaps.joined())
+                .font(DesignTokens.Typography.keyCap)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                .padding(.horizontal, DesignTokens.Spacing.md)
+                .frame(height: DesignTokens.Size.barButtonHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                        .fill(DesignTokens.Colors.controlSurface)
+                )
         }
+    }
+
+    /// 已经保存的一条绑定
+    private func boundRow(_ row: SettingsCommandBinding) -> some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            ShortcutRecorder(
+                keycaps: row.keycaps,
+                onRecord: { keyCode, modifiers in
+                    apply(keyCode: keyCode, modifiers: modifiers, commandID: row.id)
+                },
+                onClear: {
+                    dataSource.clearCommandShortcut(for: row.id)
+                    conflictNote = nil
+                    reload()
+                }
+            )
+            KeywordField(text: row.wakeKeyword, placeholder: "输入关键字") { keyword in
+                conflictNote = dataSource.retargetShortcut(from: row.id, keyword: keyword)
+                reload()
+            }
+            removeButton {
+                dataSource.clearCommandShortcut(for: row.id)
+                conflictNote = nil
+                reload()
+            }
+        }
+    }
+
+    /// 还没写进偏好的一行
+    private func draftRow(_ draft: DraftBinding) -> some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            ShortcutRecorder(
+                keycaps: draft.keycaps,
+                onRecord: { keyCode, modifiers in
+                    let caps = dataSource.shortcutKeycaps(keyCode: keyCode, carbonModifiers: modifiers)
+                    updateDraft(draft.id) { item in
+                        item.keyCode = keyCode
+                        item.carbonModifiers = modifiers
+                        item.keycaps = caps
+                    }
+                    commitDraft(id: draft.id)
+                },
+                onClear: {
+                    updateDraft(draft.id) { item in
+                        item.keyCode = nil
+                        item.carbonModifiers = nil
+                        item.keycaps = nil
+                    }
+                }
+            )
+            KeywordField(text: draft.keyword, placeholder: "输入关键字") { keyword in
+                updateDraft(draft.id) { item in
+                    item.keyword = keyword
+                }
+                commitDraft(id: draft.id)
+            }
+            removeButton {
+                drafts.removeAll { $0.id == draft.id }
+            }
+        }
+    }
+
+    private func removeButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(DesignTokens.Typography.compactIcon)
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+        }
+        .buttonStyle(.plain)
+        .help("移除这条绑定")
+    }
+
+    private func apply(keyCode: Int, modifiers: Int, commandID: String) {
+        let applied = dataSource.setCommandShortcut(
+            keyCode: keyCode, carbonModifiers: modifiers, for: commandID)
+        conflictNote = applied ? nil : "这个组合键已经绑给别的命令，没有改动。"
+        reload()
+    }
+
+    private func commitDraft(id: UUID) {
+        guard let draft = drafts.first(where: { $0.id == id }) else { return }
+        let keyword = draft.keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let keyCode = draft.keyCode, let modifiers = draft.carbonModifiers, !keyword.isEmpty else {
+            return
+        }
+        guard let resolved = dataSource.resolveKeyword(keyword) else {
+            conflictNote = "没有唯一对上的关键字。写插件声明的唤醒词，或功能标题。"
+            return
+        }
+        commit(keyCode: keyCode, modifiers: modifiers, commandID: resolved.id, draftID: id)
+    }
+
+    private func commit(keyCode: Int, modifiers: Int, commandID: String, draftID: UUID) {
+        let applied = dataSource.setCommandShortcut(
+            keyCode: keyCode, carbonModifiers: modifiers, for: commandID)
+        if applied {
+            drafts.removeAll { $0.id == draftID }
+            conflictNote = nil
+        } else {
+            conflictNote = "这个组合键已经绑给别的命令，没有改动。"
+        }
+        reload()
+    }
+
+    private func updateDraft(_ id: UUID, _ change: (inout DraftBinding) -> Void) {
+        guard let index = drafts.firstIndex(where: { $0.id == id }) else { return }
+        change(&drafts[index])
+    }
+
+    private func reload() {
+        bindings = dataSource.boundCommandBindings()
+        paletteKeycaps = dataSource.togglePaletteKeycaps
     }
 }
 
-private struct ShortcutItemRow: View {
-    let item: ShortcutsPane.BindableItem
-    let dataSource: any SettingsDataSource
+/// 还没落盘的一行绑定
+private struct DraftBinding: Identifiable {
+    let id = UUID()
+    var keyCode: Int?
+    var carbonModifiers: Int?
+    var keycaps: [String]?
+    var keyword = ""
+}
+
+/// 右侧的关键字输入框。关键字就是要唤醒的功能
+private struct KeywordField: View {
+
+    let text: String
+    let placeholder: String
+    let onSubmit: (String) -> Void
+
+    @State private var draft: String
+    @FocusState private var focused: Bool
+
+    init(text: String, placeholder: String, onSubmit: @escaping (String) -> Void) {
+        self.text = text
+        self.placeholder = placeholder
+        self.onSubmit = onSubmit
+        _draft = State(initialValue: text)
+    }
 
     var body: some View {
-        HStack(spacing: DesignTokens.Spacing.md) {
-            Image(systemName: item.icon)
-                .font(DesignTokens.Typography.iconGlyph)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
-
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                HStack(spacing: DesignTokens.Spacing.xs) {
-                    Text(item.name)
-                        .lineLimit(1)
-                    badge(for: item.category)
-                }
-                Text(item.subtitle)
-                    .font(DesignTokens.Typography.keyCap)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        TextField(placeholder, text: $draft)
+            .textFieldStyle(.plain)
+            .font(DesignTokens.Typography.rowTitle)
+            .focused($focused)
+            .onSubmit { onSubmit(draft) }
+            .onChange(of: focused) { _, isFocused in
+                if !isFocused { onSubmit(draft) }
             }
-
-            Spacer(minLength: DesignTokens.Spacing.md)
-
-            recorderView
-        }
-        .padding(.vertical, DesignTokens.Spacing.xxs)
-    }
-
-    @ViewBuilder
-    private var recorderView: some View {
-        switch item.kind {
-        case .plugin(let id):
-            ShortcutRecorder(
-                keycaps: dataSource.pluginShortcutKeycaps(for: id),
-                onRecord: { keyCode, modifiers in
-                    dataSource.setPluginShortcut(keyCode: keyCode, carbonModifiers: modifiers, for: id)
-                },
-                onClear: {
-                    dataSource.clearPluginShortcut(for: id)
-                }
-            )
-        case .systemAction(let id):
-            ShortcutRecorder(
-                keycaps: item.shortcutKeycaps,
-                onRecord: { keyCode, modifiers in
-                    dataSource.setSystemActionShortcut(keyCode: keyCode, carbonModifiers: modifiers, for: id)
-                },
-                onClear: {
-                    dataSource.clearSystemActionShortcut(for: id)
-                }
-            )
-        case .customCommand(let id):
-            ShortcutRecorder(
-                keycaps: item.shortcutKeycaps,
-                onRecord: { keyCode, modifiers in
-                    dataSource.setCustomCommandShortcut(keyCode: keyCode, carbonModifiers: modifiers, for: id)
-                },
-                onClear: {
-                    dataSource.clearCustomCommandShortcut(for: id)
-                }
-            )
-        }
-    }
-
-    private func badge(for category: ShortcutsPane.ItemCategory) -> some View {
-        Text(category.rawValue)
-            .font(DesignTokens.Typography.keyCap)
-            .foregroundStyle(DesignTokens.Colors.textTertiary)
-            .padding(.horizontal, DesignTokens.Spacing.xs)
-            .padding(.vertical, DesignTokens.Spacing.xxs)
+            .onChange(of: text) { _, newValue in
+                if !focused { draft = newValue }
+            }
+            .padding(.horizontal, DesignTokens.Spacing.sm)
+            .padding(.vertical, DesignTokens.Spacing.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
                     .fill(DesignTokens.Colors.controlSurface)

@@ -17,6 +17,7 @@ public final class SnippetsPlugin: QuickPlugin {
     public static let id = "snippets"
     public static let name = "文本片段"
     public static let icon = "curlybraces"
+    public static let description = "常用代码片段与模板快捷管理器，支持预定义占位符、动态参数求值与全局快速粘贴插入。"
     public static let triggerWords = ["片段", "snippet", "模板", "template"]
 
     public var isEnabled = true
@@ -64,6 +65,22 @@ public final class SnippetsPlugin: QuickPlugin {
     }
 
     // MARK: - QuickPlugin 协议
+
+    public func accepts(query: String) -> Bool {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else { return false }
+        if trimmed.matchesAnyTrigger(Self.triggerWords) { return true }
+        let lower = trimmed.lowercased()
+        return store.snippets.contains { snippet in
+            if let keyword = snippet.keyword?.lowercased(), keyword.contains(lower) { return true }
+            return snippet.title.lowercased().contains(lower)
+        }
+    }
+
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
+    }
 
     public func searchItems(query: String) async -> [SearchableItem] {
         // 触发提示是结果项的一部分，所以在构造结果项这一刻现读：

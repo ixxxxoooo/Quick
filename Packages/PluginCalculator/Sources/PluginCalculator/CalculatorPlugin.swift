@@ -16,6 +16,7 @@ public final class CalculatorPlugin: QuickPlugin {
     public static let id = "calculator"
     public static let name = "计算器"
     public static let icon = "plus.forwardslash.minus"
+    public static let description = "在主搜索框中直接输入数学表达式即可快速求值，支持四则运算、函数计算、千分位显示与自动复制结果。"
     public static let triggerWords = ["计算", "calculator", "calc", "算", "="]
 
     public var isEnabled = true
@@ -28,6 +29,15 @@ public final class CalculatorPlugin: QuickPlugin {
     public init() {}
 
     // MARK: - QuickPlugin 协议
+
+    public func accepts(query: String) -> Bool {
+        engine.looksLikeExpression(query.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
+    }
 
     public func searchItems(query: String) async -> [SearchableItem] {
         // 每次搜索都重新读设置：用户可能在面板开着的时候刚把小数位数改掉

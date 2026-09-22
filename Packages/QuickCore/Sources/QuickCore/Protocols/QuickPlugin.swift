@@ -21,10 +21,14 @@ public protocol QuickPlugin: AnyObject, Sendable {
     /// 插件图标（SF Symbol 名称）
     static var icon: String { get }
 
+    /// 插件功能说明与使用指南
+    static var description: String { get }
+
     /// 插件的触发词列表（中英双语）
     ///
     /// 用户在搜索框中输入这些词时会唤醒该插件。
-    /// 同时展示在设置页面中，方便用户了解如何使用。
+    /// 一条命令可以有多个关键字；不同关键字可以打开同一个插件里的不同功能。
+    /// 精确匹配到两条时不执行，避免猜错。
     static var triggerWords: [String] { get }
 
     /// 插件是否已启用
@@ -56,6 +60,28 @@ public protocol QuickPlugin: AnyObject, Sendable {
     /// 想给首屏一组精选条目的插件可以覆盖它。
     func defaultItems() async -> [SearchableItem]
 
+    /// 这个插件声明的静态命令
+    ///
+    /// 默认是一条「打开本插件」。结果会随输入变化的插件改走 `dynamicSearch`，
+    /// 并把这里留空或只放不会重复的入口。命令 id 一旦发布就不能改。
+    static var commands: [CommandDescriptor] { get }
+
+    /// 这次查询要不要走动态搜索
+    ///
+    /// 返回 false 时聚合器不会调用 `dynamicSearch`。闸门必须便宜：
+    /// 它在每次按键、每个已启用插件上都会跑。
+    func accepts(query: String) -> Bool
+
+    /// 按查询现算的结果
+    ///
+    /// 只在 `accepts` 为真时调用。循环里要看 `Task.isCancelled`，新的一次按键会取消上一次。
+    func dynamicSearch(query: String) async -> [SearchableItem]
+
+    /// 执行一条命令
+    ///
+    /// 热键和搜索命中的是同一个 id。命令已关闭时宿主不会调用这里。
+    func perform(commandID: String)
+
     /// 这个插件自己那份数据库 schema
     ///
     /// 只有需要真表的插件才要实现它（剪贴板历史、笔记、片段这类要排序和过滤的
@@ -79,6 +105,9 @@ public extension QuickPlugin {
     /// 默认无触发词
     static var triggerWords: [String] { [] }
 
+    /// 默认无功能说明
+    static var description: String { "" }
+
     /// 默认无设置视图
     func makeSettingsView() -> AnyView? { nil }
 
@@ -91,6 +120,31 @@ public extension QuickPlugin {
 
     /// 默认不建表：只有用真表的插件才声明 schema
     static var storageMigrations: [SQLiteMigration] { [] }
+
+    /// 默认一条「打开本插件」，关键词用触发词和名字
+    static var commands: [CommandDescriptor] {
+        [
+            CommandDescriptor.openPlugin(
+                id: id,
+                name: name,
+                icon: icon,
+                keywords: triggerWords + [name],
+                subtitle: description.isEmpty ? nil : description
+            )
+        ]
+    }
+
+    /// 默认不参与动态搜索，避免每次按键把所有插件都叫醒
+    func accepts(query: String) -> Bool { false }
+
+    /// 默认没有随查询变化的结果
+    func dynamicSearch(query: String) async -> [SearchableItem] { [] }
+
+    /// 默认把「打开本插件」导航进插件面板
+    func perform(commandID: String) {
+        guard commandID == CommandID.openPlugin(Self.id) else { return }
+        EventBus.shared.post(NavigateEvent(pluginID: Self.id))
+    }
 
     /// 默认取触发词裸查询的第一条
     ///

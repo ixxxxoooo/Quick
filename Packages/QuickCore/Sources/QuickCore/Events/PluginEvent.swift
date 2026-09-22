@@ -150,6 +150,16 @@ public struct AppIndexRefreshedEvent: PluginEvent {
 /// 「刚刚复制过」的地方）。宿主订阅它做两件事：面板打开时判断要不要把内容填进搜索框。
 ///
 /// 只带时间点，不带内容：内容谁需要谁去读剪贴板，避免把可能很大的文本在事件里传一遍。
+/// 命令开关、别名或搜索来源变了
+///
+/// 设置页和插件设置写完偏好后发它，宿主据此重建命令快照并重新注册热键。
+/// 不带具体改了哪条：快照本来就是整份替换，增量通知省不下多少，还容易漏。
+public struct CommandCatalogChangedEvent: PluginEvent {
+    public static let name = "quick.commandCatalog.changed"
+
+    public init() {}
+}
+
 public struct ClipboardChangedEvent: PluginEvent {
 
     public static var name: String { "quick.clipboard.changed" }

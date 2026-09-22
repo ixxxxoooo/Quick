@@ -16,6 +16,7 @@ public final class SQLFormatterPlugin: QuickPlugin {
     public static let id = "sql-formatter"
     public static let name = "SQL 格式化"
     public static let icon = "cylinder"
+    public static let description = "SQL 查询语句美化排版与单行压缩，支持关键字大小写规范化与自定义缩进风格。"
     public static let triggerWords = ["sql", "格式化", "sql formatter", "sql格式化", "数据库"]
 
     public var isEnabled = true

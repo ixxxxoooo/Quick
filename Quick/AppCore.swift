@@ -137,6 +137,9 @@ final class AppCore {
     /// 窗口本身也是惰性创建的：没打开过设置就不该有窗口。
     private(set) lazy var settingsWindowController = SettingsWindowController(dataSource: self)
 
+    /// 第一次启动的引导
+    private let onboardingController = OnboardingWindowController()
+
     /// 打开数据库
     ///
     /// 打不开文件时退到内存库继续运行：剪贴板、笔记这些功能不该因为存储问题整个用不了，
@@ -222,43 +225,17 @@ final class AppCore {
         }
 
         // 6. 启动基础设施服务
-        hotKeyService.onTogglePalette = { [weak self] in
-            self?.paletteCoordinator.toggle()
-        }
-        hotKeyService.onLaunchApp = { [weak self] bundleID in
-            self?.appIndex.app(withBundleID: bundleID)?.launch()
-        }
-        hotKeyService.onRunSystemAction = { [weak self] id in
-            if let systemPlugin = self?.plugins.first(where: { type(of: $0).id == SystemControlPlugin.id })
-                as? SystemControlPlugin,
-                let action = SystemAction(rawValue: id)
-            {
-                systemPlugin.execute(action)
-            }
-        }
-        hotKeyService.onRunCustomCommand = { [weak self] id in
-            guard let self else { return }
-            let list = self.loadCustomCommands()
-            if let cmd = list.first(where: { $0.id == id && $0.isEnabled }) {
-                Task {
-                    // 与面板里触发同一条命令，选项必须一致，否则两条入口行为不一样
-                    let result = await ShellCommandRunner.run(
-                        cmd.command,
-                        workingDirectory: cmd.workingDirectory,
-                        loadingShellEnvironment: cmd.loadsShellEnvironment)
-                    EventBus.shared.post(
-                        ShowHUDEvent(
-                            message: String(result.summary.prefix(80)),
-                            tone: result.succeeded ? .success : .warning
-                        )
-                    )
-                }
-            }
-        }
-        hotKeyService.onNavigateToPlugin = { [weak self] pluginID in
-            self?.paletteCoordinator.show(pluginID: pluginID)
+        hotKeyService.onCommand = { [weak self] commandID in
+            self?.invoke(commandID: commandID)
         }
         hotKeyService.start()
+
+        paletteCoordinator.invokeCommand = { [weak self] commandID in
+            self?.invoke(commandID: commandID)
+        }
+        paletteCoordinator.isSearchSourceEnabled = { [weak self] pluginID in
+            self?.settingsStore.isSearchSourceEnabled(pluginID) ?? true
+        }
 
         // 快捷键录制协调器：录制时暂停/恢复全局快捷键
         ShortcutRecorderCoordinator.shared.onPause = { [weak self] in
@@ -269,6 +246,14 @@ final class AppCore {
         }
 
         statusItemController.install()
+        statusItemController.applyVisibility()
+        onboardingController.isLaunchAtLoginEnabled = { [weak self] in
+            self?.isLaunchAtLoginEnabled ?? false
+        }
+        onboardingController.setLaunchAtLogin = { [weak self] enabled in
+            self?.setLaunchAtLogin(enabled)
+        }
+        onboardingController.presentIfNeeded()
         observeDebugWakeSignals()
         applyAppearance()
         observeAppearance()
@@ -277,13 +262,14 @@ final class AppCore {
         let initialScopes = settingsStore.searchScopes(defaultScopes: SearchScopes.defaults)
         Task {
             await appIndex.refresh(scopes: initialScopes)
-            self.restoreSavedHotKeys()
+            self.cachedIndexedApps = nil
         }
 
         // 8. 激活所有已启用的插件
         for plugin in plugins where plugin.isEnabled {
             plugin.activate()
         }
+        rebuildCommandCatalog()
 
         // 9. 开发启动参数：立即显示面板（验收用）
         if ProcessInfo.processInfo.arguments.contains("-showPalette") {
@@ -419,6 +405,8 @@ final class AppCore {
             ) { [weak self] _ in
                 Task { @MainActor in
                     self?.applyAppearance()
+                    self?.statusItemController.applyVisibility()
+                    self?.paletteCoordinator.applyPaletteMetrics()
                 }
             }
         }
@@ -626,6 +614,12 @@ final class AppCore {
                 self?.cachedIndexedApps = nil
             }
         )
+
+        subscriptions.append(
+            bus.on(CommandCatalogChangedEvent.self) { [weak self] _ in
+                self?.rebuildCommandCatalog()
+            }
+        )
     }
 
     // MARK: - 自定义命令存储辅助
@@ -647,14 +641,65 @@ final class AppCore {
 
     // MARK: - 快捷键恢复
 
-    private func restoreSavedHotKeys() {
-        let appIDs = appIndex.apps.map(\.bundleID)
-        let systemIDs = SystemAction.allCases.map(\.rawValue)
-        let cmdIDs = loadCustomCommands().map(\.id)
-        let pluginIDs = plugins.map { type(of: $0).id }
-        hotKeyService.restoreHotKeys(
-            appBundleIDs: appIDs, systemActionIDs: systemIDs,
-            customCommandIDs: cmdIDs, pluginIDs: pluginIDs)
+    /// 执行一条命令。热键和搜索共用这一条路径
+    private func invoke(commandID: String) {
+        log.notice("执行命令 \(commandID, privacy: .public)")
+        if commandID != CommandID.togglePalette, !settingsStore.isCommandEnabled(commandID) {
+            log.notice("命令已关闭，拒绝调用 \(commandID, privacy: .public)")
+            return
+        }
+        if commandID == CommandID.togglePalette {
+            paletteCoordinator.toggle()
+            return
+        }
+        if let pluginID = CommandID.openedPluginID(in: commandID) {
+            paletteCoordinator.show(pluginID: pluginID)
+            return
+        }
+        guard let plugin = plugin(forCommand: commandID) else {
+            log.warning("没有插件认领命令 \(commandID, privacy: .public)")
+            return
+        }
+        plugin.perform(commandID: commandID)
+    }
+
+    /// 按 id 前缀找到负责执行的插件
+    private func plugin(forCommand commandID: String) -> (any QuickPlugin)? {
+        if commandID.hasPrefix("launcher.") {
+            return plugins.first { type(of: $0).id == LauncherPlugin.id }
+        }
+        if commandID.hasPrefix("systemcontrol.") {
+            return plugins.first { type(of: $0).id == SystemControlPlugin.id }
+        }
+        if let owner = plugins.first(where: { type(of: $0).commands.contains { $0.id == commandID } }) {
+            return owner
+        }
+        return plugins.first { commandID.hasPrefix(type(of: $0).id + ".") }
+    }
+
+    /// 用当前插件声明和开关重建静态命令快照，并按开关注册热键
+    private func rebuildCommandCatalog() {
+        var indexed: [IndexedCommand] = []
+        for plugin in plugins where plugin.isEnabled {
+            let meta = type(of: plugin)
+            guard settingsStore.isSearchSourceEnabled(meta.id) else { continue }
+            for command in meta.commands {
+                guard settingsStore.isCommandEnabled(command.id) else { continue }
+                var keywords = command.keywords
+                if let aliasKey = command.aliasKey,
+                    let alias = settingsStore.alias(for: aliasKey),
+                    !alias.isEmpty
+                {
+                    keywords.append(alias)
+                }
+                indexed.append(IndexedCommand(command.replacingKeywords(keywords)))
+            }
+        }
+        paletteCoordinator.staticCommands = indexed
+        hotKeyService.syncRegistrations { [settingsStore] commandID in
+            commandID == CommandID.togglePalette || settingsStore.isCommandEnabled(commandID)
+        }
+        log.notice("命令目录已更新，静态命令 \(indexed.count, privacy: .public) 条")
     }
 }
 
@@ -674,24 +719,194 @@ extension AppCore: SettingsDataSource {
         launchAtLogin.setEnabled(enabled)
     }
 
-    var hotKeyDescription: String { HotKeyService.defaultHotKeyDescription }
-
-    var globalShortcutKeycaps: [String]? {
-        hotKeyService.binding(for: .togglePalette)?.keycaps
+    var hotKeyDescription: String {
+        hotKeyService.binding(for: CommandID.togglePalette)?.displayString
+            ?? HotKeyService.defaultHotKeyDescription
     }
 
-    func setGlobalShortcut(keyCode: Int, carbonModifiers: Int) {
-        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        hotKeyService.setBinding(shortcut, for: .togglePalette)
+    var togglePaletteKeycaps: [String] {
+        hotKeyService.binding(for: CommandID.togglePalette)?.keycaps ?? ["⌥", "Space"]
     }
 
-    func clearGlobalShortcut() {
-        // 清除后恢复默认的 ⌥Space
-        let defaultShortcut = KeyShortcut(
-            carbonKeyCode: kVK_Space,
-            carbonModifiers: optionKey
+    func shortcutKeycaps(keyCode: Int, carbonModifiers: Int) -> [String] {
+        KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers).keycaps
+    }
+
+    func boundCommandBindings() -> [SettingsCommandBinding] {
+        hotKeyService.boundCommandIDs().compactMap { commandID in
+            guard commandID != CommandID.togglePalette else { return nil }
+            guard hotKeyService.binding(for: commandID) != nil else { return nil }
+            return describe(commandID: commandID)
+        }
+    }
+
+    func resolveKeyword(_ keyword: String) -> SettingsCommandBinding? {
+        var descriptors: [CommandDescriptor] = []
+        for plugin in plugins where plugin.isEnabled {
+            descriptors.append(contentsOf: type(of: plugin).commands)
+        }
+        for cmd in loadCustomCommands() where cmd.isEnabled {
+            var words = [cmd.name]
+            if let alias = cmd.alias, !alias.isEmpty { words.append(alias) }
+            descriptors.append(
+                CommandDescriptor(
+                    id: CommandID.shell(cmd.id.uuidString),
+                    pluginID: LauncherPlugin.id,
+                    pluginName: "终端命令",
+                    title: cmd.name,
+                    keywords: words,
+                    icon: "terminal"
+                )
+            )
+        }
+        if let hit = KeywordResolver.match(query: keyword, commands: descriptors) {
+            return describe(commandID: hit.id)
+        }
+
+        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let apps = appIndex.apps.filter {
+            $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
+        }
+        guard apps.count == 1, let app = apps.first else { return nil }
+        return describe(commandID: CommandID.launchApp(app.bundleID))
+    }
+
+    func retargetShortcut(from commandID: String, keyword: String) -> String? {
+        let current = describe(commandID: commandID)
+        if keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+            .compare(current.wakeKeyword, options: .caseInsensitive) == .orderedSame
+        {
+            return nil
+        }
+        guard let shortcut = hotKeyService.binding(for: commandID) else {
+            return "这条绑定已经没有快捷键。"
+        }
+        guard let target = resolveKeyword(keyword) else {
+            return "没有唯一对上的关键字。写插件声明的唤醒词，或功能标题。"
+        }
+        guard target.id != commandID else { return nil }
+        hotKeyService.setBinding(nil, for: commandID, registerNow: false)
+        let registerNow = settingsStore.isCommandEnabled(target.id)
+        let outcome = hotKeyService.setBinding(shortcut, for: target.id, registerNow: registerNow)
+        if case .conflict = outcome {
+            let restore = commandID == CommandID.togglePalette || settingsStore.isCommandEnabled(commandID)
+            hotKeyService.setBinding(shortcut, for: commandID, registerNow: restore)
+            return "这个组合键已经绑给别的命令，没有改动。"
+        }
+        return nil
+    }
+
+    func pluginCommands(_ pluginID: String) -> [SettingsCommandBinding] {
+        if pluginID == LauncherPlugin.id {
+            return loadCustomCommands().map { describe(commandID: CommandID.shell($0.id.uuidString)) }
+        }
+        guard let plugin = plugins.first(where: { type(of: $0).id == pluginID }) else { return [] }
+        return type(of: plugin).commands.map { bindingRow(for: $0) }
+    }
+
+    /// 把命令 id 解析成设置行。应用和终端命令不在静态声明里，要单独认前缀
+    private func describe(commandID: String) -> SettingsCommandBinding {
+        if let command = plugins.lazy.compactMap({ plugin in
+            type(of: plugin).commands.first { $0.id == commandID }
+        }).first {
+            return bindingRow(for: command)
+        }
+        if commandID.hasPrefix(CommandID.launchAppPrefix) {
+            let bundleID = String(commandID.dropFirst(CommandID.launchAppPrefix.count))
+            let name = appIndex.apps.first { $0.bundleID == bundleID }?.name ?? bundleID
+            return SettingsCommandBinding(
+                id: commandID,
+                title: name,
+                pluginName: LauncherPlugin.name,
+                icon: "app",
+                isInvocationEnabled: settingsStore.isCommandEnabled(commandID),
+                keycaps: hotKeyService.binding(for: commandID)?.keycaps,
+                keywords: [name]
+            )
+        }
+        if commandID.hasPrefix(CommandID.shellPrefix) {
+            let raw = String(commandID.dropFirst(CommandID.shellPrefix.count))
+            let command = loadCustomCommands().first { $0.id.uuidString.lowercased() == raw }
+            let name = command?.name ?? raw
+            var words = [name]
+            if let alias = command?.alias, !alias.isEmpty { words.append(alias) }
+            return SettingsCommandBinding(
+                id: commandID,
+                title: name,
+                pluginName: "终端命令",
+                icon: "terminal",
+                isInvocationEnabled: settingsStore.isCommandEnabled(commandID),
+                keycaps: hotKeyService.binding(for: commandID)?.keycaps,
+                keywords: words
+            )
+        }
+        return SettingsCommandBinding(
+            id: commandID,
+            title: commandID,
+            pluginName: "命令",
+            icon: "command",
+            isInvocationEnabled: settingsStore.isCommandEnabled(commandID),
+            keycaps: hotKeyService.binding(for: commandID)?.keycaps,
+            keywords: [commandID]
         )
-        hotKeyService.setBinding(defaultShortcut, for: .togglePalette)
+    }
+
+    func setCommandShortcut(keyCode: Int, carbonModifiers: Int, for commandID: String) -> Bool {
+        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
+        let registerNow = commandID == CommandID.togglePalette || settingsStore.isCommandEnabled(commandID)
+        let outcome = hotKeyService.setBinding(shortcut, for: commandID, registerNow: registerNow)
+        if case .conflict = outcome { return false }
+        return true
+    }
+
+    func clearCommandShortcut(for commandID: String) {
+        if commandID == CommandID.togglePalette {
+            let defaultShortcut = KeyShortcut(carbonKeyCode: kVK_Space, carbonModifiers: optionKey)
+            hotKeyService.setBinding(defaultShortcut, for: commandID, registerNow: true)
+            return
+        }
+        hotKeyService.setBinding(nil, for: commandID, registerNow: false)
+    }
+
+    func isCommandEnabled(_ commandID: String) -> Bool {
+        if commandID == CommandID.togglePalette { return true }
+        return settingsStore.isCommandEnabled(commandID)
+    }
+
+    func setCommandEnabled(_ commandID: String, enabled: Bool) {
+        guard commandID != CommandID.togglePalette else { return }
+        settingsStore.setCommandEnabled(commandID, enabled: enabled)
+        rebuildCommandCatalog()
+    }
+
+    var searchSources: [SettingsSearchSource] {
+        pluginEntries.map { plugin in
+            SettingsSearchSource(
+                id: plugin.id,
+                title: plugin.name,
+                subtitle: "关闭后，主面板不再搜索这个插件的命令和结果。",
+                icon: plugin.icon,
+                isEnabled: settingsStore.isSearchSourceEnabled(plugin.id)
+            )
+        }
+    }
+
+    func setSearchSourceEnabled(_ pluginID: String, enabled: Bool) {
+        settingsStore.setSearchSourceEnabled(pluginID, enabled: enabled)
+        rebuildCommandCatalog()
+    }
+
+    private func bindingRow(for command: CommandDescriptor) -> SettingsCommandBinding {
+        SettingsCommandBinding(
+            id: command.id,
+            title: command.title,
+            pluginName: command.pluginName,
+            icon: command.icon,
+            isInvocationEnabled: settingsStore.isCommandEnabled(command.id),
+            keycaps: hotKeyService.binding(for: command.id)?.keycaps,
+            keywords: command.keywords.isEmpty ? [command.title] : command.keywords
+        )
     }
 
     // MARK: - 启动器：应用与搜索范围
@@ -705,7 +920,6 @@ extension AppCore: SettingsDataSource {
         Task {
             await appIndex.refresh(scopes: scopes)
             self.cachedIndexedApps = nil
-            self.restoreSavedHotKeys()
         }
     }
 
@@ -719,15 +933,13 @@ extension AppCore: SettingsDataSource {
         }
         let items = appIndex.apps.map { entry in
             let alias = settingsStore.alias(for: "app." + entry.bundleID)
-            let shortcut = hotKeyService.binding(for: .app(bundleID: entry.bundleID))
             return SettingsAppItem(
                 id: entry.id,
                 name: entry.name,
                 bundleID: entry.bundleID,
                 path: entry.path,
                 isSystemApp: entry.isSystemApp,
-                alias: alias,
-                shortcutKeycaps: shortcut?.keycaps
+                alias: alias
             )
         }
         if !items.isEmpty {
@@ -745,45 +957,26 @@ extension AppCore: SettingsDataSource {
         cachedIndexedApps = nil
     }
 
-    func setAppShortcut(keyCode: Int, carbonModifiers: Int, for bundleID: String) {
-        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        hotKeyService.setBinding(shortcut, for: .app(bundleID: bundleID))
-        cachedIndexedApps = nil
-    }
-
-    func clearAppShortcut(for bundleID: String) {
-        hotKeyService.setBinding(nil, for: .app(bundleID: bundleID))
-        cachedIndexedApps = nil
-    }
-
     // MARK: - 启动器：系统操作
 
     var systemActions: [SettingsSystemActionItem] {
         SystemAction.allCases.map { action in
             let alias = settingsStore.alias(for: "system." + action.rawValue)
-            let shortcut = hotKeyService.binding(for: .systemAction(id: action.rawValue))
+            let commandID = CommandID.systemAction(action.rawValue)
             return SettingsSystemActionItem(
                 id: action.rawValue,
                 title: action.title,
                 description: action.description,
                 icon: action.icon,
                 alias: alias,
-                shortcutKeycaps: shortcut?.keycaps
+                isEnabled: settingsStore.isCommandEnabled(commandID)
             )
         }
     }
 
     func setSystemActionAlias(_ alias: String?, for id: String) {
         settingsStore.setAlias(alias, for: "system." + id)
-    }
-
-    func setSystemActionShortcut(keyCode: Int, carbonModifiers: Int, for id: String) {
-        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        hotKeyService.setBinding(shortcut, for: .systemAction(id: id))
-    }
-
-    func clearSystemActionShortcut(for id: String) {
-        hotKeyService.setBinding(nil, for: .systemAction(id: id))
+        rebuildCommandCatalog()
     }
 
     // MARK: - 启动器：Shell 与自定义命令
@@ -802,14 +995,12 @@ extension AppCore: SettingsDataSource {
         }
         let list = loadCustomCommands()
         let items = list.map { cmd in
-            let shortcut = hotKeyService.binding(for: .customCommand(id: cmd.id))
             return SettingsCustomCommandItem(
                 id: cmd.id,
                 name: cmd.name,
                 command: cmd.command,
                 isEnabled: cmd.isEnabled,
                 alias: cmd.alias,
-                shortcutKeycaps: shortcut?.keycaps,
                 workingDirectory: cmd.workingDirectory,
                 loadsShellEnvironment: cmd.loadsShellEnvironment
             )
@@ -857,18 +1048,7 @@ extension AppCore: SettingsDataSource {
         var list = loadCustomCommands()
         list.removeAll { $0.id == id }
         saveCustomCommands(list)
-        clearCustomCommandShortcut(for: id)
-    }
-
-    func setCustomCommandShortcut(keyCode: Int, carbonModifiers: Int, for id: UUID) {
-        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        hotKeyService.setBinding(shortcut, for: .customCommand(id: id))
-        cachedCustomCommands = nil
-    }
-
-    func clearCustomCommandShortcut(for id: UUID) {
-        hotKeyService.setBinding(nil, for: .customCommand(id: id))
-        cachedCustomCommands = nil
+        hotKeyService.setBinding(nil, for: CommandID.shell(id.uuidString), registerNow: false)
     }
 
     // MARK: - 功能插件设置
@@ -933,6 +1113,7 @@ extension AppCore: SettingsDataSource {
             plugin.deactivate()
         }
         log.notice("插件 \(id, privacy: .public) 已\(enabled ? "启用" : "停用", privacy: .public)并同步实例")
+        rebuildCommandCatalog()
     }
 
     func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView? {
@@ -942,19 +1123,6 @@ extension AppCore: SettingsDataSource {
             return nil
         }
         return plugin.makeSettingsView()
-    }
-
-    func pluginShortcutKeycaps(for pluginID: String) -> [String]? {
-        hotKeyService.binding(for: .plugin(id: pluginID))?.keycaps
-    }
-
-    func setPluginShortcut(keyCode: Int, carbonModifiers: Int, for pluginID: String) {
-        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        hotKeyService.setBinding(shortcut, for: .plugin(id: pluginID))
-    }
-
-    func clearPluginShortcut(for pluginID: String) {
-        hotKeyService.setBinding(nil, for: .plugin(id: pluginID))
     }
 
     // MARK: - 权限

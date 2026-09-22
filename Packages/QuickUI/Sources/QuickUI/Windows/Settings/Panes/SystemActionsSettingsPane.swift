@@ -10,7 +10,7 @@ import SwiftUI
 /// 参考 Tinycast 设计：
 /// - 列出系统操作命令（锁定屏幕、睡眠、重启、关机、清空废纸篓、推出磁盘、深色模式等）
 /// - 支持筛选命令
-/// - 每项可配置别名与专属全局快捷键
+/// - 每项可配置别名，以及是否出现在主搜索里。快捷键在「快捷键」页绑定
 struct SystemActionsSettingsPane: View {
 
     let dataSource: any SettingsDataSource
@@ -18,6 +18,7 @@ struct SystemActionsSettingsPane: View {
     var body: some View {
         let actions = dataSource.systemActions
         return Form {
+            PluginIntroSection(dataSource: dataSource, pluginID: "systemcontrol")
             Section {
                 if actions.isEmpty {
                     Text("暂无系统操作")
@@ -32,7 +33,7 @@ struct SystemActionsSettingsPane: View {
             } header: {
                 Text("系统控制操作 (\(actions.count))")
             } footer: {
-                Text("支持通过快捷键或在主面板中搜索触发 macOS 系统控制命令。")
+                Text("关掉的命令不会出现在主搜索里，已绑定的快捷键也不会生效。快捷键在「快捷键」页设置。")
             }
         }
         .formStyle(.grouped)
@@ -44,11 +45,13 @@ private struct SystemActionRow: View {
     let dataSource: any SettingsDataSource
 
     @State private var alias: String
+    @State private var isEnabled: Bool
 
     init(action: SettingsSystemActionItem, dataSource: any SettingsDataSource) {
         self.action = action
         self.dataSource = dataSource
         _alias = State(initialValue: action.alias ?? "")
+        _isEnabled = State(initialValue: action.isEnabled)
     }
 
     var body: some View {
@@ -77,16 +80,13 @@ private struct SystemActionRow: View {
                 }
             )
 
-            ShortcutRecorder(
-                keycaps: action.shortcutKeycaps,
-                onRecord: { keyCode, modifiers in
-                    dataSource.setSystemActionShortcut(
-                        keyCode: keyCode, carbonModifiers: modifiers, for: action.id)
-                },
-                onClear: {
-                    dataSource.clearSystemActionShortcut(for: action.id)
-                }
-            )
+            Toggle(isOn: $isEnabled) {
+                Text("打开")
+            }
+            .toggleStyle(.checkbox)
+            .onChange(of: isEnabled) { _, newValue in
+                dataSource.setCommandEnabled(CommandID.systemAction(action.id), enabled: newValue)
+            }
         }
         .padding(.vertical, 2)
     }

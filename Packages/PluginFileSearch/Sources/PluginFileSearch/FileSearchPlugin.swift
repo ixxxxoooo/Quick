@@ -16,6 +16,7 @@ public final class FileSearchPlugin: QuickPlugin {
     public static let id = "filesearch"
     public static let name = "文件搜索"
     public static let icon = "doc.text.magnifyingglass"
+    public static let description = "基于 macOS Spotlight 原生索引的高性能文件搜索，支持全盘文件名匹配与内容深度检索。"
     public static let triggerWords = ["f", "file", "文件"]
 
     public var isEnabled = true
@@ -31,6 +32,15 @@ public final class FileSearchPlugin: QuickPlugin {
     public init() {}
 
     // MARK: - QuickPlugin 协议
+
+    public func accepts(query: String) -> Bool {
+        FileSearchQuery.keyword(in: query) != nil
+    }
+
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
+    }
 
     public func searchItems(query: String) async -> [SearchableItem] {
         // 触发词解析是纯逻辑，见 FileSearchQuery：必须以 "f " / "file " / "文件 " 开头，

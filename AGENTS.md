@@ -178,7 +178,7 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 | | Debug | Release |
 | --- | --- | --- |
 | `PRODUCT_NAME` | `Quick Dev` | `Quick` |
-| Bundle ID | `com.ygw.quick.dev` | `com.ygw.quick` |
+| Bundle ID | `com.ixxxxoooo.quick.dev` | `com.ixxxxoooo.quick` |
 
 一次性：`bash Scripts/generate-signing-cert.sh` → `bash Scripts/export-signing-cert.sh --upload`
 （写入 `QUICK_CERT_P12_BASE64` / `QUICK_CERT_P12_PASSWORD`）。

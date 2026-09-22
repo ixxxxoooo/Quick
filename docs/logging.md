@@ -25,8 +25,8 @@ private let log = QuickLog.palette
 
 | 渠道 | Bundle ID | 看日志 |
 | --- | --- | --- |
-| Release / 已安装 | `com.ygw.quick` | `./Scripts/logs.sh` |
-| Debug（本地） | `com.ygw.quick.dev` | `./Scripts/logs.sh --dev` |
+| Release / 已安装 | `com.ixxxxoooo.quick` | `./Scripts/logs.sh` |
+| Debug（本地） | `com.ixxxxoooo.quick.dev` | `./Scripts/logs.sh --dev` |
 
 详见 [development.md#发布](development.md)。
 
@@ -86,7 +86,8 @@ private let log = QuickLog.palette
 
 **性能敏感路径**
 - 面板显隐耗时（`show()` 到可见）—— `.info` + signpost。
-- 一次聚合搜索：耗时、参与插件数、命中条数 —— `.debug`（高频）+ signpost。
+- 一次聚合搜索：耗时、参与插件数、命中条数 —— `.debug`（高频）+ signpost。超过 50ms 或单个插件超时用 `.warning`，不要把查询词写进去。
+- 持久化失败走 `QuickLog.persistence`。
 - 应用扫描 / 文件索引：条目数、耗时 —— `.notice` + signpost。
 
 ---
@@ -175,9 +176,9 @@ log.debug("搜索完成，命中 \(results.count, privacy: .public) 条")
 底层命令（脚本已处理「用户 shell 可能覆盖 `log`」的问题，手动敲时注意用绝对路径）：
 
 ```bash
-/usr/bin/log stream --predicate 'subsystem == "com.ygw.quick"' --level debug --style compact
-/usr/bin/log stream --predicate 'subsystem == "com.ygw.quick" AND category == "plugin.clipboard"' --level debug
-/usr/bin/log show --predicate 'subsystem == "com.ygw.quick" AND messageType >= warning' --last 1h --style compact
+/usr/bin/log stream --predicate 'subsystem == "com.ixxxxoooo.quick"' --level debug --style compact
+/usr/bin/log stream --predicate 'subsystem == "com.ixxxxoooo.quick" AND category == "plugin.clipboard"' --level debug
+/usr/bin/log show --predicate 'subsystem == "com.ixxxxoooo.quick" AND messageType >= warning' --last 1h --style compact
 ```
 
 **再强调一次**：`log show` 读的是磁盘上的持久化日志，`debug` 与 `info` 不在其中。

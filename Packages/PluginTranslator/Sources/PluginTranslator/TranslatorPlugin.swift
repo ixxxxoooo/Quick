@@ -16,6 +16,7 @@ public final class TranslatorPlugin: QuickPlugin {
     public static let id = "translator"
     public static let name = "翻译"
     public static let icon = "character.book.closed"
+    public static let description = "多语言文本实时互译，支持自动识别源语言、词典释义查询与一键复制译文。"
     public static let triggerWords = ["翻译", "tr", "translate", "translation"]
 
     public var isEnabled = true
@@ -28,6 +29,15 @@ public final class TranslatorPlugin: QuickPlugin {
     public init() {}
 
     // MARK: - QuickPlugin 协议
+
+    public func accepts(query: String) -> Bool {
+        TranslatorQuery.text(in: query) != nil
+    }
+
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
+    }
 
     public func searchItems(query: String) async -> [SearchableItem] {
         // 触发词解析是纯逻辑，见 TranslatorQuery（"翻译 ..." / "tr ..." / "translate ..." / "fy ..."）

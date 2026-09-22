@@ -83,6 +83,15 @@ public final class PaletteCoordinator {
     /// 分离面板回调（由 AppCore 注入，协调器不直接持有 PluginPanelController）
     public var onDetach: ((String) -> Void)?
 
+    /// 静态命令快照。搜索热路径只读它，不遍历插件对象
+    public var staticCommands: [IndexedCommand] = []
+
+    /// 某个插件是否参与主搜索。关闭后不调用它的动态搜索，静态命令也不会被放进快照
+    public var isSearchSourceEnabled: (String) -> Bool = { _ in true }
+
+    /// 命中静态命令时的执行入口
+    public var invokeCommand: @MainActor (String) -> Void = { _ in }
+
     public init() {
         observeClipboardChanges()
     }
@@ -130,6 +139,7 @@ public final class PaletteCoordinator {
 
         previousApp = NSWorkspace.shared.frontmostApplication
         ensurePanel()
+        applyPaletteMetrics()
         positionOnCursorScreen()
         presentPanel()
 
@@ -343,23 +353,55 @@ public final class PaletteCoordinator {
     /// 而不是让整块面板陪它等。
     private static let pluginTimeout = Duration.seconds(2)
 
-    /// 聚合搜索：查询所有已启用插件
+    /// 聚合搜索：静态命令索引 + 声明了动态结果的插件
+    ///
+    /// 静态打分不碰插件对象，可以离开主线程。动态插件只有 `accepts` 为真才调用，
+    /// 并且超时会取消等待。
     ///
     /// - Parameter query: 搜索关键词
     /// - Returns: 去重、排序、限流之后的结果
     public func search(query: String) async -> [SearchableItem] {
-        let enabledPlugins = plugins.filter(\.isEnabled)
-
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
         let interval = signpost.beginInterval("palette.search")
         let started = Date()
+        let commands = staticCommands
 
-        let collected = await withTaskGroup(of: [SearchableItem].self) { group in
-            for plugin in enabledPlugins {
+        let staticHits = await Task.detached {
+            CommandIndex.matching(commands, query: trimmed)
+        }.value
+        if Task.isCancelled {
+            signpost.endInterval("palette.search", interval)
+            return []
+        }
+
+        let staticItems = staticHits.map { hit in
+            let descriptor = hit.command.descriptor
+            return SearchableItem(
+                id: descriptor.id,
+                pluginID: descriptor.pluginID,
+                pluginName: descriptor.pluginName,
+                title: descriptor.title,
+                subtitle: descriptor.subtitle,
+                icon: descriptor.icon,
+                relevance: hit.relevance,
+                action: { [weak self] in
+                    self?.invokeCommand(descriptor.id)
+                }
+            )
+        }
+
+        let dynamicPlugins = plugins.filter { plugin in
+            let pluginID = type(of: plugin).id
+            return plugin.isEnabled && isSearchSourceEnabled(pluginID) && plugin.accepts(query: trimmed)
+        }
+
+        let dynamicItems = await withTaskGroup(of: [SearchableItem].self) { group in
+            for plugin in dynamicPlugins {
                 let pluginName = type(of: plugin).name
+                let pluginID = type(of: plugin).id
                 group.addTask {
-                    let items = await Self.search(plugin: plugin, query: query)
-                    // 给每条搜索结果标注来源插件名
+                    let items = await self.searchDynamic(plugin: plugin, pluginID: pluginID, query: trimmed)
                     return items.map { $0.pluginName == nil ? $0.withPluginName(pluginName) : $0 }
                 }
             }
@@ -370,25 +412,22 @@ public final class PaletteCoordinator {
             return results
         }
 
-        // 去重：`SearchableItem` 的 `Hashable` 只看 id，而「id 以插件 id 开头」
-        // 只是一条约定，没有任何东西在强制它。重复 id 会让 `ForEach` 进入未定义行为
-        // （丢行、选中高亮错位），所以在这里挡一道。
+        if Task.isCancelled {
+            signpost.endInterval("palette.search", interval)
+            return []
+        }
+
+        let collected = staticItems + dynamicItems
+
+        // 去重：`SearchableItem` 的 `Hashable` 只看 id。重复 id 会让 `ForEach` 进入未定义行为。
         var seen = Set<String>()
         let deduped = collected.filter { seen.insert($0.id).inserted }
 
-        // 排序：相关度降序，**同分时按 id 升序**。
-        // 只按相关度排的话同分项的顺序由任务完成顺序决定，而常量相关度
-        // （0.5 / 0.6 是常态）意味着同分是多数情况 —— 那等于没有顺序保证，
-        // 列表每次刷新都可能换一个样子。
         var sorted = deduped.sorted {
             $0.relevance == $1.relevance ? $0.id < $1.id : $0.relevance > $1.relevance
         }
 
-        // 首屏（空查询）把「最近用过的」提到最前。
-        //
-        // 首屏是「我刚用过什么」的入口，不是「谁的分数高」的排行榜 —— 昨天启动过 20 次的
-        // 应用，不该排在刚刚用过的翻译前面。非空查询不动顺序：那时相关度才是用户要的。
-        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if trimmed.isEmpty {
             sorted = Self.promotingRecents(sorted, recents: usageHistory?.recentItemIDs(limit: 12) ?? [])
         }
 
@@ -396,16 +435,55 @@ public final class PaletteCoordinator {
 
         signpost.endInterval("palette.search", interval)
         let elapsedMS = Date().timeIntervalSince(started) * 1000
-        log.debug(
-            """
-            聚合搜索完成：\(enabledPlugins.count, privacy: .public) 个插件，\
-            命中 \(collected.count, privacy: .public) 条 → \
-            去重后 \(deduped.count, privacy: .public) 条 → \
-            返回 \(limited.count, privacy: .public) 条，\
-            耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
-            """)
+        if elapsedMS > 50 {
+            log.warning(
+                """
+                聚合搜索超过 50ms：动态插件 \(dynamicPlugins.count, privacy: .public) 个，\
+                返回 \(limited.count, privacy: .public) 条，\
+                耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
+                """
+            )
+        } else {
+            log.debug(
+                """
+                聚合搜索完成：静态 \(staticItems.count, privacy: .public) 条，\
+                动态插件 \(dynamicPlugins.count, privacy: .public) 个，\
+                返回 \(limited.count, privacy: .public) 条，\
+                耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
+                """
+            )
+        }
 
         return limited
+    }
+
+    /// 查询单个动态插件，超时即取消等待
+    private func searchDynamic(
+        plugin: any QuickPlugin, pluginID: String, query: String
+    ) async -> [SearchableItem] {
+        let started = Date()
+        return await withTaskGroup(of: [SearchableItem]?.self) { group in
+            group.addTask {
+                await plugin.dynamicSearch(query: query)
+            }
+            group.addTask {
+                try? await Task.sleep(for: Self.pluginTimeout)
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            if first == nil {
+                let elapsedMS = Date().timeIntervalSince(started) * 1000
+                log.warning(
+                    """
+                    插件 \(pluginID, privacy: .public) 搜索超时，已取消等待，\
+                    耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
+                    """
+                )
+                return []
+            }
+            return first ?? []
+        }
     }
 
     /// 把最近使用过的条目提到前面，其余保持原顺序
@@ -423,34 +501,6 @@ public final class PaletteCoordinator {
         }
         // 按「最近」的顺序排，而不是按它们原来的相关度 —— 这里要的就是时间顺序
         return recent.sorted { (rank[$0.id] ?? 0) < (rank[$1.id] ?? 0) } + rest
-    }
-
-    /// 查询单个插件，超时即放弃
-    ///
-    /// 竞速两个子任务：插件自己，和一个超时计时器。先完成的那个决定结果。
-    /// 注意超时**不会**中断插件内部的同步工作（它在主 actor 上），
-    /// 只是让我们不再等它 —— 这正是需要的：面板不能陪一个慢插件等下去。
-    ///
-    /// **空查询走 `defaultItems()` 而不是 `searchItems(query: "")`**：插件在空查询上被
-    /// 触发词闸门挡住，返回的都是空数组 —— 那样首屏就只剩应用，一条命令都没有。
-    /// 首屏该展示什么由插件自己说（见 `QuickPlugin.defaultItems`）。
-    private static func search(plugin: any QuickPlugin, query: String) async -> [SearchableItem] {
-        let wantsDefaults = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return await withTaskGroup(of: [SearchableItem].self) { group in
-            group.addTask {
-                if wantsDefaults {
-                    return await plugin.defaultItems()
-                }
-                return await plugin.searchItems(query: query)
-            }
-            group.addTask {
-                try? await Task.sleep(for: Self.pluginTimeout)
-                return []
-            }
-            let first = await group.next() ?? []
-            group.cancelAll()
-            return first
-        }
     }
 
     // MARK: - 内部方法
@@ -569,7 +619,12 @@ public final class PaletteCoordinator {
         guard let panel else { return }
         // 屏幕按鼠标位置选：多显示器下这是唯一能反映「用户此刻在看哪块屏」的信号，
         // 见 `ScreenPlacement`。
-        let screen = ScreenPlacement.screen() ?? NSScreen.main ?? NSScreen.screens.first
+        let screen =
+            if PalettePreferences.usesMainScreen {
+                NSScreen.main ?? NSScreen.screens.first
+            } else {
+                ScreenPlacement.screen() ?? NSScreen.main ?? NSScreen.screens.first
+            }
 
         guard let screen else {
             log.warning("找不到可用屏幕，面板位置未调整")
@@ -585,5 +640,20 @@ public final class PaletteCoordinator {
 
         panel.setFrameOrigin(NSPoint(x: x, y: y))
         log.debug("面板定位完成，屏幕=\(screen.localizedName, privacy: .public)")
+    }
+
+    /// 按外观设置改面板尺寸。内部排版仍按设计令牌，外层再缩放到用户选的档
+    public func applyPaletteMetrics() {
+        guard let panel else { return }
+        let factor = PalettePreferences.scaleFactor
+        panel.setContentSize(
+            NSSize(
+                width: DesignTokens.Size.panelWidth * factor,
+                height: PalettePreferences.panelHeight
+            )
+        )
+        if isVisible {
+            positionOnCursorScreen()
+        }
     }
 }

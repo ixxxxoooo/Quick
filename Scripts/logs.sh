@@ -2,8 +2,8 @@
 #
 # Quick — 查看统一日志系统里本应用的日志。
 #
-#   ./Scripts/logs.sh                 实时跟踪正式版（com.ygw.quick，含 debug）
-#   ./Scripts/logs.sh --dev           实时跟踪 Debug 频道（com.ygw.quick.dev）
+#   ./Scripts/logs.sh                 实时跟踪正式版（com.ixxxxoooo.quick，含 debug）
+#   ./Scripts/logs.sh --dev           实时跟踪 Debug 频道（com.ixxxxoooo.quick.dev）
 #   ./Scripts/logs.sh --errors        只看近 1 小时的 error / fault
 #   ./Scripts/logs.sh --saved         只看已落盘的历史（notice 及以上）
 #   ./Scripts/logs.sh -c palette      只看某个 category
@@ -19,14 +19,14 @@ set -euo pipefail
 # 用户 shell 里可能有同名函数或别名覆盖 log，所以走绝对路径。
 readonly LOG_BIN=/usr/bin/log
 
-SUBSYSTEM="com.ygw.quick"
+SUBSYSTEM="com.ixxxxoooo.quick"
 category=""
 mode="stream"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
     --dev)
-        SUBSYSTEM="com.ygw.quick.dev"
+        SUBSYSTEM="com.ixxxxoooo.quick.dev"
         shift
         ;;
     --errors)

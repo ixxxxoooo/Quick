@@ -45,7 +45,7 @@ struct QuickPlatformTests {
         #expect(caches.lastPathComponent == AppPaths.rootFolderName)
         #expect(
             AppIdentity.bundleIdentifier == AppPaths.rootFolderName
-                || AppPaths.rootFolderName == "com.ygw.quick")
+                || AppPaths.rootFolderName == "com.ixxxxoooo.quick")
     }
 
     @Test("AppIdentity 渠道判断与展示名非空")

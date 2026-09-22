@@ -17,6 +17,7 @@ public final class LauncherPlugin: QuickPlugin {
     public static let id = "launcher"
     public static let name = "应用启动器"
     public static let icon = "magnifyingglass"
+    public static let description = "全系统已安装应用程序索引与启动器，支持中英文全拼、简拼搜索、自定义别名与使用频次智能排序。"
     public static let triggerWords = ["应用", "app", "打开", "open", "启动", "launch"]
 
     public var isEnabled = true
@@ -82,6 +83,41 @@ public final class LauncherPlugin: QuickPlugin {
     }
 
     // MARK: - QuickPlugin 协议
+
+    /// 应用和终端命令是动态结果，不放进静态索引
+    public static var commands: [CommandDescriptor] { [] }
+
+    /// 空查询不扫应用列表；非空才现算
+    public func accepts(query: String) -> Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 动态结果就是原来的应用 / 终端命令搜索，并在长循环里响应取消
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
+    }
+
+    /// 热键启动应用或运行已保存的终端命令
+    public func perform(commandID: String) {
+        if commandID.hasPrefix(CommandID.launchAppPrefix) {
+            let bundleID = String(commandID.dropFirst(CommandID.launchAppPrefix.count))
+            guard let entry = appIndex.app(withBundleID: bundleID) else {
+                log.warning("找不到要启动的应用 \(bundleID, privacy: .public)")
+                return
+            }
+            entry.launch()
+            rankingStore.recordUsage(bundleID)
+            EventBus.shared.post(HidePaletteEvent())
+            log.notice("热键启动应用 \(bundleID, privacy: .public)")
+            return
+        }
+        if commandID.hasPrefix(CommandID.shellPrefix) {
+            let raw = String(commandID.dropFirst(CommandID.shellPrefix.count))
+            guard let id = UUID(uuidString: raw) else { return }
+            runSavedCommand(id)
+        }
+    }
 
     /// 空查询时不要返回全部应用，避免首屏加载过多图标
     public func searchItems(query: String) async -> [SearchableItem] {
@@ -192,7 +228,8 @@ public final class LauncherPlugin: QuickPlugin {
         }
 
         // 3. 应用搜索（支持自定义别名优先匹配）
-        for entry in appIndex.apps {
+        for (offset, entry) in appIndex.apps.enumerated() {
+            if offset.isMultiple(of: 64), Task.isCancelled { return items }
             let alias = settingsStore?.alias(for: "app." + entry.bundleID)
             var matchScore = matchQuery.score(entry.matchText)
             if let alias, !alias.isEmpty {
@@ -281,5 +318,31 @@ public final class LauncherPlugin: QuickPlugin {
     public func deactivate() {
         rankingStore.save()
         log.notice("插件已停用，使用频率已落盘")
+    }
+
+    /// 执行一条已保存的终端命令。找不到或被关掉就只记日志
+    private func runSavedCommand(_ id: UUID) {
+        guard let data = settingsStore?.customCommandsData,
+            let list = try? JSONDecoder().decode([CustomCommand].self, from: data),
+            let cmd = list.first(where: { $0.id == id && $0.isEnabled })
+        else {
+            log.warning("终端命令不存在或已关闭 \(id.uuidString, privacy: .public)")
+            return
+        }
+        log.notice("热键运行终端命令 \(id.uuidString, privacy: .public)")
+        EventBus.shared.post(HidePaletteEvent())
+        Task {
+            let result = await ShellCommandRunner.run(
+                cmd.command,
+                workingDirectory: cmd.workingDirectory,
+                loadingShellEnvironment: cmd.loadsShellEnvironment
+            )
+            EventBus.shared.post(
+                ShowHUDEvent(
+                    message: String(result.summary.prefix(80)),
+                    tone: result.succeeded ? .success : .warning
+                )
+            )
+        }
     }
 }

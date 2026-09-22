@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import QuickCore
 
 /// 剪贴板监听器
 ///
@@ -52,9 +53,8 @@ final class ClipboardMonitor {
         guard pasteboard.changeCount != lastChangeCount else { return }
         lastChangeCount = pasteboard.changeCount
 
-        // 优先检测图片（有些应用同时放了文本和图片，图片优先）
-        if let entry = detectImage(from: pasteboard) {
-            onNewContent?(entry)
+        // 优先检测图片。转码离开主线程，避免复制大图时卡住面板
+        if captureImage(from: pasteboard) {
             return
         }
 
@@ -65,28 +65,41 @@ final class ClipboardMonitor {
         onNewContent?(entry)
     }
 
-    /// 从剪贴板提取图片
-    private func detectImage(from pasteboard: NSPasteboard) -> ClipboardEntry? {
-        // 检查是否有图片类型数据（排除文件 URL 形式的图片引用）
+    /// 发现图片就在后台转成 PNG。返回 true 表示这次变化按图片处理，不再记文本
+    private func captureImage(from pasteboard: NSPasteboard) -> Bool {
         let imageTypes: [NSPasteboard.PasteboardType] = [.tiff, .png]
-        guard pasteboard.availableType(from: imageTypes) != nil else { return nil }
-
-        // 尝试读取为 NSImage
-        guard let image = NSImage(pasteboard: pasteboard) else { return nil }
-
-        // 转为 PNG 数据
-        guard let tiffData = image.tiffRepresentation,
-            let bitmap = NSBitmapImageRep(data: tiffData),
-            let pngData = bitmap.representation(using: .png, properties: [:])
-        else { return nil }
-
-        // 图片太大就不存了（超过 5MB 跳过）
-        guard pngData.count <= 5 * 1024 * 1024 else { return nil }
+        guard pasteboard.availableType(from: imageTypes) != nil,
+            let image = NSImage(pasteboard: pasteboard),
+            let tiffData = image.tiffRepresentation
+        else { return false }
 
         let size = image.size
         let sizeDesc = "\(Int(size.width))×\(Int(size.height))"
+        let changeCount = pasteboard.changeCount
+        Task.detached {
+            let pngData = Self.pngData(fromTIFF: tiffData)
+            await MainActor.run { [weak self] in
+                self?.deliverImage(pngData, sizeDescription: sizeDesc, changeCount: changeCount)
+            }
+        }
+        return true
+    }
 
-        return ClipboardEntry(imageData: pngData, sizeDescription: sizeDesc)
+    /// PNG 编码不碰 AppKit 视图，可以离开主线程
+    nonisolated private static func pngData(fromTIFF tiff: Data) -> Data? {
+        guard let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
+        return bitmap.representation(using: .png, properties: [:])
+    }
+
+    /// 图片转码结束。期间如果剪贴板又变了，丢掉这张过期图
+    private func deliverImage(_ pngData: Data?, sizeDescription: String, changeCount: Int) {
+        guard lastChangeCount == changeCount else { return }
+        guard let pngData else { return }
+        guard pngData.count <= 5 * 1024 * 1024 else {
+            QuickLog.plugin("clipboard").notice("剪贴板图片超过 5MB，已跳过")
+            return
+        }
+        onNewContent?(ClipboardEntry(imageData: pngData, sizeDescription: sizeDescription))
     }
 
     /// 检测文本内容类型

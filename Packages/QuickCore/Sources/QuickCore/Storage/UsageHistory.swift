@@ -42,7 +42,7 @@ public struct UsageHistory: Sendable {
                 [.text(itemID), .date(date)])
         } catch {
             // 记不上只影响首屏顺序，不该打断用户正在做的事
-            QuickLog.app.debug("使用历史写入失败：\(error)")
+            QuickLog.persistence.warning("使用历史写入失败：\(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -61,22 +61,37 @@ public struct UsageHistory: Sendable {
                 [.int(limit)]
             ).compactMap { $0.text("item_id") }
         } catch {
-            QuickLog.app.error("使用历史读取失败，首屏按默认顺序显示：\(error)")
+            QuickLog.persistence.error(
+                "使用历史读取失败，首屏按默认顺序显示：\(error.localizedDescription, privacy: .public)"
+            )
             return []
         }
     }
 
     /// 某个 id 最近一次使用的时间（测试与排查用）
     public func lastUsed(itemID: String) -> Date? {
-        try? database.query(
-            "SELECT last_used FROM usage_history WHERE item_id = ?",
-            [.text(itemID)]
-        ).first?.date("last_used")
+        do {
+            return try database.query(
+                "SELECT last_used FROM usage_history WHERE item_id = ?",
+                [.text(itemID)]
+            ).first?.date("last_used")
+        } catch {
+            QuickLog.persistence.error(
+                "使用历史读取失败：\(error.localizedDescription, privacy: .public)"
+            )
+            return nil
+        }
     }
 
     /// 清空历史（「重置最近使用」这类动作）
     public func removeAll() {
-        try? database.execute("DELETE FROM usage_history")
+        do {
+            try database.execute("DELETE FROM usage_history")
+        } catch {
+            QuickLog.persistence.error(
+                "使用历史清空失败：\(error.localizedDescription, privacy: .public)"
+            )
+        }
     }
 }
 

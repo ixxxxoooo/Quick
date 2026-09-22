@@ -12,9 +12,6 @@ public enum SettingsKey {
 
     // MARK: - 通用设置
 
-    /// 全局快捷键（默认 ⌥Space）
-    public static let globalHotKey = "quick.global.hotkey"
-
     /// 是否开机自启
     public static let launchAtLogin = "quick.global.launchAtLogin"
 
@@ -57,6 +54,24 @@ public enum SettingsKey {
     /// 面板打开期间强制切换到的键盘布局 id（空 = 不切换）
     public static let paletteForceKeyboardLayout = "quick.palette.forceKeyboardLayout"
 
+    /// 面板缩放级别（1.0 / 1.1 / 1.2）
+    public static let paletteScale = "quick.palette.scale"
+
+    /// 用户拖过之后记住的面板高度。没拖过则用设计高度
+    public static let paletteHeight = "quick.palette.height"
+
+    /// 面板弹出屏幕位置（cursor = 鼠标所在屏幕，main = 主显示器）
+    public static let paletteScreen = "quick.palette.screen"
+
+    /// 是否在搜索结果中显示行图标
+    public static let showResultIcons = "quick.palette.showResultIcons"
+
+    /// 是否在底栏显示快捷键提示胶囊
+    public static let showBottomBarHints = "quick.palette.showBottomBarHints"
+
+    /// 首次引导已经完成
+    public static let onboardingCompleted = "quick.onboarding.completed"
+
     // MARK: - 插件开关前缀
 
     /// 生成插件启用状态的设置键
@@ -64,5 +79,15 @@ public enum SettingsKey {
     /// - Returns: 设置键字符串
     public static func pluginEnabled(_ pluginID: String) -> String {
         "quick.plugin.\(pluginID).enabled"
+    }
+
+    /// 单条命令是否打开。没写过视为打开，避免升级后命令从搜索和热键里消失
+    public static func commandEnabled(_ commandID: String) -> String {
+        "command.enabled.\(commandID)"
+    }
+
+    /// 某个插件是否参与主搜索。没写过视为参与
+    public static func searchSourceEnabled(_ pluginID: String) -> String {
+        "search.source.\(pluginID)"
     }
 }

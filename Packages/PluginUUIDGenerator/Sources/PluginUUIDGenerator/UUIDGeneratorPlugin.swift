@@ -16,6 +16,7 @@ public final class UUIDGeneratorPlugin: QuickPlugin {
     public static let id = "uuid-generator"
     public static let name = "UUID 生成器"
     public static let icon = "number"
+    public static let description = "批量生成标准 RFC 4122 v4 UUID/GUID，支持大写字母、去除连字符与一键批量复制。"
     public static let triggerWords = ["uuid", "guid", "生成", "随机", "唯一标识"]
 
     public var isEnabled = true

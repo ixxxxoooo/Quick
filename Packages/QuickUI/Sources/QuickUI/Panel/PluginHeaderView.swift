@@ -28,6 +28,7 @@ struct PluginHeaderView: View {
             backButton
             pluginInfo
             Spacer()
+                .background(WindowDragArea())
             detachButton
         }
         .padding(.leading, DesignTokens.Spacing.md + DesignTokens.Spacing.lg)

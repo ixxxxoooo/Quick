@@ -14,80 +14,93 @@ import SwiftUI
 struct CommandsSettingsPane: View {
 
     let dataSource: any SettingsDataSource
+    var embedded = false
 
     @State private var runShellFallback: Bool
     @State private var showingAddSheet = false
     @State private var editingCommand: SettingsCustomCommandItem?
     @AppStorage(PluginSettingKey.Shell.preferredTerminal) private var preferredTerminal = "com.apple.Terminal"
 
-    init(dataSource: any SettingsDataSource) {
+    init(dataSource: any SettingsDataSource, embedded: Bool = false) {
         self.dataSource = dataSource
+        self.embedded = embedded
         _runShellFallback = State(initialValue: dataSource.isRunShellFallbackEnabled)
     }
 
     var body: some View {
-        let commands = dataSource.customCommands
-        return Form {
-            Section {
-                Toggle(isOn: $runShellFallback) {
-                    SettingsRow(
-                        title: "启用终端命令回退",
-                        subtitle: "在主面板输入任意命令或以 > 开头，可直接在终端中执行。",
-                        icon: { SettingsRowIcon(systemImage: "terminal") }
-                    )
+        Group {
+            if embedded {
+                sections
+            } else {
+                Form {
+                    sections
                 }
-                .onChange(of: runShellFallback) { _, newValue in
-                    dataSource.setRunShellFallbackEnabled(newValue)
-                }
-
-                Picker(selection: $preferredTerminal) {
-                    Text("终端 (Terminal)").tag("com.apple.Terminal")
-                    Text("iTerm2").tag("com.googlecode.iterm2")
-                    Text("Warp").tag("dev.warp.Warp-Stable")
-                    Text("Kitty").tag("net.kovidgoyal.kitty")
-                    Text("Alacritty").tag("org.alacritty")
-                } label: {
-                    SettingsRow(
-                        title: "默认终端",
-                        subtitle: "运行 Shell 命令时打开的终端应用。",
-                        icon: { SettingsRowIcon(systemImage: "rectangle.topthird.inset.filled") }
-                    )
-                }
-            } header: {
-                Text("终端集成")
-            }
-
-            Section {
-                if commands.isEmpty {
-                    Text("暂无自定义命令。点击下方按钮添加常用终端脚本。")
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, DesignTokens.Spacing.sm)
-                } else {
-                    ForEach(commands) { command in
-                        CustomCommandRow(
-                            command: command,
-                            dataSource: dataSource,
-                            onEdit: { editingCommand = command },
-                            onDelete: { dataSource.deleteCustomCommand(id: command.id) }
-                        )
-                    }
-                }
-
-                Button("添加自定义 Shell 命令…") {
-                    showingAddSheet = true
-                }
-            } header: {
-                Text("自定义 Shell 命令 (\(commands.count))")
-            } footer: {
-                Text("自定义命令将在当前用户环境下执行，支持通过名称、别名搜索或快捷键直达。")
+                .formStyle(.grouped)
             }
         }
-        .formStyle(.grouped)
         .sheet(isPresented: $showingAddSheet) {
             CommandEditorSheet(dataSource: dataSource, existingCommand: nil)
         }
         .sheet(item: $editingCommand) { cmd in
             CommandEditorSheet(dataSource: dataSource, existingCommand: cmd)
+        }
+    }
+
+    @ViewBuilder
+    private var sections: some View {
+        let commands = dataSource.customCommands
+        Section {
+            Toggle(isOn: $runShellFallback) {
+                SettingsRow(
+                    title: "启用终端命令回退",
+                    subtitle: "在主面板输入任意命令或以 > 开头，可直接在终端中执行。",
+                    icon: { SettingsRowIcon(systemImage: "terminal") }
+                )
+            }
+            .onChange(of: runShellFallback) { _, newValue in
+                dataSource.setRunShellFallbackEnabled(newValue)
+            }
+
+            Picker(selection: $preferredTerminal) {
+                Text("终端 (Terminal)").tag("com.apple.Terminal")
+                Text("iTerm2").tag("com.googlecode.iterm2")
+                Text("Warp").tag("dev.warp.Warp-Stable")
+                Text("Kitty").tag("net.kovidgoyal.kitty")
+                Text("Alacritty").tag("org.alacritty")
+            } label: {
+                SettingsRow(
+                    title: "默认终端",
+                    subtitle: "运行 Shell 命令时打开的终端应用。",
+                    icon: { SettingsRowIcon(systemImage: "rectangle.topthird.inset.filled") }
+                )
+            }
+        } header: {
+            Text("终端集成")
+        }
+
+        Section {
+            if commands.isEmpty {
+                Text("暂无自定义命令。点击下方按钮添加常用终端脚本。")
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, DesignTokens.Spacing.sm)
+            } else {
+                ForEach(commands) { command in
+                    CustomCommandRow(
+                        command: command,
+                        dataSource: dataSource,
+                        onEdit: { editingCommand = command },
+                        onDelete: { dataSource.deleteCustomCommand(id: command.id) }
+                    )
+                }
+            }
+
+            Button("添加自定义 Shell 命令…") {
+                showingAddSheet = true
+            }
+        } header: {
+            Text("自定义 Shell 命令 (\(commands.count))")
+        } footer: {
+            Text("这些命令可以在主面板里搜到。快捷键到「快捷键」页添加。")
         }
     }
 }
@@ -145,17 +158,6 @@ private struct CustomCommandRow: View {
                         loadsShellEnvironment: command.loadsShellEnvironment
                     )
                 }
-
-            ShortcutRecorder(
-                keycaps: command.shortcutKeycaps,
-                onRecord: { keyCode, modifiers in
-                    dataSource.setCustomCommandShortcut(
-                        keyCode: keyCode, carbonModifiers: modifiers, for: command.id)
-                },
-                onClear: {
-                    dataSource.clearCustomCommandShortcut(for: command.id)
-                }
-            )
 
             Button {
                 onEdit()

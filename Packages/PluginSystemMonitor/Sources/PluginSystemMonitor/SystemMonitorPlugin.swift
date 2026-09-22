@@ -16,6 +16,7 @@ public final class SystemMonitorPlugin: QuickPlugin {
     public static let id = "sysmonitor"
     public static let name = "系统监控"
     public static let icon = "cpu"
+    public static let description = "实时监控 macOS 系统 CPU、内存占用率与高负载进程，提供进程查看与一键终止功能。"
     public static let triggerWords = ["进程", "系统信息", "系统监控", "process", "monitor", "端口", "port", "cpu", "内存"]
 
     public var isEnabled = true

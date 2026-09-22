@@ -16,6 +16,7 @@ public final class JSONFormatterPlugin: QuickPlugin {
     public static let id = "json-formatter"
     public static let name = "JSON 格式化"
     public static let icon = "curlybraces"
+    public static let description = "JSON 语法校验、层级高亮、格式化美化与单行紧凑压缩，支持缩进空格调整与一键复制。"
     public static let triggerWords = ["json", "格式化", "美化", "json formatter", "json格式化"]
 
     public var isEnabled = true

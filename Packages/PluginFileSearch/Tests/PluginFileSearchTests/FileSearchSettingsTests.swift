@@ -94,7 +94,7 @@ struct FileSearchPreferencesTests {
 
     /// 独立 suite：读映射的用例不碰真实偏好
     private static func scratchDefaults() -> UserDefaults? {
-        UserDefaults(suiteName: "com.ygw.quick.tests.filesearch.\(UUID().uuidString)")
+        UserDefaults(suiteName: "com.ixxxxoooo.quick.tests.filesearch.\(UUID().uuidString)")
     }
 
     @Test("上限只认设置页给出的四档，其余一律回落到 50")

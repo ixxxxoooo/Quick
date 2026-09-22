@@ -114,10 +114,10 @@ swift build --package-path Packages/QuickUI
 （见 [logging.md](logging.md)），所以大部分问题应当能直接看出来。
 
 ```bash
-./Scripts/logs.sh                       # 实时正式版（com.ygw.quick）
-./Scripts/logs.sh --dev                 # 实时 Debug 频道（com.ygw.quick.dev）
+./Scripts/logs.sh                       # 实时正式版（com.ixxxxoooo.quick）
+./Scripts/logs.sh --dev                 # 实时 Debug 频道（com.ixxxxoooo.quick.dev）
 ./Scripts/logs.sh --errors              # 近 1 小时的问题
-log stream --predicate 'subsystem == "com.ygw.quick.dev" AND category == "palette"' --level debug
+log stream --predicate 'subsystem == "com.ixxxxoooo.quick.dev" AND category == "palette"' --level debug
 ```
 
 `subsystem` 就是 bundle id。Debug 与 Release 已隔离，见 §8。
@@ -147,7 +147,7 @@ open -a "$(./Scripts/build.sh --path)" --args -showPalette
 
 ### 调试用的分布式通知
 
-在应用内用 `DistributedNotificationCenter` 监听 `com.ygw.quick.togglePalette` 来切换面板。
+在应用内用 `DistributedNotificationCenter` 监听 `com.ixxxxoooo.quick.togglePalette` 来切换面板。
 
 **不要用 `notifyutil -p`** —— 那是另一套 notify API，和 `DistributedNotificationCenter`
 不互通，你会以为代码没生效。
@@ -242,8 +242,8 @@ Packages/PluginFoo/
 | 缓存 | `~/Library/Caches/<bundle id>/` |
 | 日志 | 统一日志系统（不是文件），见 [logging.md](logging.md) |
 
-**Debug 与 Release 已隔离**：Debug 用 `com.ygw.quick.dev`（产物 `Quick Dev.app`），
-Release 用 `com.ygw.quick`（产物 `Quick.app`）。各自独立的偏好、缓存、日志子系统与
+**Debug 与 Release 已隔离**：Debug 用 `com.ixxxxoooo.quick.dev`（产物 `Quick Dev.app`），
+Release 用 `com.ixxxxoooo.quick`（产物 `Quick.app`）。各自独立的偏好、缓存、日志子系统与
 TCC 授权。本地调试日志用 `./Scripts/logs.sh --dev`。
 
 ---
@@ -257,7 +257,7 @@ TCC 授权。本地调试日志用 `./Scripts/logs.sh --dev`。
 | | Debug | Release |
 | --- | --- | --- |
 | `PRODUCT_NAME` | `Quick Dev` | `Quick` |
-| `PRODUCT_BUNDLE_IDENTIFIER` | `com.ygw.quick.dev` | `com.ygw.quick` |
+| `PRODUCT_BUNDLE_IDENTIFIER` | `com.ixxxxoooo.quick.dev` | `com.ixxxxoooo.quick` |
 | 产物 | `…/Debug/Quick Dev.app` | `…/Release/Quick.app` |
 
 Debug 必须 `ENABLE_DEBUG_DYLIB = NO`（已写进 `project.yml`），否则主可执行只剩壳，

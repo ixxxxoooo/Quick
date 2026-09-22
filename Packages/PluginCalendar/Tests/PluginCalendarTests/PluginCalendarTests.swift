@@ -184,17 +184,16 @@ struct CalendarPluginTests {
         #expect(items.first?.relevance == 0.5)
     }
 
-    /// 触发词闸门是「查询串包含触发词」（`query.contains(trigger)`），
-    /// 不是 `matchesAnyTrigger` 的整词匹配 —— 这里记录当前行为：
-    /// 触发词出现在句子里也算命中，`calendars` 这种复数形式同样放行
-    @Test("触发词闸门是查询串的子串包含")
-    func triggerGateIsSubstring() async {
+    /// 拉丁触发词按整词匹配，所以 `calendars` 不会误开日历。
+    /// 中文触发词按包含匹配，`我的日历`、`今天有什么日程` 仍然进得来。
+    @Test("触发词按整词或中文包含匹配")
+    func triggerGateUsesSharedMatcher() async {
         let plugin = CalendarPlugin()
 
         #expect(!(await plugin.searchItems(query: "calendar")).isEmpty)
         #expect(!(await plugin.searchItems(query: "我的日历")).isEmpty)
         #expect(!(await plugin.searchItems(query: "今天有什么日程")).isEmpty)
-        #expect(!(await plugin.searchItems(query: "calendars")).isEmpty)
+        #expect(await plugin.searchItems(query: "calendars").isEmpty)
     }
 
     @Test("未命中触发词时不返回任何结果")

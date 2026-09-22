@@ -223,7 +223,12 @@ struct ScreenshotPluginTests {
     func metadataIsComplete() {
         #expect(ScreenshotPlugin.name == "截图工具")
         #expect(ScreenshotPlugin.icon == "camera")
-        #expect(ScreenshotPlugin.triggerWords == ["截图", "screenshot", "屏幕截图", "截屏", "capture"])
+        #expect(
+            ScreenshotPlugin.triggerWords == [
+                "截图工具", "截图", "截屏", "screenshot", "区域截图", "框选",
+                "全屏截图", "全屏", "fullscreen"
+            ])
+        #expect(Set(ScreenshotPlugin.areaKeywords).isDisjoint(with: ScreenshotPlugin.fullKeywords))
         #expect(ScreenshotPlugin.triggerWords.allSatisfy { !$0.isEmpty })
     }
 
@@ -243,9 +248,17 @@ struct ScreenshotPluginTests {
     func everyTriggerWordMatches() async {
         let plugin = ScreenshotPlugin()
 
-        for trigger in ScreenshotPlugin.triggerWords {
+        for trigger in ScreenshotPlugin.areaKeywords {
             let results = await plugin.searchItems(query: trigger)
-            #expect(results.count == 2, "触发词「\(trigger)」没有命中")
+            #expect(results.contains { $0.id == "screenshot.area" }, "触发词「\(trigger)」没有命中区域截图")
+        }
+        for trigger in ScreenshotPlugin.fullKeywords {
+            let results = await plugin.searchItems(query: trigger)
+            #expect(results.contains { $0.id == "screenshot.full" }, "触发词「\(trigger)」没有命中全屏截图")
+        }
+        for trigger in ["全屏", "fullscreen"] {
+            let results = await plugin.searchItems(query: trigger)
+            #expect(results.map(\.id) == ["screenshot.full"], "触发词「\(trigger)」应该只打开全屏截图")
         }
     }
 
@@ -254,8 +267,8 @@ struct ScreenshotPluginTests {
         let plugin = ScreenshotPlugin()
         let results = await plugin.searchItems(query: "SCREENSHOT")
 
-        #expect(results.count == 2)
-        #expect(results.allSatisfy { $0.pluginID == ScreenshotPlugin.id })
+        #expect(results.count == 1)
+        #expect(results.allSatisfy { $0.id == "screenshot.area" })
     }
 
     @Test("无关查询与空查询不返回结果")

@@ -104,4 +104,36 @@ public final class SettingsStore {
             defaults.removeObject(forKey: SettingsKey.launcherCustomCommands)
         }
     }
+
+    // MARK: - 命令开关与搜索来源
+
+    /// 命令是否打开
+    ///
+    /// 未设置过视为打开。关掉之后：不进主搜索，热键不注册，`perform` 也会拒绝。
+    public func isCommandEnabled(_ commandID: String) -> Bool {
+        let key = SettingsKey.commandEnabled(commandID)
+        guard defaults.object(forKey: key) != nil else { return true }
+        return defaults.bool(forKey: key)
+    }
+
+    /// 打开或关闭一条命令
+    public func setCommandEnabled(_ commandID: String, enabled: Bool) {
+        defaults.set(enabled, forKey: SettingsKey.commandEnabled(commandID))
+        log.notice("命令 \(commandID, privacy: .public) 已\(enabled ? "打开" : "关闭", privacy: .public)")
+    }
+
+    /// 插件是否参与主搜索
+    ///
+    /// 这和插件启用是两件事：插件可以开着（自己的界面还能进），但主面板不搜它。
+    public func isSearchSourceEnabled(_ pluginID: String) -> Bool {
+        let key = SettingsKey.searchSourceEnabled(pluginID)
+        guard defaults.object(forKey: key) != nil else { return true }
+        return defaults.bool(forKey: key)
+    }
+
+    /// 设置某个插件是否参与主搜索
+    public func setSearchSourceEnabled(_ pluginID: String, enabled: Bool) {
+        defaults.set(enabled, forKey: SettingsKey.searchSourceEnabled(pluginID))
+        log.notice("搜索来源 \(pluginID, privacy: .public) 已\(enabled ? "打开" : "关闭", privacy: .public)")
+    }
 }

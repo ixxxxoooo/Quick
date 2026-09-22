@@ -6,13 +6,13 @@ import Foundation
 
 /// 应用路径管理。
 ///
-/// 目录名取自 `Bundle.main.bundleIdentifier`，因此 Debug（`com.ygw.quick.dev`）
-/// 与 Release（`com.ygw.quick`）各有一份 Application Support / Caches，互不污染。
+/// 目录名取自 `Bundle.main.bundleIdentifier`，因此 Debug（`com.ixxxxoooo.quick.dev`）
+/// 与 Release（`com.ixxxxoooo.quick`）各有一份 Application Support / Caches，互不污染。
 public enum AppPaths {
 
     /// 当前构建的根目录名（= bundle id；测试宿主缺失时回退正式版 id）
     public static var rootFolderName: String {
-        Bundle.main.bundleIdentifier ?? "com.ygw.quick"
+        Bundle.main.bundleIdentifier ?? "com.ixxxxoooo.quick"
     }
 
     /// Application Support 目录（存放用户数据）

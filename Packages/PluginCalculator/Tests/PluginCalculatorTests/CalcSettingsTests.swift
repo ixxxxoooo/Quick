@@ -61,7 +61,7 @@ struct CalcPreferencesTests {
 
     /// 独立 suite：读映射的用例不碰真实偏好，也就不会给别的用例留下残留
     private static func scratchDefaults() -> UserDefaults? {
-        UserDefaults(suiteName: "com.ygw.quick.tests.calculator.\(UUID().uuidString)")
+        UserDefaults(suiteName: "com.ixxxxoooo.quick.tests.calculator.\(UUID().uuidString)")
     }
 
     @Test("精度只认设置页给出的四档，其余一律回落到 4")

@@ -22,11 +22,11 @@ public enum QuickLog {
 
     /// 日志子系统。
     ///
-    /// 取 bundle id，所以 Debug 构建（`com.ygw.quick.dev`）的日志不会和已安装版本
+    /// 取 bundle id，所以 Debug 构建（`com.ixxxxoooo.quick.dev`）的日志不会和已安装版本
     /// 混在一起 —— 这正是 `Scripts/logs.sh --dev` 能生效的原因。
     /// 在 SPM 测试里 `Bundle.main` 是测试宿主，bundle id 可能为 nil，此时回退到默认值。
     public static let subsystem: String =
-        Bundle.main.bundleIdentifier ?? "com.ygw.quick"
+        Bundle.main.bundleIdentifier ?? "com.ixxxxoooo.quick"
 
     // MARK: - 固定区域
 

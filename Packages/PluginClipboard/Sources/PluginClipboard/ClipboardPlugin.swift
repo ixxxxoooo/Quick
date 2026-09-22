@@ -17,6 +17,7 @@ public final class ClipboardPlugin: QuickPlugin {
     public static let id = "clipboard"
     public static let name = "剪贴板历史"
     public static let icon = "doc.on.clipboard"
+    public static let description = "自动记录系统剪贴板历史，支持文本、代码与图片预览，提供快速搜索、置顶收藏与重新复制。"
     public static let triggerWords = ["剪贴板", "clipboard", "粘贴", "复制", "历史", "cb"]
 
     public var isEnabled = true
@@ -77,6 +78,16 @@ public final class ClipboardPlugin: QuickPlugin {
     }
 
     // MARK: - QuickPlugin 协议
+
+    public func accepts(query: String) -> Bool {
+        query.matchesAnyTrigger(Self.triggerWords)
+    }
+
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        let items = await searchItems(query: query)
+        return items.filter { $0.id != "clipboard.open-panel" }
+    }
 
     public func searchItems(query: String) async -> [SearchableItem] {
         // 仅当搜索词与剪贴板相关时才返回入口

@@ -43,28 +43,48 @@ struct SettingsSidebarView: View {
         .background(focusShortcut)
     }
 
-    /// 分区列表（参考 Tinycast SettingsSidebarView）
+    /// 分区列表：宿主页面在上，「插件」是分类，每个插件一项，关于在最后
     private var browse: some View {
         List(selection: selectionBinding) {
-            ForEach(SettingsSection.allCases) { section in
-                Section(section.title) {
-                    ForEach(section.tabs) { tab in
-                        Label {
-                            Text(tab.title)
-                        } icon: {
-                            Image(systemName: tab.systemImage)
-                                .font(DesignTokens.Typography.sidebarIcon)
-                                .frame(
-                                    width: DesignTokens.Size.sidebarIconSlot,
-                                    height: DesignTokens.Size.sidebarIconSlot,
-                                    alignment: .center)
-                        }
+            Section {
+                ForEach(SettingsSection.host.tabs) { tab in
+                    sidebarRow(title: tab.title, systemImage: tab.systemImage)
                         .tag(tab)
-                    }
                 }
+            }
+            Section("插件") {
+                ForEach(pluginRows, id: \.plugin.id) { row in
+                    sidebarRow(title: row.plugin.name, systemImage: row.plugin.icon)
+                        .tag(row.tab)
+                }
+            }
+            Section {
+                sidebarRow(title: SettingsTab.about.title, systemImage: SettingsTab.about.systemImage)
+                    .tag(SettingsTab.about)
             }
         }
         .listStyle(.sidebar)
+    }
+
+    /// 已注册插件里，能对上设置页的那些。顺序跟插件名单一致
+    private var pluginRows: [(plugin: SettingsPlugin, tab: SettingsTab)] {
+        dataSource.pluginEntries.compactMap { plugin in
+            guard let tab = SettingsTab.tab(forPluginID: plugin.id) else { return nil }
+            return (plugin, tab)
+        }
+    }
+
+    private func sidebarRow(title: String, systemImage: String) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: systemImage)
+                .font(DesignTokens.Typography.sidebarIcon)
+                .frame(
+                    width: DesignTokens.Size.sidebarIconSlot,
+                    height: DesignTokens.Size.sidebarIconSlot,
+                    alignment: .center)
+        }
     }
 
     private var selectionBinding: Binding<SettingsTab?> {

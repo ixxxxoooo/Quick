@@ -62,22 +62,36 @@ struct PermissionsPane: View {
                 .font(DesignTokens.Typography.rowTrailing)
                 .foregroundStyle(DesignTokens.Colors.success)
 
-        case .some(let state) where state.canRequest:
-            Button("申请") {
-                dataSource.requestPermission(permission)
-                // 系统对话框是异步的，给它一点时间再回读状态
-                Task {
-                    try? await Task.sleep(for: .seconds(1))
-                    refresh()
+        default:
+            HStack(spacing: DesignTokens.Spacing.sm) {
+                Button("重新检测") { refresh() }
+                if let target = dragTarget(for: permission) {
+                    Button("拖拽授权") {
+                        PermissionDragController.shared.present(target)
+                    }
+                } else if state?.canRequest == true {
+                    Button("申请") {
+                        dataSource.requestPermission(permission)
+                        Task {
+                            try? await Task.sleep(for: .seconds(1))
+                            refresh()
+                        }
+                    }
+                } else {
+                    Button("打开系统设置") {
+                        dataSource.openPermissionSettings(permission)
+                    }
                 }
             }
+        }
+    }
 
-        case .some:
-            // 已经拒绝过的权限系统不会再弹框，只能去系统设置里手动打开 ——
-            // 这时给「申请」按钮是骗人的。
-            Button("打开系统设置") {
-                dataSource.openPermissionSettings(permission)
-            }
+    /// 辅助功能和屏幕录制走拖拽授权。定位仍由系统对话框申请
+    private func dragTarget(for permission: SettingsPermission) -> PermissionDragTarget? {
+        switch permission {
+        case .accessibility: .accessibility
+        case .screenCapture: .screenCapture
+        case .location: nil
         }
     }
 

@@ -77,7 +77,7 @@ struct OCRPreferencesTests {
 
     /// 独立 suite：读映射的用例不碰真实偏好
     private static func scratchDefaults() -> UserDefaults? {
-        UserDefaults(suiteName: "com.ygw.quick.tests.ocr.\(UUID().uuidString)")
+        UserDefaults(suiteName: "com.ixxxxoooo.quick.tests.ocr.\(UUID().uuidString)")
     }
 
     @Test("未设置过时就是设置页显示的档位：自动检测 + 自动复制")
@@ -121,7 +121,7 @@ struct OCREngineSettingsTests {
     @MainActor
     func enginePassesTheConfiguredLanguageThrough() throws {
         let defaults = try #require(
-            UserDefaults(suiteName: "com.ygw.quick.tests.ocr.\(UUID().uuidString)"))
+            UserDefaults(suiteName: "com.ixxxxoooo.quick.tests.ocr.\(UUID().uuidString)"))
         let engine = OCREngine(defaults: defaults)
 
         #expect(engine.configuredLanguageSettings.detectsLanguageAutomatically)

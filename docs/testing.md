@@ -61,7 +61,6 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 | `PluginClipboard` | 去重/排序/剪枝、条数与图片预算、坏行降级 | 有覆盖 |
 | `PluginNotes` · `PluginSnippets` | 表读写往返、排序 | 有覆盖 |
 | `PluginSystemMonitor` | 时长/字节格式化的边界、`ps` 输出解析 | 有覆盖 |
-| `PluginWindowManager` | 各布局的目标矩形（含 AppKit 与 AX 的坐标翻转） | 有覆盖 |
 | `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式 | 有覆盖 |
 | `PluginTranslator` | 词典方向、触发词前缀、语言判定 | 有覆盖 |
 | `PluginOCR` · `PluginFileSearch` | 触发词匹配、文本拼接、查询前缀解析、图标映射 | 有覆盖 |
@@ -70,7 +69,7 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 | 11 个开发者工具 | 各自的纯逻辑（编解码、格式化、diff、字数统计…） | 有覆盖 |
 | 其余插件 | 插件契约 + 从服务里抽出来的纯逻辑 | 有覆盖 |
 
-**30 个包全部有测试目标，由 `Scripts/run-tests.sh` 强制**：少一个包就红。
+**29 个包全部有测试目标，由 `Scripts/run-tests.sh` 强制**：少一个包就红。
 规则是「每个包都要有测试」而不是「想测才测」—— 系统依赖重不等于没有可测的东西，
 见下面一节。
 
@@ -175,7 +174,7 @@ swift test --package-path Packages/QuickCore
 
 - **启动参数 `-showPalette`**：启动后立即显示面板，省掉手按快捷键。
 - **分布式通知**：应用内用 `DistributedNotificationCenter` 监听
-  `com.ygw.quick.togglePalette` 来切换面板。**不要用 `notifyutil -p`** ——
+  `com.ixxxxoooo.quick.togglePalette` 来切换面板。**不要用 `notifyutil -p`** ——
   那是另一套 notify API，不互通。
 - **窗口可见性**：`CGWindowListCopyWindowInfo` 确认存在名为 `Quick` 的窗口且尺寸正常。
 - **日志**：`./Scripts/logs.sh` 实时跟踪，看面板显隐耗时与搜索耗时是否在预算内。

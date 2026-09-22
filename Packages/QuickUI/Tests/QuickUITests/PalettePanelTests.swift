@@ -169,3 +169,26 @@ struct PalettePanelTests {
         )
     }
 }
+
+@Suite("面板高度与授权面板吸附")
+struct PaletteGeometryTests {
+
+    @Test("拖出来的高度不会矮过下限，也不会高出屏幕")
+    func clampsPanelHeight() {
+        let floor = DesignTokens.Size.panelMinHeight
+        #expect(PalettePreferences.clampedPanelHeight(1, maxHeight: 2000) == floor)
+        #expect(PalettePreferences.clampedPanelHeight(9000, maxHeight: 800) == 800)
+        #expect(PalettePreferences.clampedPanelHeight(600, maxHeight: 2000) == 600)
+    }
+
+    @Test("授权面板贴在系统设置右侧内容区的正下方")
+    func snapsUnderSystemSettings() {
+        let settings = CGRect(x: 100, y: 400, width: 900, height: 700)
+        let screen = CGRect(x: 0, y: 0, width: 1600, height: 1000)
+        let frame = PermissionSnapGeometry.frame(settings: settings, screen: screen, panelHeight: 160)
+        #expect(frame.minX == settings.minX + DesignTokens.Size.systemSettingsSidebar)
+        #expect(frame.maxY == settings.minY)
+        #expect(frame.width == DesignTokens.Size.permissionPanelWidth)
+        #expect(frame.height == 160)
+    }
+}

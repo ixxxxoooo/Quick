@@ -56,10 +56,19 @@ public final class SuperPanelPlugin: QuickPlugin {
 
     // MARK: - 搜索
 
-    public func searchItems(query: String) async -> [SearchableItem] {
-        guard !query.isEmpty else { return [] }
+    public func accepts(query: String) -> Bool {
+        query.matchesAnyTrigger(Self.triggerWords)
+    }
 
-        // 检测当前项目
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
+    }
+
+    public func searchItems(query: String) async -> [SearchableItem] {
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
+
+        // 只有触发词命中才探测前台项目，避免每次按键都扫窗口和磁盘
         guard let context = await detector.detect() else { return [] }
 
         let actions = actionProvider.actions(for: context)

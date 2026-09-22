@@ -17,6 +17,7 @@ public final class CalendarPlugin: QuickPlugin {
     public static let id = "calendar"
     public static let name = "日历"
     public static let icon = "calendar"
+    public static let description = "同步展示系统日历日程与近期事件安排，支持会议链接自动识别与农历视图显示。"
     public static let triggerWords = ["日历", "日程", "calendar", "今天", "日期"]
 
     public var isEnabled = true
@@ -35,8 +36,17 @@ public final class CalendarPlugin: QuickPlugin {
 
     // MARK: - QuickPlugin 协议
 
+    public func accepts(query: String) -> Bool {
+        query.matchesAnyTrigger(Self.triggerWords)
+    }
+
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
+    }
+
     public func searchItems(query: String) async -> [SearchableItem] {
-        guard Self.triggerWords.contains(where: { query.lowercased().contains($0) }) else { return [] }
+        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
         let todayEvents = await calendarService.todayEvents()
         if todayEvents.isEmpty {

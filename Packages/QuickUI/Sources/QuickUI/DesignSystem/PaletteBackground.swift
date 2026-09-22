@@ -21,12 +21,18 @@ public struct PaletteBackground: View {
     /// 边缘高光要用物理像素宽度，否则 2x 屏上是 2px 的粗边
     @Environment(\.displayScale) private var displayScale
 
-    public init() {}
+    /// 在现有遮罩上再加减。正数更实，负数更透，0 保持原样
+    public var scrimBoost: Double = 0
+
+    public init(scrimBoost: Double = 0) {
+        self.scrimBoost = scrimBoost
+    }
 
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous)
 
         DesignTokens.Colors.panelScrim
+            .opacity(max(0.15, min(1, 1 + scrimBoost)))
             .background(VisualEffectView())
             .overlay {
                 shape

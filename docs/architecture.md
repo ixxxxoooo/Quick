@@ -71,7 +71,7 @@
 1. `registerPlugins()` —— 组装插件（**唯一实例化插件的地方**）
 2. `paletteCoordinator.setPlugins(plugins)` —— 让面板能搜索
 3. `wireEventBus()` —— 订阅事件，把事件接到协调器/剪贴板/HUD
-4. 热键：设 `onTogglePalette` 回调 → `hotKeyService.start()`
+4. 热键：设 `onCommand` 回调 → `hotKeyService.start()` → 按命令目录同步注册
 5. `statusItemController.install()` —— 菜单栏图标
 6. `observeDebugWakeSignals()` —— 调试用分布式通知
 7. `Task { await appIndex.refresh() }` —— **异步**扫描应用，不阻塞启动
@@ -100,23 +100,41 @@
 ```swift
 @MainActor
 public protocol QuickPlugin: AnyObject, Sendable {
-    static var id: String { get }        // 全局唯一主键：事件路由 + 设置存储
-    static var name: String { get }      // 出现在搜索结果与设置页
-    static var icon: String { get }      // SF Symbol 名
+    static var id: String { get }
+    static var name: String { get }
+    static var icon: String { get }
+    static var commands: [CommandDescriptor] { get } // 默认为「打开本插件」
     var isEnabled: Bool { get set }
     func searchItems(query: String) async -> [SearchableItem]
-    func defaultItems() async -> [SearchableItem]  // 首屏（空查询）展示什么
-    func makeView() -> AnyView           // 面板内的插件主视图
-    func makeSettingsView() -> AnyView?  // 设置页；无设置返回 nil
-    func activate()                      // 启动 / 启用时
-    func deactivate()                    // 退出 / 禁用时
+    func accepts(query: String) -> Bool          // 动态搜索闸门，默认 false
+    func dynamicSearch(query: String) async -> [SearchableItem]
+    func perform(commandID: String)              // 热键和搜索共用
+    func makeView() -> AnyView
+    func makeSettingsView() -> AnyView?
+    func activate()
+    func deactivate()
 }
 ```
 
-协议提供了默认实现：`isEnabled` 默认 `true`、`makeSettingsView` 默认 `nil`、
-`searchItems` 默认空、`activate`/`deactivate` 默认无操作、
+协议提供了默认实现：`commands` 默认一条打开插件的命令、`accepts` 默认 false、
+`dynamicSearch` 默认空、`perform` 默认导航进插件面板、`isEnabled` 默认 `true`、
+`makeSettingsView` 默认 `nil`、`searchItems` 默认空、`activate`/`deactivate` 默认无操作、
 `defaultItems` 默认取「触发词裸查询的第一条」。**只实现你需要的那些**，
 不要写空实现占位。
+
+主面板搜索不再对每个插件调用 `searchItems`。静态命令进内存索引，在后台线程打分；
+只有 `accepts` 返回 true 的插件才会跑 `dynamicSearch`。空查询每个插件至多一条
+`showsWhenQueryEmpty` 的命令，再加上最近使用。命令 id 和插件 id 一样，发布后不能改。
+
+快捷键只有一张表，键是 `hotkey.command.<命令 id>`。一条组合键只对应一个命令。
+命令关掉后绑定还在，但 Carbon 不注册，搜索索引里也没有它。设置侧边栏上面是
+通用、外观、快捷键、权限、搜索，「插件」是一级分类，每个插件是它下面的一项，最后是关于。
+快捷键页的系统区只展示面板固定键，只有唤出面板可以改；下面是用户自己添加的绑定。
+绑定的右边是关键字，不是命令下拉框。一条命令可以挂多个关键字，不同关键字可以打开
+同一个插件里的不同功能。主面板输入「锁屏」唤醒锁定屏幕，输入「全屏」只打开全屏截图。
+对不上或同时对上多条时不猜测。
+插件不调用 `RegisterEventHotKey`，系统能力（热键、权限、剪贴板、应用索引）只走 QuickPlatform。
+主面板高度拖过底边之后记在 `quick.palette.height`，搜索栏左侧的手柄用来拖动位置。
 
 ### 不变量
 

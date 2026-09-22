@@ -16,6 +16,7 @@ public final class URLCodecPlugin: QuickPlugin {
     public static let id = "url-codec"
     public static let name = "URL 编解码"
     public static let icon = "link"
+    public static let description = "URL 百分号编码与解码工具，支持整条链接保留结构编码或纯参数组件编码。"
     public static let triggerWords = ["url", "编码", "解码", "urlencode", "urldecode", "链接"]
 
     public var isEnabled = true

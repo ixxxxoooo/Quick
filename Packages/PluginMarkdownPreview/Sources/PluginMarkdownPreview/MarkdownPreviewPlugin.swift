@@ -16,6 +16,7 @@ public final class MarkdownPreviewPlugin: QuickPlugin {
     public static let id = "markdown-preview"
     public static let name = "Markdown 预览"
     public static let icon = "text.badge.checkmark"
+    public static let description = "实时 Markdown 编辑与渲染预览，支持 GitHub 风格语法、代码高亮、表格排版与数学公式。"
     public static let triggerWords = ["markdown", "md", "预览", "标记"]
 
     public var isEnabled = true

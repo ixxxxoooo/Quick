@@ -14,6 +14,7 @@ struct PluginsPane: View {
 
     @State private var enabledPlugins: [String: Bool]
     @State private var filter = ""
+    @State private var selectedPluginID: String?
     @FocusState private var filterFocused: Bool
 
     init(dataSource: any SettingsDataSource) {
@@ -53,21 +54,25 @@ struct PluginsPane: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(visiblePlugins) { plugin in
-                        Toggle(isOn: binding(for: plugin.id)) {
-                            SettingsRow(
-                                title: plugin.name,
-                                // 副标题给日志分类名：排查「某个功能怎么没了」时，
-                                // 这就是要在日志里 grep 的那个词。
-                                subtitle: "plugin.\(plugin.id)",
-                                icon: {
-                                    SettingsRowIcon(
-                                        systemImage: plugin.icon,
-                                        isEnabled: enabledPlugins[plugin.id] ?? true
-                                    )
+                        HStack {
+                            Toggle(isOn: binding(for: plugin.id)) {
+                                SettingsRow(
+                                    title: plugin.name,
+                                    subtitle: "plugin.\(plugin.id)",
+                                    icon: {
+                                        SettingsRowIcon(
+                                            systemImage: plugin.icon,
+                                            isEnabled: enabledPlugins[plugin.id] ?? true
+                                        )
+                                    }
+                                ) {
+                                    builtInBadge
                                 }
-                            ) {
-                                builtInBadge
                             }
+                            Button("选项") {
+                                selectedPluginID = plugin.id
+                            }
+                            .buttonStyle(.borderless)
                         }
                     }
                 }
@@ -86,6 +91,9 @@ struct PluginsPane: View {
                             + "因此不会出现来源不明的代码在后台运行。"
                     )
                 }
+            }
+            if let selected = dataSource.pluginEntries.first(where: { $0.id == selectedPluginID }) {
+                PluginOptionsPane(plugin: selected, dataSource: dataSource)
             }
         }
         .formStyle(.grouped)
@@ -117,4 +125,27 @@ struct PluginsPane: View {
             }
         )
     }
+}
+
+/// 某个插件自己的功能选项。快捷键不在这里
+private struct PluginOptionsPane: View {
+    let plugin: SettingsPlugin
+    let dataSource: any SettingsDataSource
+
+    var body: some View {
+        if plugin.id == LauncherPluginID.launcher {
+            ApplicationsSettingsPane(dataSource: dataSource)
+            CommandsSettingsPane(dataSource: dataSource)
+        } else if plugin.id == LauncherPluginID.systemControl {
+            SystemActionsSettingsPane(dataSource: dataSource)
+        } else if let tab = SettingsTab.allCases.first(where: { $0.pluginID == plugin.id }) {
+            FeatureSettingsPane(tab: tab, dataSource: dataSource)
+        }
+    }
+}
+
+/// 避免 QuickUI 依赖插件包，只用插件 id 字面量
+private enum LauncherPluginID {
+    static let launcher = "launcher"
+    static let systemControl = "systemcontrol"
 }

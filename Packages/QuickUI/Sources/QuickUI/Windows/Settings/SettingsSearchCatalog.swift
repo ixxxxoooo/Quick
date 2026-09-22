@@ -32,67 +32,62 @@ enum SettingsSearchCatalog {
             id: "general.keyboardLayout", tab: .general, title: "Keyboard Layout / 强制键盘布局",
             subtitle: "General"),
         .init(id: "permissions", tab: .permissions, title: "Permissions / 系统权限", subtitle: "General"),
-        .init(
-            id: "launcher.applications", tab: .applications, title: "Applications / 应用程序",
-            subtitle: "Launcher"),
-        .init(id: "launcher.scopes", tab: .applications, title: "Search Scopes / 搜索范围", subtitle: "Launcher"),
-        .init(
-            id: "launcher.systemActions", tab: .systemActions, title: "System Actions / 系统操作",
-            subtitle: "Launcher"),
-        .init(id: "launcher.commands", tab: .commands, title: "Commands / 终端与命令", subtitle: "Launcher"),
-        .init(id: "features.clipboard", tab: .clipboard, title: "Clipboard / 剪贴板历史", subtitle: "Features"),
-        .init(id: "features.calculator", tab: .calculator, title: "Calculator / 计算器", subtitle: "Features"),
-        .init(id: "features.filesearch", tab: .fileSearch, title: "File Search / 文件搜索", subtitle: "Features"),
-        .init(id: "features.snippets", tab: .snippets, title: "Snippets / 代码片段", subtitle: "Features"),
-        .init(id: "features.notes", tab: .notes, title: "Notes / 便签备忘", subtitle: "Features"),
-        .init(id: "features.calendar", tab: .calendar, title: "Calendar / 日历日程", subtitle: "Features"),
-        .init(id: "features.weather", tab: .weather, title: "Weather / 实时天气", subtitle: "Features"),
-        .init(id: "features.ai", tab: .ai, title: "AI Assistant / AI 助手", subtitle: "Features"),
-        .init(id: "features.translator", tab: .translator, title: "Translator / 划词翻译", subtitle: "Features"),
+        .init(id: "search.sources", tab: .search, title: "Search Sources / 搜索来源", subtitle: "搜索"),
+        .init(id: "launcher.scopes", tab: .search, title: "Search Scopes / 搜索范围", subtitle: "搜索"),
+        .init(id: "plugins.launcher", tab: .applications, title: "应用启动器", subtitle: "插件"),
+        .init(id: "plugins.system", tab: .systemActions, title: "系统控制", subtitle: "插件"),
+        .init(id: "features.calculator", tab: .calculator, title: "Calculator / 计算器", subtitle: "插件"),
+        .init(id: "features.filesearch", tab: .fileSearch, title: "File Search / 文件搜索", subtitle: "插件"),
+        .init(id: "features.snippets", tab: .snippets, title: "Snippets / 代码片段", subtitle: "插件"),
+        .init(id: "features.notes", tab: .notes, title: "Notes / 便签备忘", subtitle: "插件"),
+        .init(id: "features.calendar", tab: .calendar, title: "Calendar / 日历日程", subtitle: "插件"),
+        .init(id: "features.weather", tab: .weather, title: "Weather / 实时天气", subtitle: "插件"),
+        .init(id: "features.ai", tab: .ai, title: "AI Assistant / AI 助手", subtitle: "插件"),
+        .init(id: "features.translator", tab: .translator, title: "Translator / 划词翻译", subtitle: "插件"),
         .init(
             id: "features.jsonformatter", tab: .jsonFormatter, title: "JSON Formatter / JSON 格式化",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.sqlformatter", tab: .sqlFormatter, title: "SQL Formatter / SQL 格式化",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.base64codec", tab: .base64Codec, title: "Base64 Codec / Base64 编解码",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.urlcodec", tab: .urlCodec, title: "URL Codec / URL 编解码",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.uuidgenerator", tab: .uuidGenerator, title: "UUID Generator / UUID 生成器",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.hashcalculator", tab: .hashCalculator, title: "Hash Calculator / Hash 计算器",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.timestampconverter", tab: .timestampConverter,
-            title: "Timestamp Converter / 时间戳转换", subtitle: "Developer Tools"),
+            title: "Timestamp Converter / 时间戳转换", subtitle: "插件"),
         .init(
             id: "features.wordcounter", tab: .wordCounter, title: "Word Counter / 字数统计",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.textdiff", tab: .textDiff, title: "Text Diff / 文本对比",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.markdownpreview", tab: .markdownPreview, title: "Markdown Preview / Markdown 预览",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.colorcompare", tab: .colorCompare, title: "Color Compare / 颜色工具",
-            subtitle: "Developer Tools"),
+            subtitle: "插件"),
         .init(
             id: "features.sysmonitor", tab: .systemMonitor, title: "System Monitor / 系统监控",
-            subtitle: "Features"),
+            subtitle: "插件"),
         .init(
             id: "features.networktools", tab: .networkTools, title: "Network Tools / 网络诊断",
-            subtitle: "Features"),
-        .init(id: "features.ocr", tab: .ocr, title: "OCR / 文字识别", subtitle: "Features"),
-        .init(id: "features.screenshot", tab: .screenshot, title: "Screenshot / 截图工具", subtitle: "Features"),
+            subtitle: "插件"),
+        .init(id: "features.ocr", tab: .ocr, title: "OCR / 文字识别", subtitle: "插件"),
+        .init(id: "features.screenshot", tab: .screenshot, title: "Screenshot / 截图工具", subtitle: "插件"),
         .init(
             id: "features.superpanel", tab: .superPanel, title: "Super Panel / 超级面板",
-            subtitle: "Features"),
+            subtitle: "插件"),
         .init(id: "about.version", tab: .about, title: "About / 关于 Quick", subtitle: "Advanced")
     ]
 

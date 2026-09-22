@@ -19,6 +19,7 @@ public final class WeatherPlugin: QuickPlugin {
     public static let id = "weather"
     public static let name = "天气"
     public static let icon = "cloud.sun"
+    public static let description = "实时天气概况与气温、湿度、空气质量速查，支持自动定位与常用城市切换。"
     public static let triggerWords = ["天气", "weather", "温度", "预报"]
 
     public var isEnabled = true
@@ -36,6 +37,15 @@ public final class WeatherPlugin: QuickPlugin {
     /// `searchItems` 每次按键（防抖后）都会跑，而取位置最长要 8 秒；
     /// 聚合搜索又要等所有插件都返回，所以在这里取位置会把**整批**结果卡住。
     /// 需要取的时候由用户点这一条去触发 —— 那也是定位权限该被申请的时机。
+    public func accepts(query: String) -> Bool {
+        query.matchesAnyTrigger(Self.triggerWords)
+    }
+
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
+    }
+
     public func searchItems(query: String) async -> [SearchableItem] {
         guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 

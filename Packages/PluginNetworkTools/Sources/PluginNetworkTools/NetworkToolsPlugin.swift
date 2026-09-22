@@ -16,6 +16,7 @@ public final class NetworkToolsPlugin: QuickPlugin {
     public static let id = "networktools"
     public static let name = "网络工具"
     public static let icon = "network"
+    public static let description = "网络环境与连通性检测，支持本机局域网 IP 查询、当前公共外网 IP 识别与 DNS 服务解析。"
     public static let triggerWords = ["ip", "网络", "network", "dns", "测速", "speed"]
 
     public var isEnabled = true

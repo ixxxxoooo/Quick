@@ -16,6 +16,7 @@ public final class OCRPlugin: QuickPlugin {
     public static let id = "ocr"
     public static let name = "文字识别"
     public static let icon = "text.viewfinder"
+    public static let description = "基于 Apple Vision 原生离线光学字符识别，选取屏幕区域即可快速提取文字并自动复制到剪贴板。"
     public static let triggerWords = OCRQuery.triggers
 
     public var isEnabled = true
@@ -26,6 +27,26 @@ public final class OCRPlugin: QuickPlugin {
     private let engine = OCREngine()
 
     public init() {}
+
+    public static var commands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "ocr.capture",
+                pluginID: id,
+                pluginName: name,
+                title: "截图识别文字",
+                subtitle: "截取屏幕区域并识别文字",
+                keywords: triggerWords,
+                icon: icon,
+                showsWhenQueryEmpty: true
+            )
+        ]
+    }
+
+    public func perform(commandID: String) {
+        guard commandID == "ocr.capture" || commandID == CommandID.openPlugin(Self.id) else { return }
+        Task { await startCapture() }
+    }
 
     // MARK: - QuickPlugin 协议
 

@@ -17,6 +17,7 @@ public final class NotesPlugin: QuickPlugin {
     public static let id = "notes"
     public static let name = "笔记"
     public static let icon = "text.page"
+    public static let description = "轻量级便签与待办备忘录，支持极简富文本与 Markdown 记录，编辑即时自动保存且本地安全存储。"
     public static let triggerWords = ["笔记", "备忘", "note", "memo", "便签", "待办", "todo"]
 
     public var isEnabled = true
@@ -68,6 +69,15 @@ public final class NotesPlugin: QuickPlugin {
                     "CREATE INDEX IF NOT EXISTS idx_todos_created ON todos(created_at ASC)"
                 ])
         ]
+    }
+
+    public func accepts(query: String) -> Bool {
+        query.matchesAnyTrigger(Self.triggerWords)
+    }
+
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
     }
 
     public func searchItems(query: String) async -> [SearchableItem] {

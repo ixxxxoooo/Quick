@@ -3,38 +3,28 @@
 // @author ygw
 
 import Foundation
+import QuickCore
 
-/// 全局快捷键可绑定的操作
-public enum HotKeyAction: Hashable, Sendable {
+/// 一条全局快捷键绑定的目标
+///
+/// 以前按「唤出面板 / 应用 / 系统操作 / 终端命令 / 整个插件」分成五种。
+/// 现在一律指向命令 id，热键和搜索执行的是同一条命令。
+public struct HotKeyAction: Hashable, Sendable {
 
-    /// 呼出/隐藏主面板（默认 ⌥Space）
-    case togglePalette
+    /// 命令 id，对应 `CommandID`
+    public let commandID: String
 
-    /// 启动/激活指定 Bundle ID 的应用
-    case app(bundleID: String)
+    /// UserDefaults 键。旧的 `hotkey.togglePalette` 等只在迁移时读一次
+    public var defaultsKey: String { "hotkey.command.\(commandID)" }
 
-    /// 执行指定的系统控制操作（如 lockScreen, sleep, restart 等）
-    case systemAction(id: String)
-
-    /// 运行自定义 Shell 命令
-    case customCommand(id: UUID)
-
-    /// 导航到指定功能插件面板
-    case plugin(id: String)
-
-    /// 持久化与 Carbon 注册用的唯一标识
-    public var defaultsKey: String {
-        switch self {
-        case .togglePalette:
-            return "hotkey.togglePalette"
-        case .app(let bundleID):
-            return "hotkey.app." + bundleID
-        case .systemAction(let id):
-            return "hotkey.systemAction." + id
-        case .customCommand(let id):
-            return "hotkey.customCommand." + id.uuidString.lowercased()
-        case .plugin(let id):
-            return "hotkey.plugin." + id
-        }
+    /// 用命令 id 构建
+    public init(commandID: String) {
+        self.commandID = commandID
     }
+
+    /// 唤出主面板
+    public static let togglePalette = HotKeyAction(commandID: CommandID.togglePalette)
+
+    /// 持久化键前缀，用来扫出用户绑过的全部命令
+    public static let commandKeyPrefix = "hotkey.command."
 }

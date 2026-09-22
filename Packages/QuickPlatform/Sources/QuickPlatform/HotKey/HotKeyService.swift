@@ -31,39 +31,31 @@ private func hotKeyCarbonCallback(
     }
 }
 
+/// 绑定结果
+public enum HotKeyBindOutcome: Equatable, Sendable {
+    /// 已写入并按需要注册
+    case applied
+    /// 同一组合键已经绑了别的命令，这次没有改
+    case conflict(commandID: String)
+}
+
 /// 全局快捷键服务
 ///
-/// 使用 Carbon HotKey API 注册系统级全局快捷键。
-/// 支持：
-/// - 默认 ⌥Space 呼出主面板
-/// - 各应用独立绑定热键（直接启动/激活应用）
-/// - 各系统控制操作绑定热键
-/// - 自定义 Shell 命令绑定热键
-/// - 录制时自动暂停全局监听，防止冲突
+/// 使用 Carbon HotKey API 注册系统级全局快捷键。一条组合键只对应一个命令；
+/// 命令被关闭时绑定留在偏好里，但不向系统注册。
 @MainActor
 public final class HotKeyService {
 
     public static let defaultHotKeyDescription = "⌥Space"
 
-    /// 面板切换回调
-    public var onTogglePalette: (() -> Void)?
-
-    /// 启动应用回调
-    public var onLaunchApp: ((String) -> Void)?
-
-    /// 执行系统操作回调
-    public var onRunSystemAction: ((String) -> Void)?
-
-    /// 运行自定义 Shell 命令回调
-    public var onRunCustomCommand: ((UUID) -> Void)?
-
-    /// 导航到功能插件回调
-    public var onNavigateToPlugin: ((String) -> Void)?
+    /// 热键触发时交出命令 id，由宿主执行
+    public var onCommand: ((String) -> Void)?
 
     private let log = QuickLog.hotKey
+    private let defaults: UserDefaults
 
     private struct Entry {
-        let action: HotKeyAction
+        let commandID: String
         let shortcut: KeyShortcut
         let carbonID: UInt32
         var ref: EventHotKeyRef?
@@ -75,8 +67,8 @@ public final class HotKeyService {
     private var eventHandlerRef: EventHandlerRef?
     private let signature: OSType = 0x5155434B  // "QUCK"
 
-    /// 内存中保存的所有当前绑定
-    private var bindings: [HotKeyAction: KeyShortcut] = [:]
+    /// 内存中的绑定。键是命令 id
+    private var bindings: [String: KeyShortcut] = [:]
 
     /// 是否暂停监听（录制快捷键时为 true）
     public var isPaused = false {
@@ -92,24 +84,24 @@ public final class HotKeyService {
         }
     }
 
-    public init() {}
+    /// 初始化
+    /// - Parameter defaults: 偏好存储。测试传独立 suite，避免污染用户的快捷键
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
 
-    /// 启动快捷键监听
+    /// 启动快捷键监听，并做一次旧键迁移
     public func start() {
+        HotKeyMigration.migrate(defaults: defaults)
         installCarbonHandlerIfNeeded()
-        // 注册默认面板快捷键
-        if binding(for: .togglePalette) == nil {
-            // ⌥Space: Space is 49, Option is optionKey
+        if binding(for: CommandID.togglePalette) == nil {
             let defaultShortcut = KeyShortcut(
                 carbonKeyCode: kVK_Space,
                 carbonModifiers: optionKey
             )
-            setBinding(defaultShortcut, for: .togglePalette)
-        } else {
-            // 恢复已保存的快捷键
-            register(.togglePalette)
+            _ = setBinding(defaultShortcut, for: CommandID.togglePalette, registerNow: true)
         }
-        log.info("全局快捷键服务已启动")
+        log.notice("全局快捷键服务已启动")
     }
 
     /// 停止快捷键监听，释放所有注册
@@ -121,89 +113,130 @@ public final class HotKeyService {
             RemoveEventHandler(handler)
             eventHandlerRef = nil
         }
-        log.info("已注销所有全局快捷键")
+        log.notice("已注销所有全局快捷键")
     }
 
     /// 测试用：模拟触发主面板热键
     func handleHotKeyPressedForTesting() {
-        onTogglePalette?()
+        onCommand?(CommandID.togglePalette)
     }
 
     // MARK: - 绑定管理
 
-    /// 获取某操作当前绑定的快捷键
-    public func binding(for action: HotKeyAction) -> KeyShortcut? {
-        if let memory = bindings[action] {
+    /// 当前绑了快捷键的命令 id
+    public func boundCommandIDs() -> [String] {
+        let prefix = HotKeyAction.commandKeyPrefix
+        return defaults.dictionaryRepresentation().keys.compactMap { key in
+            guard key.hasPrefix(prefix) else { return nil }
+            let id = String(key.dropFirst(prefix.count))
+            return id.isEmpty ? nil : id
+        }
+    }
+
+    /// 读取某条命令的快捷键
+    public func binding(for commandID: String) -> KeyShortcut? {
+        if let memory = bindings[commandID] {
             return memory
         }
-        // 从 UserDefaults 读取
-        if let data = UserDefaults.standard.data(forKey: action.defaultsKey),
-            let shortcut = try? JSONDecoder().decode(KeyShortcut.self, from: data)
-        {
-            bindings[action] = shortcut
+        let key = HotKeyAction(commandID: commandID).defaultsKey
+        guard let data = defaults.data(forKey: key) else { return nil }
+        do {
+            let shortcut = try JSONDecoder().decode(KeyShortcut.self, from: data)
+            bindings[commandID] = shortcut
             return shortcut
+        } catch {
+            log.error(
+                "快捷键解码失败 \(commandID, privacy: .public)：\(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    /// 设置快捷键。`shortcut == nil` 表示清除
+    ///
+    /// - Parameters:
+    ///   - shortcut: 新组合键；nil 表示清除
+    ///   - commandID: 命令 id
+    ///   - registerNow: 命令当前是否允许注册。关闭的命令只存绑定
+    /// - Returns: 冲突时偏好和注册都不变
+    @discardableResult
+    public func setBinding(
+        _ shortcut: KeyShortcut?,
+        for commandID: String,
+        registerNow: Bool
+    ) -> HotKeyBindOutcome {
+        let action = HotKeyAction(commandID: commandID)
+        if let shortcut {
+            if let occupied = commandIDOccupying(shortcut, except: commandID) {
+                log.notice(
+                    "快捷键冲突，拒绝把 \(commandID, privacy: .public) 绑到已被 \(occupied, privacy: .public) 占用的组合键"
+                )
+                return .conflict(commandID: occupied)
+            }
+            bindings[commandID] = shortcut
+            do {
+                let data = try JSONEncoder().encode(shortcut)
+                defaults.set(data, forKey: action.defaultsKey)
+            } catch {
+                log.error(
+                    "快捷键写入失败 \(commandID, privacy: .public)：\(error.localizedDescription, privacy: .public)")
+            }
+            if registerNow {
+                register(commandID)
+                log.notice(
+                    "已绑定快捷键 \(commandID, privacy: .public) \(shortcut.displayString, privacy: .public)")
+            } else {
+                unregister(action.defaultsKey)
+                log.notice("命令 \(commandID, privacy: .public) 已关闭，快捷键已保存但未注册")
+            }
+        } else {
+            bindings.removeValue(forKey: commandID)
+            defaults.removeObject(forKey: action.defaultsKey)
+            unregister(action.defaultsKey)
+            log.notice("已清除快捷键 \(commandID, privacy: .public)")
+        }
+        return .applied
+    }
+
+    /// 按命令开关同步 Carbon 注册。绑定本身不删
+    public func syncRegistrations(isEnabled: (String) -> Bool) {
+        var registered = 0
+        var skipped = 0
+        for commandID in boundCommandIDs() {
+            let allow = commandID == CommandID.togglePalette || isEnabled(commandID)
+            if allow, binding(for: commandID) != nil {
+                register(commandID)
+                registered += 1
+            } else {
+                unregister(HotKeyAction(commandID: commandID).defaultsKey)
+                skipped += 1
+            }
+        }
+        log.notice(
+            "热键同步完成，注册 \(registered, privacy: .public) 个，因命令关闭跳过 \(skipped, privacy: .public) 个"
+        )
+    }
+
+    /// 注册某个已保存的命令热键
+    public func register(_ commandID: String) {
+        guard let shortcut = binding(for: commandID) else { return }
+        register(commandID: commandID, shortcut: shortcut)
+    }
+
+    private func commandIDOccupying(_ shortcut: KeyShortcut, except commandID: String) -> String? {
+        for id in boundCommandIDs() where id != commandID {
+            if binding(for: id) == shortcut {
+                return id
+            }
         }
         return nil
     }
 
-    /// 设置并保存快捷键绑定（传 nil 表示清除）
-    public func setBinding(_ shortcut: KeyShortcut?, for action: HotKeyAction) {
-        if let shortcut {
-            bindings[action] = shortcut
-            if let data = try? JSONEncoder().encode(shortcut) {
-                UserDefaults.standard.set(data, forKey: action.defaultsKey)
-            }
-            register(action)
-        } else {
-            bindings.removeValue(forKey: action)
-            UserDefaults.standard.removeObject(forKey: action.defaultsKey)
-            unregister(action.defaultsKey)
-        }
-    }
-
-    /// 注册某个 action 的热键
-    public func register(_ action: HotKeyAction) {
-        guard let shortcut = binding(for: action) else { return }
-        register(action: action, shortcut: shortcut)
-    }
-
-    /// 恢复已持久化的热键绑定
-    public func restoreHotKeys(
-        appBundleIDs: [String], systemActionIDs: [String],
-        customCommandIDs: [UUID], pluginIDs: [String] = []
-    ) {
-        for bundleID in appBundleIDs {
-            let action = HotKeyAction.app(bundleID: bundleID)
-            if binding(for: action) != nil {
-                register(action)
-            }
-        }
-        for id in systemActionIDs {
-            let action = HotKeyAction.systemAction(id: id)
-            if binding(for: action) != nil {
-                register(action)
-            }
-        }
-        for id in customCommandIDs {
-            let action = HotKeyAction.customCommand(id: id)
-            if binding(for: action) != nil {
-                register(action)
-            }
-        }
-        for id in pluginIDs {
-            let action = HotKeyAction.plugin(id: id)
-            if binding(for: action) != nil {
-                register(action)
-            }
-        }
-    }
-
-    private func register(action: HotKeyAction, shortcut: KeyShortcut) {
-        let key = action.defaultsKey
+    private func register(commandID: String, shortcut: KeyShortcut) {
+        let key = HotKeyAction(commandID: commandID).defaultsKey
         unregister(key)
 
         nextCarbonID += 1
-        let entry = Entry(action: action, shortcut: shortcut, carbonID: nextCarbonID, ref: nil)
+        let entry = Entry(commandID: commandID, shortcut: shortcut, carbonID: nextCarbonID, ref: nil)
         entries[key] = entry
         idToKey[nextCarbonID] = key
 
@@ -234,7 +267,7 @@ public final class HotKeyService {
             &ref
         )
         guard status == noErr, let ref else {
-            log.warning("注册热键失败：\(key, privacy: .public)，status=\(status, privacy: .public)")
+            log.error("注册热键失败：\(key, privacy: .public)，status=\(status, privacy: .public)")
             return
         }
         entry.ref = ref
@@ -276,18 +309,7 @@ public final class HotKeyService {
             let entry = entries[key]
         else { return }
 
-        log.info("触发全局快捷键：\(key, privacy: .public)")
-        switch entry.action {
-        case .togglePalette:
-            onTogglePalette?()
-        case .app(let bundleID):
-            onLaunchApp?(bundleID)
-        case .systemAction(let id):
-            onRunSystemAction?(id)
-        case .customCommand(let id):
-            onRunCustomCommand?(id)
-        case .plugin(let id):
-            onNavigateToPlugin?(id)
-        }
+        log.notice("触发全局快捷键：\(entry.commandID, privacy: .public)")
+        onCommand?(entry.commandID)
     }
 }

@@ -50,7 +50,9 @@ final class CalcEngine {
     }
 
     /// 判断输入是否像数学表达式
-    private func looksLikeExpression(_ expr: String) -> Bool {
+    ///
+    /// 给搜索闸门用：不像表达式就不要进求值，主面板每次按键都会问一次。
+    func looksLikeExpression(_ expr: String) -> Bool {
         let unitKeywords = ["to", "in", "转", "换"]
         if unitKeywords.contains(where: { expr.lowercased().contains($0) }) {
             return true

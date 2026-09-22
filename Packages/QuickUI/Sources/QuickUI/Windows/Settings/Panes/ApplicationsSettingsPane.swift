@@ -40,7 +40,7 @@ struct ApplicationsSettingsPane: View {
             return allApps
         }
         // 优先展示已配置别名或快捷键的应用，其余补齐前 30 个
-        let customized = allApps.filter { $0.alias != nil || $0.shortcutKeycaps != nil }
+        let customized = allApps.filter { $0.alias != nil }
         let customizedIDs = Set(customized.map(\.id))
         let remaining = allApps.filter { !customizedIDs.contains($0.id) }.prefix(30)
         return customized + remaining
@@ -51,7 +51,7 @@ struct ApplicationsSettingsPane: View {
         let totalCount = allApps.count
 
         return Form {
-            SearchScopesSection(dataSource: dataSource)
+            PluginIntroSection(dataSource: dataSource, pluginID: "launcher")
 
             Section {
                 // 搜索过滤框
@@ -95,8 +95,10 @@ struct ApplicationsSettingsPane: View {
             } header: {
                 Text("应用程序（\(totalCount) 个）")
             } footer: {
-                Text("为应用设置自定义别名（如 'code' 对应 VS Code）或全局快捷键以快速启动。")
+                Text("别名用来在主面板里搜到这个应用。快捷键到「快捷键」页添加。")
             }
+
+            CommandsSettingsPane(dataSource: dataSource, embedded: true)
         }
         .formStyle(.grouped)
         .onAppear {
@@ -166,16 +168,6 @@ private struct AppItemRow: View {
                 }
             )
 
-            // 快捷键录制
-            ShortcutRecorder(
-                keycaps: app.shortcutKeycaps,
-                onRecord: { keyCode, modifiers in
-                    dataSource.setAppShortcut(keyCode: keyCode, carbonModifiers: modifiers, for: app.bundleID)
-                },
-                onClear: {
-                    dataSource.clearAppShortcut(for: app.bundleID)
-                }
-            )
         }
         .padding(.vertical, 2)
         .onAppear {

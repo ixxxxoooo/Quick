@@ -24,6 +24,9 @@ public struct ResultListView: View {
     /// 协调选择状态（包含指针防抖与激活标记）
     public var selection: PaletteSelection?
 
+    /// 关掉后结果行不画图标
+    public var showsIcons: Bool
+
     /// 悬停的结果 ID
     @State private var hoveredID: String?
 
@@ -35,11 +38,13 @@ public struct ResultListView: View {
     public init(
         items: [SearchableItem],
         selectedIndex: Binding<Int>,
-        selection: PaletteSelection? = nil
+        selection: PaletteSelection? = nil,
+        showsIcons: Bool = true
     ) {
         self.items = items
         self._selectedIndex = selectedIndex
         self.selection = selection
+        self.showsIcons = showsIcons
     }
 
     /// 结果集的指纹
@@ -59,7 +64,8 @@ public struct ResultListView: View {
                         ResultRowView(
                             item: item,
                             isSelected: index == selectedIndex,
-                            isHovered: hoveredID == item.id
+                            isHovered: hoveredID == item.id,
+                            showsIcon: showsIcons
                         )
                         .id(item.id)
                         .onHover { hovering in
@@ -124,11 +130,14 @@ struct ResultRowView: View {
     let item: SearchableItem
     let isSelected: Bool
     let isHovered: Bool
+    var showsIcon = true
 
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.lg) {
-            resultIcon
-                .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
+            if showsIcon {
+                resultIcon
+                    .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
+            }
 
             Text(item.title)
                 .font(DesignTokens.Typography.rowTitle)

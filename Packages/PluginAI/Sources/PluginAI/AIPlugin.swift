@@ -18,6 +18,7 @@ public final class AIPlugin: QuickPlugin {
     public static let id = "ai"
     public static let name = "AI 聚合"
     public static let icon = "sparkles"
+    public static let description = "一站式直达主流大语言模型官网（DeepSeek、ChatGPT、Claude、Gemini 等），独立轻量窗口运行并保持登录态。"
     public static let triggerWords = [
         "ai", "AI", "聊天", "对话", "chat",
         "deepseek", "chatgpt", "gpt", "openai",
@@ -39,6 +40,35 @@ public final class AIPlugin: QuickPlugin {
     public init() {}
 
     // MARK: - 搜索
+
+    public static var commands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "ai.portal",
+                pluginID: id,
+                pluginName: name,
+                title: "AI 聚合门户",
+                subtitle: "管理所有 AI 官网窗口",
+                keywords: triggerWords,
+                icon: icon,
+                showsWhenQueryEmpty: true
+            )
+        ]
+    }
+
+    public func perform(commandID: String) {
+        guard commandID == "ai.portal" || commandID == CommandID.openPlugin(Self.id) else { return }
+        EventBus.shared.post(NavigateEvent(pluginID: Self.id))
+    }
+
+    public func accepts(query: String) -> Bool {
+        query.matchesAnyTriggerIncludingPrefix(AIProviderRegistry.allKeywords)
+    }
+
+    public func dynamicSearch(query: String) async -> [SearchableItem] {
+        guard !Task.isCancelled else { return [] }
+        return await searchItems(query: query)
+    }
 
     public func searchItems(query: String) async -> [SearchableItem] {
         // 闸门要认前缀：Provider 名是「用户打一半就该收窄」的东西 —— 打 `deep` 得能出

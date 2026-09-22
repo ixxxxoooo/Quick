@@ -4,6 +4,7 @@
 
 import AppKit
 import QuickCore
+import QuickUI
 
 /// 菜单栏状态项控制器
 ///
@@ -44,6 +45,15 @@ final class StatusItemController {
 
         item.menu = menu
         statusItem = item
+    }
+
+    /// 按「显示菜单栏图标」收起或装回
+    func applyVisibility() {
+        if PalettePreferences.showMenuBar {
+            if statusItem == nil { install() }
+        } else {
+            remove()
+        }
     }
 
     /// 移除菜单栏图标

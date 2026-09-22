@@ -22,16 +22,26 @@ struct SettingsDetailView: View {
             switch navigationState.tab {
             case .general:
                 GeneralPane(dataSource: dataSource)
+            case .appearance:
+                AppearancePane(dataSource: dataSource)
+            case .shortcuts:
+                ShortcutsPane(dataSource: dataSource)
+            case .search:
+                SearchPane(dataSource: dataSource)
             case .permissions:
                 PermissionsPane(dataSource: dataSource)
+            case .plugins:
+                ContentUnavailableView(
+                    "选择一个插件",
+                    systemImage: "square.grid.2x2",
+                    description: Text("插件在左侧单独列出。点进去可以看介绍、命令和它自己的设置。")
+                )
             case .applications:
                 ApplicationsSettingsPane(dataSource: dataSource)
             case .systemActions:
                 SystemActionsSettingsPane(dataSource: dataSource)
             case .commands:
                 CommandsSettingsPane(dataSource: dataSource)
-            case .windowManagement:
-                WindowManagementSettingsPane(dataSource: dataSource)
             case .about:
                 AboutPane(dataSource: dataSource)
             default:

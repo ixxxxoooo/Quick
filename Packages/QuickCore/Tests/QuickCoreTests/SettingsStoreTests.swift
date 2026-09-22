@@ -89,4 +89,20 @@ struct SettingsStoreTests {
         #expect(storeA.isPluginEnabled("snippets") == false)
         #expect(storeB.isPluginEnabled("snippets"), "另一个域不该看到这次改动")
     }
+
+    @Test("命令和搜索来源默认打开，关掉后能读回")
+    func commandAndSearchSourceFlags() {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        #expect(store.isCommandEnabled("systemcontrol.lock"))
+        #expect(store.isSearchSourceEnabled("filesearch"))
+
+        store.setCommandEnabled("systemcontrol.lock", enabled: false)
+        store.setSearchSourceEnabled("filesearch", enabled: false)
+
+        #expect(store.isCommandEnabled("systemcontrol.lock") == false)
+        #expect(store.isSearchSourceEnabled("filesearch") == false)
+        #expect(store.isCommandEnabled("systemcontrol.sleep"))
+    }
 }

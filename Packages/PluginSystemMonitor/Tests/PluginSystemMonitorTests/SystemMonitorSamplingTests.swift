@@ -35,7 +35,7 @@ struct SystemMonitorSamplingTests {
     @Test("间隔跟着键走，没设置过就是设置页显示的 2 秒")
     func configuredIntervalFollowsTheKey() throws {
         let defaults = try #require(
-            UserDefaults(suiteName: "com.ygw.quick.tests.sysmonitor.\(UUID().uuidString)"))
+            UserDefaults(suiteName: "com.ixxxxoooo.quick.tests.sysmonitor.\(UUID().uuidString)"))
 
         #expect(SystemMonitorSampling.configuredInterval(defaults: defaults) == 2)
 
@@ -64,7 +64,7 @@ struct SystemMonitorSamplingLoopTests {
     }
 
     private static func makeDefaults(interval: Int) -> UserDefaults? {
-        let defaults = UserDefaults(suiteName: "com.ygw.quick.tests.sysmonitor.\(UUID().uuidString)")
+        let defaults = UserDefaults(suiteName: "com.ixxxxoooo.quick.tests.sysmonitor.\(UUID().uuidString)")
         defaults?.set(interval, forKey: PluginSettingKey.SystemMonitor.interval)
         return defaults
     }

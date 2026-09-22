@@ -16,32 +16,25 @@ public struct SettingsKeyboardLayout: Identifiable, Sendable, Equatable {
     }
 }
 
-/// 一条窗口布局命令（窗口管理插件提供）
-///
-/// id 是插件的 `WindowLayout` rawValue，设置页按它写「是否显示」的开关。
-public struct SettingsWindowLayoutCommand: Identifiable, Sendable {
-    public let id: String
-    public let name: String
-    public let icon: String
-
-    public init(id: String, name: String, icon: String) {
-        self.id = id
-        self.name = name
-        self.icon = icon
-    }
-}
-
 /// 设置窗口里的一行插件
 public struct SettingsPlugin: Identifiable, Sendable {
     public let id: String
     public let name: String
     public let icon: String
+    public let description: String
     public let triggerWords: [String]
 
-    public init(id: String, name: String, icon: String, triggerWords: [String] = []) {
+    public init(
+        id: String,
+        name: String,
+        icon: String,
+        description: String = "",
+        triggerWords: [String] = []
+    ) {
         self.id = id
         self.name = name
         self.icon = icon
+        self.description = description
         self.triggerWords = triggerWords
     }
 }
@@ -54,7 +47,6 @@ public struct SettingsAppItem: Identifiable, Sendable {
     public let path: String
     public let isSystemApp: Bool
     public let alias: String?
-    public let shortcutKeycaps: [String]?
 
     public init(
         id: String,
@@ -62,8 +54,7 @@ public struct SettingsAppItem: Identifiable, Sendable {
         bundleID: String,
         path: String,
         isSystemApp: Bool,
-        alias: String? = nil,
-        shortcutKeycaps: [String]? = nil
+        alias: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -71,7 +62,6 @@ public struct SettingsAppItem: Identifiable, Sendable {
         self.path = path
         self.isSystemApp = isSystemApp
         self.alias = alias
-        self.shortcutKeycaps = shortcutKeycaps
     }
 }
 
@@ -82,7 +72,7 @@ public struct SettingsSystemActionItem: Identifiable, Sendable {
     public let description: String
     public let icon: String
     public let alias: String?
-    public let shortcutKeycaps: [String]?
+    public let isEnabled: Bool
 
     public init(
         id: String,
@@ -90,14 +80,14 @@ public struct SettingsSystemActionItem: Identifiable, Sendable {
         description: String,
         icon: String,
         alias: String? = nil,
-        shortcutKeycaps: [String]? = nil
+        isEnabled: Bool = true
     ) {
         self.id = id
         self.title = title
         self.description = description
         self.icon = icon
         self.alias = alias
-        self.shortcutKeycaps = shortcutKeycaps
+        self.isEnabled = isEnabled
     }
 }
 
@@ -108,7 +98,6 @@ public struct SettingsCustomCommandItem: Identifiable, Sendable {
     public let command: String
     public let isEnabled: Bool
     public let alias: String?
-    public let shortcutKeycaps: [String]?
     public let workingDirectory: String?
     /// 是否用交互式 shell 执行（`.zshrc` 里的别名与 PATH 才在）
     public let loadsShellEnvironment: Bool
@@ -119,7 +108,6 @@ public struct SettingsCustomCommandItem: Identifiable, Sendable {
         command: String,
         isEnabled: Bool,
         alias: String? = nil,
-        shortcutKeycaps: [String]? = nil,
         workingDirectory: String? = nil,
         loadsShellEnvironment: Bool = false
     ) {
@@ -128,7 +116,6 @@ public struct SettingsCustomCommandItem: Identifiable, Sendable {
         self.command = command
         self.isEnabled = isEnabled
         self.alias = alias
-        self.shortcutKeycaps = shortcutKeycaps
         self.workingDirectory = workingDirectory
         self.loadsShellEnvironment = loadsShellEnvironment
     }
@@ -159,7 +146,7 @@ public enum SettingsPermission: String, CaseIterable, Sendable {
     public var purpose: String {
         switch self {
         case .accessibility:
-            "用于窗口管理（移动/缩放其他应用的窗口）。系统只允许已授权的应用这样做。"
+            "用于需要辅助功能的插件操作。系统只允许已授权的应用控制其他界面。"
         case .screenCapture:
             "用于截图与窗口捕获。macOS 只允许已授权的应用读取屏幕内容。"
         case .location:
@@ -179,6 +166,58 @@ public struct SettingsPermissionState: Sendable {
     }
 }
 
+/// 快捷键页里的一行：左边是已录制的键，右边是命令
+public struct SettingsCommandBinding: Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let pluginName: String
+    public let icon: String
+    public let isInvocationEnabled: Bool
+    public let keycaps: [String]?
+    /// 唤醒这条功能的关键字。用户在主面板或快捷键页输入其中任意一个
+    public let keywords: [String]
+
+    public init(
+        id: String,
+        title: String,
+        pluginName: String,
+        icon: String,
+        isInvocationEnabled: Bool,
+        keycaps: [String]?,
+        keywords: [String] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.pluginName = pluginName
+        self.icon = icon
+        self.isInvocationEnabled = isInvocationEnabled
+        self.keycaps = keycaps
+        self.keywords = keywords
+    }
+
+    /// 快捷键页里展示的那个关键字：优先用声明的唤醒词，没有就用标题
+    public var wakeKeyword: String {
+        keywords.first ?? title
+    }
+}
+
+/// 主搜索的一个来源
+public struct SettingsSearchSource: Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let subtitle: String
+    public let icon: String
+    public let isEnabled: Bool
+
+    public init(id: String, title: String, subtitle: String, icon: String, isEnabled: Bool) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.isEnabled = isEnabled
+    }
+}
+
 /// 设置窗口的数据源与动作
 @MainActor
 public protocol SettingsDataSource: AnyObject {
@@ -187,9 +226,28 @@ public protocol SettingsDataSource: AnyObject {
     var isLaunchAtLoginEnabled: Bool { get }
     func setLaunchAtLogin(_ enabled: Bool)
     var hotKeyDescription: String { get }
-    var globalShortcutKeycaps: [String]? { get }
-    func setGlobalShortcut(keyCode: Int, carbonModifiers: Int)
-    func clearGlobalShortcut()
+
+    /// 唤出主面板当前的键帽。清空后是 ⌥Space
+    var togglePaletteKeycaps: [String] { get }
+    /// 把录到的 Carbon 键码格式化成键帽，给还没落盘的草稿用
+    func shortcutKeycaps(keyCode: Int, carbonModifiers: Int) -> [String]
+    /// 已经绑了快捷键的命令，不含唤出主面板
+    func boundCommandBindings() -> [SettingsCommandBinding]
+    /// 把用户输入的关键字解析成唯一一条命令。对不上、或同时对上多条时返回 nil
+    func resolveKeyword(_ keyword: String) -> SettingsCommandBinding?
+    /// 把已有快捷键改绑到另一个关键字。成功返回 nil，失败返回给用户看的原因
+    func retargetShortcut(from commandID: String, keyword: String) -> String?
+    /// 某个插件声明的命令，给插件页介绍用
+    func pluginCommands(_ pluginID: String) -> [SettingsCommandBinding]
+    /// 录制成功返回 true；组合键已被占用时返回 false，偏好不变
+    func setCommandShortcut(keyCode: Int, carbonModifiers: Int, for commandID: String) -> Bool
+    func clearCommandShortcut(for commandID: String)
+    func isCommandEnabled(_ commandID: String) -> Bool
+    func setCommandEnabled(_ commandID: String, enabled: Bool)
+
+    // MARK: - 搜索来源
+    var searchSources: [SettingsSearchSource] { get }
+    func setSearchSourceEnabled(_ pluginID: String, enabled: Bool)
 
     // MARK: - 启动器：应用与搜索范围
     var searchScopes: [String] { get }
@@ -198,14 +256,10 @@ public protocol SettingsDataSource: AnyObject {
     var indexedApplications: [SettingsAppItem] { get }
     func appIcon(for path: String) -> NSImage?
     func setAppAlias(_ alias: String?, for bundleID: String)
-    func setAppShortcut(keyCode: Int, carbonModifiers: Int, for bundleID: String)
-    func clearAppShortcut(for bundleID: String)
 
     // MARK: - 启动器：系统操作
     var systemActions: [SettingsSystemActionItem] { get }
     func setSystemActionAlias(_ alias: String?, for id: String)
-    func setSystemActionShortcut(keyCode: Int, carbonModifiers: Int, for id: String)
-    func clearSystemActionShortcut(for id: String)
 
     // MARK: - 启动器：Shell 与自定义命令
     var isRunShellFallbackEnabled: Bool { get }
@@ -217,15 +271,8 @@ public protocol SettingsDataSource: AnyObject {
         id: UUID, name: String, command: String, isEnabled: Bool, alias: String?,
         workingDirectory: String?, loadsShellEnvironment: Bool)
     func deleteCustomCommand(id: UUID)
-    func setCustomCommandShortcut(keyCode: Int, carbonModifiers: Int, for id: UUID)
-    func clearCustomCommandShortcut(for id: UUID)
 
     // MARK: - 功能插件设置
-    /// 窗口管理的布局命令
-    ///
-    /// 由插件提供而不是设置页自己列一份：设置页按这些 id 写「是否显示」的开关，
-    /// 抄一份迟早会和插件里的 id 对不上（这曾经是一次真实缺陷）。
-    var windowLayoutCommands: [SettingsWindowLayoutCommand] { get }
 
     /// 系统里可选的键盘布局
     ///
@@ -240,9 +287,6 @@ public protocol SettingsDataSource: AnyObject {
     func isPluginEnabled(_ id: String) -> Bool
     func setPluginEnabled(_ id: String, enabled: Bool)
     func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView?
-    func pluginShortcutKeycaps(for pluginID: String) -> [String]?
-    func setPluginShortcut(keyCode: Int, carbonModifiers: Int, for pluginID: String)
-    func clearPluginShortcut(for pluginID: String)
 
     // MARK: - 权限
     func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState

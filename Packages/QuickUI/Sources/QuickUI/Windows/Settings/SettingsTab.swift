@@ -4,44 +4,29 @@
 
 import Foundation
 
-/// 设置窗口的分组结构
+/// 设置窗口的分组
+///
+/// 上面是宿主自己的页面。`插件` 是侧边栏里的一级分类，每个插件是它下面的一项。
 public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
-    case general
-    case launcher
-    case features
-    case advanced
+    case host
+    case plugins
+    case about
 
     public var id: Self { self }
 
     public var title: String {
         switch self {
-        case .general: "通用"
-        case .launcher: "启动器"
-        case .features: "功能插件"
-        case .advanced: "高级"
+        case .host, .about: ""
+        case .plugins: "插件"
         }
     }
 
+    /// 宿主页面。插件列表不写死在这里，侧边栏按已注册插件生成
     public var tabs: [SettingsTab] {
         switch self {
-        case .general:
-            return [.general, .appearance, .shortcuts, .permissions]
-        case .launcher:
-            return [.applications, .systemActions, .commands]
-        case .features:
-            return [
-                .clipboard, .calculator, .fileSearch, .snippets,
-                .notes, .calendar, .weather,
-                .ai, .translator, .systemMonitor,
-                .networkTools, .ocr, .screenshot,
-                // 开发者工具：原先是一个 devtools 容器，现在每个工具都是独立插件
-                .jsonFormatter, .sqlFormatter, .base64Codec, .urlCodec,
-                .uuidGenerator, .hashCalculator, .timestampConverter,
-                .wordCounter, .textDiff, .markdownPreview, .colorCompare,
-                .superPanel
-            ]
-        case .advanced:
-            return [.about]
+        case .host: [.general, .appearance, .shortcuts, .permissions, .search]
+        case .plugins: []
+        case .about: [.about]
         }
     }
 }
@@ -55,6 +40,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case shortcuts
     case plugins
     case permissions
+    case search
 
     // MARK: - 启动器
     case applications
@@ -96,14 +82,15 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     /// 侧边栏标题
     public var title: String {
         switch self {
-        case .general: "通用设置"
+        case .general: "通用"
         case .appearance: "外观"
         case .shortcuts: "快捷键"
-        case .plugins: "插件管理"
+        case .plugins: "插件"
         case .permissions: "权限"
+        case .search: "搜索"
 
-        case .applications: "应用程序"
-        case .systemActions: "系统操作"
+        case .applications: "应用启动器"
+        case .systemActions: "系统控制"
         case .commands: "终端命令"
 
         case .clipboard: "剪贴板历史"
@@ -144,6 +131,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: "command"
         case .plugins: "square.grid.2x2"
         case .permissions: "lock.shield"
+        case .search: "magnifyingglass"
 
         case .applications: "app.badge"
         case .systemActions: "bolt"
@@ -211,5 +199,10 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .superPanel: "superPanel"
         default: nil
         }
+    }
+
+    /// 按插件 id 找到它的设置页
+    public static func tab(forPluginID pluginID: String) -> SettingsTab? {
+        allCases.first { $0.pluginID == pluginID }
     }
 }

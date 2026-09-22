@@ -2,10 +2,10 @@
 #
 # Quick — 构建 .app。
 #
-#   ./Scripts/build.sh            构建 Debug（Quick Dev.app / com.ygw.quick.dev）
+#   ./Scripts/build.sh            构建 Debug（Quick Dev.app / com.ixxxxoooo.quick.dev）
 #   ./Scripts/build.sh --run      构建并启动
 #   ./Scripts/build.sh --path     只打印产物路径
-#   ./Scripts/build.sh --release  构建 Release（Quick.app / com.ygw.quick）
+#   ./Scripts/build.sh --release  构建 Release（Quick.app / com.ixxxxoooo.quick）
 #
 # 用了固定的 derivedDataPath，所以产物路径是确定的，
 # --run / --path 不需要去猜 Xcode 把东西放哪了。

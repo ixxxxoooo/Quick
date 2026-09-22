@@ -53,10 +53,13 @@ struct FeatureSettingsPane: View {
                 Text(tab.title)
             }
 
-            // 第二部分：唤醒命令
+            // 第二部分：功能说明
+            descriptionSection
+
+            // 唤醒词只读展示。快捷键只在「快捷键」页绑定
             Group {
                 triggerWordsSection
-                shortcutSection
+                commandsSection
             }
             .settingsEnabled(isEnabled)
 
@@ -74,6 +77,22 @@ struct FeatureSettingsPane: View {
             pluginIdentitySection
         }
         .formStyle(.grouped)
+    }
+
+    /// 插件功能说明区域
+    @ViewBuilder
+    private var descriptionSection: some View {
+        if let info = pluginInfo, !info.description.isEmpty {
+            Section {
+                SettingsRow(
+                    title: "插件说明",
+                    subtitle: info.description,
+                    icon: { SettingsRowIcon(systemImage: "info.circle") }
+                )
+            } header: {
+                Text("功能说明")
+            }
+        }
     }
 
     /// 触发词列表区域
@@ -109,6 +128,38 @@ struct FeatureSettingsPane: View {
         }
     }
 
+    /// 这个插件对外的命令。绑定快捷键不在本页
+    @ViewBuilder
+    private var commandsSection: some View {
+        let commands = dataSource.pluginCommands(tab.pluginID ?? "")
+        if !commands.isEmpty {
+            Section {
+                ForEach(commands) { command in
+                    SettingsRow(
+                        title: command.title,
+                        subtitle: commandSubtitle(command),
+                        icon: {
+                            SettingsRowIcon(systemImage: command.icon, isEnabled: command.isInvocationEnabled)
+                        }
+                    )
+                }
+            } header: {
+                Text("命令")
+            } footer: {
+                Text("要给其中一条绑快捷键，打开「快捷键」，在插件绑定里写它的关键字。")
+            }
+        }
+    }
+
+    /// 命令行的说明：关键字是唤醒词
+    private func commandSubtitle(_ command: SettingsCommandBinding) -> String {
+        let words = command.keywords.isEmpty ? command.title : command.keywords.joined(separator: "、")
+        if command.isInvocationEnabled {
+            return "关键字：\(words)。在主面板输入即可唤醒这个功能。"
+        }
+        return "关键字：\(words)。已关闭，主搜索和快捷键都不会生效。"
+    }
+
     /// 触发词标签
     private func triggerChips(_ words: [String]) -> some View {
         HStack(spacing: DesignTokens.Spacing.xs) {
@@ -126,34 +177,7 @@ struct FeatureSettingsPane: View {
         }
     }
 
-    /// 快捷键绑定区域
-    @ViewBuilder
-    private var shortcutSection: some View {
-        if let pluginID = tab.pluginID {
-            Section {
-                SettingsRow(
-                    title: "全局快捷键",
-                    subtitle: "在任何应用中按下即可打开此插件面板。",
-                    icon: { SettingsRowIcon(systemImage: "keyboard") }
-                ) {
-                    ShortcutRecorder(
-                        keycaps: dataSource.pluginShortcutKeycaps(for: pluginID),
-                        onRecord: { keyCode, modifiers in
-                            dataSource.setPluginShortcut(
-                                keyCode: keyCode, carbonModifiers: modifiers, for: pluginID)
-                        },
-                        onClear: {
-                            dataSource.clearPluginShortcut(for: pluginID)
-                        }
-                    )
-                }
-            } header: {
-                Text("快捷键")
-            }
-        }
-    }
-
-    /// 插件身份说明
+    /// 触发词标签
     ///
     /// Quick 目前只支持内置插件 —— 它们和宿主一起编译、一起签名，不加载任何外部代码。
     /// 把这件事写在每个插件的设置页里，是因为「插件」这个词会让人以为能装第三方的：
@@ -214,7 +238,7 @@ struct FeatureSettingsPane: View {
         case .weather:
             WeatherFeatureSection()
         case .ai:
-            AIFeatureSection()
+            EmptyView()
         case .translator:
             TranslatorFeatureSection()
         case .jsonFormatter:
@@ -230,19 +254,24 @@ struct FeatureSettingsPane: View {
         case .screenshot:
             ScreenshotFeatureSection()
 
-        // 还没有专属选项的插件：说清楚，而不是留一片空白让人以为页没加载完
-        case .sqlFormatter, .base64Codec, .urlCodec, .hashCalculator,
-            .timestampConverter, .wordCounter, .textDiff,
-            .markdownPreview, .colorCompare:
-            Section {
-                SettingsRow(
-                    title: "暂无专属设置",
-                    subtitle: "这个插件的参数都在它的面板里直接调整，例如模式切换与缩进。",
-                    icon: { SettingsRowIcon(systemImage: "slider.horizontal.3") }
-                )
-            } header: {
-                Text("插件设置")
-            }
+        case .sqlFormatter:
+            SQLFormatterFeatureSection()
+        case .base64Codec:
+            Base64CodecFeatureSection()
+        case .urlCodec:
+            URLCodecFeatureSection()
+        case .hashCalculator:
+            HashCalculatorFeatureSection()
+        case .timestampConverter:
+            TimestampConverterFeatureSection()
+        case .wordCounter:
+            WordCounterFeatureSection()
+        case .textDiff:
+            TextDiffFeatureSection()
+        case .markdownPreview:
+            MarkdownPreviewFeatureSection()
+        case .colorCompare:
+            ColorCompareFeatureSection()
 
         default:
             EmptyView()
@@ -578,83 +607,6 @@ private struct WeatherFeatureSection: View {
     }
 }
 
-private struct AIFeatureSection: View {
-    @AppStorage(PluginSettingKey.AI.defaultAlwaysOnTop) private var alwaysOnTop = false
-
-    var body: some View {
-        Section {
-            SettingsRow(
-                title: "AI 聚合门户",
-                subtitle: "集成 DeepSeek、ChatGPT、Gemini、Claude、豆包、Kimi、智谱、通义千问等 AI 官网。"
-                    + "每个服务在独立窗口中运行，保持登录态。",
-                icon: { SettingsRowIcon(systemImage: "sparkles") }
-            )
-        } header: {
-            Text("关于")
-        }
-
-        Section {
-            Toggle(isOn: $alwaysOnTop) {
-                SettingsRow(
-                    title: "窗口默认置顶",
-                    subtitle: "新打开的 AI 窗口默认悬浮在最前。",
-                    icon: { SettingsRowIcon(systemImage: "pin") }
-                )
-            }
-        } header: {
-            Text("窗口偏好")
-        }
-
-        Section {
-            ForEach(aiProviderNames, id: \.id) { item in
-                AIProviderToggleRow(id: item.id, name: item.name, icon: item.icon)
-            }
-        } header: {
-            Text("AI 服务")
-        } footer: {
-            Text("关闭的服务不会出现在搜索结果和聚合面板中。")
-        }
-    }
-
-    /// 内置 Provider 列表（仅用于设置展示，避免 QuickUI 依赖 PluginAI）
-    private var aiProviderNames: [(id: String, name: String, icon: String)] {
-        [
-            (id: "deepseek", name: "DeepSeek", icon: "brain.head.profile"),
-            (id: "chatgpt", name: "ChatGPT", icon: "bubble.left.and.text.bubble.right"),
-            (id: "gemini", name: "Gemini", icon: "sparkle"),
-            (id: "claude", name: "Claude", icon: "text.bubble"),
-            (id: "doubao", name: "豆包", icon: "leaf"),
-            (id: "kimi", name: "Kimi", icon: "moon"),
-            (id: "glm", name: "智谱清言", icon: "wand.and.stars"),
-            (id: "tongyi", name: "通义千问", icon: "cloud")
-        ]
-    }
-}
-
-/// 单个 AI Provider 的启用/禁用开关行
-private struct AIProviderToggleRow: View {
-    let id: String
-    let name: String
-    let icon: String
-    @AppStorage var isEnabled: Bool
-
-    init(id: String, name: String, icon: String) {
-        self.id = id
-        self.name = name
-        self.icon = icon
-        self._isEnabled = AppStorage(wrappedValue: true, "ai.provider.\(id).enabled")
-    }
-
-    var body: some View {
-        Toggle(isOn: $isEnabled) {
-            SettingsRow(
-                title: name,
-                icon: { SettingsRowIcon(systemImage: icon) }
-            )
-        }
-    }
-}
-
 private struct TranslatorFeatureSection: View {
     @AppStorage(PluginSettingKey.Translator.targetLang) private var targetLang = "zh-Hans"
     @AppStorage(PluginSettingKey.Translator.autoDetect) private var autoDetect = true
@@ -890,6 +842,271 @@ private struct ScreenshotFeatureSection: View {
             }
         } header: {
             Text("截图设置")
+        }
+    }
+}
+
+// MARK: - 独立开发者工具设置子表单
+
+private struct SQLFormatterFeatureSection: View {
+    @AppStorage(PluginSettingKey.SQLFormatter.keywordCase) private var keywordCase = "uppercase"
+    @AppStorage(PluginSettingKey.SQLFormatter.indent) private var indent = 2
+
+    var body: some View {
+        Section {
+            Picker(selection: $keywordCase) {
+                Text("大写 (UPPERCASE)").tag("uppercase")
+                Text("小写 (lowercase)").tag("lowercase")
+            } label: {
+                SettingsRow(
+                    title: "关键字大小写",
+                    subtitle: "格式化时 SELECT、FROM 等 SQL 关键字的风格。",
+                    icon: { SettingsRowIcon(systemImage: "textformat") }
+                )
+            }
+
+            Picker(selection: $indent) {
+                Text("2 个空格").tag(2)
+                Text("4 个空格").tag(4)
+            } label: {
+                SettingsRow(
+                    title: "缩进宽度",
+                    subtitle: "每层子查询与表达式的缩进空格数。",
+                    icon: { SettingsRowIcon(systemImage: "increase.indent") }
+                )
+            }
+        } header: {
+            Text("SQL 格式化选项")
+        }
+    }
+}
+
+private struct Base64CodecFeatureSection: View {
+    @AppStorage(PluginSettingKey.Base64Codec.urlSafe) private var urlSafe = false
+    @AppStorage(PluginSettingKey.Base64Codec.wrapLines) private var wrapLines = false
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $urlSafe) {
+                SettingsRow(
+                    title: "URL 安全模式 (URL-Safe)",
+                    subtitle: "将字符 +/ 替换为 -_，且省略尾部填充 =，适用于 URL 传参。",
+                    icon: { SettingsRowIcon(systemImage: "shield") }
+                )
+            }
+
+            Toggle(isOn: $wrapLines) {
+                SettingsRow(
+                    title: "自动换行",
+                    subtitle: "编码长数据时每 76 个字符自动插入换行符。",
+                    icon: { SettingsRowIcon(systemImage: "text.alignleft") }
+                )
+            }
+        } header: {
+            Text("编解码规则")
+        }
+    }
+}
+
+private struct URLCodecFeatureSection: View {
+    @AppStorage(PluginSettingKey.URLCodec.encodeSpacesAsPluses) private var spacesAsPluses = false
+    @AppStorage(PluginSettingKey.URLCodec.encodeFullUrl) private var encodeFullUrl = false
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $spacesAsPluses) {
+                SettingsRow(
+                    title: "空格编码为加号 (+)",
+                    subtitle: "关闭时使用标准的 %20，开启后符合 application/x-www-form-urlencoded 规范。",
+                    icon: { SettingsRowIcon(systemImage: "plus") }
+                )
+            }
+
+            Toggle(isOn: $encodeFullUrl) {
+                SettingsRow(
+                    title: "完整 URL 模式",
+                    subtitle: "保留 :// 等协议分隔符，仅对查询参数与路径非保留字符编码。",
+                    icon: { SettingsRowIcon(systemImage: "link") }
+                )
+            }
+        } header: {
+            Text("URL 编码选项")
+        }
+    }
+}
+
+private struct HashCalculatorFeatureSection: View {
+    @AppStorage(PluginSettingKey.HashCalculator.uppercase) private var uppercase = false
+    @AppStorage(PluginSettingKey.HashCalculator.autoCopy) private var autoCopy = false
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $uppercase) {
+                SettingsRow(
+                    title: "十六进制大写显示",
+                    subtitle: "输出 A-F 而非默认的小写 a-f 散列值。",
+                    icon: { SettingsRowIcon(systemImage: "textformat") }
+                )
+            }
+
+            Toggle(isOn: $autoCopy) {
+                SettingsRow(
+                    title: "计算后自动复制",
+                    subtitle: "输入文本后自动把首选 SHA-256 散列结果复制到剪贴板。",
+                    icon: { SettingsRowIcon(systemImage: "doc.on.clipboard") }
+                )
+            }
+        } header: {
+            Text("计算与输出")
+        }
+    }
+}
+
+private struct TimestampConverterFeatureSection: View {
+    @AppStorage(PluginSettingKey.TimestampConverter.defaultUnit) private var defaultUnit = "seconds"
+    @AppStorage(PluginSettingKey.TimestampConverter.timeZone) private var timeZone = "local"
+
+    var body: some View {
+        Section {
+            Picker(selection: $defaultUnit) {
+                Text("秒 (10 位)").tag("seconds")
+                Text("毫秒 (13 位)").tag("milliseconds")
+            } label: {
+                SettingsRow(
+                    title: "默认时间戳单位",
+                    subtitle: "生成当前时间戳时使用的默认精度单位。",
+                    icon: { SettingsRowIcon(systemImage: "clock") }
+                )
+            }
+
+            Picker(selection: $timeZone) {
+                Text("本地时区 (Local)").tag("local")
+                Text("协调世界时 (UTC)").tag("utc")
+            } label: {
+                SettingsRow(
+                    title: "默认时区",
+                    subtitle: "格式化输出可读日期文本时使用的参考时区。",
+                    icon: { SettingsRowIcon(systemImage: "globe") }
+                )
+            }
+        } header: {
+            Text("转换偏好")
+        }
+    }
+}
+
+private struct WordCounterFeatureSection: View {
+    @AppStorage(PluginSettingKey.WordCounter.ignoreWhitespace) private var ignoreWhitespace = false
+    @AppStorage(PluginSettingKey.WordCounter.readingSpeedWPM) private var readingSpeed = 300
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $ignoreWhitespace) {
+                SettingsRow(
+                    title: "字符统计忽略空白符",
+                    subtitle: "统计总字数时不计入空格、制表符与换行符。",
+                    icon: { SettingsRowIcon(systemImage: "character") }
+                )
+            }
+
+            Picker(selection: $readingSpeed) {
+                Text("200 字/分（沉浸阅读）").tag(200)
+                Text("300 字/分（标准阅读）").tag(300)
+                Text("400 字/分（快速浏览）").tag(400)
+            } label: {
+                SettingsRow(
+                    title: "预估阅读速度",
+                    subtitle: "用于估算文本所需阅读时长。",
+                    icon: { SettingsRowIcon(systemImage: "speedometer") }
+                )
+            }
+        } header: {
+            Text("统计规则")
+        }
+    }
+}
+
+private struct TextDiffFeatureSection: View {
+    @AppStorage(PluginSettingKey.TextDiff.ignoreWhitespace) private var ignoreWhitespace = false
+    @AppStorage(PluginSettingKey.TextDiff.ignoreCase) private var ignoreCase = false
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $ignoreWhitespace) {
+                SettingsRow(
+                    title: "忽略空白字符差异",
+                    subtitle: "比对文本时忽略行首行尾空格与换行符的变动。",
+                    icon: { SettingsRowIcon(systemImage: "space") }
+                )
+            }
+
+            Toggle(isOn: $ignoreCase) {
+                SettingsRow(
+                    title: "忽略大小写差异",
+                    subtitle: "比对英文字符时不区分大写与小写。",
+                    icon: { SettingsRowIcon(systemImage: "textformat.size") }
+                )
+            }
+        } header: {
+            Text("文本比对选项")
+        }
+    }
+}
+
+private struct MarkdownPreviewFeatureSection: View {
+    @AppStorage(PluginSettingKey.MarkdownPreview.showLineNumbers) private var showLineNumbers = true
+    @AppStorage(PluginSettingKey.MarkdownPreview.enableMathJax) private var enableMathJax = true
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $showLineNumbers) {
+                SettingsRow(
+                    title: "代码块显示行号",
+                    subtitle: "在渲染的代码语法高亮区块左侧显示代码行号。",
+                    icon: { SettingsRowIcon(systemImage: "list.number") }
+                )
+            }
+
+            Toggle(isOn: $enableMathJax) {
+                SettingsRow(
+                    title: "启用数学公式渲染 (LaTeX)",
+                    subtitle: "自动识别并渲染 $...$ 与 $$...$$ 内的数学公式。",
+                    icon: { SettingsRowIcon(systemImage: "function") }
+                )
+            }
+        } header: {
+            Text("Markdown 渲染")
+        }
+    }
+}
+
+private struct ColorCompareFeatureSection: View {
+    @AppStorage(PluginSettingKey.ColorCompare.defaultFormat) private var defaultFormat = "hex"
+    @AppStorage(PluginSettingKey.ColorCompare.uppercaseHex) private var uppercaseHex = true
+
+    var body: some View {
+        Section {
+            Picker(selection: $defaultFormat) {
+                Text("十六进制 (HEX)").tag("hex")
+                Text("RGB 格式").tag("rgb")
+                Text("HSL 格式").tag("hsl")
+            } label: {
+                SettingsRow(
+                    title: "默认色彩格式",
+                    subtitle: "复制颜色代码时的优先格式。",
+                    icon: { SettingsRowIcon(systemImage: "paintpalette") }
+                )
+            }
+
+            Toggle(isOn: $uppercaseHex) {
+                SettingsRow(
+                    title: "HEX 字母大写",
+                    subtitle: "生成 #FFFFFF 而不是小写的 #ffffff。",
+                    icon: { SettingsRowIcon(systemImage: "textformat") }
+                )
+            }
+        } header: {
+            Text("颜色格式")
         }
     }
 }

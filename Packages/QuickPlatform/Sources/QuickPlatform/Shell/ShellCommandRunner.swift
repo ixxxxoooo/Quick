@@ -77,7 +77,7 @@ public enum ShellCommandRunner {
     /// 不能用 `Task.detached`：那占的是 Swift 协作线程池的线程，池子只有核心数个，
     /// 一条卡住的命令就可能让面板的其他异步活一起排队。并发而非串行 —— 多命令互不排队。
     private static let queue = DispatchQueue(
-        label: "com.ygw.quick.shell-command", qos: .userInitiated, attributes: .concurrent)
+        label: "com.ixxxxoooo.quick.shell-command", qos: .userInitiated, attributes: .concurrent)
 
     // MARK: - 后台执行
 
