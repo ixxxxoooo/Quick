@@ -84,10 +84,13 @@ public final class PaletteCoordinator {
     /// 首屏顺序依赖它，所以它必须是宿主级的：应用、命令、工具条目都在同一张表里。
     public var usageHistory: UsageHistory?
 
-    /// 面板外点击的监视器
+    /// 面板外点击的监视器（发往其他应用的点击）
     ///
     /// 与协调器同生命周期（进程级），所以不主动摘除 —— 面板一旦创建就一直存在。
     private var outsideClickMonitor: Any?
+
+    /// 面板外点击的本地监视器（发往本应用其他窗口的点击）
+    private var outsideClickLocalMonitor: Any?
 
     /// 分离面板回调（由 AppCore 注入，协调器不直接持有 PluginPanelController）
     public var onDetach: ((String) -> Void)?
@@ -648,10 +651,11 @@ public final class PaletteCoordinator {
     /// 于是面板会在启动几秒后自己消失。用户要的只是「点空白处关掉」，
     /// 那就精确地只对「点击」作出反应。
     ///
-    /// **只装全局监视器。** 它收到的是发往其他应用的事件，也就是「点到别的应用去了」，
-    /// 这正好是用户说的「空白处」。曾经还装过一个本地监视器来处理「点了本应用的其他
-    /// 窗口」，但它会收到启动阶段某些非用户发起的事件，导致面板刚显示就被收起 ——
-    /// 与其猜哪些本地事件算数，不如不做：点设置窗口时面板不收，代价小得多。
+    /// 两个监视器都要：**全局**收「点到别的应用」，**本地**收「点到本应用的其他窗口」
+    /// （设置窗口、分离窗口）。只装全局时，点设置窗口面板会赖在它上面不收。
+    ///
+    /// 本地监视器按「点击点是否落在面板框内」判断，而不是见到本地点击就收 ——
+    /// 启动阶段有些非用户发起的本地事件，按位置过滤后它们都落在面板内，不会误伤。
     ///
     /// 鼠标事件不需要辅助功能权限（键盘事件才需要）。
     private func observeOutsideClicks(on panel: PalettePanel) {
@@ -659,6 +663,20 @@ public final class PaletteCoordinator {
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
         ) { [weak self] _ in
             Task { @MainActor in self?.hideIfVisible() }
+        }
+
+        outsideClickLocalMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self, weak panel] event in
+            // 本地监视器回调在主线程上，面板与其状态都是主线程隔离的
+            MainActor.assumeIsolated {
+                guard let self, let panel else { return }
+                if !panel.frame.contains(NSEvent.mouseLocation) {
+                    self.hideIfVisible()
+                }
+            }
+            // 必须放行：本地监视器会把事件拦下来，返回 nil 的话设置窗口自己也点不动了
+            return event
         }
     }
 
