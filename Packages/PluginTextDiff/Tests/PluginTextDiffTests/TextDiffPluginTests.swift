@@ -125,6 +125,44 @@ struct TextDiffLogicTests {
         #expect(first == second)
         #expect(first != third)
     }
+
+    // MARK: - 逐行状态（编辑器逐行上色用）
+
+    @Test("相同行两侧都是 same")
+    func sideLineStatesSame() {
+        let states = TextDiffLogic.sideLineStates("a\nb", against: "a\nb")
+        #expect(states.left == [.same, .same])
+        #expect(states.right == [.same, .same])
+    }
+
+    @Test("改写行：原文记 removed，修改后记 added")
+    func sideLineStatesChanged() {
+        let states = TextDiffLogic.sideLineStates("a\nold", against: "a\nnew")
+        #expect(states.left == [.same, .removed])
+        #expect(states.right == [.same, .added])
+    }
+
+    @Test("纯新增只给右侧记 added")
+    func sideLineStatesInsertion() {
+        let states = TextDiffLogic.sideLineStates("a", against: "a\nb")
+        #expect(states.left == [.same])
+        #expect(states.right == [.same, .added])
+    }
+
+    @Test("纯删除只给左侧记 removed")
+    func sideLineStatesDeletion() {
+        let states = TextDiffLogic.sideLineStates("a\nb", against: "a")
+        #expect(states.left == [.same, .removed])
+        #expect(states.right == [.same])
+    }
+
+    @Test("状态数量分别等于两侧行数")
+    func sideLineStatesCountPerSide() {
+        // 中间插入后按下标对齐，后续行全部错位（既有行为）；状态数量仍各算各的
+        let states = TextDiffLogic.sideLineStates("a\nb", against: "a\nx\nb")
+        #expect(states.left.count == 2)
+        #expect(states.right.count == 3)
+    }
 }
 
 @Suite("文本对比插件契约")

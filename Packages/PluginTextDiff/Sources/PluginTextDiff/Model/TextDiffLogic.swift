@@ -53,6 +53,40 @@ public enum TextDiffLogic {
         public let removedCount: Int
     }
 
+    /// 左右两栏各自的逐行状态
+    ///
+    /// 编辑器按行号对齐（关闭软换行 + 固定行高），所以只要给每一侧「第几行是什么状态」，
+    /// 视图就能把红 / 绿底画到对应的行上。配对的规则与一维流一致：
+    /// 相同行两侧都是 `.same`；某行两边内容不同时，原文档位记 `.removed`、修改后记 `.added`；
+    /// 一侧没有这一行时只给有内容的那侧上色。
+    public struct SideLineStates: Equatable, Sendable {
+        /// 每行状态，下标即行号（0 起）
+        public let left: [DiffLine.LineType]
+        public let right: [DiffLine.LineType]
+    }
+
+    /// 按行位置对齐，算出左右两侧各自的逐行状态
+    public static func sideLineStates(_ textA: String, against textB: String) -> SideLineStates {
+        let linesA = textA.components(separatedBy: "\n")
+        let linesB = textB.components(separatedBy: "\n")
+        var left: [DiffLine.LineType] = []
+        var right: [DiffLine.LineType] = []
+
+        for index in 0..<max(linesA.count, linesB.count) {
+            let a = index < linesA.count ? linesA[index] : nil
+            let b = index < linesB.count ? linesB[index] : nil
+
+            if a == b {
+                if a != nil { left.append(.same) }
+                if b != nil { right.append(.same) }
+            } else {
+                if a != nil { left.append(.removed) }
+                if b != nil { right.append(.added) }
+            }
+        }
+        return SideLineStates(left: left, right: right)
+    }
+
     /// 逐行对比两段文本
     ///
     /// - Parameters:

@@ -40,8 +40,12 @@ public final class TextDiffPlugin: QuickPlugin {
         ]
     }
 
+    /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
+    private let bufferA = TextBuffer()
+    private let bufferB = TextBuffer()
+
     public func makeView() -> AnyView {
-        AnyView(TextDiffView())
+        AnyView(TextDiffView(bufferA: bufferA, bufferB: bufferB))
     }
 
     public func activate() {
