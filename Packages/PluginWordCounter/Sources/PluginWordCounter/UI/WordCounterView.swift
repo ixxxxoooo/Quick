@@ -7,7 +7,13 @@ import QuickUI
 import SwiftUI
 
 struct WordCounterView: View {
-    @State private var input = ""
+    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
+
+    private var input: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
 
     /// 计数规则全在模型层，视图只负责展示
     private var stats: WordCounterLogic.Stats { WordCounterLogic.stats(for: input) }
@@ -15,7 +21,7 @@ struct WordCounterView: View {
     var body: some View {
         VStack(spacing: 0) {
             // 输入区
-            TextEditor(text: $input)
+            TextEditor(text: $buffer.text)
                 .font(DesignTokens.Typography.code)
                 .scrollContentBackground(.hidden)
                 .frame(maxHeight: .infinity)
@@ -25,7 +31,7 @@ struct WordCounterView: View {
                             .font(DesignTokens.Typography.code)
                             .foregroundStyle(DesignTokens.Colors.textTertiary)
                             .padding(.horizontal, 5)
-                            .padding(.top, 8)
+                            .padding(.top, DesignTokens.Spacing.md)
                             .allowsHitTesting(false)
                     }
                 }
@@ -54,10 +60,10 @@ struct WordCounterView: View {
                 Spacer()
                 HStack(spacing: 4) {
                     Image(systemName: "book")
-                        .font(.system(size: 10))
+                        .font(DesignTokens.Typography.compactIcon)
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                     Text(stats.readingTime)
-                        .font(.caption)
+                        .font(DesignTokens.Typography.keyCap)
                         .foregroundStyle(DesignTokens.Colors.textSecondary)
                 }
             }
@@ -72,7 +78,7 @@ struct WordCounterView: View {
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
             Text(label)
-                .font(.system(size: 10))
+                .font(DesignTokens.Typography.compactKeyCap)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
         }
         .frame(maxWidth: .infinity)
@@ -84,10 +90,10 @@ struct WordCounterView: View {
     private func miniStat(_ label: String, _ value: Int) -> some View {
         HStack(spacing: 4) {
             Text(label)
-                .font(.system(size: 10))
+                .font(DesignTokens.Typography.compactKeyCap)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
             Text("\(value)")
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .font(DesignTokens.Typography.compactKeyCap).fontWeight(.medium)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
         }
     }

@@ -19,7 +19,13 @@ struct JSONFormatterView: View {
     }
 
     /// 当前文本（唯一真相：代码视图编辑它，格式化也写回它）
-    @State private var text = ""
+    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
+
+    private var text: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
 
     @State private var mode: Mode = .code
 
@@ -97,7 +103,7 @@ struct JSONFormatterView: View {
     private var content: some View {
         switch mode {
         case .code:
-            TextEditor(text: $text)
+            TextEditor(text: $buffer.text)
                 .font(DesignTokens.Typography.code)
                 .scrollContentBackground(.hidden)
                 .padding(DesignTokens.Spacing.sm)
@@ -260,9 +266,12 @@ struct JSONFormatterView: View {
 
     /// 从导航上下文读取初始输入（粘贴检测自动跳转场景），顺手反转义并格式化一次
     ///
+    /// **带了初始文本就覆盖编辑器内容。** 缓冲区是插件级的、会跨次保留；若只在「空」时加载，
+    /// 新粘贴进来的内容会被上一次的旧内容挡住。
+    ///
     /// 只在「刚进来」时格式化：编辑中的每次按键都重排会把光标顶走，所以之后要用户自己点按钮。
     private func loadInitialText() {
-        guard let query = pluginContext["query"], !query.isEmpty, text.isEmpty else {
+        guard let query = pluginContext["query"], !query.isEmpty else {
             refresh()
             return
         }

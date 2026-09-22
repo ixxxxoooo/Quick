@@ -19,8 +19,8 @@ struct AISettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("窗口默认置顶")
                         Text("新打开的 AI 窗口默认悬浮在最前")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(DesignTokens.Typography.keyCap)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
                     }
                 }
             } header: {
@@ -55,16 +55,16 @@ private struct AIProviderSettingsRow: View {
         Toggle(isOn: $isEnabled) {
             HStack(spacing: DesignTokens.Spacing.md) {
                 Image(systemName: provider.icon)
-                    .font(.system(size: 14))
+                    .font(DesignTokens.Typography.iconGlyph)
                     .foregroundStyle(Color(hex: provider.accent) ?? Color.accentColor)
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(provider.name)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(DesignTokens.Typography.rowTitle)
                     Text(provider.url.replacingOccurrences(of: "https://", with: ""))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .font(DesignTokens.Typography.compactKeyCap)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
                 }
             }
         }

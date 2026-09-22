@@ -37,7 +37,7 @@ struct SystemActionRow: View {
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.lg) {
             Image(systemName: action.icon)
-                .font(.system(size: 16, weight: .medium))
+                .font(DesignTokens.Typography.iconGlyph)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .frame(width: DesignTokens.Size.rowIcon)
 
@@ -47,7 +47,7 @@ struct SystemActionRow: View {
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
 
                 Text(action.description)
-                    .font(.caption)
+                    .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
 

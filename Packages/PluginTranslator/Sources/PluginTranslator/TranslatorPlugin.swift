@@ -62,8 +62,11 @@ public final class TranslatorPlugin: QuickPlugin {
         ]
     }
 
+    /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
+    private let buffer = TextBuffer()
+
     public func makeView() -> AnyView {
-        AnyView(TranslatorView(service: service))
+        AnyView(TranslatorView(service: service, buffer: buffer))
     }
 
     public func activate() {

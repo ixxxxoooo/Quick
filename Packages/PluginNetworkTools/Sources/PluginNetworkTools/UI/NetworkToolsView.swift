@@ -41,7 +41,7 @@ struct NetworkToolsView: View {
             } else {
                 VStack(spacing: DesignTokens.Spacing.md) {
                     Image(systemName: "network")
-                        .font(.system(size: 32, weight: .light))
+                        .font(DesignTokens.Typography.emptyStateIcon)
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                     Text("点击刷新按钮获取网络信息")
                         .foregroundStyle(DesignTokens.Colors.textTertiary)

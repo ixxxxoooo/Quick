@@ -500,6 +500,14 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 **刷新是真的重建**：`PluginPanelController` 存的是视图工厂（`viewProvider`）而不是
 建好的视图，所以刷新会重新走一遍插件的 `makeView()`，而不是重画一份旧状态。
 
+**分离必须把「当时面板里的内容」带过去。** 输入文本不能放视图的 `@State` —— 那只活在主面板
+那棵视图树里，分离后随旧视图销毁。各文本插件把输入提到插件上的 `QuickCore.TextBuffer`，
+`makeView()` 每次都把同一个实例交给视图，主面板与分离窗口因此读写同一份数据，分离时自然带过去。
+
+**导航上下文里的初始文本要覆盖缓冲区，不能只在「缓冲区为空」时加载。** 缓冲区是插件级的、
+会跨次保留；只在空时加载的话，新粘贴进来的内容会被上一次的旧内容挡住。JSON / SQL 的
+`loadInitialText` 都以「上下文带 query 就覆盖」为准。新增「可编辑内容」的插件时照此办理。
+
 ### AI 网页窗口：普通窗口 + 悬浮胶囊
 
 `AIWebViewWindowManager` 每个 Provider 一个独立窗口，**关闭只是隐藏**（保持登录态与

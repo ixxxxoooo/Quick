@@ -40,8 +40,11 @@ public final class Base64CodecPlugin: QuickPlugin {
         ]
     }
 
+    /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
+    private let buffer = TextBuffer()
+
     public func makeView() -> AnyView {
-        AnyView(Base64CodecView())
+        AnyView(Base64CodecView(buffer: buffer))
     }
 
     public func activate() {

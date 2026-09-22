@@ -14,7 +14,7 @@ struct ScreenshotView: View {
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.xxl) {
             Image(systemName: "camera.viewfinder")
-                .font(.system(size: 40, weight: .light))
+                .font(DesignTokens.Typography.emptyStateIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
 
             Text("截图工具")
@@ -34,7 +34,7 @@ struct ScreenshotView: View {
 
             if let path = capture.lastCapturePath {
                 Text("最近截图: \(path)")
-                    .font(.caption)
+                    .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
                     .lineLimit(1)
             }
@@ -42,7 +42,7 @@ struct ScreenshotView: View {
             Spacer()
 
             Text(capture.savesToDesktop ? "截图将保存到桌面" : "截图将复制到剪贴板")
-                .font(.caption)
+                .font(DesignTokens.Typography.keyCap)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
         }
         .padding(DesignTokens.Spacing.xxl)
@@ -55,7 +55,7 @@ struct ScreenshotView: View {
                 Image(systemName: icon)
                     .font(.system(size: 24))
                 Text(label)
-                    .font(.caption)
+                    .font(DesignTokens.Typography.keyCap)
             }
             .frame(width: 120, height: 80)
             .background(DesignTokens.Colors.cardFill)

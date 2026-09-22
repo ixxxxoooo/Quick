@@ -57,7 +57,7 @@ struct NotesView: View {
                         ForEach(store.notes) { note in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(note.title).font(DesignTokens.Typography.rowTitle).lineLimit(1)
-                                Text(note.preview).font(.caption).foregroundStyle(
+                                Text(note.preview).font(DesignTokens.Typography.keyCap).foregroundStyle(
                                     DesignTokens.Colors.textTertiary
                                 ).lineLimit(1)
                             }

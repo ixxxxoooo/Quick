@@ -49,12 +49,12 @@ struct UUIDGeneratorView: View {
                     ForEach(Array(uuids.enumerated()), id: \.offset) { index, uuid in
                         HStack(spacing: DesignTokens.Spacing.md) {
                             Text("\(index + 1)")
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(DesignTokens.Typography.compactKeyCap)
                                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                                 .frame(width: 20, alignment: .trailing)
 
                             Text(uuid)
-                                .font(.system(size: 12, design: .monospaced))
+                                .font(DesignTokens.Typography.code)
                                 .foregroundStyle(DesignTokens.Colors.textPrimary)
                                 .textSelection(.enabled)
 
@@ -69,9 +69,11 @@ struct UUIDGeneratorView: View {
                                 }
                             } label: {
                                 Image(systemName: copiedIndex == index ? "checkmark" : "doc.on.doc")
-                                    .font(.system(size: 11))
+                                    .font(DesignTokens.Typography.inlineIcon)
                                     .foregroundStyle(
-                                        copiedIndex == index ? .green : DesignTokens.Colors.textTertiary)
+                                        copiedIndex == index
+                                            ? DesignTokens.Colors.success
+                                            : DesignTokens.Colors.textTertiary)
                             }
                             .buttonStyle(.plain)
                         }
@@ -90,7 +92,7 @@ struct UUIDGeneratorView: View {
             // 状态栏
             HStack {
                 Text("已生成 \(uuids.count) 个 UUID")
-                    .font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .font(DesignTokens.Typography.keyCap).foregroundStyle(DesignTokens.Colors.textTertiary)
                 Spacer()
             }
             .padding(.horizontal, DesignTokens.Spacing.lg)

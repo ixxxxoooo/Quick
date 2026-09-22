@@ -11,7 +11,13 @@ struct TranslatorView: View {
 
     let service: TranslationService
 
-    @State private var sourceText = ""
+    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
+
+    private var sourceText: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
     @State private var resultText = ""
 
     var body: some View {
@@ -25,14 +31,14 @@ struct TranslatorView: View {
                 Spacer()
                 if let lang = service.detectedLanguage {
                     Text("检测: \(lang)")
-                        .font(.caption)
+                        .font(DesignTokens.Typography.keyCap)
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
             }
             .foregroundStyle(DesignTokens.Colors.textPrimary)
 
             // 源文本
-            TextEditor(text: $sourceText)
+            TextEditor(text: $buffer.text)
                 .font(DesignTokens.Typography.rowTitle)
                 .scrollContentBackground(.hidden)
                 .padding(DesignTokens.Spacing.md)

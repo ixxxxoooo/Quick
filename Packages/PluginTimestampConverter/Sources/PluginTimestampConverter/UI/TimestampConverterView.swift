@@ -8,7 +8,13 @@ import QuickUI
 import SwiftUI
 
 struct TimestampConverterView: View {
-    @State private var input = ""
+    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
+
+    private var input: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
     @State private var results: [TimestampConverterLogic.Row] = []
     @State private var inputType: TimestampConverterLogic.InputType = .empty
     @State private var now = Date()
@@ -27,7 +33,7 @@ struct TimestampConverterView: View {
         VStack(spacing: 0) {
             // 输入区
             HStack(spacing: DesignTokens.Spacing.md) {
-                TextField("输入时间戳或日期…", text: $input)
+                TextField("输入时间戳或日期…", text: $buffer.text)
                     .textFieldStyle(.plain)
                     .font(DesignTokens.Typography.code)
                     .padding(DesignTokens.Spacing.md)
@@ -36,12 +42,12 @@ struct TimestampConverterView: View {
 
                 if inputType != .empty {
                     Text(inputType == .timestamp ? "时间戳" : "日期")
-                        .font(.caption)
+                        .font(DesignTokens.Typography.keyCap)
                         .padding(.horizontal, DesignTokens.Spacing.sm)
                         .padding(.vertical, DesignTokens.Spacing.xxs)
                         .background(Color.accentColor.opacity(0.15))
                         .foregroundStyle(Color.accentColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap))
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.lg)
@@ -57,7 +63,7 @@ struct TimestampConverterView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.label)
-                                        .font(.caption)
+                                        .font(DesignTokens.Typography.keyCap)
                                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                                     Text(item.value)
                                         .font(.system(.body, design: .monospaced))
@@ -76,9 +82,10 @@ struct TimestampConverterView: View {
                                     Image(
                                         systemName: copiedKey == item.key ? "checkmark" : "doc.on.doc"
                                     )
-                                    .font(.system(size: 12))
+                                    .font(DesignTokens.Typography.inlineIcon)
                                     .foregroundStyle(
-                                        copiedKey == item.key ? .green : DesignTokens.Colors.textTertiary)
+                                        copiedKey == item.key
+                                            ? DesignTokens.Colors.success : DesignTokens.Colors.textTertiary)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -92,12 +99,12 @@ struct TimestampConverterView: View {
                 }
             } else if !input.isEmpty {
                 Text("无法识别的时间格式")
-                    .font(.caption).foregroundStyle(DesignTokens.Colors.destructive)
+                    .font(DesignTokens.Typography.keyCap).foregroundStyle(DesignTokens.Colors.destructive)
                     .padding(DesignTokens.Spacing.lg)
             } else {
                 VStack(spacing: DesignTokens.Spacing.md) {
                     Text("输入时间戳或日期后自动转换")
-                        .font(.caption)
+                        .font(DesignTokens.Typography.keyCap)
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -110,13 +117,13 @@ struct TimestampConverterView: View {
             // 底部当前时间
             HStack(spacing: DesignTokens.Spacing.sm) {
                 Image(systemName: "clock")
-                    .font(.system(size: 11))
+                    .font(DesignTokens.Typography.compactIcon)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
                 Text("当前时间")
-                    .font(.caption)
+                    .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
                 Text(dateFormatter.string(from: now))
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(DesignTokens.Typography.code)
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 Spacer()
                 Button {

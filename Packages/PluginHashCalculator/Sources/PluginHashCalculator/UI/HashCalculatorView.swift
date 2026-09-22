@@ -7,14 +7,20 @@ import QuickUI
 import SwiftUI
 
 struct HashCalculatorView: View {
-    @State private var input = ""
+    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
+
+    private var input: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
     @State private var results: [(algorithm: HashCalculatorLogic.Algorithm, value: String)] = []
     @State private var copiedAlgorithm: HashCalculatorLogic.Algorithm?
 
     var body: some View {
         VStack(spacing: 0) {
             // 输入区
-            TextEditor(text: $input)
+            TextEditor(text: $buffer.text)
                 .font(DesignTokens.Typography.code)
                 .scrollContentBackground(.hidden)
                 .frame(height: 100)
@@ -54,12 +60,12 @@ struct HashCalculatorView: View {
                         ForEach(results, id: \.algorithm) { item in
                             HStack(spacing: DesignTokens.Spacing.md) {
                                 Text(item.algorithm.rawValue)
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                    .font(DesignTokens.Typography.code).fontWeight(.medium)
                                     .foregroundStyle(Color.accentColor)
                                     .frame(width: 55, alignment: .leading)
 
                                 Text(item.value)
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(DesignTokens.Typography.code)
                                     .foregroundStyle(DesignTokens.Colors.textPrimary)
                                     .textSelection(.enabled)
                                     .lineLimit(1)
@@ -78,10 +84,10 @@ struct HashCalculatorView: View {
                                         systemName: copiedAlgorithm == item.algorithm
                                             ? "checkmark" : "doc.on.doc"
                                     )
-                                    .font(.system(size: 11))
+                                    .font(DesignTokens.Typography.inlineIcon)
                                     .foregroundStyle(
                                         copiedAlgorithm == item.algorithm
-                                            ? .green : DesignTokens.Colors.textTertiary)
+                                            ? DesignTokens.Colors.success : DesignTokens.Colors.textTertiary)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -97,7 +103,7 @@ struct HashCalculatorView: View {
             } else if input.isEmpty {
                 VStack(spacing: DesignTokens.Spacing.md) {
                     Text("输入文本后自动计算哈希值")
-                        .font(.caption)
+                        .font(DesignTokens.Typography.keyCap)
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

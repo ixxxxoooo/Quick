@@ -14,7 +14,13 @@ extension ParsedColor {
 }
 
 struct ColorCompareView: View {
-    @State private var input = ""
+    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
+
+    private var input: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
     @State private var colors: [ParsedColor] = []
     @State private var copiedKey: String?
 
@@ -24,7 +30,8 @@ struct ColorCompareView: View {
             HStack(spacing: DesignTokens.Spacing.sm) {
                 if !colors.isEmpty {
                     Text("识别到 \(colors.count) 个颜色")
-                        .font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
+                            DesignTokens.Colors.textTertiary)
                 }
                 Spacer()
                 Button {
@@ -44,7 +51,7 @@ struct ColorCompareView: View {
             .padding(.vertical, DesignTokens.Spacing.sm)
 
             // 输入区
-            TextEditor(text: $input)
+            TextEditor(text: $buffer.text)
                 .font(DesignTokens.Typography.code)
                 .scrollContentBackground(.hidden)
                 .frame(height: 60)
@@ -55,7 +62,7 @@ struct ColorCompareView: View {
                             .font(DesignTokens.Typography.code)
                             .foregroundStyle(DesignTokens.Colors.textTertiary)
                             .padding(.horizontal, DesignTokens.Spacing.lg + 5)
-                            .padding(.top, 8)
+                            .padding(.top, DesignTokens.Spacing.md)
                             .allowsHitTesting(false)
                     }
                 }
@@ -65,9 +72,11 @@ struct ColorCompareView: View {
             if colors.isEmpty {
                 VStack(spacing: DesignTokens.Spacing.md) {
                     Text("粘贴颜色值自动识别")
-                        .font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
+                            DesignTokens.Colors.textTertiary)
                     Text("支持 #FF5733、rgb(255,87,51) 等格式")
-                        .font(.system(size: 10)).foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .font(DesignTokens.Typography.compactKeyCap).foregroundStyle(
+                            DesignTokens.Colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -113,18 +122,19 @@ struct ColorCompareView: View {
                 } label: {
                     HStack {
                         Text(color.hex)
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .font(DesignTokens.Typography.code).fontWeight(.medium)
                             .foregroundStyle(DesignTokens.Colors.textPrimary)
                         Spacer()
                         Image(systemName: copiedKey == color.hex ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 10))
+                            .font(DesignTokens.Typography.compactIcon)
                             .foregroundStyle(
-                                copiedKey == color.hex ? .green : DesignTokens.Colors.textTertiary)
+                                copiedKey == color.hex
+                                    ? DesignTokens.Colors.success : DesignTokens.Colors.textTertiary)
                     }
                 }.buttonStyle(.plain)
 
                 Text(color.rgbString)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(DesignTokens.Typography.compactKeyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             .padding(DesignTokens.Spacing.sm)
@@ -148,7 +158,7 @@ struct ColorCompareView: View {
                             .fill(color.color)
                             .frame(width: 16, height: 16)
                         Text(color.hex)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(DesignTokens.Typography.code)
                             .foregroundStyle(DesignTokens.Colors.textPrimary)
 
                         GeometryReader { geo in
@@ -158,7 +168,7 @@ struct ColorCompareView: View {
                         }.frame(height: 8)
 
                         Text(String(format: "%.1f%%", color.luminance * 100))
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(DesignTokens.Typography.compactKeyCap)
                             .foregroundStyle(DesignTokens.Colors.textTertiary)
                             .frame(width: 50, alignment: .trailing)
                     }

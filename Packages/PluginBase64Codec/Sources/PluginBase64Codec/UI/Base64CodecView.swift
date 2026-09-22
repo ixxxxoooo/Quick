@@ -11,7 +11,13 @@ struct Base64CodecView: View {
     /// 模式类型归 Model 所有（视图与逻辑共用同一份定义，避免两处各写一个）
     private typealias Mode = Base64CodecLogic.Mode
 
-    @State private var input = ""
+    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
+
+    private var input: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
     @State private var output = ""
     @State private var mode: Mode = .encode
     @State private var errorMessage: String?
@@ -62,10 +68,12 @@ struct Base64CodecView: View {
             HSplitView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(mode == .encode ? "原文" : "Base64")
-                        .font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
+                            DesignTokens.Colors.textTertiary
+                        )
                         .padding(.horizontal, DesignTokens.Spacing.md)
                         .padding(.top, DesignTokens.Spacing.xs)
-                    TextEditor(text: $input)
+                    TextEditor(text: $buffer.text)
                         .font(DesignTokens.Typography.code)
                         .scrollContentBackground(.hidden)
                 }
@@ -73,7 +81,9 @@ struct Base64CodecView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text(mode == .encode ? "Base64" : "原文")
-                        .font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
+                            DesignTokens.Colors.textTertiary
+                        )
                         .padding(.horizontal, DesignTokens.Spacing.md)
                         .padding(.top, DesignTokens.Spacing.xs)
                     TextEditor(text: .constant(output))
@@ -89,14 +99,15 @@ struct Base64CodecView: View {
             HStack(spacing: DesignTokens.Spacing.lg) {
                 if !input.isEmpty {
                     Text("\(input.utf8.count) B")
-                        .font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
+                            DesignTokens.Colors.textTertiary)
                 }
                 if let error = errorMessage {
                     Text(error)
-                        .font(.caption).foregroundStyle(DesignTokens.Colors.destructive)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(DesignTokens.Colors.destructive)
                 } else if !output.isEmpty {
                     Text(mode == .encode ? "已编码" : "已解码")
-                        .font(.caption).foregroundStyle(.green)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(DesignTokens.Colors.success)
                 }
                 Spacer()
             }

@@ -11,7 +11,13 @@ struct FileSearchView: View {
 
     let session: FileSearchSession
 
-    @State private var searchText = ""
+    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
+
+    private var searchText: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
     @State private var results: [FileSearchSession.FileResult] = []
 
     var body: some View {
@@ -20,7 +26,7 @@ struct FileSearchView: View {
             HStack {
                 Image(systemName: "doc.text.magnifyingglass")
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
-                TextField("搜索文件…", text: $searchText)
+                TextField("搜索文件…", text: $buffer.text)
                     .textFieldStyle(.plain)
                     .font(DesignTokens.Typography.searchField)
                     .onSubmit {
@@ -64,16 +70,16 @@ struct FileResultRow: View {
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
             Image(systemName: file.icon)
-                .font(.system(size: 16))
+                .font(DesignTokens.Typography.iconGlyph)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
-                .frame(width: 24)
+                .frame(width: DesignTokens.Size.rowIcon)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(file.name)
                     .font(DesignTokens.Typography.rowTitle)
                     .lineLimit(1)
                 Text(file.path)
-                    .font(.caption)
+                    .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
                     .lineLimit(1)
             }

@@ -7,22 +7,13 @@ import QuickUI
 import SwiftUI
 
 struct MarkdownPreviewView: View {
-    @State private var input = """
-        # 标题
+    /// 文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
 
-        这是一段 **Markdown** 文本。
-
-        - 列表项 1
-        - 列表项 2
-
-        `代码` 和 [链接](https://example.com)
-
-        > 引用文本
-
-        ```
-        let x = 42
-        ```
-        """
+    private var input: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,7 +35,8 @@ struct MarkdownPreviewView: View {
 
                 if let countLabel = MarkdownPreviewLogic.characterCountLabel(for: input) {
                     Text(countLabel)
-                        .font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
+                            DesignTokens.Colors.textTertiary)
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.lg)
@@ -56,10 +48,12 @@ struct MarkdownPreviewView: View {
             HSplitView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("编辑")
-                        .font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
+                            DesignTokens.Colors.textTertiary
+                        )
                         .padding(.horizontal, DesignTokens.Spacing.md)
                         .padding(.top, DesignTokens.Spacing.xs)
-                    TextEditor(text: $input)
+                    TextEditor(text: $buffer.text)
                         .font(DesignTokens.Typography.code)
                         .scrollContentBackground(.hidden)
                 }
@@ -67,7 +61,9 @@ struct MarkdownPreviewView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text("预览")
-                        .font(.caption).foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
+                            DesignTokens.Colors.textTertiary
+                        )
                         .padding(.horizontal, DesignTokens.Spacing.md)
                         .padding(.top, DesignTokens.Spacing.xs)
                     ScrollView {

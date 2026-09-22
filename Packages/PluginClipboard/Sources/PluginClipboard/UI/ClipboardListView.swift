@@ -191,7 +191,7 @@ struct ClipboardListView: View {
                 store.clearHistory()
             } label: {
                 Image(systemName: "trash")
-                    .font(.system(size: 12))
+                    .font(DesignTokens.Typography.inlineIcon)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             .buttonStyle(.plain)
@@ -230,12 +230,12 @@ struct ClipboardListView: View {
         } label: {
             HStack(spacing: DesignTokens.Spacing.xxs) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 11))
+                    .font(DesignTokens.Typography.compactIcon)
                 Text(tab.rawValue)
-                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                    .font(DesignTokens.Typography.keyCap).fontWeight(isSelected ? .medium : .regular)
                 if count > 0 {
                     Text("\(count)")
-                        .font(.system(size: 10))
+                        .font(DesignTokens.Typography.compactKeyCap)
                         .foregroundStyle(isSelected ? .white.opacity(0.8) : DesignTokens.Colors.textTertiary)
                 }
             }
@@ -304,7 +304,7 @@ struct ClipboardListView: View {
     private var emptyState: some View {
         VStack(spacing: DesignTokens.Spacing.lg) {
             Image(systemName: selectedTab == .favorites ? "star.slash" : "clipboard")
-                .font(.system(size: 36))
+                .font(DesignTokens.Typography.emptyStateIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
             Text(emptyMessage)
                 .font(DesignTokens.Typography.rowTrailing)
@@ -558,12 +558,12 @@ private struct ClipboardRowView: View {
         } else {
             // 文字类图标
             Image(systemName: entry.type.icon)
-                .font(.system(size: 14))
+                .font(DesignTokens.Typography.iconGlyph)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .frame(width: 40, height: 40)
                 .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.08))
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.thumbnail)
+                        .fill(DesignTokens.Colors.controlSurface)
                 )
         }
     }
@@ -591,7 +591,7 @@ private struct ClipboardThumbnail: View {
             } else {
                 // 解码完成前占住同样的位置，避免行高跳一下
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
-                    .fill(Color.secondary.opacity(0.08))
+                    .fill(DesignTokens.Colors.controlSurface)
             }
         }
         .frame(

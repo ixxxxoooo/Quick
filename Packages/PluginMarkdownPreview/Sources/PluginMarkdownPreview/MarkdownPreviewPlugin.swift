@@ -40,8 +40,29 @@ public final class MarkdownPreviewPlugin: QuickPlugin {
         ]
     }
 
+    /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
+    ///
+    /// 初始值就是面板默认展示的那段示例 Markdown。
+    private let buffer = TextBuffer(
+        """
+        # 标题
+
+        这是一段 **Markdown** 文本。
+
+        - 列表项 1
+        - 列表项 2
+
+        `代码` 和 [链接](https://example.com)
+
+        > 引用文本
+
+        ```
+        let x = 42
+        ```
+        """)
+
     public func makeView() -> AnyView {
-        AnyView(MarkdownPreviewView())
+        AnyView(MarkdownPreviewView(buffer: buffer))
     }
 
     public func activate() {

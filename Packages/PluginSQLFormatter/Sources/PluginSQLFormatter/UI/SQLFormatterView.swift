@@ -11,7 +11,13 @@ import SwiftUI
 /// 布局与 Fasty sql-formatter 一致：工具栏 → 编辑区（输入 / 输出）→ 状态栏。
 /// 输出带 SQL 语法高亮，见 `CodeTextView`。
 struct SQLFormatterView: View {
-    @State private var input = ""
+    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+    @Bindable var buffer: TextBuffer
+
+    private var input: String {
+        get { buffer.text }
+        nonmutating set { buffer.text = newValue }
+    }
     @State private var output = ""
     @State private var indent = 2
     @State private var statementCount = 0
@@ -27,7 +33,7 @@ struct SQLFormatterView: View {
 
             HSplitView {
                 editorPane(title: "输入") {
-                    TextEditor(text: $input)
+                    TextEditor(text: $buffer.text)
                         .font(DesignTokens.Typography.code)
                         .scrollContentBackground(.hidden)
                         .padding(DesignTokens.Spacing.sm)
@@ -44,8 +50,9 @@ struct SQLFormatterView: View {
         }
         .onChange(of: input) { _, _ in autoFormat() }
         .onAppear {
-            // 从导航上下文读取初始输入（粘贴检测自动跳转场景）
-            if let initialQuery = pluginContext["query"], !initialQuery.isEmpty, input.isEmpty {
+            // 从导航上下文读取初始输入（粘贴检测自动跳转场景）。
+            // **带了初始文本就覆盖**：缓冲区是插件级的、会跨次保留，只在「空」时加载会被旧内容挡住。
+            if let initialQuery = pluginContext["query"], !initialQuery.isEmpty {
                 input = initialQuery
             }
         }

@@ -123,7 +123,7 @@ struct SnippetRow: View {
                 .font(DesignTokens.Typography.rowTitle)
                 .lineLimit(1)
             Text(snippet.preview)
-                .font(.caption)
+                .font(DesignTokens.Typography.keyCap)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .lineLimit(1)
         }

@@ -36,7 +36,7 @@ struct CalendarView: View {
             if events.isEmpty {
                 VStack(spacing: DesignTokens.Spacing.md) {
                     Image(systemName: "calendar.badge.checkmark")
-                        .font(.system(size: 32, weight: .light))
+                        .font(DesignTokens.Typography.emptyStateIcon)
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                     Text("今天没有日程安排")
                         .foregroundStyle(DesignTokens.Colors.textSecondary)
@@ -48,13 +48,13 @@ struct CalendarView: View {
                         ForEach(events) { event in
                             HStack(spacing: DesignTokens.Spacing.md) {
                                 Circle()
-                                    .fill(Color.blue)
+                                    .fill(DesignTokens.Colors.progress)
                                     .frame(width: 8, height: 8)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(event.title)
                                         .font(DesignTokens.Typography.rowTitle)
                                     Text(event.timeRange)
-                                        .font(.caption)
+                                        .font(DesignTokens.Typography.keyCap)
                                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                                 }
                                 Spacer()

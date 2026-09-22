@@ -14,7 +14,7 @@ struct OCRResultView: View {
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.xxl) {
             Image(systemName: "text.viewfinder")
-                .font(.system(size: 40, weight: .light))
+                .font(DesignTokens.Typography.emptyStateIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
 
             Text("文字识别 (OCR)")
@@ -34,7 +34,7 @@ struct OCRResultView: View {
                             Label("复制", systemImage: "doc.on.doc")
                         }
                         .buttonStyle(.plain)
-                        .font(.caption)
+                        .font(DesignTokens.Typography.keyCap)
                     }
 
                     ScrollView {

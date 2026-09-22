@@ -112,8 +112,8 @@ struct MarkdownPreviewPluginTests {
     func makeViewBuildsTheRealView() {
         let plugin = MarkdownPreviewPlugin()
 
-        // AnyView 的相等性无法比较，这里只确认不崩溃且带上了本插件的视图
+        // AnyView 的相等性无法比较，这里只确认不崩溃且带上了本插件的视图。
+        // 视图现在由插件持有输入状态（`TextBuffer`），所以不再单独裸构造 `MarkdownPreviewView()`。
         _ = plugin.makeView()
-        _ = MarkdownPreviewView()
     }
 }
