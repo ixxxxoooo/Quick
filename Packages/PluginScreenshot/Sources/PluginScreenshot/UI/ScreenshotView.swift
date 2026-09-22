@@ -2,15 +2,19 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
-import QuickCore
 import QuickUI
 import SwiftUI
 
 /// 截图插件视图
+///
+/// 面板里的四个入口：区域 / 全屏 / 窗口 / 贴图。真正的截图在有遮罩的浮层里完成，
+/// 这里只负责把动作转出去。
 struct ScreenshotView: View {
 
-    let capture: ScreenCapture
-    var onPin: (() -> Void)?
+    let onArea: () -> Void
+    let onFullScreen: () -> Void
+    let onWindow: () -> Void
+    let onPin: () -> Void
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.xxl) {
@@ -22,30 +26,15 @@ struct ScreenshotView: View {
                 .font(DesignTokens.Typography.panelTitle)
 
             HStack(spacing: DesignTokens.Spacing.xl) {
-                screenshotButton("区域截图", icon: "rectangle.dashed") {
-                    Task { await capture.captureArea() }
-                }
-                screenshotButton("全屏截图", icon: "rectangle.on.rectangle") {
-                    Task { await capture.captureFullScreen() }
-                }
-                screenshotButton("窗口截图", icon: "macwindow") {
-                    Task { await capture.captureWindow() }
-                }
-                screenshotButton("贴图", icon: "pin") {
-                    onPin?()
-                }
-            }
-
-            if let path = capture.lastCapturePath {
-                Text("最近截图: \(path)")
-                    .font(DesignTokens.Typography.keyCap)
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-                    .lineLimit(1)
+                entryButton("区域截图", icon: "rectangle.dashed", action: onArea)
+                entryButton("全屏截图", icon: "rectangle.on.rectangle", action: onFullScreen)
+                entryButton("窗口截图", icon: "macwindow", action: onWindow)
+                entryButton("贴图", icon: "pin", action: onPin)
             }
 
             Spacer()
 
-            Text(capture.savesToDesktop ? "截图将保存到桌面，并可搜「贴图」钉住" : "截图将复制到剪贴板")
+            Text("框选后可在原地标注：矩形、箭头、画笔、文字、马赛克、序号")
                 .font(DesignTokens.Typography.keyCap)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
         }
@@ -53,11 +42,11 @@ struct ScreenshotView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func screenshotButton(_ label: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func entryButton(_ label: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: DesignTokens.Spacing.md) {
                 Image(systemName: icon)
-                    .font(.system(size: 24))
+                    .font(DesignTokens.Typography.iconGlyph)
                 Text(label)
                     .font(DesignTokens.Typography.keyCap)
             }

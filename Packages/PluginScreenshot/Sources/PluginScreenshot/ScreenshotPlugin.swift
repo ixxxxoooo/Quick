@@ -9,32 +9,30 @@ import SwiftUI
 
 /// 截图工具插件
 ///
-/// 参考 jietu 项目与 Fasty screenshot 插件：
-/// 支持区域截图、全屏截图、窗口截图与贴图功能。
+/// 参考 jietu 项目：自绘遮罩冻结屏幕 → 原地框选与标注 → 保存 / 复制 / 钉图。
+/// 抓屏走 ScreenCaptureKit（不再用系统 `screencapture`），因为原地标注需要拿到
+/// 冻结的那一帧画面。
 @MainActor
 public final class ScreenshotPlugin: QuickPlugin {
 
     public static let id = "screenshot"
     public static let name = "截图工具"
     public static let icon = "camera"
-    public static let description = "调用系统级截屏能力，支持全屏、交互式区域选区、窗口截图与贴图，可选择存入剪贴板或桌面。"
-    /// 区域截图的关键字，对齐 Fasty `plugins/screenshot` 的 area / capture。和全屏那组不能有相同的词
+    public static let description = "自绘遮罩截图，支持原地框选与标注（矩形、箭头、画笔、文字、马赛克、序号），可保存、复制或钉在桌面。"
     public static let areaKeywords = ["截图工具", "截图", "截屏", "screenshot", "区域截图", "框选"]
-    /// 全屏截图的关键字
     public static let fullKeywords = ["全屏截图"]
-    /// 窗口截图的关键字（参考 jietu 的窗口截图功能）
     public static let windowKeywords = ["窗口截图"]
-    /// 贴图的关键字（参考 jietu 的 PinWindowController 功能）
     public static let pinKeywords = ["贴图", "钉在桌面", "pin"]
     public static let triggerWords = areaKeywords + fullKeywords + windowKeywords + pinKeywords
 
     public var isEnabled = true
 
     private let log = QuickLog.plugin(ScreenshotPlugin.id)
-
-    private let capture = ScreenCapture()
+    private let overlay = OverlayCoordinator()
 
     public init() {}
+
+    // MARK: - 命令
 
     public static var commands: [CommandDescriptor] {
         [
@@ -43,7 +41,7 @@ public final class ScreenshotPlugin: QuickPlugin {
                 pluginID: id,
                 pluginName: name,
                 title: "区域截图",
-                subtitle: "截取屏幕指定区域",
+                subtitle: "框选屏幕区域并标注",
                 keywords: areaKeywords,
                 icon: "rectangle.dashed",
                 showsWhenQueryEmpty: true
@@ -53,7 +51,7 @@ public final class ScreenshotPlugin: QuickPlugin {
                 pluginID: id,
                 pluginName: name,
                 title: "全屏截图",
-                subtitle: "截取整个屏幕",
+                subtitle: "截取整个屏幕并可标注",
                 keywords: fullKeywords,
                 icon: "rectangle.on.rectangle"
             ),
@@ -62,7 +60,7 @@ public final class ScreenshotPlugin: QuickPlugin {
                 pluginID: id,
                 pluginName: name,
                 title: "窗口截图",
-                subtitle: "截取指定窗口",
+                subtitle: "点击选择要截取的窗口",
                 keywords: windowKeywords,
                 icon: "macwindow"
             ),
@@ -71,7 +69,7 @@ public final class ScreenshotPlugin: QuickPlugin {
                 pluginID: id,
                 pluginName: name,
                 title: "贴图",
-                subtitle: "将剪贴板或最近截图钉在桌面",
+                subtitle: "将剪贴板里的图片钉在桌面",
                 keywords: pinKeywords,
                 icon: "pin"
             )
@@ -81,13 +79,13 @@ public final class ScreenshotPlugin: QuickPlugin {
     public func perform(commandID: String) {
         switch commandID {
         case "screenshot.area":
-            Task { await captureArea() }
+            Task { await overlay.begin(windowMode: false) }
         case "screenshot.full":
-            Task { await captureFullScreen() }
+            Task { await overlay.begin(windowMode: false, preselectFullScreen: true) }
         case "screenshot.window":
-            Task { await captureWindow() }
+            Task { await overlay.begin(windowMode: true) }
         case "screenshot.pin":
-            pinImage()
+            overlay.pinExistingImage()
         default:
             break
         }
@@ -103,68 +101,56 @@ public final class ScreenshotPlugin: QuickPlugin {
         var items: [SearchableItem] = []
         if area {
             items.append(
-                SearchableItem(
-                    id: "screenshot.area",
-                    pluginID: Self.id,
-                    title: "区域截图",
-                    subtitle: "截取屏幕指定区域",
-                    icon: "rectangle.dashed",
-                    relevance: 0.8,
-                    action: { [weak self] in
-                        Task { await self?.captureArea() }
-                    }
-                )
-            )
+                item(
+                    id: "screenshot.area", title: "区域截图", subtitle: "框选屏幕区域并标注", icon: "rectangle.dashed",
+                    relevance: 0.8
+                ) { [weak self] in
+                    Task { await self?.overlay.begin(windowMode: false) }
+                })
         }
         if full {
             items.append(
-                SearchableItem(
-                    id: "screenshot.full",
-                    pluginID: Self.id,
-                    title: "全屏截图",
-                    subtitle: "截取整个屏幕",
-                    icon: "rectangle.on.rectangle",
-                    relevance: 0.7,
-                    action: { [weak self] in
-                        Task { await self?.captureFullScreen() }
-                    }
-                )
-            )
+                item(
+                    id: "screenshot.full", title: "全屏截图", subtitle: "截取整个屏幕并可标注",
+                    icon: "rectangle.on.rectangle", relevance: 0.7
+                ) { [weak self] in
+                    Task { await self?.overlay.begin(windowMode: false, preselectFullScreen: true) }
+                })
         }
         if window {
             items.append(
-                SearchableItem(
-                    id: "screenshot.window",
-                    pluginID: Self.id,
-                    title: "窗口截图",
-                    subtitle: "点击选择要截取的窗口",
-                    icon: "macwindow",
-                    relevance: 0.7,
-                    action: { [weak self] in
-                        Task { await self?.captureWindow() }
-                    }
-                )
-            )
+                item(
+                    id: "screenshot.window", title: "窗口截图", subtitle: "点击选择要截取的窗口", icon: "macwindow",
+                    relevance: 0.7
+                ) { [weak self] in
+                    Task { await self?.overlay.begin(windowMode: true) }
+                })
         }
         if pin {
             items.append(
-                SearchableItem(
-                    id: "screenshot.pin",
-                    pluginID: Self.id,
-                    title: "贴图",
-                    subtitle: "将剪贴板或最近截图钉在桌面",
-                    icon: "pin",
-                    relevance: 0.7,
-                    action: { [weak self] in
-                        self?.pinImage()
-                    }
-                )
-            )
+                item(id: "screenshot.pin", title: "贴图", subtitle: "将剪贴板里的图片钉在桌面", icon: "pin", relevance: 0.7)
+                { [weak self] in
+                    self?.overlay.pinExistingImage()
+                })
         }
         return items
     }
 
-    /// 查询包含关键字，或关键字包含查询。这样输入「截图」能看到区域和全屏，输入「全屏」只看到全屏
+    private func item(
+        id: String, title: String, subtitle: String, icon: String, relevance: Double,
+        action: @escaping @Sendable @MainActor () -> Void
+    ) -> SearchableItem {
+        SearchableItem(
+            id: id,
+            pluginID: Self.id,
+            title: title,
+            subtitle: subtitle,
+            icon: icon,
+            relevance: relevance,
+            action: action)
+    }
+
+    /// 查询包含关键字，或关键字包含查询
     static func matches(_ keywords: [String], query: String) -> Bool {
         let text = query.lowercased()
         guard !text.isEmpty else { return false }
@@ -175,7 +161,16 @@ public final class ScreenshotPlugin: QuickPlugin {
     }
 
     public func makeView() -> AnyView {
-        AnyView(ScreenshotView(capture: capture, onPin: { [weak self] in self?.pinImage() }))
+        AnyView(
+            ScreenshotView(
+                onArea: { [weak self] in Task { await self?.overlay.begin(windowMode: false) } },
+                onFullScreen: { [weak self] in
+                    Task { await self?.overlay.begin(windowMode: false, preselectFullScreen: true) }
+                },
+                onWindow: { [weak self] in Task { await self?.overlay.begin(windowMode: true) } },
+                onPin: { [weak self] in self?.overlay.pinExistingImage() }
+            )
+        )
     }
 
     public func activate() {
@@ -184,53 +179,5 @@ public final class ScreenshotPlugin: QuickPlugin {
 
     public func deactivate() {
         log.notice("插件已停用")
-    }
-
-    /// 区域截图
-    private func captureArea() async {
-        await runCapture { await capture.captureArea() }
-    }
-
-    /// 全屏截图
-    private func captureFullScreen() async {
-        await runCapture { await capture.captureFullScreen() }
-    }
-
-    /// 窗口截图
-    private func captureWindow() async {
-        await runCapture { await capture.captureWindow() }
-    }
-
-    /// 隐藏面板 → 截图 → 成功/失败 HUD
-    private func runCapture(_ work: () async -> Bool) async {
-        EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
-        try? await Task.sleep(for: .milliseconds(200))
-
-        if await work() {
-            EventBus.shared.post(ShowHUDEvent(message: successMessage, tone: .success))
-        } else {
-            EventBus.shared.post(ShowHUDEvent(message: "截图已取消或失败", tone: .warning))
-        }
-    }
-
-    /// 贴图：剪贴板优先，其次最近一次落盘截图
-    private func pinImage() {
-        EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
-
-        guard let image = capture.imageForPin() else {
-            EventBus.shared.post(ShowHUDEvent(message: "没有可贴的图片，请先截图", tone: .warning))
-            return
-        }
-
-        PinWindowController.pin(image: image)
-        log.notice("已将图片钉在桌面")
-        EventBus.shared.post(ShowHUDEvent(message: "已钉在桌面", tone: .success))
-    }
-
-    /// 截图成功后的提示语
-    ///
-    /// 只进剪贴板的截图没有文件，这时还说「已保存到桌面」会让用户去桌面找一个不存在的文件。
-    private var successMessage: String {
-        capture.lastCapturePath == nil ? "截图已复制到剪贴板" : "截图已保存（可搜「贴图」钉到桌面）"
     }
 }
