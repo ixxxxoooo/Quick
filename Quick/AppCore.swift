@@ -56,11 +56,6 @@ import PluginURLCodec
 
 import PluginUUIDGenerator
 
-import PluginWeather
-import PluginWeather
-
-import PluginWordCounter
-
 import PluginSuperPanel
 
 import Carbon.HIToolbox
@@ -484,7 +479,7 @@ final class AppCore {
                 }
             ),
             (ClipboardPlugin.self, { ClipboardPlugin(storage: self.storage(for: ClipboardPlugin.id)) }),
-            (CalculatorPlugin.self, { CalculatorPlugin() }),
+            (CalculatorPlugin.self, { CalculatorPlugin(storage: self.storage(for: CalculatorPlugin.id)) }),
             (SystemControlPlugin.self, { SystemControlPlugin(settingsStore: self.settingsStore) }),
 
             // Phase 3: 效率与工具插件
@@ -501,14 +496,12 @@ final class AppCore {
             (UUIDGeneratorPlugin.self, { UUIDGeneratorPlugin() }),
             (HashCalculatorPlugin.self, { HashCalculatorPlugin() }),
             (TimestampConverterPlugin.self, { TimestampConverterPlugin() }),
-            (WordCounterPlugin.self, { WordCounterPlugin() }),
             (TextDiffPlugin.self, { TextDiffPlugin() }),
             (MarkdownPreviewPlugin.self, { MarkdownPreviewPlugin() }),
             (ColorComparePlugin.self, { ColorComparePlugin() }),
 
             // Phase 4: 扩展插件
             (CalendarPlugin.self, { CalendarPlugin() }),
-            (WeatherPlugin.self, { WeatherPlugin() }),
             (NotesPlugin.self, { NotesPlugin(storage: self.storage(for: NotesPlugin.id)) }),
             (AIPlugin.self, { AIPlugin() }),
             (SystemMonitorPlugin.self, { SystemMonitorPlugin() }),

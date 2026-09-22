@@ -78,13 +78,6 @@ public enum PluginSettingKey {
         public static let showWeekNumber = "calendar.showWeekNumber"
     }
 
-    /// 天气
-    public enum Weather {
-        public static let defaultCity = "weather.defaultCity"
-        public static let unit = "weather.unit"
-        public static let showHumidity = "weather.showHumidity"
-    }
-
     /// AI 聚合
     public enum AI {
         public static let defaultAlwaysOnTop = "ai.defaultAlwaysOnTop"
@@ -122,7 +115,6 @@ public enum PluginSettingKey {
     /// 截图
     public enum Screenshot {
         public static let format = "screenshot.format"
-        public static let includePointer = "screenshot.includePointer"
         public static let saveToDesktop = "screenshot.saveToDesktop"
     }
 
@@ -165,12 +157,6 @@ public enum PluginSettingKey {
     public enum TimestampConverter {
         public static let defaultUnit = "timestampConverter.defaultUnit"
         public static let timeZone = "timestampConverter.timeZone"
-    }
-
-    /// 字数统计
-    public enum WordCounter {
-        public static let ignoreWhitespace = "wordCounter.ignoreWhitespace"
-        public static let readingSpeedWPM = "wordCounter.readingSpeedWPM"
     }
 
     /// 文本对比

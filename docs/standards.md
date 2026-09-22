@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | `Plugin` | 一个功能插件，实现 `QuickPlugin` | `ClipboardPlugin` |
 | `Store` | 持久化某类数据的读写者，负责落盘 | `RankingStore`、`ClipboardStore` |
-| `Service` | 对系统或网络的封装，无 UI | `WeatherService`、`HotKeyService` |
+| `Service` | 对系统或网络的封装，无 UI | `PasteboardService`、`HotKeyService` |
 | `Coordinator` | 编排一组视图/窗口的生命周期与路由 | `PaletteCoordinator` |
 | `Controller` | 拥有一个 AppKit 窗口并驱动它 | `HUDController`、`StatusItemController` |
 | `Engine` | 纯计算，输入到输出，无状态副作用 | `CalcEngine` |

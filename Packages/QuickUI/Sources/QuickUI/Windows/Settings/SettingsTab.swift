@@ -54,7 +54,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case snippets
     case notes
     case calendar
-    case weather
     case ai
     case translator
     case jsonFormatter
@@ -64,7 +63,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case uuidGenerator
     case hashCalculator
     case timestampConverter
-    case wordCounter
     case textDiff
     case markdownPreview
     case colorCompare
@@ -99,7 +97,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .snippets: "文本片段"
         case .notes: "笔记"
         case .calendar: "日历"
-        case .weather: "天气"
         case .ai: "AI 聚合"
         case .translator: "翻译"
         case .jsonFormatter: "JSON 格式化"
@@ -109,7 +106,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .uuidGenerator: "UUID 生成器"
         case .hashCalculator: "Hash 计算器"
         case .timestampConverter: "时间戳转换"
-        case .wordCounter: "字数统计"
         case .textDiff: "文本对比"
         case .markdownPreview: "Markdown 预览"
         case .colorCompare: "颜色工具"
@@ -143,7 +139,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .snippets: "curlybraces"
         case .notes: "text.page"
         case .calendar: "calendar"
-        case .weather: "cloud.sun"
         case .ai: "sparkles"
         case .translator: "character.book.closed"
         case .jsonFormatter: "curlybraces"
@@ -153,7 +148,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .uuidGenerator: "number"
         case .hashCalculator: "number.square"
         case .timestampConverter: "clock"
-        case .wordCounter: "textformat.123"
         case .textDiff: "doc.on.doc"
         case .markdownPreview: "text.badge.checkmark"
         case .colorCompare: "paintpalette"
@@ -178,7 +172,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .snippets: "snippets"
         case .notes: "notes"
         case .calendar: "calendar"
-        case .weather: "weather"
         case .ai: "ai"
         case .translator: "translator"
         case .jsonFormatter: "json-formatter"
@@ -188,7 +181,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .uuidGenerator: "uuid-generator"
         case .hashCalculator: "hash-calculator"
         case .timestampConverter: "timestamp-converter"
-        case .wordCounter: "word-counter"
         case .textDiff: "text-diff"
         case .markdownPreview: "markdown-preview"
         case .colorCompare: "color-compare"

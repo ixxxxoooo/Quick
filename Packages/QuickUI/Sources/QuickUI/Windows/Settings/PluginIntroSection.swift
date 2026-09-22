@@ -6,7 +6,8 @@ import SwiftUI
 
 /// 插件页开头：开关和一段介绍
 ///
-/// 每个插件在侧边栏里单独占一项，点进去先看到它是做什么的，再往下是命令和自己的设置。
+/// 每个插件在侧边栏里单独占一项，点进去先看到它是做什么的，再往下是它自己的设置。
+/// 不设分组标题、开关标题里也不重复插件名 —— 窗口标题与侧边栏已经写着它了。
 struct PluginIntroSection: View {
 
     let dataSource: any SettingsDataSource
@@ -28,8 +29,8 @@ struct PluginIntroSection: View {
         Section {
             Toggle(isOn: $isEnabled) {
                 SettingsRow(
-                    title: "启用\(plugin?.name ?? "插件")",
-                    subtitle: "开启后可在主面板里搜索和使用。",
+                    title: "启用此插件",
+                    subtitle: "开启后可在主面板搜索并使用。",
                     icon: { SettingsRowIcon(systemImage: plugin?.icon ?? "puzzlepiece.extension") }
                 )
             }
@@ -39,13 +40,11 @@ struct PluginIntroSection: View {
 
             if let description = plugin?.description, !description.isEmpty {
                 SettingsRow(
-                    title: "介绍",
+                    title: "简介",
                     subtitle: description,
                     icon: { SettingsRowIcon(systemImage: "info.circle") }
                 )
             }
-        } header: {
-            Text(plugin?.name ?? "插件")
         }
     }
 }

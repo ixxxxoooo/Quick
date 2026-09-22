@@ -39,8 +39,6 @@ packages:
     path: Packages/PluginTranslator
   PluginCalendar:
     path: Packages/PluginCalendar
-  PluginWeather:
-    path: Packages/PluginWeather
   PluginNotes:
     path: Packages/PluginNotes
   PluginAI:
@@ -65,8 +63,6 @@ packages:
     path: Packages/PluginHashCalculator
   PluginTimestampConverter:
     path: Packages/PluginTimestampConverter
-  PluginWordCounter:
-    path: Packages/PluginWordCounter
   PluginTextDiff:
     path: Packages/PluginTextDiff
   PluginColorCompare:
@@ -123,7 +119,6 @@ targets:
       - package: PluginOCR
       - package: PluginTranslator
       - package: PluginCalendar
-      - package: PluginWeather
       - package: PluginNotes
       - package: PluginAI
       - package: PluginSystemMonitor
@@ -136,7 +131,6 @@ targets:
       - package: PluginUUIDGenerator
       - package: PluginHashCalculator
       - package: PluginTimestampConverter
-      - package: PluginWordCounter
       - package: PluginTextDiff
       - package: PluginColorCompare
       - package: PluginMarkdownPreview

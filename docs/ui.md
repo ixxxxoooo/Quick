@@ -364,6 +364,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | 组件 | 职责 |
 | --- | --- |
 | `DesignTokens` | 全部设计令牌 + `panelScale` 缩放，以及 `NSColor.srgbInk` / `NSAppearance.isDark` / `View.frosted(in:)` |
+| `FlowLayout` | 能塞就塞、塞不下换行的横向布局（`Layout` 协议）。给关键字标签这类宽度不定的内容用 |
 | `VisualEffectView` | 原生 vibrancy 背景（`NSVisualEffectView` 的 SwiftUI 封装） |
 | `PaletteBackground` | 面板背景：vibrancy + scrim + 边缘高光，一处配置。**不含投影** |
 | `Scrolling/EdgeDissolve` | 滚动内容在浮动栏下方淡出的遮罩，`.edgeDissolve()` 挂载 |

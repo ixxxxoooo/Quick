@@ -1,7 +1,7 @@
 # Quick
 
 原生 macOS 效率启动器：菜单栏常驻 + 全局快捷键（默认 ⌥Space）唤出的命令面板，
-聚合应用启动、剪贴板历史、计算器、文件搜索、系统控制、11 个开发者工具等 27 个内置插件。
+聚合应用启动、剪贴板历史、计算器、文件搜索、系统控制、10 个开发者工具等 25 个内置插件。
 
 SwiftUI + AppKit，以 accessory 模式运行（`LSUIElement`，无 Dock 图标）。零第三方依赖。
 
@@ -45,7 +45,7 @@ SwiftUI + AppKit，以 accessory 模式运行（`LSUIElement`，无 Dock 图标�
 | `Packages/QuickCore/` | 内核：`QuickPlugin` 协议、`EventBus`、`SearchableItem`、`QuickLog`、字符串扩展 |
 | `Packages/QuickUI/` | 共享 UI：`DesignTokens`、面板外壳（`PalettePanel`/`PaletteCoordinator`/`PaletteRootView`）、设计系统组件、`HUDController` |
 | `Packages/QuickPlatform/` | 系统能力封装：热键、应用扫描、权限、剪贴板、图标缓存、路径 |
-| `Packages/Plugin*/` | 27 个内置插件，每个一个包；大插件内部再分 `Model/` `Service/` `UI/` `Settings/` |
+| `Packages/Plugin*/` | 25 个内置插件，每个一个包；大插件内部再分 `Model/` `Service/` `UI/` `Settings/` |
 | `Scripts/` | 所有可执行脚本：测试、构建、lint、格式化、脚手架 |
 | `docs/` | 规范文档（本目录）；每个功能插件的约束写在 `docs/features/` |
 | `.githooks/` | 版本控制的 git 钩子，通过 `Scripts/setup.sh` 启用 |

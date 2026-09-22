@@ -7,12 +7,10 @@ import SwiftUI
 
 /// 功能插件独立设置页容器
 ///
-/// 每个功能插件的设置页结构：
-/// 1. 启用开关
-/// 2. 触发词列表（中英文混排，不拆成两栏）
-/// 3. 全局快捷键绑定（快速打开插件面板）
-/// 4. 插件身份的说明（内置插件、日志分类）
-/// 5. 插件专属配置项
+/// 每个功能插件的设置页只有三块，且互不重复：
+/// 1. 概览：启用开关 + 一句话简介
+/// 2. 专属配置项
+/// 3. 唤醒与命令：关键字（只出现一次）与额外命令
 struct FeatureSettingsPane: View {
 
     let tab: SettingsTab
@@ -35,124 +33,126 @@ struct FeatureSettingsPane: View {
 
     var body: some View {
         Form {
-            // 第一部分：基本开关
-            Section {
-                Toggle(isOn: $isEnabled) {
-                    SettingsRow(
-                        title: "启用\(tab.title)",
-                        subtitle: "开启后可在 Quick 面板中搜索和使用此插件。",
-                        icon: { SettingsRowIcon(systemImage: tab.systemImage) }
-                    )
-                }
-                .onChange(of: isEnabled) { _, newValue in
-                    if let modID = tab.pluginID {
-                        dataSource.setPluginEnabled(modID, enabled: newValue)
-                    }
-                }
-            } header: {
-                Text(tab.title)
-            }
-
-            // 第二部分：功能说明
-            descriptionSection
-
-            // 唤醒词只读展示。快捷键只在「快捷键」页绑定
-            Group {
-                triggerWordsSection
-                commandsSection
-            }
-            .settingsEnabled(isEnabled)
-
-            // 第三部分：专属配置项
-            Group {
-                if let customView = dataSource.makeFeatureSettingsView(for: tab) {
-                    customView
-                } else {
-                    defaultFeatureContent
-                }
-            }
-            .settingsEnabled(isEnabled)
-
-            // 第四部分：身份说明
-            pluginIdentitySection
+            overviewSection
+            featureSection
+            wakeSection
         }
         .formStyle(.grouped)
     }
 
-    /// 插件功能说明区域
-    @ViewBuilder
-    private var descriptionSection: some View {
-        if let info = pluginInfo, !info.description.isEmpty {
-            Section {
+    // MARK: - 概览
+
+    /// 启用开关 + 简介
+    ///
+    /// 不设分组标题：窗口标题与侧边栏已经写着插件名，这里再重复一遍就是噪音。
+    private var overviewSection: some View {
+        Section {
+            Toggle(isOn: $isEnabled) {
                 SettingsRow(
-                    title: "插件说明",
-                    subtitle: info.description,
+                    title: "启用此插件",
+                    subtitle: "开启后可在主面板搜索并使用。",
+                    icon: { SettingsRowIcon(systemImage: tab.systemImage) }
+                )
+            }
+            .onChange(of: isEnabled) { _, newValue in
+                if let modID = tab.pluginID {
+                    dataSource.setPluginEnabled(modID, enabled: newValue)
+                }
+            }
+
+            if let description = pluginInfo?.description, !description.isEmpty {
+                SettingsRow(
+                    title: "简介",
+                    subtitle: description,
                     icon: { SettingsRowIcon(systemImage: "info.circle") }
                 )
-            } header: {
-                Text("功能说明")
             }
         }
     }
 
-    /// 触发词列表区域：中英文混排展示，不按语言拆栏
+    // MARK: - 专属配置
+
+    /// 插件自己的设置项；插件关闭时整体置灰
     @ViewBuilder
-    private var triggerWordsSection: some View {
-        if let info = pluginInfo, !info.triggerWords.isEmpty {
+    private var featureSection: some View {
+        Group {
+            if let customView = dataSource.makeFeatureSettingsView(for: tab) {
+                customView
+            } else {
+                defaultFeatureContent
+            }
+        }
+        .settingsEnabled(isEnabled)
+    }
+
+    // MARK: - 唤醒与命令
+
+    /// 唤醒关键字与额外命令
+    ///
+    /// 关键字只在这里出现一次。插件默认的「打开本插件」命令只是同一批关键字的另一种说法，
+    /// 因此不再单列 —— 只有真正额外的命令才列出来。
+    @ViewBuilder
+    private var wakeSection: some View {
+        let words = pluginInfo?.triggerWords ?? []
+        let commands = extraCommands
+        if !words.isEmpty || !commands.isEmpty {
             Section {
-                SettingsRow(
-                    title: "关键字",
-                    subtitle: "输入其中任一关键词即可唤醒。中英文通用，无需切换语言。",
-                    icon: { SettingsRowIcon(systemImage: "text.magnifyingglass") }
-                ) {
-                    triggerChips(info.triggerWords)
+                if !words.isEmpty {
+                    SettingsRow(
+                        title: "关键字",
+                        subtitle: "在主面板输入任一关键字即可打开此插件。",
+                        trailingPlacement: .below,
+                        icon: { SettingsRowIcon(systemImage: "text.magnifyingglass") }
+                    ) {
+                        triggerChips(words)
+                    }
                 }
-            } header: {
-                Text("唤醒命令")
-            } footer: {
-                Text("在搜索框中输入以上任一关键词即可唤醒此插件。")
-            }
-        }
-    }
 
-    /// 这个插件对外的命令。绑定快捷键不在本页
-    @ViewBuilder
-    private var commandsSection: some View {
-        let commands = dataSource.pluginCommands(tab.pluginID ?? "")
-        if !commands.isEmpty {
-            Section {
                 ForEach(commands) { command in
                     SettingsRow(
                         title: command.title,
                         subtitle: commandSubtitle(command),
                         icon: {
-                            SettingsRowIcon(systemImage: command.icon, isEnabled: command.isInvocationEnabled)
+                            SettingsRowIcon(
+                                systemImage: command.icon,
+                                isEnabled: command.isInvocationEnabled)
                         }
                     )
                 }
             } header: {
-                Text("命令")
+                Text("唤醒与命令")
             } footer: {
-                Text("要给其中一条绑快捷键，打开「快捷键」，在插件绑定里写它的关键字。")
+                Text("要给某条命令绑快捷键，到「快捷键」页添加。")
             }
         }
     }
 
-    /// 命令行的说明：关键字是唤醒词
+    /// 除默认「打开本插件」之外的命令
+    ///
+    /// 默认命令的关键字就是上面那批唤醒词，列出来只会和关键字行重复。
+    private var extraCommands: [SettingsCommandBinding] {
+        guard let pluginID = tab.pluginID else { return [] }
+        let openCommandID = CommandID.openPlugin(pluginID)
+        return dataSource.pluginCommands(pluginID).filter { $0.id != openCommandID }
+    }
+
+    /// 额外命令的说明：关键字 + 是否可用
     private func commandSubtitle(_ command: SettingsCommandBinding) -> String {
         let words = command.keywords.isEmpty ? command.title : command.keywords.joined(separator: "、")
         if command.isInvocationEnabled {
-            return "关键字：\(words)。在主面板输入即可唤醒这个功能。"
+            return "关键字：\(words)。"
         }
         return "关键字：\(words)。已关闭，主搜索和快捷键都不会生效。"
     }
 
-    /// 触发词标签
+    /// 关键字标签：一行放不下就换行，标签内部不换行
     private func triggerChips(_ words: [String]) -> some View {
-        HStack(spacing: DesignTokens.Spacing.xs) {
+        FlowLayout(horizontalSpacing: DesignTokens.Spacing.sm, verticalSpacing: DesignTokens.Spacing.xs) {
             ForEach(Array(words.enumerated()), id: \.offset) { _, word in
                 Text(word)
                     .font(DesignTokens.Typography.keyCap)
+                    .lineLimit(1)
+                    .fixedSize()
                     .padding(.horizontal, DesignTokens.Spacing.sm)
                     .padding(.vertical, DesignTokens.Spacing.xxs)
                     .background(
@@ -160,49 +160,6 @@ struct FeatureSettingsPane: View {
                             .fill(Color.accentColor.opacity(0.12))
                     )
                     .foregroundStyle(Color.accentColor)
-            }
-        }
-    }
-
-    /// 触发词标签
-    ///
-    /// Quick 目前只支持内置插件 —— 它们和宿主一起编译、一起签名，不加载任何外部代码。
-    /// 把这件事写在每个插件的设置页里，是因为「插件」这个词会让人以为能装第三方的：
-    /// 与其让用户去别处找安装入口，不如在这里说清楚。
-    @ViewBuilder
-    private var pluginIdentitySection: some View {
-        if let pluginID = tab.pluginID {
-            Section {
-                SettingsRow(
-                    title: "内置插件",
-                    subtitle: "与 Quick 一同编译分发，不需要也无法单独安装。",
-                    icon: { SettingsRowIcon(systemImage: "shippingbox") }
-                ) {
-                    Text("内置")
-                        .font(DesignTokens.Typography.keyCap)
-                        .padding(.horizontal, DesignTokens.Spacing.sm)
-                        .padding(.vertical, DesignTokens.Spacing.xxs)
-                        .background(
-                            RoundedRectangle(
-                                cornerRadius: DesignTokens.Radius.barControl, style: .continuous
-                            )
-                            .fill(Color.accentColor.opacity(0.12))
-                        )
-                        .foregroundStyle(Color.accentColor)
-                }
-
-                SettingsRow(
-                    title: "标识",
-                    subtitle: "设置存储与日志都用它做键，发布后不会变。",
-                    icon: { SettingsRowIcon(systemImage: "number") }
-                ) {
-                    Text(pluginID)
-                        .font(DesignTokens.Typography.code)
-                        .foregroundStyle(DesignTokens.Colors.textSecondary)
-                        .textSelection(.enabled)
-                }
-            } header: {
-                Text("关于")
             }
         }
     }
@@ -222,8 +179,6 @@ struct FeatureSettingsPane: View {
             NotesFeatureSection()
         case .calendar:
             CalendarFeatureSection()
-        case .weather:
-            WeatherFeatureSection()
         case .ai:
             EmptyView()
         case .translator:
@@ -251,8 +206,6 @@ struct FeatureSettingsPane: View {
             HashCalculatorFeatureSection()
         case .timestampConverter:
             TimestampConverterFeatureSection()
-        case .wordCounter:
-            WordCounterFeatureSection()
         case .textDiff:
             TextDiffFeatureSection()
         case .markdownPreview:
@@ -533,54 +486,6 @@ private struct CalendarFeatureSection: View {
     }
 }
 
-private struct WeatherFeatureSection: View {
-    @AppStorage(PluginSettingKey.Weather.defaultCity) private var defaultCity = "自动定位"
-    @AppStorage(PluginSettingKey.Weather.unit) private var unit = "celsius"
-    @AppStorage(PluginSettingKey.Weather.showHumidity) private var showHumidity = true
-
-    var body: some View {
-        Section {
-            Picker(selection: $defaultCity) {
-                Text("自动定位").tag("自动定位")
-                Text("北京").tag("北京")
-                Text("上海").tag("上海")
-                Text("深圳").tag("深圳")
-                Text("广州").tag("广州")
-                Text("杭州").tag("杭州")
-                Text("成都").tag("成都")
-            } label: {
-                SettingsRow(
-                    title: "默认城市",
-                    subtitle: "不使用定位时显示该城市的天气。",
-                    icon: { SettingsRowIcon(systemImage: "building.2") }
-                )
-            }
-
-            Picker(selection: $unit) {
-                Text("摄氏度 (°C)").tag("celsius")
-                Text("华氏度 (°F)").tag("fahrenheit")
-            } label: {
-                SettingsRow(
-                    title: "温度单位",
-                    subtitle: "天气信息使用的温度计量单位。"
-                )
-            }
-
-            Toggle(isOn: $showHumidity) {
-                SettingsRow(
-                    title: "显示湿度",
-                    subtitle: "在天气信息中同时展示湿度百分比。"
-                )
-            }
-        } header: {
-            Text("天气偏好")
-        } footer: {
-            PendingFeatureNote(detail: "这三项还没有实现：天气服务目前是占位实现（未接入 WeatherKit），返回的是固定内容。")
-        }
-        .disabled(true)
-    }
-}
-
 private struct TranslatorFeatureSection: View {
     @AppStorage(PluginSettingKey.Translator.targetLang) private var targetLang = "zh-Hans"
     @AppStorage(PluginSettingKey.Translator.autoDetect) private var autoDetect = true
@@ -784,7 +689,6 @@ private struct OCRFeatureSection: View {
 
 private struct ScreenshotFeatureSection: View {
     @AppStorage(PluginSettingKey.Screenshot.format) private var format = "png"
-    @AppStorage(PluginSettingKey.Screenshot.includePointer) private var includePointer = false
     @AppStorage(PluginSettingKey.Screenshot.saveToDesktop) private var saveToDesktop = true
 
     var body: some View {
@@ -798,13 +702,6 @@ private struct ScreenshotFeatureSection: View {
                     title: "图片格式",
                     subtitle: "截图保存使用的图片编码格式。",
                     icon: { SettingsRowIcon(systemImage: "photo") }
-                )
-            }
-
-            Toggle(isOn: $includePointer) {
-                SettingsRow(
-                    title: "包含鼠标指针",
-                    subtitle: "截图时保留鼠标光标的图像。"
                 )
             }
 
@@ -965,37 +862,6 @@ private struct TimestampConverterFeatureSection: View {
             }
         } header: {
             Text("转换偏好")
-        }
-    }
-}
-
-private struct WordCounterFeatureSection: View {
-    @AppStorage(PluginSettingKey.WordCounter.ignoreWhitespace) private var ignoreWhitespace = false
-    @AppStorage(PluginSettingKey.WordCounter.readingSpeedWPM) private var readingSpeed = 300
-
-    var body: some View {
-        Section {
-            Toggle(isOn: $ignoreWhitespace) {
-                SettingsRow(
-                    title: "字符统计忽略空白符",
-                    subtitle: "统计总字数时不计入空格、制表符与换行符。",
-                    icon: { SettingsRowIcon(systemImage: "character") }
-                )
-            }
-
-            Picker(selection: $readingSpeed) {
-                Text("200 字/分（沉浸阅读）").tag(200)
-                Text("300 字/分（标准阅读）").tag(300)
-                Text("400 字/分（快速浏览）").tag(400)
-            } label: {
-                SettingsRow(
-                    title: "预估阅读速度",
-                    subtitle: "用于估算文本所需阅读时长。",
-                    icon: { SettingsRowIcon(systemImage: "speedometer") }
-                )
-            }
-        } header: {
-            Text("统计规则")
         }
     }
 }

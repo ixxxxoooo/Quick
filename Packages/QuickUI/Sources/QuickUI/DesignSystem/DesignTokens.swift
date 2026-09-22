@@ -121,19 +121,6 @@ public enum DesignTokens {
         public static let jsonTreeIndent = scaled(14)
         /// JSON 树的行高
         public static let jsonTreeRowHeight = scaled(22)
-        /// 计算器每行输入 / 结果的固定行高
-        ///
-        /// 取计算器字体的**自然行高**：编辑器和结果行都按它居中排版，第 N 行结果才能和输入
-        /// 严格对齐（见 `CalcInputView`）。不要写死数字 —— 字号或 `panelScale` 一变，
-        /// 写死的值就会让两栏错位。
-        public static var calculatorLineHeight: CGFloat {
-            let font = Typography.calculatorNSFont
-            return (font.ascender - font.descender + font.leading).rounded(.up)
-        }
-        /// 计算器结果列宽度
-        ///
-        /// 要放得下 `= 142,857.1429` 这种带千分位与小数的结果，加上复制图标，不能太窄。
-        public static let calculatorResultWidth = scaled(260)
         /// 代码编辑器（`CodeEditorView`）的固定行高
         ///
         /// 关闭软换行后，左右两个编辑器靠同一条行高按行号对齐；行号槽也按它定位。
@@ -366,10 +353,6 @@ public enum DesignTokens {
         /// 计算器输入 / 结果字体
         public static let calculator = Font.system(
             size: calculatorSize, weight: .regular, design: .monospaced)
-        /// 计算器字体的 AppKit 版本（自绘 `NSTextView` 用）
-        public static var calculatorNSFont: NSFont {
-            NSFont.monospacedSystemFont(ofSize: calculatorSize, weight: .regular)
-        }
         /// 行内代码
         public static let inlineCode = scaledStyle(.body).monospaced()
     }

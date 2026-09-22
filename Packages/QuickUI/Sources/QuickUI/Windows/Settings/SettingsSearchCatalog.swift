@@ -41,7 +41,6 @@ enum SettingsSearchCatalog {
         .init(id: "features.snippets", tab: .snippets, title: "Snippets / 代码片段", subtitle: "插件"),
         .init(id: "features.notes", tab: .notes, title: "Notes / 便签备忘", subtitle: "插件"),
         .init(id: "features.calendar", tab: .calendar, title: "Calendar / 日历日程", subtitle: "插件"),
-        .init(id: "features.weather", tab: .weather, title: "Weather / 实时天气", subtitle: "插件"),
         .init(id: "features.ai", tab: .ai, title: "AI Assistant / AI 助手", subtitle: "插件"),
         .init(id: "features.translator", tab: .translator, title: "Translator / 划词翻译", subtitle: "插件"),
         .init(
@@ -65,9 +64,6 @@ enum SettingsSearchCatalog {
         .init(
             id: "features.timestampconverter", tab: .timestampConverter,
             title: "Timestamp Converter / 时间戳转换", subtitle: "插件"),
-        .init(
-            id: "features.wordcounter", tab: .wordCounter, title: "Word Counter / 字数统计",
-            subtitle: "插件"),
         .init(
             id: "features.textdiff", tab: .textDiff, title: "Text Diff / 文本对比",
             subtitle: "插件"),

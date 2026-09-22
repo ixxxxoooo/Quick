@@ -13,30 +13,56 @@ import SwiftUI
 /// 放进 `Toggle` 的 label 里时只贡献左侧内容，开关仍然由系统放在尾部。
 struct SettingsRow<Icon: View, Trailing: View>: View {
 
+    /// 尾部内容的位置
+    enum TrailingPlacement {
+        /// 与标题同一行、靠右（默认）
+        case inline
+        /// 标题下方占满整行；标签这类「宽度不定、需要换行」的内容用它，
+        /// 挤在同一行会被压扁成竖排文字
+        case below
+    }
+
     let title: String
     var subtitle: String?
+    var trailingPlacement: TrailingPlacement = .inline
     @ViewBuilder var icon: Icon
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(spacing: DesignTokens.Spacing.lg) {
-            icon
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                Text(title)
-                    .lineLimit(1)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(DesignTokens.Typography.rowTrailing)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .truncationMode(.middle)
-                        // 副标题被截断时，悬停要能看到全文
-                        .help(subtitle)
-                }
+        switch trailingPlacement {
+        case .inline:
+            HStack(spacing: DesignTokens.Spacing.lg) {
+                icon
+                titleBlock
+                Spacer(minLength: DesignTokens.Spacing.lg)
+                trailing
             }
-            Spacer(minLength: DesignTokens.Spacing.lg)
-            trailing
+        case .below:
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                HStack(spacing: DesignTokens.Spacing.lg) {
+                    icon
+                    titleBlock
+                }
+                trailing
+                    .padding(.leading, DesignTokens.Size.rowIcon + DesignTokens.Spacing.lg)
+            }
+        }
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+            Text(title)
+                .lineLimit(1)
+            if let subtitle {
+                Text(subtitle)
+                    .font(DesignTokens.Typography.rowTrailing)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .truncationMode(.middle)
+                    // 副标题被截断时，悬停要能看到全文
+                    .help(subtitle)
+            }
         }
     }
 }
