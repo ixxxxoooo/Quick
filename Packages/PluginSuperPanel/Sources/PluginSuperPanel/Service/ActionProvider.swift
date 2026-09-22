@@ -612,7 +612,7 @@ final class ActionProvider {
     // MARK: - 系统操作
 
     /// 在终端中打开目录
-    private static func openInTerminal(path: String) {
+    static func openInTerminal(path: String) {
         let url = URL(fileURLWithPath: path)
         NSWorkspace.shared.open(
             [url],

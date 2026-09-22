@@ -86,6 +86,7 @@ struct SuperPanelAction: Identifiable, Sendable {
     let execute: @Sendable @MainActor () -> Void
 
     enum Category: String, Sendable, CaseIterable {
+        case context = "上下文"
         case git = "Git"
         case build = "构建"
         case file = "文件"

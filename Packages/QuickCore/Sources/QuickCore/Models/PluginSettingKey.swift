@@ -208,5 +208,9 @@ public enum PluginSettingKey {
         public static let showFileNav = "superPanel.showFileNav"
         /// 首选终端应用
         public static let preferredTerminal = "superPanel.preferredTerminal"
+        /// 工作台是否显示剪贴板预览
+        public static let showClipboard = "superPanel.showClipboard"
+        /// 工作台是否显示常用工具
+        public static let showQuickTools = "superPanel.showQuickTools"
     }
 }

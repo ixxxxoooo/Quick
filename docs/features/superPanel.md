@@ -1,56 +1,57 @@
 # 超级面板（Super Panel）
 
-感知当前项目上下文的命令面板。通过检测前台应用（Xcode、VS Code、
-Cursor、Terminal 等）的当前项目路径，提供针对该项目的快速操作。
+对齐 Fasty 的双态超级面板：识别剪贴板内容给出即时动作；空白时提供工作台；
+并保留 IDE 前台项目检测。
 
 - 插件 id：`superPanel`
-- 触发词：`sp`、`super`、`超级`
+- 触发词：`sp`、`super`、`超级`、`超级面板`
 
 ---
 
 ## 不变量
 
-1. **项目检测只在前台应用变化时执行。** 同一应用重复触发返回缓存，
+1. **面板有三态：上下文 / 工作台 / 项目。** 打开时若剪贴板有文本，默认进上下文；
+   否则进工作台。项目页由用户切换或从工作台项目卡片进入。
+2. **智能预览是纯逻辑。** `SmartPreviewDetector` 不依赖 AppKit，路径存在性通过
+   注入的闭包判断，测试可脱离磁盘。
+3. **项目检测只在前台应用变化时执行。** 同一应用重复触发返回缓存，
    不做文件系统轮询。
-2. **Git 分支名通过读 `.git/HEAD` 文件获取。** 不跑 `git` 进程——
-   进程创建开销是 5~20ms，读文件是微秒级，差两个数量级。
-3. **操作列表按项目路径缓存。** 上下文不变不重算，`searchItems`
-   只做内存过滤。
-4. **项目类型检测是纯文件系统操作。** 只看标记文件是否存在
-   （`Package.swift`、`package.json`、`Cargo.toml` 等），微秒级。
+4. **Git 分支名通过读 `.git/HEAD` 文件获取。** 不跑 `git` 进程。
+5. **操作列表按项目路径缓存。** 上下文不变不重算。
+6. **插件之间只通过 `EventBus` 跳转。** 打开翻译 / JSON / 颜色等工具走
+   `NavigateEvent`，不直接 `import` 其他插件。
 
-## 支持的项目类型
+## 智能预览类型（上下文）
+
+| 类型 | 示例 | 主要动作 |
+| --- | --- | --- |
+| 网址 | `https://…` | 打开、复制 |
+| 文件路径 | `/Users/…`、`~/…` | Finder、终端、复制路径 |
+| 颜色 | `#FF5500` | 复制 HEX、打开颜色工具 |
+| 时间戳 | `1700000000` | 复制格式化时间、打开时间戳工具 |
+| Base64 | 可解码明文 | 复制解码结果、打开 Base64 工具 |
+| URL 编码 | `%E4%BD%A0` | 复制解码结果、打开 URL 工具 |
+| 算式 | `1+2*3` | 复制结果 |
+| 邮箱 / 电话 / IP | … | 复制 / mailto / 网络工具 |
+| JSON | `{…}` | 打开 JSON 格式化 |
+| 中英文本 | 短句 | 打开翻译 |
+
+## 工作台
+
+默认常用工具（对齐 Fasty）：截图、剪贴板、翻译、AI、备忘、计算、监控、JSON。
+可在设置中关闭工具网格或剪贴板预览。
+
+## 项目
 
 | 类型 | 标记文件 | 特有操作 |
 | --- | --- | --- |
-| Xcode / Swift | `Package.swift`、`*.xcodeproj` | swift build/test、运行 Scripts/*.sh |
-| Node.js | `package.json` | npm/yarn/pnpm run（读 scripts 字段） |
-| Python | `requirements.txt`、`pyproject.toml` | pytest、pip install |
+| Xcode / Swift | `Package.swift`、`*.xcodeproj` | swift build/test、Scripts |
+| Node.js | `package.json` | npm/yarn/pnpm scripts |
+| Python | `requirements.txt`、`pyproject.toml` | pytest、pip |
 | Rust | `Cargo.toml` | cargo build/run/test |
 | Go | `go.mod` | go build/test/run |
-| Java | `pom.xml`、`build.gradle` | maven/gradle build/test |
-| 通用 | `.git` | 仅 Git + 文件操作 |
-
-## 支持的 IDE
-
-| 应用 | 检测方式 |
-| --- | --- |
-| Xcode | 窗口标题 |
-| VS Code | 窗口标题 |
-| Cursor | 窗口标题 |
-| Zed | 窗口标题 |
-| Sublime Text | 窗口标题 |
-| JetBrains 系列 | 窗口标题 |
-| Terminal | 窗口标题 |
-| iTerm2 | 窗口标题 |
-
-## 操作分类
-
-- **Git**：分支信息、status、log、diff、pull、push
-- **构建**：项目类型特定的构建/测试/运行命令
-- **文件**：Finder 中打开、快速导航（README、.env、Makefile 等）
-- **终端**：在终端中打开、运行命令
-- **快捷**：复制路径、在其他 IDE 中打开
+| Java | `pom.xml`、`build.gradle` | maven/gradle |
+| 通用 | `.git` | Git + 文件操作 |
 
 ## 设置
 
@@ -61,3 +62,5 @@ Cursor、Terminal 等）的当前项目路径，提供针对该项目的快速�
 | `superPanel.showBuildActions` | Bool | 显示构建命令 |
 | `superPanel.showFileNav` | Bool | 显示文件导航 |
 | `superPanel.preferredTerminal` | String | 首选终端应用 |
+| `superPanel.showClipboard` | Bool | 工作台显示剪贴板预览 |
+| `superPanel.showQuickTools` | Bool | 工作台显示常用工具 |

@@ -404,21 +404,24 @@ private struct ClipboardRowView: View {
 
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            // 左侧图标或缩略图
-            leadingContent
-            // 主要内容
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                // 图片不再用文字说明，左侧缩略图就是预览
-                if entry.type != .image {
+            if entry.type == .image {
+                // 图片：缩略图在上，来源/时间等元信息排在图片下面
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                    leadingContent
+                    metadataRow
+                }
+            } else {
+                // 文字：不再显示左侧图标，预览与元信息占满整行
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                     // 预览要压平换行、截断，对长文本是实打实的字符串扫描 —— 走缓存，
                     // 别让每次重绘、每次滚回来都重算一遍
                     Text(ClipboardPreviewCache.text(for: entry))
                         .font(DesignTokens.Typography.rowTitle)
                         .foregroundStyle(DesignTokens.Colors.textPrimary)
                         .lineLimit(2)
-                }
 
-                metadataRow
+                    metadataRow
+                }
             }
 
             Spacer(minLength: 0)
@@ -486,7 +489,8 @@ private struct ClipboardRowView: View {
     /// 类型标签只是噪音。
     private var metadataRow: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
-            if let source = entry.sourceAppName {
+            // 图片不显示来源应用，只留时间
+            if entry.type != .image, let source = entry.sourceAppName {
                 sourceBadge(source)
             }
 
@@ -549,23 +553,12 @@ private struct ClipboardRowView: View {
     /// 时间列的格式（只建一次）
     private static let timestampStyle = Date.FormatStyle(date: .abbreviated, time: .shortened)
 
-    @ViewBuilder
+    /// 图片缩略图（只有图片行才有前置内容）
+    ///
+    /// 高度固定，宽度按比例，宽图也不会撑破行。解码走 `ClipboardThumbnail` 的后台缩略图，
+    /// 不在这里同步 `NSImage(data:)`。
     private var leadingContent: some View {
-        if entry.type == .image {
-            // 图片直接当预览看：高度固定，宽度按比例，宽图也不会撑破行。
-            // 解码走 `ClipboardThumbnail` 的后台缩略图，不在这里同步 `NSImage(data:)`
-            ClipboardThumbnail(entry: entry)
-        } else {
-            // 文字类图标
-            Image(systemName: entry.type.icon)
-                .font(DesignTokens.Typography.iconGlyph)
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-                .frame(width: 40, height: 40)
-                .background(
-                    RoundedRectangle(cornerRadius: DesignTokens.Radius.thumbnail)
-                        .fill(DesignTokens.Colors.controlSurface)
-                )
-        }
+        ClipboardThumbnail(entry: entry)
     }
 }
 

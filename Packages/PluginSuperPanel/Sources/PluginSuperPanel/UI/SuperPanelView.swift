@@ -2,70 +2,197 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
+import AppKit
 import QuickCore
 import QuickUI
 import SwiftUI
 
-/// 超级面板在面板内的主视图
+/// 超级面板主视图（对齐 Fasty：上下文态 + 工作台态）
 ///
-/// 展示当前项目上下文和可用操作。布局参考 Fasty 的超级面板：
-/// 顶部是项目信息卡片，下方按分类列出操作。
+/// - 有剪贴板/选中内容 → 默认「上下文」：Spotlight + 智能动作
+/// - 无内容 → 默认「工作台」：常用工具 + 剪贴板 + 项目入口
+/// - 「项目」页：保留原有 IDE 项目检测与 Git/构建操作
 struct SuperPanelView: View {
+
+    enum Tab: String, CaseIterable, Identifiable {
+        case context = "上下文"
+        case dock = "工作台"
+        case project = "项目"
+        var id: String { rawValue }
+    }
 
     let plugin: SuperPanelPlugin
 
-    @State private var context: ProjectContext?
-    @State private var actions: [SuperPanelAction] = []
+    @State private var tab: Tab = .dock
+    @State private var clipboardText = ""
+    @State private var previews: [SmartPreview] = []
+    @State private var contextActions: [SuperPanelAction] = []
+    @State private var project: ProjectContext?
+    @State private var projectActions: [SuperPanelAction] = []
     @State private var isLoading = true
     @State private var filterText = ""
     @State private var hoveredID: String?
 
-    /// 按分类分组后的操作
-    private var groupedActions: [(SuperPanelAction.Category, [SuperPanelAction])] {
+    @AppStorage(PluginSettingKey.SuperPanel.showClipboard) private var showClipboard = true
+    @AppStorage(PluginSettingKey.SuperPanel.showQuickTools) private var showQuickTools = true
+
+    private var primaryPreview: SmartPreview? {
+        previews.first { $0.isMeaningful } ?? previews.first
+    }
+
+    private var hasContext: Bool {
+        !clipboardText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var filteredProjectActions: [(SuperPanelAction.Category, [SuperPanelAction])] {
         let filtered: [SuperPanelAction]
         if filterText.isEmpty {
-            filtered = actions
+            filtered = projectActions
         } else {
             let query = filterText.lowercased()
-            filtered = actions.filter {
+            filtered = projectActions.filter {
                 $0.title.localizedCaseInsensitiveContains(query)
                     || $0.subtitle.localizedCaseInsensitiveContains(query)
-                    || $0.category.rawValue.localizedCaseInsensitiveContains(query)
             }
         }
-
         let grouped = Dictionary(grouping: filtered, by: \.category)
-        return SuperPanelAction.Category.allCases
-            .compactMap { cat in
-                guard let items = grouped[cat], !items.isEmpty else { return nil }
-                return (cat, items)
-            }
+        return SuperPanelAction.Category.allCases.compactMap { cat in
+            guard let items = grouped[cat], !items.isEmpty else { return nil }
+            return (cat, items)
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
+            header
+            Divider().opacity(0.3)
+
             if isLoading {
                 loadingState
-            } else if let context {
-                // 项目信息头
-                projectHeader(context)
-
-                // 搜索过滤
-                filterBar
-
-                // 操作列表
-                actionList
             } else {
-                noProjectState
+                switch tab {
+                case .context:
+                    contextContent
+                case .dock:
+                    SuperPanelDockView(
+                        clipboardText: clipboardText,
+                        showQuickTools: showQuickTools,
+                        showClipboard: showClipboard,
+                        project: project,
+                        onOpenProject: { tab = .project }
+                    )
+                case .project:
+                    projectContent
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task {
-            await loadContext()
+        .task { await reload() }
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        HStack(spacing: DesignTokens.Spacing.md) {
+            Picker("", selection: $tab) {
+                ForEach(Tab.allCases) { item in
+                    Text(item.rawValue).tag(item)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            Spacer(minLength: DesignTokens.Spacing.md)
+
+            Button {
+                Task { await reload() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(DesignTokens.Typography.iconGlyph)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            }
+            .buttonStyle(.plain)
+            .help("刷新上下文")
+        }
+        .padding(.horizontal, DesignTokens.Spacing.xl)
+        .padding(.vertical, DesignTokens.Spacing.md)
+    }
+
+    // MARK: - 上下文
+
+    @ViewBuilder
+    private var contextContent: some View {
+        if !hasContext {
+            VStack(spacing: DesignTokens.Spacing.md) {
+                Image(systemName: "doc.on.clipboard")
+                    .font(DesignTokens.Typography.emptyStateIcon)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                Text("剪贴板为空")
+                    .font(DesignTokens.Typography.panelTitle)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                Text("复制网址、色值、时间戳、路径等内容后刷新")
+                    .font(DesignTokens.Typography.rowTitle)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                Button("切换到工作台") { tab = .dock }
+                    .buttonStyle(.borderedProminent)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            VStack(spacing: 0) {
+                if let primaryPreview {
+                    SuperPanelSpotlightCard(preview: primaryPreview, sourceText: clipboardText)
+                }
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        sectionTitle("操作")
+                        ForEach(contextActions) { action in
+                            actionRow(action)
+                        }
+                    }
+                    .padding(.horizontal, DesignTokens.Spacing.md)
+                    .padding(.bottom, DesignTokens.Spacing.lg)
+                }
+            }
         }
     }
 
-    // MARK: - 项目头部
+    // MARK: - 项目
+
+    @ViewBuilder
+    private var projectContent: some View {
+        if let project {
+            projectHeader(project)
+            filterBar
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(filteredProjectActions, id: \.0) { category, items in
+                        sectionTitle(category.rawValue)
+                        ForEach(items) { action in
+                            actionRow(action)
+                        }
+                    }
+                }
+                .padding(.horizontal, DesignTokens.Spacing.md)
+                .padding(.bottom, DesignTokens.Spacing.lg)
+            }
+        } else {
+            VStack(spacing: DesignTokens.Spacing.md) {
+                Image(systemName: "questionmark.folder")
+                    .font(DesignTokens.Typography.emptyStateIcon)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                Text("未检测到项目")
+                    .font(DesignTokens.Typography.panelTitle)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                Text("请先在 IDE 或终端中打开一个项目")
+                    .font(DesignTokens.Typography.rowTitle)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                Button("手动选择目录") { selectDirectory() }
+                    .buttonStyle(.borderedProminent)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
 
     private func projectHeader(_ context: ProjectContext) -> some View {
         HStack(spacing: DesignTokens.Spacing.lg) {
@@ -77,56 +204,35 @@ struct SuperPanelView: View {
                     height: DesignTokens.Size.rowIcon + DesignTokens.Spacing.xl
                 )
                 .background(
-                    RoundedRectangle(
-                        cornerRadius: DesignTokens.Radius.card, style: .continuous
-                    )
-                    .fill(Color.accentColor.opacity(0.1))
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.1))
                 )
 
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 Text(context.name)
                     .font(DesignTokens.Typography.panelTitle)
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
-
                 HStack(spacing: DesignTokens.Spacing.sm) {
-                    Label(context.type.displayName, systemImage: context.type.icon)
-                        .font(DesignTokens.Typography.rowTrailing)
-                        .foregroundStyle(DesignTokens.Colors.textSecondary)
-
+                    Text(context.type.displayName)
                     if let branch = context.gitBranch {
                         Label(branch, systemImage: "arrow.triangle.branch")
-                            .font(DesignTokens.Typography.rowTrailing)
-                            .foregroundStyle(DesignTokens.Colors.textSecondary)
                     }
                 }
+                .font(DesignTokens.Typography.rowTrailing)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
             }
-
             Spacer()
-
-            // 刷新按钮
-            Button {
-                Task { await refreshContext() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(DesignTokens.Typography.iconGlyph)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-            }
-            .buttonStyle(.plain)
-            .help("刷新项目信息")
         }
         .padding(.horizontal, DesignTokens.Spacing.xl)
         .padding(.vertical, DesignTokens.Spacing.lg)
         .background(DesignTokens.Colors.cardFill)
     }
 
-    // MARK: - 过滤栏
-
     private var filterBar: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
             Image(systemName: "line.3.horizontal.decrease")
                 .font(DesignTokens.Typography.inlineIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
-
             TextField("过滤操作…", text: $filterText)
                 .textFieldStyle(.plain)
                 .font(DesignTokens.Typography.rowTitle)
@@ -135,30 +241,13 @@ struct SuperPanelView: View {
         .padding(.vertical, DesignTokens.Spacing.sm)
     }
 
-    // MARK: - 操作列表
+    // MARK: - 共享行
 
-    private var actionList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(groupedActions, id: \.0) { category, items in
-                    sectionHeader(category)
-
-                    ForEach(items) { action in
-                        actionRow(action)
-                    }
-                }
-            }
-            .padding(.horizontal, DesignTokens.Spacing.md)
-            .padding(.bottom, DesignTokens.Spacing.lg)
-        }
-    }
-
-    private func sectionHeader(_ category: SuperPanelAction.Category) -> some View {
-        HStack(spacing: DesignTokens.Spacing.xs) {
-            Text(category.rawValue)
+    private func sectionTitle(_ title: String) -> some View {
+        HStack {
+            Text(title)
                 .font(DesignTokens.Typography.sectionHeader)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
-
             Spacer()
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
@@ -168,36 +257,26 @@ struct SuperPanelView: View {
 
     private func actionRow(_ action: SuperPanelAction) -> some View {
         let isHovered = hoveredID == action.id
-
         return Button {
             action.execute()
-            EventBus.shared.post(HidePaletteEvent())
         } label: {
             HStack(spacing: DesignTokens.Spacing.lg) {
                 Image(systemName: action.icon)
                     .font(DesignTokens.Typography.iconGlyph)
-                    .foregroundStyle(
-                        isHovered ? Color.white : Color.accentColor
-                    )
+                    .foregroundStyle(isHovered ? Color.white : Color.accentColor)
                     .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
 
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                     Text(action.title)
                         .font(DesignTokens.Typography.rowTitle)
-                        .foregroundStyle(
-                            isHovered
-                                ? Color.white : DesignTokens.Colors.textPrimary
-                        )
-
+                        .foregroundStyle(isHovered ? Color.white : DesignTokens.Colors.textPrimary)
                     Text(action.subtitle)
                         .font(DesignTokens.Typography.rowTrailing)
                         .foregroundStyle(
-                            isHovered
-                                ? Color.white.opacity(0.7) : DesignTokens.Colors.textSecondary
+                            isHovered ? Color.white.opacity(0.7) : DesignTokens.Colors.textSecondary
                         )
                         .lineLimit(1)
                 }
-
                 Spacer()
             }
             .padding(.horizontal, DesignTokens.Spacing.lg)
@@ -211,59 +290,43 @@ struct SuperPanelView: View {
         .onHover { hoveredID = $0 ? action.id : nil }
     }
 
-    // MARK: - 空状态
-
     private var loadingState: some View {
         VStack(spacing: DesignTokens.Spacing.md) {
-            ProgressView()
-                .controlSize(.large)
-            Text("检测项目…")
+            ProgressView().controlSize(.large)
+            Text("加载上下文…")
                 .font(DesignTokens.Typography.rowTitle)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var noProjectState: some View {
-        VStack(spacing: DesignTokens.Spacing.md) {
-            Image(systemName: "questionmark.folder")
-                .font(DesignTokens.Typography.emptyStateIcon)
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
+    // MARK: - 数据
 
-            Text("未检测到项目")
-                .font(DesignTokens.Typography.panelTitle)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-
-            Text("请先在 IDE 或终端中打开一个项目")
-                .font(DesignTokens.Typography.rowTitle)
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-
-            Button("手动选择目录") {
-                selectDirectory()
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    // MARK: - 数据加载
-
-    private func loadContext() async {
+    private func reload() async {
         isLoading = true
-        context = await plugin.detector.detect()
-        if let context {
-            actions = plugin.actionProvider.actions(for: context)
-        }
-        isLoading = false
-    }
 
-    private func refreshContext() async {
-        plugin.actionProvider.invalidateCache()
-        context = await plugin.detector.refresh()
-        if let context {
-            actions = plugin.actionProvider.actions(for: context)
+        // 剪贴板 → 智能预览（对齐 Fasty 选中文本 / 剪贴板上下文）
+        let text = NSPasteboard.general.string(forType: .string) ?? ""
+        clipboardText = text
+        previews = SmartPreviewDetector.detect(text)
+        contextActions = ContextActionBuilder.actions(previews: previews, sourceText: text)
+
+        // 项目检测
+        project = await plugin.detector.detect()
+        if let project {
+            projectActions = plugin.actionProvider.actions(for: project)
+        } else {
+            projectActions = []
         }
+
+        // 有内容默认上下文，否则工作台（有项目时也可以从工作台点进去）
+        if hasContext {
+            tab = .context
+        } else if project != nil, tab == .context {
+            tab = .dock
+        }
+
+        isLoading = false
     }
 
     private func selectDirectory() {
@@ -274,19 +337,18 @@ struct SuperPanelView: View {
         panel.message = "选择项目根目录"
 
         if panel.runModal() == .OK, let url = panel.url {
-            Task {
-                let ctx = ProjectContext(
-                    rootPath: url.path,
-                    name: url.lastPathComponent,
-                    type: .generic,
-                    isGitRepo: FileManager.default.fileExists(
-                        atPath: url.appendingPathComponent(".git").path),
-                    gitBranch: nil,
-                    sourceBundleID: nil
-                )
-                context = ctx
-                actions = plugin.actionProvider.actions(for: ctx)
-            }
+            let ctx = ProjectContext(
+                rootPath: url.path,
+                name: url.lastPathComponent,
+                type: .generic,
+                isGitRepo: FileManager.default.fileExists(
+                    atPath: url.appendingPathComponent(".git").path),
+                gitBranch: nil,
+                sourceBundleID: nil
+            )
+            project = ctx
+            projectActions = plugin.actionProvider.actions(for: ctx)
+            tab = .project
         }
     }
 }
