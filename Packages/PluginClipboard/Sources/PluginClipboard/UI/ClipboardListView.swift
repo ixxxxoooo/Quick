@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import ImageIO
 import QuickCore
 import QuickPlatform
 import QuickUI
@@ -21,13 +22,17 @@ struct ClipboardListView: View {
     /// 当前选中条目索引
     @State private var selectedIndex: Int = 0
 
-    /// 悬停高亮的条目 ID
+    /// 悬停高亮状态
     ///
-    /// **放在列表这一层，不放在行里。** 行各自持有 `@State isHovered` 时，键盘一动
-    /// 列表就滚，而滚动不会给指针底下那一行补一次 `onHover(false)` —— 旧的灰色高亮
-    /// 留在原地，和键盘选中项同时亮着，看起来就是一层残影。列表统一持有，
-    /// 键盘一移动就能一次全清掉。
-    @State private var hoveredID: UUID?
+    /// **统一持有，不放在行里。** 行各自持有 `@State isHovered` 时，键盘一动列表就滚，
+    /// 而滚动不会给指针底下那一行补一次 `onHover(false)` —— 旧的灰色高亮留在原地，
+    /// 和键盘选中项同时亮着，看起来就是一层残影。所以由列表统一清。
+    ///
+    /// **用一个引用类型兜着，而不是列表上的 `@State`。** 悬停变化只该让**行**重绘：
+    /// 挂成列表的状态时，指针每掠过一行都会让整个 body 重算一遍（里面有按标签计数、
+    /// 按搜索词过滤这些 O(n) 的活），条目一多就成了滚动时的卡顿来源。行自己读这个对象，
+    /// 变化时被失效的只有行。
+    @State private var hover = ClipboardHoverState()
 
     /// 搜索文本
     ///
@@ -134,7 +139,7 @@ struct ClipboardListView: View {
         // 过滤词一变，结果集就换了一批，选中项回到第一条
         .onChange(of: search?.text ?? "") { _, _ in
             selectedIndex = 0
-            hoveredID = nil
+            hover.clear()
         }
         // **`phases:` 要显式写。** 单键重载 `onKeyPress(.downArrow) { }` 不带 phases，
         // 只响应第一次按下：长按方向键不会连续移动，手感就是「按住了没反应」。
@@ -168,9 +173,10 @@ struct ClipboardListView: View {
     // MARK: - 标签栏
 
     private var tabBar: some View {
-        HStack(spacing: DesignTokens.Spacing.xs) {
+        let counts = tabCounts
+        return HStack(spacing: DesignTokens.Spacing.xs) {
             ForEach(ClipboardTab.allCases, id: \.rawValue) { tab in
-                tabButton(tab)
+                tabButton(tab, count: counts[tab] ?? 0)
             }
 
             Spacer()
@@ -195,16 +201,28 @@ struct ClipboardListView: View {
         .padding(.vertical, DesignTokens.Spacing.sm)
     }
 
-    private func tabButton(_ tab: ClipboardTab) -> some View {
+    /// 各标签的计数
+    ///
+    /// 一次遍历算完所有标签。以前每个按钮各自 `filter` 一遍全表 —— 四个标签就是四趟
+    /// O(n)，而这个视图每次悬停变化都会重算一遍，条目一多就成了滚动时的隐形开销。
+    private var tabCounts: [ClipboardTab: Int] {
+        var texts = 0
+        var images = 0
+        var favorites = 0
+        for entry in store.entries {
+            if entry.type == .image { images += 1 } else { texts += 1 }
+            if entry.isFavorite { favorites += 1 }
+        }
+        return [
+            .all: store.entries.count,
+            .text: texts,
+            .image: images,
+            .favorites: favorites
+        ]
+    }
+
+    private func tabButton(_ tab: ClipboardTab, count: Int) -> some View {
         let isSelected = selectedTab == tab
-        let count: Int = {
-            switch tab {
-            case .all: store.entries.count
-            case .text: store.entries.filter { $0.type != .image }.count
-            case .image: store.imageEntries.count
-            case .favorites: store.favorites.count
-            }
-        }()
 
         return Button {
             selectedTab = tab
@@ -242,7 +260,7 @@ struct ClipboardListView: View {
                         ClipboardRowView(
                             entry: entry,
                             isSelected: index == selectedIndex,
-                            isHovered: hoveredID == entry.id,
+                            hover: hover,
                             onSelect: {
                                 selectAndCopy(entry)
                             },
@@ -253,11 +271,7 @@ struct ClipboardListView: View {
                                 store.remove(entry.id)
                             },
                             onHoverChange: { hovering in
-                                if hovering {
-                                    hoveredID = entry.id
-                                } else if hoveredID == entry.id {
-                                    hoveredID = nil
-                                }
+                                hover.setHovered(entry.id, hovering)
                             },
                             onCopy: {
                                 copyOnly(entry)
@@ -317,14 +331,14 @@ struct ClipboardListView: View {
         if newIndex >= 0, newIndex < tabs.count {
             selectedTab = tabs[newIndex]
             selectedIndex = 0
-            hoveredID = nil
+            hover.clear()
         }
     }
 
     private func moveSelection(direction: Int) {
         // 键盘一动就把悬停高亮清掉：指针没动，底下那一行已经换人了，
         // 留着就是和选中项抢眼的一层残影。
-        hoveredID = nil
+        hover.clear()
         selectedIndex = ClipboardListNavigation.step(
             from: selectedIndex,
             direction: direction,
@@ -370,12 +384,15 @@ struct ClipboardListView: View {
 
 /// 剪贴板条目行视图
 ///
-/// **无状态：悬停与否由列表传入，不在行里记。** 行自己记 `@State isHovered` 的话，
-/// 键盘移动导致列表滚动时没人来清它，旧的灰色高亮会留在原地（见 `ClipboardListView.hoveredID`）。
-struct ClipboardRowView: View {
+/// **不持有 `@State isHovered`，而是读列表传下来的 `hover`。** 行自己记状态的话，
+/// 键盘移动导致列表滚动时没人来清它，旧的灰色高亮会留在原地（见 `ClipboardHoverState`）。
+/// 读引用对象而不是收一个 `isHovered` 布尔值，是为了让悬停变化只失效这一行，
+/// 不牵连列表 body 重算。
+private struct ClipboardRowView: View {
     let entry: ClipboardEntry
     let isSelected: Bool
-    let isHovered: Bool
+    /// 列表统一的悬停状态
+    let hover: ClipboardHoverState
     let onSelect: () -> Void
     let onToggleFavorite: () -> Void
     let onDelete: () -> Void
@@ -393,7 +410,9 @@ struct ClipboardRowView: View {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                 // 图片不再用文字说明，左侧缩略图就是预览
                 if entry.type != .image {
-                    Text(entry.preview)
+                    // 预览要压平换行、截断，对长文本是实打实的字符串扫描 —— 走缓存，
+                    // 别让每次重绘、每次滚回来都重算一遍
+                    Text(ClipboardPreviewCache.text(for: entry))
                         .font(DesignTokens.Typography.rowTitle)
                         .foregroundStyle(DesignTokens.Colors.textPrimary)
                         .lineLimit(2)
@@ -413,7 +432,7 @@ struct ClipboardRowView: View {
                 .fill(
                     isSelected
                         ? Color.accentColor.opacity(0.2)
-                        : (isHovered ? DesignTokens.Colors.rowHover : .clear)
+                        : (hover.hoveredID == entry.id ? DesignTokens.Colors.rowHover : .clear)
                 )
         }
         .overlay {
@@ -471,7 +490,9 @@ struct ClipboardRowView: View {
                 sourceBadge(source)
             }
 
-            Text(entry.timestamp.formatted(date: .abbreviated, time: .shortened))
+            // 用缓存好的 `FormatStyle` + `Text(_:format:)`：日期格式化在滚动里
+            // 是逐行都要跑一遍的活，别每次现造一个样式
+            Text(entry.timestamp, format: Self.timestampStyle)
                 .font(DesignTokens.Typography.rowTrailing)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
         }
@@ -525,21 +546,15 @@ struct ClipboardRowView: View {
         .help(entry.isFavorite ? "取消收藏" : "收藏")
     }
 
+    /// 时间列的格式（只建一次）
+    private static let timestampStyle = Date.FormatStyle(date: .abbreviated, time: .shortened)
+
     @ViewBuilder
     private var leadingContent: some View {
-        if entry.type == .image, let data = entry.imageData,
-            let nsImage = NSImage(data: data)
-        {
-            // 图片直接当预览看：高度固定，宽度按比例，宽图也不会撑破行
-            Image(nsImage: nsImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(
-                    maxWidth: DesignTokens.Size.clipboardThumbMaxWidth,
-                    maxHeight: DesignTokens.Size.clipboardThumbHeight,
-                    alignment: .leading
-                )
-                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.row))
+        if entry.type == .image {
+            // 图片直接当预览看：高度固定，宽度按比例，宽图也不会撑破行。
+            // 解码走 `ClipboardThumbnail` 的后台缩略图，不在这里同步 `NSImage(data:)`
+            ClipboardThumbnail(entry: entry)
         } else {
             // 文字类图标
             Image(systemName: entry.type.icon)
@@ -551,5 +566,140 @@ struct ClipboardRowView: View {
                         .fill(Color.secondary.opacity(0.08))
                 )
         }
+    }
+}
+
+// MARK: - 图片缩略图
+
+/// 剪贴板图片缩略图
+///
+/// 解码与缩放都在后台做，只把**缩小后**的位图交给 SwiftUI。原来的写法是每次行重绘都
+/// `NSImage(data:)` 同步解一张全尺寸截图（可能是 Retina 下 4000+ 像素宽），滚过去一行
+/// 解一张 —— 这是列表滚动卡顿的主因。缩小后的结果按条目 id 缓存，滚回来是即时的。
+private struct ClipboardThumbnail: View {
+
+    let entry: ClipboardEntry
+
+    @State private var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                // 解码完成前占住同样的位置，避免行高跳一下
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+            }
+        }
+        .frame(
+            maxWidth: DesignTokens.Size.clipboardThumbMaxWidth,
+            maxHeight: DesignTokens.Size.clipboardThumbHeight,
+            alignment: .leading
+        )
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.row))
+        .task(id: entry.id) {
+            await load()
+        }
+    }
+
+    private func load() async {
+        if let cached = ClipboardThumbnailCache.shared.image(for: entry.id) {
+            image = cached
+            return
+        }
+        guard let data = entry.imageData else { return }
+
+        // 后台缩放到显示尺寸再编码成小 PNG；Data 是 Sendable，可以安全跨回主线程
+        let downsampled = await Task.detached(priority: .userInitiated) {
+            Self.downsampledPNG(from: data)
+        }.value
+
+        guard let downsampled, let decoded = NSImage(data: downsampled) else { return }
+        ClipboardThumbnailCache.shared.store(decoded, for: entry.id)
+        image = decoded
+    }
+
+    /// 缩放到最长边 `thumbnailMaxPixelSize` 像素并重新编码成 PNG
+    ///
+    /// 全程只用 ImageIO / 位图，不碰视图，可以在主线程之外跑。
+    nonisolated private static func downsampledPNG(from data: Data) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: thumbnailMaxPixelSize
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        else { return nil }
+        return NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:])
+    }
+
+    /// 缩略图最长边的像素数（显示尺寸 × 2，覆盖 Retina）
+    nonisolated private static let thumbnailMaxPixelSize: CGFloat = 360
+}
+
+/// 缩略图缓存（按条目 id）
+@MainActor
+private final class ClipboardThumbnailCache {
+
+    static let shared = ClipboardThumbnailCache()
+
+    private let cache = NSCache<NSString, NSImage>()
+
+    private init() {
+        cache.countLimit = 200
+    }
+
+    func image(for id: UUID) -> NSImage? {
+        cache.object(forKey: id.uuidString as NSString)
+    }
+
+    func store(_ image: NSImage, for id: UUID) {
+        cache.setObject(image, forKey: id.uuidString as NSString)
+    }
+}
+
+/// 预览文本缓存（按条目 id）
+///
+/// `ClipboardEntry.preview` 每次访问都要压平换行、截断，对长文本是一遍字符串扫描。
+/// 条目内容不可变、id 稳定，所以按 id 缓存一次即可。
+@MainActor
+private enum ClipboardPreviewCache {
+
+    private static let cache = NSCache<NSString, NSString>()
+
+    static func text(for entry: ClipboardEntry) -> String {
+        let key = entry.id.uuidString as NSString
+        if let cached = cache.object(forKey: key) { return cached as String }
+        let value = entry.preview
+        cache.setObject(value as NSString, forKey: key)
+        return value
+    }
+}
+
+/// 列表统一的悬停状态
+///
+/// 做成引用类型让行自己去读：悬停变化只失效读它的行，不像列表 `@State` 那样
+/// 带着整个 body（含 O(n) 的计数与过滤）一起重算。
+@MainActor
+@Observable
+private final class ClipboardHoverState {
+
+    private(set) var hoveredID: UUID?
+
+    func setHovered(_ id: UUID, _ hovering: Bool) {
+        if hovering {
+            hoveredID = id
+        } else if hoveredID == id {
+            hoveredID = nil
+        }
+    }
+
+    func clear() {
+        hoveredID = nil
     }
 }

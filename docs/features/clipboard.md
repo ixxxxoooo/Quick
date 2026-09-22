@@ -48,8 +48,15 @@
   `deactivate()` 里的 `save()` 是唯一的即时落盘点。
 - **列表的悬停高亮归 `ClipboardListView` 持有，`ClipboardRowView` 无状态。**
   行自己记 `@State isHovered` 的话，键盘移动导致列表滚动时没人来清它，旧的灰色高亮
-  会留在原地与选中项同时亮着（一层残影）。行只接收 `isHovered`，由列表在
-  `moveSelection` / `switchTab` 里整体清空。
+  会留在原地与选中项同时亮着（一层残影）。状态放 `ClipboardHoverState`（一个引用类型，
+  行自己读它），由列表在 `moveSelection` / `switchTab` / 换搜索词时整体清空。
+  用引用类型而不是列表上的 `@State` 是为了性能：悬停变化只该失效读它的行，
+  挂成列表状态会让指针每掠过一行都重算整个 body（含按标签计数、按搜索词过滤）。
+- **滚动热路径上的重活都不许同步做在行体里。** 图片缩略图走
+  `ClipboardThumbnail`：后台用 ImageIO 缩到显示尺寸、按条目 id 缓存，行体里不再
+  `NSImage(data:)` 同步解全尺寸截图；`preview` 与时间戳分别走 `ClipboardPreviewCache`
+  与缓存的 `Date.FormatStyle`。这三处都是「滚过去一行就付一次代价」的典型，
+  改回同步解码 / 现算字符串就是滚动卡顿的回归。
 - **滚动跟随只在两端发生**，决策走 `ListScrollFollow.anchor(for:count:)` —— 不要退回
   `anchor: .center`，那会让每按一下方向键整块列表都滚动。**并且不做动画**（`scrollTo`
   不包 `withAnimation`）：这里的行高本来就不齐（图片行单行、文本行两行），动画追着变高的
@@ -63,7 +70,7 @@
 | `ClipboardMonitor` | 轮询系统剪贴板，回调 `onNewContent` |
 | `ClipboardStore` | 内存缓存 + 去重 + 上限裁剪 + 防抖落盘 |
 | `ClipboardEntry` | 值类型条目（`Codable` + `Sendable`） |
-| `ClipboardListView` | 插件主视图 |
+| `ClipboardListView` | 插件主视图（含 `ClipboardHoverState` / 缩略图与预览缓存） |
 | `ClipboardListNavigation` | 上下键移动下标的纯函数（两端夹取、下标越界时也要能走） |
 | `ClipboardSettingsView` | 设置页 |
 
