@@ -65,6 +65,74 @@ struct JSONFormatterLogicTests {
         #expect(JSONFormatterLogic.byteSize(String(repeating: "a", count: 1023)) == "1023 B")
         #expect(JSONFormatterLogic.byteSize(String(repeating: "a", count: 1024)) == "1.0 KB")
     }
+
+    // MARK: - 反转义
+
+    @Test("带引号的转义 JSON 字符串被还原")
+    func unescapesQuotedString() throws {
+        let decoded = try JSONFormatterLogic.unescape(#""{\"a\":1,\n\"b\":\"x\"}""#)
+        #expect(decoded == "{\"a\":1,\n\"b\":\"x\"}")
+        // 还原后应该是合法 JSON
+        #expect((try? JSONFormatterLogic.parseTree(decoded)) != nil)
+    }
+
+    @Test("裸的转义正文也能还原")
+    func unescapesBareEscapedBody() throws {
+        let decoded = try JSONFormatterLogic.unescape(#"{\"a\":1,\"b\":2}"#)
+        #expect(decoded == #"{"a":1,"b":2}"#)
+    }
+
+    @Test("自动反转义只在不影响正常 JSON 时生效")
+    func autoUnescapeIsConservative() {
+        // 正常 JSON 原样返回
+        #expect(JSONFormatterLogic.autoUnescape(#"{"a":1}"#) == #"{"a":1}"#)
+        // 普通文本不动
+        #expect(JSONFormatterLogic.autoUnescape("hello") == "hello")
+        // 被转义的 JSON 会被还原
+        #expect(JSONFormatterLogic.autoUnescape(#"{\"a\":1}"#) == #"{"a":1}"#)
+    }
+
+    // MARK: - 树
+
+    @Test("解析出带排序键的节点树并统计节点数")
+    func parsesTree() throws {
+        let root = try JSONFormatterLogic.parseTree(#"{"b":1,"a":[true,null]}"#)
+        #expect(root.nodeCount == 5)
+        guard case .object(let pairs) = root else {
+            Issue.record("根应为对象")
+            return
+        }
+        #expect(pairs.map(\.key) == ["a", "b"])
+    }
+
+    @Test("默认只展开根，其余容器折叠成计数")
+    func defaultCollapsedShowsTopLevel() throws {
+        let root = try JSONFormatterLogic.parseTree(#"{"a":{"b":{"c":1}},"d":2}"#)
+        let rows = JSONTreeLayout.rows(
+            root: root, collapsed: JSONTreeLayout.defaultCollapsed(root), query: "")
+        // 根 + a + d；a 折叠后不再往下
+        #expect(rows.map(\.depth) == [0, 1, 1])
+        #expect(rows[1].value == "{1}")
+        #expect(rows[1].isCollapsed)
+    }
+
+    @Test("搜索命中时自动展开命中路径")
+    func searchExpandsMatches() throws {
+        let root = try JSONFormatterLogic.parseTree(#"{"a":{"needle":1},"b":2}"#)
+        let rows = JSONTreeLayout.rows(
+            root: root, collapsed: JSONTreeLayout.defaultCollapsed(root), query: "needle")
+        // 命中路径被展开：根 → a → needle
+        #expect(rows.contains { $0.key == "needle" && $0.matchesQuery })
+        #expect(!rows.contains { $0.isCollapsed && $0.key == "a" })
+    }
+
+    @Test("折叠全部后只剩根一行")
+    func collapseAllLeavesRoot() throws {
+        let root = try JSONFormatterLogic.parseTree(#"{"a":{"b":1}}"#)
+        let rows = JSONTreeLayout.rows(root: root, collapsed: JSONTreeLayout.allCollapsed(root), query: "")
+        #expect(rows.count == 1)
+        #expect(rows[0].isCollapsed)
+    }
 }
 
 @MainActor

@@ -39,6 +39,12 @@ public final class PaletteCoordinator {
     /// 当前是搜索模式还是插件模式。这个对象只持有纯状态，安全观察。
     public let paletteMode = PaletteMode()
 
+    /// 当前插件的「插件内搜索」状态（供支持搜索的插件视图观察）
+    ///
+    /// 与 `paletteQuery` 分开：主搜索的查询与插件内搜索是两回事，进入/离开插件时
+    /// 都要清掉，否则一个插件过滤过的词会漏进下一个插件。
+    public let pluginSearch = PluginSearchQuery()
+
     private let log = QuickLog.palette
 
     /// 被面板遮挡前的前台应用（用于恢复焦点）
@@ -46,6 +52,9 @@ public final class PaletteCoordinator {
 
     /// 面板实例（延迟创建）
     private var panel: PalettePanel?
+
+    /// 上次套用的缩放档，用来识别「换档」并据此丢掉手动拖出来的尺寸
+    private var lastScale: CGFloat?
 
     /// 所有已注册插件（由 AppCore 注入）
     private var plugins: [any QuickPlugin] = []
@@ -124,6 +133,7 @@ public final class PaletteCoordinator {
 
         if let pluginID {
             activePluginID = pluginID
+            pluginSearch.reset()
             syncPaletteMode(pluginID: pluginID)
         }
 
@@ -263,6 +273,7 @@ public final class PaletteCoordinator {
     public func navigate(to pluginID: String, context: [String: String] = [:]) {
         activePluginID = pluginID
         query = context["query"] ?? ""
+        pluginSearch.reset()
         syncPaletteMode(pluginID: pluginID, context: context)
 
         if !isVisible {
@@ -278,6 +289,7 @@ public final class PaletteCoordinator {
     public func popToRoot() {
         activePluginID = nil
         query = ""
+        pluginSearch.reset()
         paletteMode.popToRoot()
 
         guard let panel else { return }
@@ -335,7 +347,14 @@ public final class PaletteCoordinator {
         let plugin = plugins.first { type(of: $0).id == pluginID }
         let name = plugin.map { type(of: $0).name } ?? pluginID
         let icon = plugin.map { type(of: $0).icon } ?? "questionmark"
-        paletteMode.navigate(to: pluginID, name: name, icon: icon, context: context)
+        let supportsSearch = plugin.map { type(of: $0).supportsPanelSearch } ?? false
+        paletteMode.navigate(
+            to: pluginID,
+            name: name,
+            icon: icon,
+            context: context,
+            supportsSearch: supportsSearch
+        )
     }
 
     // MARK: - 搜索
@@ -513,6 +532,7 @@ public final class PaletteCoordinator {
             selection: selection,
             paletteQuery: paletteQuery,
             paletteMode: paletteMode,
+            pluginSearch: pluginSearch,
             searchHandler: { [weak self] query in
                 guard let self else { return [] }
                 return await self.search(query: query)
@@ -546,19 +566,30 @@ public final class PaletteCoordinator {
             return true
         }
 
+        // ⌘F：把焦点交给插件头部的搜索框
+        //
+        // 头部搜索框默认不聚焦（焦点留在插件视图上，方向键才好用），主动要搜索时才按 ⌘F。
+        // 只对声明了插件内搜索的插件生效，其余插件把 ⌘F 放行给它们自己。
+        newPanel.onCommandShortcut = { [weak self] event in
+            guard let self, event.charactersIgnoringModifiers?.lowercased() == "f" else {
+                return false
+            }
+            return self.requestPluginSearchFocus()
+        }
+
         // 上下键与回车在 AppKit 层转给选中状态，见 PalettePanel.sendEvent 的说明。
         //
-        // **插件模式下不接。** 那时屏幕上是插件的视图，方向键与回车属于它 —— 它有焦点、
-        // 有自己的标签栏和列表；而搜索列表的选中项还停在最后一次搜索上，让它接管既吃掉了
-        // 插件该收的键，又可能把回车打到一条用户早已看不见的结果上。返回 false 就是让事件
-        // 继续往响应链上走，由插件的视图处理。
+        // **插件模式下走另一条路。** 插件声明要吃导航时，把上下 / 左右 / 回车记成
+        // `PluginSearchQuery` 的请求，插件视图用 `commandToken` 取走执行；不声明（或自己
+        // 把 `wantsNavigation` 置假）就返回 false，事件沿响应链继续走，由插件视图处理。
         newPanel.onMove = { [weak self] delta in
-            guard let self, self.activePluginID == nil else { return false }
-            return self.selection.move(delta)
+            self?.routeMove(delta) ?? false
         }
         newPanel.onSubmit = { [weak self] in
-            guard let self, self.activePluginID == nil else { return false }
-            return self.selection.activateSelection()
+            self?.routeSubmit() ?? false
+        }
+        newPanel.onTab = { [weak self] delta in
+            self?.routeTab(delta) ?? false
         }
         newPanel.onPointerMoved = { [weak self] location in
             self?.selection.notePointerMoved(to: location)
@@ -569,6 +600,45 @@ public final class PaletteCoordinator {
 
         observeOutsideClicks(on: newPanel)
         panel = newPanel
+    }
+
+    // MARK: - 面板按键路由
+
+    /// 上下键：插件模式转给插件内搜索（仅当插件声明要吃），否则给主搜索列表
+    func routeMove(_ delta: Int) -> Bool {
+        if activePluginID != nil {
+            guard pluginSearch.wantsNavigation else { return false }
+            pluginSearch.request(.move(delta))
+            return true
+        }
+        return selection.move(delta)
+    }
+
+    /// 回车：插件模式下转给插件内搜索，否则激活主搜索选中项
+    func routeSubmit() -> Bool {
+        if activePluginID != nil {
+            guard pluginSearch.wantsNavigation else { return false }
+            pluginSearch.request(.submit)
+            return true
+        }
+        return selection.activateSelection()
+    }
+
+    /// 左右键：只有插件内搜索需要（主搜索的左右键属于搜索框光标）
+    func routeTab(_ delta: Int) -> Bool {
+        guard activePluginID != nil, pluginSearch.wantsNavigation else { return false }
+        pluginSearch.request(.tab(delta))
+        return true
+    }
+
+    /// ⌘F：把焦点交给插件头部的搜索框
+    ///
+    /// 只在插件模式且该插件提供头部搜索框时消费；主搜索里焦点本来就在搜索框，
+    /// 其他插件把 ⌘F 留给它们自己。
+    func requestPluginSearchFocus() -> Bool {
+        guard activePluginID != nil, pluginSearch.hasHeaderField else { return false }
+        pluginSearch.requestFocus()
+        return true
     }
 
     /// 点击面板以外的位置时收起
@@ -645,15 +715,28 @@ public final class PaletteCoordinator {
     /// 按外观设置改面板尺寸。内部排版仍按设计令牌，外层再缩放到用户选的档
     public func applyPaletteMetrics() {
         guard let panel else { return }
-        let factor = PalettePreferences.scaleFactor
-        panel.setContentSize(
-            NSSize(
-                width: DesignTokens.Size.panelWidth * factor,
-                height: PalettePreferences.panelHeight
-            )
-        )
+        let scale = PalettePreferences.scaleFactor
+        if let lastScale, lastScale != scale {
+            // 换档是显式选择：丢掉手动拖出来的尺寸，回到该档的设计尺寸
+            PalettePreferences.clearPanelSize()
+        }
+        lastScale = scale
+
+        let target = NSSize(width: PalettePreferences.panelWidth, height: PalettePreferences.panelHeight)
+        // 尺寸没变就什么都不做。拖拽结束时刚写回的记忆值会触发一次这里，
+        // 若照常重排会把用户刚拖好的位置重新居中。
+        guard !panel.frame.size.isApproximately(target) else { return }
+
+        panel.setContentSize(target)
         if isVisible {
             positionOnCursorScreen()
         }
+    }
+}
+
+extension NSSize {
+    /// 两个尺寸是否近似相等（写进偏好再读回来会过一遍 Double，不敢用精确比较）
+    fileprivate func isApproximately(_ other: NSSize) -> Bool {
+        abs(width - other.width) < 0.5 && abs(height - other.height) < 0.5
     }
 }

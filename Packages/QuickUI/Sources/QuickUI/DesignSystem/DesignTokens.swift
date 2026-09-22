@@ -112,8 +112,22 @@ public enum DesignTokens {
         public static let systemSettingsSidebar: CGFloat = 230
         /// 主面板允许拖到的最矮高度
         public static let panelMinHeight: CGFloat = panelHeight * 0.6
-        /// 主面板底部用来拖高矮的热区
-        public static let resizeGrip = scaled(8)
+        /// 主面板允许拖到的最窄宽度
+        public static let panelMinWidth: CGFloat = panelWidth * 0.6
+        /// 主面板四边用来拖拽改变大小的热区厚度
+        public static let resizeMargin = scaled(6)
+        /// JSON 树每一层的缩进宽度
+        public static let jsonTreeIndent = scaled(14)
+        /// JSON 树的行高
+        public static let jsonTreeRowHeight = scaled(22)
+        /// 剪贴板图片缩略图的高度（比文本行图标大，直接当预览看）
+        public static let clipboardThumbHeight = scaled(72)
+        /// 剪贴板图片缩略图的最大宽度（宽图按比例缩，不撑破行）
+        public static let clipboardThumbMaxWidth = scaled(180)
+        /// 剪贴板来源应用图标尺寸
+        public static let clipboardSourceIcon = scaled(14)
+        /// 剪贴板行右侧收藏按钮的点击区尺寸
+        public static let clipboardFavoriteButton = scaled(22)
         /// 引导页步骤圆点
         public static let onboardingDot = scaled(7)
         /// 引导页宽度。系统窗口，不跟主面板缩放

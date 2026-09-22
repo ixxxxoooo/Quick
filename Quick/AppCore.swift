@@ -101,6 +101,9 @@ final class AppCore {
     /// 粘贴板服务
     let pasteboardService = PasteboardService()
 
+    /// 合成系统粘贴（⌘V，需要辅助功能权限）
+    let pasteService = PasteService()
+
     /// 应用索引
     let appIndex = AppIndex()
 
@@ -583,6 +586,15 @@ final class AppCore {
             }
         )
 
+        // 粘贴回上一个应用：内容已经写好，这里只负责隐藏面板、交还焦点、再合成 ⌘V
+        subscriptions.append(
+            bus.on(PasteIntoPreviousAppEvent.self) { [weak self] _ in
+                guard let self else { return }
+                self.paletteCoordinator.hide(restoreFocus: true)
+                self.schedulePasteIntoPreviousApp()
+            }
+        )
+
         // 显示面板事件
         subscriptions.append(
             bus.on(ShowPaletteEvent.self) { [weak self] event in
@@ -620,6 +632,32 @@ final class AppCore {
                 self?.rebuildCommandCatalog()
             }
         )
+    }
+
+    // MARK: - 粘贴回上一个应用
+
+    /// 交还焦点后多久再合成 ⌘V
+    ///
+    /// `NSRunningApplication.activate()` 是异步的：立刻发 ⌘V 会打在被切走的面板或
+    /// 还没回到前台的旧应用上。给系统一点时间把前一个应用带到前台。
+    private static let pasteSettleDelay = Duration.milliseconds(140)
+
+    /// 等前一个应用回到前台，再合成一次 ⌘V；没有辅助功能权限就只提示
+    private func schedulePasteIntoPreviousApp() {
+        let canPaste = pasteService.canSynthesize
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard canPaste else {
+                // 面板已隐藏，剪贴板里已经有内容了 —— 告诉用户为什么没自动粘贴
+                self.hudController.show(
+                    message: "已复制，开启辅助功能权限后可自动粘贴",
+                    tone: .warning
+                )
+                return
+            }
+            try? await Task.sleep(for: Self.pasteSettleDelay)
+            self.pasteService.paste()
+        }
     }
 
     // MARK: - 自定义命令存储辅助

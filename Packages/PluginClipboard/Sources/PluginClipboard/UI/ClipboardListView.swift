@@ -4,6 +4,7 @@
 
 import AppKit
 import QuickCore
+import QuickPlatform
 import QuickUI
 import SwiftUI
 
@@ -29,13 +30,19 @@ struct ClipboardListView: View {
     @State private var hoveredID: UUID?
 
     /// 搜索文本
-    @State private var searchText = ""
+    ///
+    /// 来自面板头部的插件内搜索框（`PluginSearchQuery`）。分离窗口里没有这个环境，
+    /// `search` 为 `nil`，退化成「不过滤」。
+    @Environment(PluginSearchQuery.self) private var search: PluginSearchQuery?
 
     /// 本视图是否持有键盘焦点
     ///
     /// **方向键与回车要先有人接。** 插件模式下搜索框不在视图树里，没有这句焦点声明的话
     /// 焦点会落在面板本身，`onKeyPress` 一个都收不到 —— 它们是「视图或其后代获得焦点时」
     /// 才触发的。这是 `docs/ui.md` §2b 记过的同一个坑：键盘不能指望「挂上去就有人送」。
+    ///
+    /// 有头部搜索框时反过来：焦点在搜索框，方向键与回车由面板转给 `search.move/submit/tab`，
+    /// 这里不再抢焦点。
     @FocusState private var isFocused: Bool
 
     /// 标签枚举
@@ -55,6 +62,9 @@ struct ClipboardListView: View {
         }
     }
 
+    /// 头部是否有真正的搜索框（分离窗口的兜底对象不算）
+    private var hasHeaderSearch: Bool { search?.hasHeaderField == true }
+
     /// 当前标签下的条目
     private var currentEntries: [ClipboardEntry] {
         let base: [ClipboardEntry]
@@ -68,6 +78,7 @@ struct ClipboardListView: View {
         case .favorites:
             base = store.favorites
         }
+        let searchText = search?.text ?? ""
         if searchText.isEmpty { return base }
         let lower = searchText.lowercased()
         return base.filter {
@@ -95,10 +106,36 @@ struct ClipboardListView: View {
         // `.focused` 把它绑到 `isFocused`，`onAppear` 里主动取一次 —— 插件视图是随导航
         // 新插进视图树的，没人会替它取焦点。`.focusEffectDisabled()` 是因为焦点圈在这里
         // 只会糊住整块内容：面板自己就是「焦点所在」的视觉提示，不需要再描一圈。
+        //
+        // **头部搜索框默认不抢焦点**（`SearchFieldView(autoFocus: false)`），所以这里
+        // 始终自己取焦点：方向键由面板转接，打字要靠 ⌘F 把焦点交给搜索框。
         .focusable()
         .focused($isFocused)
         .focusEffectDisabled()
-        .onAppear { isFocused = true }
+        .onAppear {
+            // 声明「方向键与回车归我」，面板据此在 AppKit 层把它们转成命令
+            if hasHeaderSearch {
+                search?.wantsNavigation = true
+            }
+            isFocused = true
+        }
+        // 面板把上下 / 左右 / 回车变成请求记在 `commandToken` 上，这里取走并执行
+        .onChange(of: search?.commandToken) { _, _ in
+            guard let command = search?.lastCommand else { return }
+            switch command {
+            case .move(let delta):
+                moveSelection(direction: delta)
+            case .tab(let delta):
+                switchTab(direction: delta)
+            case .submit:
+                confirmSelection()
+            }
+        }
+        // 过滤词一变，结果集就换了一批，选中项回到第一条
+        .onChange(of: search?.text ?? "") { _, _ in
+            selectedIndex = 0
+            hoveredID = nil
+        }
         // **`phases:` 要显式写。** 单键重载 `onKeyPress(.downArrow) { }` 不带 phases，
         // 只响应第一次按下：长按方向键不会连续移动，手感就是「按住了没反应」。
         .onKeyPress(.leftArrow, phases: [.down, .repeat]) { _ in
@@ -221,6 +258,9 @@ struct ClipboardListView: View {
                                 } else if hoveredID == entry.id {
                                     hoveredID = nil
                                 }
+                            },
+                            onCopy: {
+                                copyOnly(entry)
                             }
                         )
                         .id(entry.id)
@@ -298,17 +338,31 @@ struct ClipboardListView: View {
         selectAndCopy(entries[selectedIndex])
     }
 
+    /// 主操作：复制并粘贴回面板打开前的那个应用
+    ///
+    /// 内容先写好剪贴板，再发粘贴事件由宿主负责「隐藏面板 → 交还焦点 → 合成 ⌘V」。
+    /// 目标应用不是可输入的地方时，⌘V 自然什么都不发生，不需要我们判定。
     private func selectAndCopy(_ entry: ClipboardEntry) {
+        writeToPasteboard(entry)
+        EventBus.shared.post(PasteIntoPreviousAppEvent())
+    }
+
+    /// 仅复制到剪贴板（右键菜单），不粘贴、不隐藏面板之外的额外动作
+    private func copyOnly(_ entry: ClipboardEntry) {
+        writeToPasteboard(entry)
+        EventBus.shared.post(HidePaletteEvent())
+    }
+
+    private func writeToPasteboard(_ entry: ClipboardEntry) {
         if entry.type == .image, let data = entry.imageData {
-            // 图片复制到剪贴板
+            // 图片直接写 PNG（走 PasteboardService 的 copyImage 会丢失原始字节）
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setData(data, forType: .png)
-            EventBus.shared.post(ShowHUDEvent(message: "已复制图片", tone: .success))
         } else {
-            EventBus.shared.post(CopyToClipboardEvent(text: entry.text))
+            // showHUD 关掉：粘贴本身就是反馈，不必再叠一层「已复制」
+            EventBus.shared.post(CopyToClipboardEvent(text: entry.text, showHUD: false))
         }
-        EventBus.shared.post(HidePaletteEvent())
     }
 }
 
@@ -328,51 +382,29 @@ struct ClipboardRowView: View {
     /// 指针进出这一行（由列表统一记录）
     let onHoverChange: (Bool) -> Void
 
+    /// 仅复制（不动面板、不粘贴）
+    let onCopy: () -> Void
+
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
             // 左侧图标或缩略图
             leadingContent
-
             // 主要内容
-            VStack(alignment: .leading, spacing: 2) {
-                if entry.type == .image {
-                    Text(entry.preview)
-                        .font(DesignTokens.Typography.rowTitle)
-                        .foregroundStyle(DesignTokens.Colors.textPrimary)
-                        .lineLimit(1)
-                } else {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                // 图片不再用文字说明，左侧缩略图就是预览
+                if entry.type != .image {
                     Text(entry.preview)
                         .font(DesignTokens.Typography.rowTitle)
                         .foregroundStyle(DesignTokens.Colors.textPrimary)
                         .lineLimit(2)
                 }
 
-                HStack(spacing: DesignTokens.Spacing.xs) {
-                    // 类型标签
-                    Text(entry.type.displayName)
-                        .font(.system(size: 10))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(Color.secondary.opacity(0.15))
-                        )
-                        .foregroundStyle(DesignTokens.Colors.textTertiary)
-
-                    Text(entry.timestamp.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
-                        .foregroundStyle(DesignTokens.Colors.textTertiary)
-                }
+                metadataRow
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
-            // 收藏标记
-            if entry.isFavorite {
-                Image(systemName: "star.fill")
-                    .foregroundStyle(.yellow)
-                    .font(.system(size: 12))
-            }
+            favoriteButton
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .padding(.vertical, DesignTokens.Spacing.md)
@@ -397,7 +429,13 @@ struct ClipboardRowView: View {
             Button {
                 onSelect()
             } label: {
-                Label("复制", systemImage: "doc.on.doc")
+                Label("粘贴到当前应用", systemImage: "arrow.down.doc")
+            }
+
+            Button {
+                onCopy()
+            } label: {
+                Label("仅复制", systemImage: "doc.on.doc")
             }
 
             Divider()
@@ -421,17 +459,87 @@ struct ClipboardRowView: View {
         }
     }
 
+    // MARK: - 元信息
+
+    /// 来源应用 / 时间
+    ///
+    /// 不再显示内容类型名（「文本」「图片」…）：行本身已经说明了它是什么，
+    /// 类型标签只是噪音。
+    private var metadataRow: some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            if let source = entry.sourceAppName {
+                sourceBadge(source)
+            }
+
+            Text(entry.timestamp.formatted(date: .abbreviated, time: .shortened))
+                .font(DesignTokens.Typography.rowTrailing)
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+        }
+    }
+
+    /// 来源应用：能拿到图标就显示图标，否则退回一个通用符号
+    private func sourceBadge(_ name: String) -> some View {
+        HStack(spacing: DesignTokens.Spacing.xxs) {
+            if let bundleID = entry.sourceBundleID,
+                let icon = IconCache.shared.icon(forBundleID: bundleID)
+            {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(
+                        width: DesignTokens.Size.clipboardSourceIcon,
+                        height: DesignTokens.Size.clipboardSourceIcon
+                    )
+            } else {
+                Image(systemName: "app")
+                    .font(DesignTokens.Typography.compactIcon)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            }
+
+            Text(name)
+                .font(DesignTokens.Typography.rowTrailing)
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+                .lineLimit(1)
+        }
+    }
+
+    // MARK: - 收藏
+
+    /// 右侧的收藏按钮：点一下切换收藏，不影响整行的「复制」手势
+    private var favoriteButton: some View {
+        Button {
+            onToggleFavorite()
+        } label: {
+            Image(systemName: entry.isFavorite ? "star.fill" : "star")
+                .font(DesignTokens.Typography.inlineIcon)
+                .foregroundStyle(
+                    entry.isFavorite ? DesignTokens.Colors.warning : DesignTokens.Colors.textTertiary
+                )
+                .frame(
+                    width: DesignTokens.Size.clipboardFavoriteButton,
+                    height: DesignTokens.Size.clipboardFavoriteButton
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(entry.isFavorite ? "取消收藏" : "收藏")
+        .help(entry.isFavorite ? "取消收藏" : "收藏")
+    }
+
     @ViewBuilder
     private var leadingContent: some View {
         if entry.type == .image, let data = entry.imageData,
             let nsImage = NSImage(data: data)
         {
-            // 图片缩略图
+            // 图片直接当预览看：高度固定，宽度按比例，宽图也不会撑破行
             Image(nsImage: nsImage)
                 .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 40, height: 40)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .aspectRatio(contentMode: .fit)
+                .frame(
+                    maxWidth: DesignTokens.Size.clipboardThumbMaxWidth,
+                    maxHeight: DesignTokens.Size.clipboardThumbHeight,
+                    alignment: .leading
+                )
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.row))
         } else {
             // 文字类图标
             Image(systemName: entry.type.icon)

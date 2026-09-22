@@ -60,6 +60,9 @@ public enum SettingsKey {
     /// 用户拖过之后记住的面板高度。没拖过则用设计高度
     public static let paletteHeight = "quick.palette.height"
 
+    /// 用户拖过之后记住的面板宽度。没拖过则用设计宽度
+    public static let paletteWidth = "quick.palette.width"
+
     /// 面板弹出屏幕位置（cursor = 鼠标所在屏幕，main = 主显示器）
     public static let paletteScreen = "quick.palette.screen"
 

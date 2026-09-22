@@ -26,6 +26,11 @@ public final class PaletteMode {
     /// 当前插件的图标（SF Symbol 名称）
     public var activePluginIcon: String?
 
+    /// 当前插件是否声明了「插件内搜索」
+    ///
+    /// 为真时头部用搜索框替换插件名，文本走 `PluginSearchQuery`。
+    public var activePluginSupportsSearch = false
+
     /// 是否处于插件模式
     public var isPluginMode: Bool { activePluginID != nil }
 
@@ -38,10 +43,18 @@ public final class PaletteMode {
     ///   - name: 插件显示名称
     ///   - icon: 插件图标
     ///   - context: 附加上下文
-    public func navigate(to pluginID: String, name: String, icon: String, context: [String: String] = [:]) {
+    ///   - supportsSearch: 该插件是否提供插件内搜索
+    public func navigate(
+        to pluginID: String,
+        name: String,
+        icon: String,
+        context: [String: String] = [:],
+        supportsSearch: Bool = false
+    ) {
         self.activePluginID = pluginID
         self.activePluginName = name
         self.activePluginIcon = icon
+        self.activePluginSupportsSearch = supportsSearch
         self.context = context
     }
 
@@ -50,6 +63,7 @@ public final class PaletteMode {
         activePluginID = nil
         activePluginName = nil
         activePluginIcon = nil
+        activePluginSupportsSearch = false
         context = [:]
     }
 }

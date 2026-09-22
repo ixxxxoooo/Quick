@@ -47,14 +47,13 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 - **`1.1` = 当前采用**：面板 825×523，圆角 29
 
 面板与它的浮动兄弟（HUD、对话框）按此缩放；设置窗口这类系统窗口不缩放。
-拖过主面板底边之后，高度改记用户拖出来的值，不再回到这张表里的默认高度。
-搜索栏左侧的手柄用来拖动面板位置。
+拖过主面板四边之后，尺寸改记用户拖出来的值，不再回到这张表里的默认高度/宽度。
 `Size.hairline` **刻意不缩放** —— 它是物理像素级的东西，跟着放大只会变成粗边。
 
 | 令牌 | 基础值 | 当前实际值 |
 | --- | --- | --- |
 | `Size.panelWidth` | 750 | **825** |
-| `Size.panelHeight` | 475 | **523**（没拖过底边时的默认高度） |
+| `Size.panelHeight` | 475 | **523**（没拖过时的默认高度） |
 | `Radius.panel` | 26 | **29** |
 | `Size.headerHeight` | 44 | 48 |
 | `Size.headerIconSlot` | 22 | 24 |
@@ -161,16 +160,25 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 拦到的按键写进 `PaletteSelection`（一个**不持有窗口**的 `@Observable` 对象，
 所以被 SwiftUI 观察是安全的；会与 AttributeGraph 死循环的是协调器本身）。
 
-**插件模式下相反：面板一个键都不接。** 那时屏幕上是插件自己的视图，方向键与回车属于
-它（标签栏、列表都是它画的），而搜索结果列表的选中项还停在最后一次搜索上。所以
-`PaletteCoordinator` 在插件模式下让 `onMove` / `onSubmit` 直接返回 `false`：事件沿响应链
-继续走，落到插件的视图上。
+**插件模式下分两种情况。** 声明了 `supportsPanelSearch` 的插件，头部保留一个搜索框
+（`PluginSearchQuery`）。**它默认不聚焦**：焦点留在插件视图上（方向键归插件），按 ⌘F
+才把焦点交给它。搜索框拿到焦点后方向键与回车同样会被 field editor 吃掉，所以面板在
+`wantsNavigation` 为真时把上下键 / 左右键 / 回车记成 `Navigation` 请求，插件用
+`.onChange(of: commandToken)` 取走执行。没有声明搜索（或插件自己把 `wantsNavigation`
+置假，例如 JSON 的代码视图）时，`onMove` / `onSubmit` 返回 `false`：事件沿响应链继续走。
+
+**为什么是「请求 + 令牌」而不是回调闭包：** 闭包要在插件视图的 `onAppear` 里挂上，
+而视图重建时 `onAppear` / `onDisappear` 的先后顺序不保证 —— 后到的 `onDisappear`
+会把新视图刚挂上的回调清掉，表现就是「方向键时灵时不灵」。
 
 代价在插件这一侧：**`onKeyPress` 不会自己收到键**，插件必须让内容成为第一响应者
 （`.focusable()` + `@FocusState` + `onAppear` 里取一次焦点，并用 `.focusEffectDisabled()`
 去掉那圈焦点描边）。漏掉这一步的表现就是「键都写好了，但按下去毫无反应」——剪贴板
 插件正是这样静默失效了很久。另外要显式写 `phases: [.down, .repeat]`：单键重载
 `onKeyPress(.downArrow) { }` 不带 phases，长按不会连续移动。
+有头部搜索框时，插件视图仍然照常取焦点（方向键归它），但要声明 `wantsNavigation`
+并消费 `commandToken`，这样即使焦点后来被 ⌘F 挪进搜索框，方向键也还到得了列表。
+参见剪贴板与 JSON 树视图。
 
 ### 列表的滚动跟随与悬停高亮
 

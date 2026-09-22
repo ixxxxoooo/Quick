@@ -34,6 +34,14 @@ public protocol QuickPlugin: AnyObject, Sendable {
     /// 插件是否已启用
     var isEnabled: Bool { get set }
 
+    /// 面板模式下是否在头部保留一个「插件内搜索」框
+    ///
+    /// 默认 false：不声明的插件进入面板后，头部仍然只有 返回 / 名称 / 分离。
+    /// 声明为 true 的插件（剪贴板、JSON 格式化等）会得到搜索框，文本经
+    /// `PluginSearchQuery` 环境对象传进来，由插件自己决定怎么过滤。
+    /// **默认不聚焦**，按 ⌘F 才把焦点放进去。
+    static var supportsPanelSearch: Bool { get }
+
     /// 返回该插件能响应的搜索结果
     /// - Parameter query: 用户在搜索框中输入的文本
     /// - Returns: 匹配的搜索结果项
@@ -104,6 +112,9 @@ public extension QuickPlugin {
 
     /// 默认无触发词
     static var triggerWords: [String] { [] }
+
+    /// 默认不在面板里提供插件内搜索
+    static var supportsPanelSearch: Bool { false }
 
     /// 默认无功能说明
     static var description: String { "" }

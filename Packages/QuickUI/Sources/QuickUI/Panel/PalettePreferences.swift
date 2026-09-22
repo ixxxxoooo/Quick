@@ -27,7 +27,7 @@ public enum PalettePreferences {
         return scale / base
     }
 
-    /// 主面板高度。拖过底边之后用记住的值，否则用当前缩放下的设计高度
+    /// 主面板高度。拖过上下边之后用记住的值，否则用当前缩放下的设计高度
     public static var panelHeight: CGFloat {
         let fallback = DesignTokens.Size.panelHeight * scaleFactor
         guard UserDefaults.standard.object(forKey: SettingsKey.paletteHeight) != nil else { return fallback }
@@ -36,9 +36,25 @@ public enum PalettePreferences {
         return stored
     }
 
-    /// 记住用户拖出来的高度
-    public static func setPanelHeight(_ height: CGFloat) {
-        UserDefaults.standard.set(Double(height), forKey: SettingsKey.paletteHeight)
+    /// 主面板宽度。拖过左右边之后用记住的值，否则用当前缩放下的设计宽度
+    public static var panelWidth: CGFloat {
+        let fallback = DesignTokens.Size.panelWidth * scaleFactor
+        guard UserDefaults.standard.object(forKey: SettingsKey.paletteWidth) != nil else { return fallback }
+        let stored = UserDefaults.standard.double(forKey: SettingsKey.paletteWidth)
+        guard stored > 0 else { return fallback }
+        return stored
+    }
+
+    /// 记住用户拖出来的尺寸
+    public static func setPanelSize(_ size: CGSize) {
+        UserDefaults.standard.set(Double(size.width), forKey: SettingsKey.paletteWidth)
+        UserDefaults.standard.set(Double(size.height), forKey: SettingsKey.paletteHeight)
+    }
+
+    /// 换缩放档时丢掉手动拖出来的尺寸，回到该档的设计尺寸
+    public static func clearPanelSize() {
+        UserDefaults.standard.removeObject(forKey: SettingsKey.paletteWidth)
+        UserDefaults.standard.removeObject(forKey: SettingsKey.paletteHeight)
     }
 
     /// 把拖出来的高度夹在最矮和当前屏幕之间
@@ -46,6 +62,13 @@ public enum PalettePreferences {
         let floor = DesignTokens.Size.panelMinHeight
         let ceiling = max(floor, maxHeight)
         return min(max(floor, height), ceiling)
+    }
+
+    /// 把拖出来的宽度夹在最窄和当前屏幕之间
+    public static func clampedPanelWidth(_ width: CGFloat, maxWidth: CGFloat) -> CGFloat {
+        let floor = DesignTokens.Size.panelMinWidth
+        let ceiling = max(floor, maxWidth)
+        return min(max(floor, width), ceiling)
     }
 
     /// 为真时面板出现在主显示器，否则跟鼠标所在屏幕

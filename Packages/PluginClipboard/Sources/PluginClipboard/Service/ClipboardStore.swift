@@ -259,7 +259,8 @@ final class ClipboardStore {
     // MARK: - SQL 片段
 
     private static let selectColumns = """
-        SELECT id, text, image_data, image_size, type, is_favorite, is_pinned, created_at
+        SELECT id, text, image_data, image_size, type, is_favorite, is_pinned, created_at,
+               source_app, source_bundle_id
         FROM clipboard_history
         ORDER BY is_pinned DESC, created_at DESC
         """
@@ -283,7 +284,9 @@ final class ClipboardStore {
             type: type,
             timestamp: row.date("created_at") ?? Date(),
             isFavorite: row.bool("is_favorite") ?? false,
-            isPinned: row.bool("is_pinned") ?? false
+            isPinned: row.bool("is_pinned") ?? false,
+            sourceAppName: row.text("source_app"),
+            sourceBundleID: row.text("source_bundle_id")
         )
     }
 
@@ -291,15 +294,18 @@ final class ClipboardStore {
         SQLiteStatement(
             """
             INSERT INTO clipboard_history
-                (id, text, image_data, image_size, type, is_favorite, is_pinned, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, text, image_data, image_size, type, is_favorite, is_pinned, created_at,
+                 source_app, source_bundle_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 text = excluded.text,
                 image_data = excluded.image_data,
                 image_size = excluded.image_size,
                 type = excluded.type,
                 is_favorite = excluded.is_favorite,
-                is_pinned = excluded.is_pinned
+                is_pinned = excluded.is_pinned,
+                source_app = excluded.source_app,
+                source_bundle_id = excluded.source_bundle_id
             """,
             [
                 .text(entry.id.uuidString),
@@ -309,7 +315,9 @@ final class ClipboardStore {
                 .text(entry.type.rawValue),
                 .bool(entry.isFavorite),
                 .bool(entry.isPinned),
-                .date(entry.timestamp)
+                .date(entry.timestamp),
+                entry.sourceAppName.map { SQLiteValue.text($0) } ?? .null,
+                entry.sourceBundleID.map { SQLiteValue.text($0) } ?? .null
             ])
     }
 

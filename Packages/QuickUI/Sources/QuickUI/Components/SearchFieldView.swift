@@ -23,6 +23,14 @@ public struct SearchFieldView: View {
     /// 左侧图标（SF Symbol 名称）
     public let icon: String
 
+    /// 出现时是否自动取焦点。主搜索传 true；插件头部传 false（按 ⌘F 才聚焦）
+    public let autoFocus: Bool
+
+    /// 外部请求聚焦的序号：变化一次就取一次焦点
+    ///
+    /// 焦点在 `@FocusState` 里，外部没法直接设，只能靠这个令牌。
+    public let focusTrigger: Int
+
     @FocusState private var isFocused: Bool
 
     /// 初始化搜索输入框
@@ -30,14 +38,20 @@ public struct SearchFieldView: View {
     ///   - query: 搜索文本绑定
     ///   - placeholder: 占位文本
     ///   - icon: 左侧图标
+    ///   - autoFocus: 出现时是否自动取焦点
+    ///   - focusTrigger: 外部聚焦请求序号
     public init(
         query: Binding<String>,
         placeholder: String = "搜索…",
-        icon: String = "magnifyingglass"
+        icon: String = "magnifyingglass",
+        autoFocus: Bool = true,
+        focusTrigger: Int = 0
     ) {
         self._query = query
         self.placeholder = placeholder
         self.icon = icon
+        self.autoFocus = autoFocus
+        self.focusTrigger = focusTrigger
     }
 
     public var body: some View {
@@ -54,11 +68,14 @@ public struct SearchFieldView: View {
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
                 .focused($isFocused)
                 .onAppear {
+                    if autoFocus { isFocused = true }
+                }
+                .onChange(of: focusTrigger) { _, _ in
                     isFocused = true
                 }
                 .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) {
                     _ in
-                    isFocused = true
+                    if autoFocus { isFocused = true }
                 }
         }
         .frame(height: DesignTokens.Size.headerHeight)

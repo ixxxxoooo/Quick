@@ -38,7 +38,7 @@ struct ClipboardPluginTests {
     @Test("插件声明了自己的 schema")
     func pluginDeclaresItsSchema() {
         let ids = ClipboardPlugin.storageMigrations.map(\.id)
-        #expect(ids == ["clipboard.history"])
+        #expect(ids == ["clipboard.history", "clipboard.history.source"])
     }
 
     @Test("启停是幂等的")
@@ -205,6 +205,29 @@ struct ClipboardPluginTests {
         #expect(reader.entries.first?.imageData == png)
         #expect(reader.entries.first?.imageSizeDescription == "64×64")
         #expect(reader.entries.first?.type == .image)
+    }
+
+    @Test("图片预览不再带 emoji 或「图片」字样")
+    func imagePreviewHasNoEmoji() {
+        let entry = ClipboardEntry(imageData: Data([0x01]), sizeDescription: "64×64")
+        #expect(entry.preview == "64×64")
+        #expect(!entry.preview.contains("📷"))
+    }
+
+    @Test("来源应用随条目往返持久化")
+    func sourceAppRoundTrip() throws {
+        let database = try makeDatabase()
+        let writer = try makeStore(database: database)
+        writer.add(
+            ClipboardEntry(
+                text: "来自 Safari 的复制",
+                sourceAppName: "Safari",
+                sourceBundleID: "com.apple.Safari"
+            ))
+
+        let reader = try makeStore(database: database)
+        #expect(reader.entries.first?.sourceAppName == "Safari")
+        #expect(reader.entries.first?.sourceBundleID == "com.apple.Safari")
     }
 
     @Test("坏数据只丢那一行，不影响整份历史")

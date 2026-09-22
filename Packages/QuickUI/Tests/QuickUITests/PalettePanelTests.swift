@@ -116,8 +116,7 @@ struct PalettePanelTests {
         coordinator.hide(restoreFocus: false)
     }
 
-    /// 按键路由：Esc 走 `onEscape`，⌘W 走 `onClose`
-    ///
+    /// 按键路由：Esc 走 `onEscape`，⌘W 走 `onClose`    ///
     /// 这两条路必须分开 —— 合并的话 ⌘W 会退化成「清空搜索框」，
     /// 而用户按 ⌘W 想的是关掉面板。
     @Test("Esc 与 ⌘W 走各自回调")
@@ -147,6 +146,51 @@ struct PalettePanelTests {
         #expect(closed == 1)
 
         panel.close()
+    }
+
+    /// 插件内搜索的按键路由：`wantsNavigation` 为真才消费，否则放行给插件视图
+    @Test("插件模式上下/左右/回车按 wantsNavigation 决定是否消费")
+    func pluginSearchKeyRouting() {
+        let coordinator = PaletteCoordinator()
+        coordinator.navigate(to: "clipboard")
+
+        // 插件没有声明要吃按键时，三个键都必须放行
+        #expect(coordinator.routeMove(1) == false)
+        #expect(coordinator.routeTab(-1) == false)
+        #expect(coordinator.routeSubmit() == false)
+        #expect(coordinator.pluginSearch.lastCommand == nil)
+
+        coordinator.pluginSearch.wantsNavigation = true
+        #expect(coordinator.routeMove(1))
+        #expect(coordinator.pluginSearch.lastCommand == .move(1))
+        #expect(coordinator.routeTab(-1))
+        #expect(coordinator.pluginSearch.lastCommand == .tab(-1))
+        #expect(coordinator.routeSubmit())
+        #expect(coordinator.pluginSearch.lastCommand == .submit)
+
+        coordinator.hide(restoreFocus: false)
+    }
+
+    /// 主搜索模式下左右键属于搜索框光标，必须放行
+    @Test("主搜索模式下左右键不被面板消费")
+    func mainSearchDoesNotConsumeTab() {
+        let coordinator = PaletteCoordinator()
+        #expect(coordinator.routeTab(1) == false)
+        #expect(coordinator.routeMove(1) == false)
+    }
+
+    /// ⌘F 只在「插件模式 + 该插件有头部搜索框」时被消费，并且会请求一次聚焦
+    @Test("⌘F 请求插件搜索框聚焦")
+    func commandFRequestsPluginSearchFocus() {
+        let coordinator = PaletteCoordinator()
+        #expect(coordinator.requestPluginSearchFocus() == false)
+
+        coordinator.navigate(to: "clipboard")
+        let before = coordinator.pluginSearch.focusToken
+        #expect(coordinator.requestPluginSearchFocus())
+        #expect(coordinator.pluginSearch.focusToken == before + 1)
+
+        coordinator.hide(restoreFocus: false)
     }
 
     /// 合成一个按下事件（返回 nil 时由调用方记一条失败，而不是崩掉）
@@ -179,6 +223,14 @@ struct PaletteGeometryTests {
         #expect(PalettePreferences.clampedPanelHeight(1, maxHeight: 2000) == floor)
         #expect(PalettePreferences.clampedPanelHeight(9000, maxHeight: 800) == 800)
         #expect(PalettePreferences.clampedPanelHeight(600, maxHeight: 2000) == 600)
+    }
+
+    @Test("拖出来的宽度不会窄过下限，也不会宽出屏幕")
+    func clampsPanelWidth() {
+        let floor = DesignTokens.Size.panelMinWidth
+        #expect(PalettePreferences.clampedPanelWidth(1, maxWidth: 3000) == floor)
+        #expect(PalettePreferences.clampedPanelWidth(9000, maxWidth: 1200) == 1200)
+        #expect(PalettePreferences.clampedPanelWidth(900, maxWidth: 3000) == 900)
     }
 
     @Test("授权面板贴在系统设置右侧内容区的正下方")

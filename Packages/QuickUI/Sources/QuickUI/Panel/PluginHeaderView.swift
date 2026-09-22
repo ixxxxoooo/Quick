@@ -9,6 +9,10 @@ import SwiftUI
 ///
 /// 替换搜索模式下的搜索框，显示返回按钮、插件图标与名称、分离按钮。
 /// 布局与搜索栏高度对齐，确保切换时不产生跳变。
+///
+/// 声明了 `supportsPanelSearch` 的插件，中间用**插件内搜索框**替换插件名 —— 文本经
+/// `PluginSearchQuery` 交给插件视图自行过滤（对齐 Raycast：进入扩展后搜索栏一直在，
+/// 由扩展决定怎么用）。
 struct PluginHeaderView: View {
 
     /// 插件显示名称
@@ -16,6 +20,9 @@ struct PluginHeaderView: View {
 
     /// 插件图标（SF Symbol 名称）
     let pluginIcon: String
+
+    /// 插件内搜索状态；`nil` 表示该插件不提供插件内搜索
+    let search: PluginSearchQuery?
 
     /// 返回按钮回调
     let onBack: () -> Void
@@ -26,9 +33,27 @@ struct PluginHeaderView: View {
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
             backButton
-            pluginInfo
-            Spacer()
-                .background(WindowDragArea())
+
+            if let search {
+                SearchFieldView(
+                    query: Binding(
+                        get: { search.text },
+                        set: { search.text = $0 }
+                    ),
+                    placeholder: "在 \(pluginName) 中搜索…",
+                    icon: "magnifyingglass",
+                    // 默认不抢焦点：焦点属于插件视图（方向键切换）。⌘F 才把焦点要过来
+                    autoFocus: false,
+                    focusTrigger: search.focusToken
+                )
+            } else {
+                pluginInfo
+
+                // 没有搜索框时中间空白仍是窗口拖拽区（分离窗口同款做法）
+                Spacer()
+                    .background(WindowDragArea())
+            }
+
             detachButton
         }
         .padding(.leading, DesignTokens.Spacing.md + DesignTokens.Spacing.lg)

@@ -97,6 +97,17 @@ public struct HidePaletteEvent: PluginEvent {
     }
 }
 
+/// 把当前剪贴板内容粘贴回「面板打开前的那个应用」
+///
+/// 剪贴板内容由调用方在此之前写好（`CopyToClipboardEvent` 或直接写 `NSPasteboard`）。
+/// 宿主收到后：隐藏面板、把焦点交还之前的应用，等它回到前台再合成一次 ⌘V。
+/// 需要辅助功能权限；没有权限时退化成「只完成复制」并提示用户。
+public struct PasteIntoPreviousAppEvent: PluginEvent {
+    public static let name = "quick.clipboard.pasteIntoPreviousApp"
+
+    public init() {}
+}
+
 /// 请求显示面板并切换到指定插件
 public struct ShowPaletteEvent: PluginEvent {
     public static let name = "quick.palette.show"

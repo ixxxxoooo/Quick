@@ -20,6 +20,9 @@ public final class ClipboardPlugin: QuickPlugin {
     public static let description = "自动记录系统剪贴板历史，支持文本、代码与图片预览，提供快速搜索、置顶收藏与重新复制。"
     public static let triggerWords = ["剪贴板", "clipboard", "粘贴", "复制", "历史", "cb"]
 
+    /// 面板头部保留搜索框：输入即过滤剪贴板历史
+    public static var supportsPanelSearch: Bool { true }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(ClipboardPlugin.id)
@@ -73,6 +76,14 @@ public final class ClipboardPlugin: QuickPlugin {
                     """,
                     "CREATE INDEX IF NOT EXISTS idx_clip_type ON clipboard_history(type)",
                     "CREATE INDEX IF NOT EXISTS idx_clip_text ON clipboard_history(text)"
+                ]),
+            // 来源应用：单独的迁移，老库已经有 clipboard_history 表，只能 ALTER 补列。
+            // 新库会依次跑这两条 —— CREATE 里不能带这两列，否则这里的 ALTER 会重复。
+            SQLiteMigration(
+                id: "clipboard.history.source",
+                statements: [
+                    "ALTER TABLE clipboard_history ADD COLUMN source_app TEXT",
+                    "ALTER TABLE clipboard_history ADD COLUMN source_bundle_id TEXT"
                 ])
         ]
     }

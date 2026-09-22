@@ -134,7 +134,7 @@ public protocol QuickPlugin: AnyObject, Sendable {
 同一个插件里的不同功能。主面板输入「锁屏」唤醒锁定屏幕，输入「全屏」只打开全屏截图。
 对不上或同时对上多条时不猜测。
 插件不调用 `RegisterEventHotKey`，系统能力（热键、权限、剪贴板、应用索引）只走 QuickPlatform。
-主面板高度拖过底边之后记在 `quick.palette.height`，搜索栏左侧的手柄用来拖动位置。
+主面板的尺寸拖过四边之后记在 `quick.palette.width` / `quick.palette.height`，换缩放档时丢掉。
 
 ### 不变量
 

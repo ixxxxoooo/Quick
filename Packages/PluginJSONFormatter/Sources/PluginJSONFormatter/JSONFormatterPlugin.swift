@@ -19,6 +19,9 @@ public final class JSONFormatterPlugin: QuickPlugin {
     public static let description = "JSON 语法校验、层级高亮、格式化美化与单行紧凑压缩，支持缩进空格调整与一键复制。"
     public static let triggerWords = ["json", "格式化", "美化", "json formatter", "json格式化"]
 
+    /// 面板头部保留搜索框：树视图里用它定位字段
+    public static var supportsPanelSearch: Bool { true }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(JSONFormatterPlugin.id)

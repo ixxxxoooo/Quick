@@ -36,13 +36,21 @@ public struct ClipboardEntry: Identifiable, Codable, Sendable {
     /// 是否置顶
     public var isPinned: Bool
 
+    /// 来源应用名（记录时前台应用的本地化名称）
+    public let sourceAppName: String?
+
+    /// 来源应用 Bundle ID（用来取应用图标）
+    public let sourceBundleID: String?
+
     /// 预览文本（单行，最多 80 个字符）
     ///
     /// 三种换行都要处理：从 Windows/网页复制来的文本常带 `\r\n`，
     /// 只替换 `\n` 会留下一个游离的 `\r`，让预览在列表里显示成断行。
+    ///
+    /// 图片返回尺寸描述而不是「📷 图片」—— 列表用真正的缩略图预览，不再用文字说明它是图片。
     public var preview: String {
         if type == .image {
-            return "📷 图片 \(imageSizeDescription ?? "")"
+            return imageSizeDescription ?? ""
         }
         let flattened =
             text
@@ -87,7 +95,12 @@ public struct ClipboardEntry: Identifiable, Codable, Sendable {
     }
 
     /// 创建文本类条目
-    public init(text: String, type: ContentType = .text) {
+    public init(
+        text: String,
+        type: ContentType = .text,
+        sourceAppName: String? = nil,
+        sourceBundleID: String? = nil
+    ) {
         self.id = UUID()
         self.text = text
         self.type = type
@@ -96,10 +109,17 @@ public struct ClipboardEntry: Identifiable, Codable, Sendable {
         self.isPinned = false
         self.imageData = nil
         self.imageSizeDescription = nil
+        self.sourceAppName = sourceAppName
+        self.sourceBundleID = sourceBundleID
     }
 
     /// 创建图片条目
-    public init(imageData: Data, sizeDescription: String) {
+    public init(
+        imageData: Data,
+        sizeDescription: String,
+        sourceAppName: String? = nil,
+        sourceBundleID: String? = nil
+    ) {
         self.id = UUID()
         self.text = ""
         self.type = .image
@@ -108,6 +128,8 @@ public struct ClipboardEntry: Identifiable, Codable, Sendable {
         self.isPinned = false
         self.imageData = imageData
         self.imageSizeDescription = sizeDescription
+        self.sourceAppName = sourceAppName
+        self.sourceBundleID = sourceBundleID
     }
 
     /// 从数据库的一行还原
@@ -122,7 +144,9 @@ public struct ClipboardEntry: Identifiable, Codable, Sendable {
         type: ContentType,
         timestamp: Date,
         isFavorite: Bool,
-        isPinned: Bool
+        isPinned: Bool,
+        sourceAppName: String?,
+        sourceBundleID: String?
     ) {
         self.id = id
         self.text = text
@@ -132,5 +156,7 @@ public struct ClipboardEntry: Identifiable, Codable, Sendable {
         self.timestamp = timestamp
         self.isFavorite = isFavorite
         self.isPinned = isPinned
+        self.sourceAppName = sourceAppName
+        self.sourceBundleID = sourceBundleID
     }
 }

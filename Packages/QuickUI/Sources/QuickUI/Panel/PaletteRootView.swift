@@ -48,6 +48,12 @@ struct PaletteRootView: View {
     /// 由协调器提供的 `@Observable` 桥接对象，不持有 NSPanel，安全观察。
     var paletteMode: PaletteMode
 
+    /// 插件内搜索的桥接对象（由协调器提供）
+    ///
+    /// 只声明了 `supportsPanelSearch` 的插件才在头部显示搜索框；对象始终注入环境，
+    /// 插件视图按需读取。
+    var pluginSearch: PluginSearchQuery
+
     /// 执行搜索（由协调器注入）
     var searchHandler: (String) async -> [SearchableItem]
 
@@ -81,19 +87,6 @@ struct PaletteRootView: View {
     @AppStorage(SettingsKey.showBottomBarHints) private var showBottomBarHints = true
     @AppStorage(SettingsKey.panelTransparency) private var panelTransparency = 0
 
-    /// 搜索栏左侧的拖动手柄。搜索框本身要打字，不能整条栏都拿去拖窗口
-    private var dragHandle: some View {
-        WindowDragArea()
-            .frame(width: DesignTokens.Size.headerIconSlot, height: DesignTokens.Size.headerHeight)
-            .overlay {
-                Image(systemName: "line.3.horizontal")
-                    .font(DesignTokens.Typography.compactIcon)
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-                    .allowsHitTesting(false)
-            }
-            .help("拖动面板")
-    }
-
     var body: some View {
         ZStack {
             if paletteMode.isPluginMode {
@@ -105,8 +98,9 @@ struct PaletteRootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PaletteBackground(scrimBoost: Double(panelTransparency) / 100))
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
-        .overlay(alignment: .bottom) {
-            PaletteResizeGrip()
+        .overlay {
+            PaletteResizeBorder()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
             query = paletteQuery.text
@@ -170,7 +164,6 @@ struct PaletteRootView: View {
     /// 搜索栏
     private var searchHeader: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            dragHandle
             SearchFieldView(
                 query: Binding(
                     get: { paletteQuery.text },
@@ -283,6 +276,7 @@ struct PaletteRootView: View {
             PluginHeaderView(
                 pluginName: paletteMode.activePluginName ?? "",
                 pluginIcon: paletteMode.activePluginIcon ?? "questionmark",
+                search: paletteMode.activePluginSupportsSearch ? pluginSearch : nil,
                 onBack: onReturnToSearch,
                 onDetach: {
                     guard let pluginID = paletteMode.activePluginID else { return }
@@ -295,6 +289,7 @@ struct PaletteRootView: View {
             {
                 pluginView
                     .environment(\.pluginContext, paletteMode.context)
+                    .environment(pluginSearch)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
             } else {
@@ -352,48 +347,114 @@ struct PaletteRootView: View {
     }
 }
 
-/// 主面板底边的拉高热区。高度记在设置里，下次打开还是这个高度
-struct PaletteResizeGrip: NSViewRepresentable {
+/// 主面板四边的缩放热区
+///
+/// 面板是无边框窗口，系统不给边缘缩放；这里用一个只铺在四边的透明视图补上。
+/// 它只在离边 `DesignTokens.Size.resizeMargin` 之内才 `hitTest` 命中自己，
+/// 其余位置一律放行给下面的 SwiftUI 内容，所以搜索框、结果列表照常工作。
+struct PaletteResizeBorder: NSViewRepresentable {
 
-    func makeNSView(context: Context) -> PaletteResizeView {
-        PaletteResizeView()
+    func makeNSView(context: Context) -> PaletteResizeBorderView {
+        PaletteResizeBorderView()
     }
 
-    func updateNSView(_ nsView: PaletteResizeView, context: Context) {}
+    func updateNSView(_ nsView: PaletteResizeBorderView, context: Context) {}
 }
 
-/// 拖底边时顶边不动，只改高度
-final class PaletteResizeView: NSView {
+/// 拖某条边时，对边不动，只改一个维度；拖角同时改两个维度
+final class PaletteResizeBorderView: NSView {
 
-    /// 按下时的窗口框和鼠标位置
+    /// 命中的边（角是两个边同时命中）
+    private struct Edges: OptionSet {
+        let rawValue: Int
+        static let left = Edges(rawValue: 1 << 0)
+        static let right = Edges(rawValue: 1 << 1)
+        static let bottom = Edges(rawValue: 1 << 2)
+        static let top = Edges(rawValue: 1 << 3)
+    }
+
+    /// 按下时的窗口框与鼠标位置
     private var startFrame: NSRect = .zero
-    private var startMouseY: CGFloat = 0
+    private var startMouse: NSPoint = .zero
+    private var activeEdges: Edges = []
+
+    private var margin: CGFloat { DesignTokens.Size.resizeMargin }
+
+    override var isFlipped: Bool { false }
+
+    /// 窗口没被激活时，第一次按下也要能拖
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// 只有贴着四边的那圈命中自己，内容区放行
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let superview else { return nil }
+        let local = convert(point, from: superview)
+        guard bounds.contains(local) else { return nil }
+        return edges(at: local).isEmpty ? nil : self
+    }
+
+    private func edges(at point: NSPoint) -> Edges {
+        var edges: Edges = []
+        if point.x <= margin { edges.insert(.left) }
+        if point.x >= bounds.width - margin { edges.insert(.right) }
+        if point.y <= margin { edges.insert(.bottom) }
+        if point.y >= bounds.height - margin { edges.insert(.top) }
+        return edges
+    }
 
     override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .resizeUpDown)
+        let m = margin
+        let b = bounds
+        guard b.width > 0, b.height > 0 else { return }
+        // AppKit 没有对角缩放光标，角上落到后加的水平光标即可
+        addCursorRect(NSRect(x: 0, y: 0, width: b.width, height: m), cursor: .resizeUpDown)
+        addCursorRect(NSRect(x: 0, y: b.height - m, width: b.width, height: m), cursor: .resizeUpDown)
+        addCursorRect(NSRect(x: 0, y: 0, width: m, height: b.height), cursor: .resizeLeftRight)
+        addCursorRect(NSRect(x: b.width - m, y: 0, width: m, height: b.height), cursor: .resizeLeftRight)
     }
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
+        activeEdges = edges(at: convert(event.locationInWindow, from: nil))
+        guard !activeEdges.isEmpty else { return }
         startFrame = window.frame
-        startMouseY = NSEvent.mouseLocation.y
+        startMouse = NSEvent.mouseLocation
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let window else { return }
-        let delta = startMouseY - NSEvent.mouseLocation.y
+        guard let window, !activeEdges.isEmpty else { return }
+        let dx = NSEvent.mouseLocation.x - startMouse.x
+        let dy = NSEvent.mouseLocation.y - startMouse.y
+
         let screen = window.screen ?? NSScreen.main
+        let maxWidth = screen?.visibleFrame.width ?? startFrame.width
         let maxHeight = screen?.visibleFrame.height ?? startFrame.height
-        let height = PalettePreferences.clampedPanelHeight(startFrame.height + delta, maxHeight: maxHeight)
-        let top = startFrame.maxY
+
         var frame = startFrame
-        frame.size.height = height
-        frame.origin.y = top - height
+
+        if activeEdges.contains(.left) {
+            let width = PalettePreferences.clampedPanelWidth(startFrame.width - dx, maxWidth: maxWidth)
+            frame.origin.x = startFrame.maxX - width
+            frame.size.width = width
+        } else if activeEdges.contains(.right) {
+            frame.size.width = PalettePreferences.clampedPanelWidth(startFrame.width + dx, maxWidth: maxWidth)
+        }
+
+        if activeEdges.contains(.bottom) {
+            let height = PalettePreferences.clampedPanelHeight(startFrame.height - dy, maxHeight: maxHeight)
+            frame.origin.y = startFrame.maxY - height
+            frame.size.height = height
+        } else if activeEdges.contains(.top) {
+            frame.size.height = PalettePreferences.clampedPanelHeight(
+                startFrame.height + dy, maxHeight: maxHeight)
+        }
+
         window.setFrame(frame, display: true)
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard let window else { return }
-        PalettePreferences.setPanelHeight(window.frame.height)
+        guard let window, !activeEdges.isEmpty else { return }
+        activeEdges = []
+        PalettePreferences.setPanelSize(window.frame.size)
     }
 }

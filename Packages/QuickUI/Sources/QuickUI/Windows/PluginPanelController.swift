@@ -472,11 +472,16 @@ private struct DetachedPanelContentView: View {
     let onTogglePin: () -> Void
     let onClose: () -> Void
 
+    /// 分离窗口没有头部搜索框，但插件视图可能用非可选的方式读这个环境；
+    /// 给一份 `hasHeaderField = false` 的空对象，既避免取环境崩掉，也让插件知道这里没有搜索框。
+    @State private var pluginSearch = PluginSearchQuery(hasHeaderField: false)
+
     var body: some View {
         VStack(spacing: 0) {
             titleBar
 
             pluginView
+                .environment(pluginSearch)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(PaletteBackground())

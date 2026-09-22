@@ -2,6 +2,7 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
+import CoreFoundation
 import Foundation
 
 /// JSON 格式化的纯逻辑
@@ -63,6 +64,55 @@ enum JSONFormatterLogic {
         return String(format: "%.1f KB", Double(bytes) / 1024)
     }
 
+    // MARK: - 树
+
+    /// 解析成节点树（树视图用）
+    static func parseTree(_ input: String) throws -> JSONNode {
+        node(from: try parse(input))
+    }
+
+    // MARK: - 反转义
+
+    /// 把「被转义的 JSON 字符串」还原成正常文本
+    ///
+    /// 覆盖两种常见来源：
+    /// - 整段带引号的 JSON 字符串字面量（`"{\"a\":1}"`），按 JSON 字符串解码；
+    /// - 裸的转义正文（`{\"a\":1,\n\"b\":2}`），补一层引号再解码。
+    ///
+    /// 只解一层。多重转义（`\\\"`）需要用户再点一次 —— 盲目递归会把本该保留的
+    /// 转义也吃掉。
+    static func unescape(_ input: String) throws -> String {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw Failure.invalidJSON }
+
+        if trimmed.hasPrefix("\""), trimmed.hasSuffix("\""), trimmed.count >= 2 {
+            if let decoded = decodeJSONString(trimmed) { return decoded }
+        }
+        if let decoded = decodeJSONString("\"\(trimmed)\"") { return decoded }
+        throw Failure.invalidJSON
+    }
+
+    /// 自动反转义：只在「当前不是合法 JSON、但反转义之后是合法 JSON」时才还原
+    ///
+    /// 这样既不会改动用户正在写的正常 JSON，也不会把普通文本误当成转义内容。
+    static func autoUnescape(_ input: String) -> String {
+        guard !input.isEmpty else { return input }
+        if (try? parse(input)) != nil { return input }
+        guard let decoded = try? unescape(input), (try? parse(decoded)) != nil else { return input }
+        return decoded
+    }
+
+    /// 把一段 JSON 字符串字面量解码成它表示的内容，失败返回 nil
+    private static func decodeJSONString(_ literal: String) -> String? {
+        guard let data = literal.data(using: .utf8),
+            let value = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
+            let string = value as? String
+        else {
+            return nil
+        }
+        return string
+    }
+
     // MARK: - 内部
 
     /// 解析为 JSON 对象树
@@ -86,5 +136,25 @@ enum JSONFormatterLogic {
             return 1 + arr.reduce(0) { $0 + countNodes($1) }
         }
         return 1
+    }
+
+    /// `JSONSerialization` 的对象树 → `JSONNode`
+    ///
+    /// **键排序一次。** 否则同一份 JSON 每次生成的树顺序不同，折叠状态（按路径存）
+    /// 也会跟着错位。布尔与数字都是 `NSNumber`，靠 CFTypeID 区分。
+    private static func node(from any: Any) -> JSONNode {
+        if let dict = any as? [String: Any] {
+            return .object(
+                dict.keys.sorted().map { JSONNode.Pair(key: $0, value: node(from: dict[$0]!)) })
+        }
+        if let arr = any as? [Any] {
+            return .array(arr.map(node(from:)))
+        }
+        if let string = any as? String { return .string(string) }
+        if let number = any as? NSNumber {
+            if CFGetTypeID(number) == CFBooleanGetTypeID() { return .bool(number.boolValue) }
+            return .number(number.doubleValue)
+        }
+        return .null
     }
 }

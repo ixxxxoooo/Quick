@@ -53,20 +53,40 @@ final class ClipboardMonitor {
         guard pasteboard.changeCount != lastChangeCount else { return }
         lastChangeCount = pasteboard.changeCount
 
+        // 来源取「此刻的前台应用」。macOS 不提供剪贴板归属，这是轮询方案能做到的最好近似
+        let source = Self.frontmostSource()
+
         // 优先检测图片。转码离开主线程，避免复制大图时卡住面板
-        if captureImage(from: pasteboard) {
+        if captureImage(from: pasteboard, source: source) {
             return
         }
 
         // 检测文本
         guard let text = pasteboard.string(forType: .string), !text.isEmpty else { return }
         let type = detectContentType(text)
-        let entry = ClipboardEntry(text: text, type: type)
+        let entry = ClipboardEntry(
+            text: text,
+            type: type,
+            sourceAppName: source.name,
+            sourceBundleID: source.bundleID
+        )
         onNewContent?(entry)
     }
 
+    /// 记录来源应用（名称 + Bundle ID）
+    private struct Source: Sendable {
+        let name: String?
+        let bundleID: String?
+    }
+
+    /// 取当前前台应用作为剪贴板来源
+    private static func frontmostSource() -> Source {
+        let app = NSWorkspace.shared.frontmostApplication
+        return Source(name: app?.localizedName, bundleID: app?.bundleIdentifier)
+    }
+
     /// 发现图片就在后台转成 PNG。返回 true 表示这次变化按图片处理，不再记文本
-    private func captureImage(from pasteboard: NSPasteboard) -> Bool {
+    private func captureImage(from pasteboard: NSPasteboard, source: Source) -> Bool {
         let imageTypes: [NSPasteboard.PasteboardType] = [.tiff, .png]
         guard pasteboard.availableType(from: imageTypes) != nil,
             let image = NSImage(pasteboard: pasteboard),
@@ -79,7 +99,12 @@ final class ClipboardMonitor {
         Task.detached {
             let pngData = Self.pngData(fromTIFF: tiffData)
             await MainActor.run { [weak self] in
-                self?.deliverImage(pngData, sizeDescription: sizeDesc, changeCount: changeCount)
+                self?.deliverImage(
+                    pngData,
+                    sizeDescription: sizeDesc,
+                    changeCount: changeCount,
+                    source: source
+                )
             }
         }
         return true
@@ -92,14 +117,20 @@ final class ClipboardMonitor {
     }
 
     /// 图片转码结束。期间如果剪贴板又变了，丢掉这张过期图
-    private func deliverImage(_ pngData: Data?, sizeDescription: String, changeCount: Int) {
+    private func deliverImage(_ pngData: Data?, sizeDescription: String, changeCount: Int, source: Source) {
         guard lastChangeCount == changeCount else { return }
         guard let pngData else { return }
         guard pngData.count <= 5 * 1024 * 1024 else {
             QuickLog.plugin("clipboard").notice("剪贴板图片超过 5MB，已跳过")
             return
         }
-        onNewContent?(ClipboardEntry(imageData: pngData, sizeDescription: sizeDescription))
+        onNewContent?(
+            ClipboardEntry(
+                imageData: pngData,
+                sizeDescription: sizeDescription,
+                sourceAppName: source.name,
+                sourceBundleID: source.bundleID
+            ))
     }
 
     /// 检测文本内容类型

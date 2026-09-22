@@ -34,6 +34,11 @@ public final class PalettePanel: NSPanel {
     /// 上下键回调（`-1` 上移、`+1` 下移），返回 `true` 表示已消费
     var onMove: ((Int) -> Bool)?
 
+    /// 左右键回调（`-1` 左移、`+1` 右移），返回 `true` 表示已消费
+    ///
+    /// 主搜索里左右键属于搜索框的光标移动，只有插件内搜索（标签切换）才需要拦截。
+    var onTab: ((Int) -> Bool)?
+
     /// 回车回调，返回 `true` 表示已消费
     var onSubmit: (() -> Bool)?
 
@@ -125,6 +130,15 @@ public final class PalettePanel: NSPanel {
             return
         }
 
+        // 左右键（插件内搜索的标签切换；主搜索里返回 false，键继续给搜索框光标）
+        if event.type == .keyDown,
+            event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
+            let delta = Self.horizontalDelta(for: event),
+            onTab?(delta) == true
+        {
+            return
+        }
+
         // 回车（含小键盘回车）
         if event.type == .keyDown,
             Int(event.keyCode) == kVK_Return || Int(event.keyCode) == kVK_ANSI_KeypadEnter,
@@ -176,6 +190,15 @@ public final class PalettePanel: NSPanel {
         switch Int(event.keyCode) {
         case kVK_UpArrow: return -1
         case kVK_DownArrow: return 1
+        default: return nil
+        }
+    }
+
+    /// 左右键对应的方向，其他键返回 `nil`
+    private static func horizontalDelta(for event: NSEvent) -> Int? {
+        switch Int(event.keyCode) {
+        case kVK_LeftArrow: return -1
+        case kVK_RightArrow: return 1
         default: return nil
         }
     }
