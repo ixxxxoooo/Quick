@@ -72,7 +72,7 @@ public struct ResultListView: View {
                             if hovering {
                                 if let sel = selection {
                                     if sel.hoverArmed {
-                                        selectedIndex = index
+                                        sel.selectByHover(index)
                                         hoveredID = item.id
                                     }
                                 } else {
@@ -107,11 +107,18 @@ public struct ResultListView: View {
             // 选中跟随：锚点走 ListScrollFollow（碰到边缘才滚，中间原地不动），
             // 而且**不做动画** —— 长按方向键会连发按键，每次按键都起一段 0.1 秒的动画，
             // 列表就一直在追赶按键，体感是卡顿；跨过边缘时直接跳一档反而更稳。
-            .onChange(of: selectedIndex) { _, newIndex in
-                guard newIndex >= 0, newIndex < items.count else { return }
+            //
+            // **只在键盘移动时滚，悬停不滚。** 悬停改的是选中项，但指针底下那一行本来
+            // 就在可视区里；跟着 `selectedIndex` 滚的话，光标扫过第一行会触发
+            // `scrollTo(anchor: .top)`，把内容往上顶一个内边距，看起来就是「跳一下」。
+            // 所以这里听 `keyboardScrollToken`，而不是 `selectedIndex`。
+            .onChange(of: selection?.keyboardScrollToken) { _, _ in
+                guard let index = selection?.index,
+                    index >= 0, index < items.count
+                else { return }
                 proxy.scrollTo(
-                    items[newIndex].id,
-                    anchor: ListScrollFollow.anchor(for: newIndex, count: items.count)
+                    items[index].id,
+                    anchor: ListScrollFollow.anchor(for: index, count: items.count)
                 )
             }
         }

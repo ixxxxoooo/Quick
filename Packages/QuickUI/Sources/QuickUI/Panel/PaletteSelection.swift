@@ -37,6 +37,14 @@ public final class PaletteSelection {
     /// 悬停解除令牌（按键或滚轮触发时更新，重置所有行的悬停表现）
     public private(set) var hoverDisarmToken = UUID()
 
+    /// 键盘滚动令牌
+    ///
+    /// **只有上下键 `move(_:)` 会更新它，指针悬停改选中项时不动。** 结果列表据此
+    /// 决定要不要执行滚动跟随 —— 悬停不该让列表滚动：指针底下那一行本来就在可视区里，
+    /// 而 `scrollTo(anchor: .top)` 会把内容往上顶一个内边距（首项尤其明显），
+    /// 看起来就是光标扫过第一行时「跳一下」。
+    public private(set) var keyboardScrollToken = UUID()
+
     public init() {}
 
     /// 检测光标移动是否为有意操作（位移大于 3pt 时激活悬停）
@@ -58,6 +66,16 @@ public final class PaletteSelection {
         }
     }
 
+    /// 指针悬停选中某一项
+    ///
+    /// 与 `move(_:)` 分开：悬停改的是选中项，但**不该触发滚动跟随**（见
+    /// `keyboardScrollToken` 的说明）。
+    ///
+    /// - Parameter newIndex: 指针所在行的下标
+    public func selectByHover(_ newIndex: Int) {
+        index = newIndex
+    }
+
     /// 上下移动选中项
     ///
     /// 夹在边界内而不是环绕：面板里没有可见的滚动条，环绕会让人瞬间失去方位感。
@@ -67,6 +85,7 @@ public final class PaletteSelection {
     public func move(_ delta: Int) -> Bool {
         guard count > 0 else { return false }
         index = min(max(index + delta, 0), count - 1)
+        keyboardScrollToken = UUID()
         return true
     }
 
