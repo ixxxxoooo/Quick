@@ -14,7 +14,11 @@ import SwiftUI
 /// - 跨空间：在所有桌面空间和全屏应用上层可见
 /// - 浮动层级：始终保持在其他窗口之上
 /// - 键盘驱动：拦截 Escape、Backspace、⌘ 快捷键等
-public final class PalettePanel: NSPanel {
+///
+/// **缩放与分离窗口同一套机制**：带 `.resizable` 让 AppKit 自己在四边提供缩放热区与光标，
+/// 不再自绘一圈 `NSView` 去模拟（自绘那套既拿不到系统光标，也和分离窗口手感不一致）。
+/// 尺寸的上下限在 `windowWillResize` 里夹好，缩放结束时写回 `PalettePreferences`。
+public final class PalettePanel: NSPanel, NSWindowDelegate {
 
     /// 裸退格键回调（搜索框为空时退回上一层）
     var onBareBackspace: (() -> Bool)?
@@ -60,7 +64,7 @@ public final class PalettePanel: NSPanel {
                 width: DesignTokens.Size.panelWidth,
                 height: DesignTokens.Size.panelHeight
             ),
-            styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel],
+            styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -79,11 +83,40 @@ public final class PalettePanel: NSPanel {
         hasShadow = true
         animationBehavior = .none
         isReleasedWhenClosed = false
+        // 手动拖出来的尺寸与分离窗口一样有下限；上限交给 windowWillResize 按当前屏幕夹
+        minSize = NSSize(
+            width: DesignTokens.Size.panelMinWidth,
+            height: DesignTokens.Size.panelMinHeight
+        )
+        // 系统缩放热区只有在 delegate 里夹尺寸时才可控
+        delegate = self
 
         let hosting = NSHostingView(rootView: rootView)
         hosting.wantsLayer = true
         hosting.sizingOptions = []
         contentView = hosting
+    }
+
+    // MARK: - 缩放（与分离窗口同一套 AppKit 机制）
+
+    /// 用户拖四边缩放时把尺寸夹在最值与当前屏幕之间
+    ///
+    /// 逻辑与旧的自绘边框完全一致（`PalettePreferences.clampedPanelWidth/Height`），
+    /// 只是改由系统缩放路径回调。程序里的 `setContentSize`（换缩放档）不会走这里。
+    public func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        let screen = sender.screen ?? NSScreen.main
+        let maxWidth = screen?.visibleFrame.width ?? frameSize.width
+        let maxHeight = screen?.visibleFrame.height ?? frameSize.height
+        return NSSize(
+            width: PalettePreferences.clampedPanelWidth(frameSize.width, maxWidth: maxWidth),
+            height: PalettePreferences.clampedPanelHeight(frameSize.height, maxHeight: maxHeight)
+        )
+    }
+
+    /// 缩放结束才写回偏好，拖动过程中不落盘
+    public func windowDidEndLiveResize(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        PalettePreferences.setPanelSize(window.frame.size)
     }
 
     // MARK: - 按键拦截
@@ -179,7 +212,9 @@ public final class PalettePanel: NSPanel {
     // MARK: - 窗口行为
 
     /// 上下键对应的方向，其他键返回 `nil`
-    private static func verticalDelta(for event: NSEvent) -> Int? {
+    ///
+    /// 分离窗口（`DetachedPluginPanel`）复用同一份判定，保证两个窗口的方向键行为一致。
+    static func verticalDelta(for event: NSEvent) -> Int? {
         if event.modifierFlags.contains(.control) {
             if let chars = event.charactersIgnoringModifiers {
                 if chars.lowercased() == "n" { return 1 }
@@ -195,7 +230,7 @@ public final class PalettePanel: NSPanel {
     }
 
     /// 左右键对应的方向，其他键返回 `nil`
-    private static func horizontalDelta(for event: NSEvent) -> Int? {
+    static func horizontalDelta(for event: NSEvent) -> Int? {
         switch Int(event.keyCode) {
         case kVK_LeftArrow: return -1
         case kVK_RightArrow: return 1

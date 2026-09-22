@@ -114,8 +114,6 @@ public enum DesignTokens {
         public static let panelMinHeight: CGFloat = panelHeight * 0.6
         /// 主面板允许拖到的最窄宽度
         public static let panelMinWidth: CGFloat = panelWidth * 0.6
-        /// 主面板四边用来拖拽改变大小的热区厚度
-        public static let resizeMargin = scaled(6)
         /// JSON 树每一层的缩进宽度
         public static let jsonTreeIndent = scaled(14)
         /// JSON 树的行高

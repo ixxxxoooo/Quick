@@ -54,6 +54,38 @@ struct PalettePanelTests {
         #expect(DesignTokens.panelScale != 1)
     }
 
+    // MARK: - 缩放（与分离窗口同一套）
+
+    /// 主面板与分离窗口共用同一套系统缩放：靠 `.resizable` 拿系统热区，不再自绘透明边框。
+    @Test("主面板用 .resizable 缩放并带最小尺寸")
+    func panelUsesNativeResize() {
+        let panel = PalettePanel(rootView: Text("t"))
+        #expect(panel.styleMask.contains(.resizable))
+        #expect(panel.minSize.width >= DesignTokens.Size.panelMinWidth)
+        #expect(panel.minSize.height >= DesignTokens.Size.panelMinHeight)
+        panel.close()
+    }
+
+    /// 缩放上限按窗口所在屏幕夹，下限是设计令牌的 0.6 倍
+    @Test("窗口缩放在 delegate 里夹到屏幕与最小值之间")
+    func windowWillResizeClampsToScreen() {
+        let panel = PalettePanel(rootView: Text("t"))
+
+        let huge = panel.windowWillResize(panel, to: NSSize(width: 99999, height: 99999))
+        if let screen = panel.screen ?? NSScreen.main {
+            #expect(huge.width <= screen.visibleFrame.width)
+            #expect(huge.height <= screen.visibleFrame.height)
+        }
+        #expect(huge.width >= DesignTokens.Size.panelMinWidth)
+        #expect(huge.height >= DesignTokens.Size.panelMinHeight)
+
+        let tiny = panel.windowWillResize(panel, to: NSSize(width: 1, height: 1))
+        #expect(tiny.width == DesignTokens.Size.panelMinWidth)
+        #expect(tiny.height == DesignTokens.Size.panelMinHeight)
+
+        panel.close()
+    }
+
     /// 协调器显隐状态在 show/hide 后应一致
     @Test("协调器 show/hide 状态")
     func coordinatorShowHide() {

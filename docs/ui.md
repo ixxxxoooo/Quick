@@ -384,7 +384,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 
 | 组件 | 职责 |
 | --- | --- |
-| `PalettePanel` | 无边框非激活 `NSPanel`，拦截 Esc / 裸退格 / ⌘D / ⌘ 快捷键 |
+| `PalettePanel` | 无边框非激活 `NSPanel`，拦截 Esc / 裸退格 / ⌘D / ⌘ 快捷键；`.resizable` + `windowWillResize` 提供与分离窗口同一套系统缩放 |
 | `PaletteCoordinator` | 面板生命周期、定位、聚合搜索。**不要加 `@Observable`** |
 | `PaletteMode` | 面板模式状态桥接（`@Observable`）：搜索模式 vs 插件模式。不持有 NSPanel，安全观察 |
 | `PaletteRootView` | 面板外壳：搜索模式（header / content / bottom bar 三段）或插件模式（插件头部 + makeView） |

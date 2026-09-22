@@ -135,6 +135,10 @@ public protocol QuickPlugin: AnyObject, Sendable {
 对不上或同时对上多条时不猜测。
 插件不调用 `RegisterEventHotKey`，系统能力（热键、权限、剪贴板、应用索引）只走 QuickPlatform。
 主面板的尺寸拖过四边之后记在 `quick.palette.width` / `quick.palette.height`，换缩放档时丢掉。
+主面板与分离窗口用**同一套缩放机制**：窗口带 `.resizable`，AppKit 在四边提供系统缩放热区与
+光标；尺寸的上下限在 `PalettePanel.windowWillResize` 里按当前屏幕夹，缩放结束
+（`windowDidEndLiveResize`）才写回偏好。不要退回「自绘一圈透明 `NSView` 模拟缩放」——
+那既拿不到系统光标，也和分离窗口手感不一致。
 
 ### 不变量
 

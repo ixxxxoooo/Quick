@@ -98,10 +98,6 @@ struct PaletteRootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PaletteBackground(scrimBoost: Double(panelTransparency) / 100))
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
-        .overlay {
-            PaletteResizeBorder()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
         .onAppear {
             query = paletteQuery.text
             log.debug("面板视图已出现，开始首次搜索")
@@ -344,117 +340,5 @@ struct PaletteRootView: View {
                 items[index].action()
             }
         }
-    }
-}
-
-/// 主面板四边的缩放热区
-///
-/// 面板是无边框窗口，系统不给边缘缩放；这里用一个只铺在四边的透明视图补上。
-/// 它只在离边 `DesignTokens.Size.resizeMargin` 之内才 `hitTest` 命中自己，
-/// 其余位置一律放行给下面的 SwiftUI 内容，所以搜索框、结果列表照常工作。
-struct PaletteResizeBorder: NSViewRepresentable {
-
-    func makeNSView(context: Context) -> PaletteResizeBorderView {
-        PaletteResizeBorderView()
-    }
-
-    func updateNSView(_ nsView: PaletteResizeBorderView, context: Context) {}
-}
-
-/// 拖某条边时，对边不动，只改一个维度；拖角同时改两个维度
-final class PaletteResizeBorderView: NSView {
-
-    /// 命中的边（角是两个边同时命中）
-    private struct Edges: OptionSet {
-        let rawValue: Int
-        static let left = Edges(rawValue: 1 << 0)
-        static let right = Edges(rawValue: 1 << 1)
-        static let bottom = Edges(rawValue: 1 << 2)
-        static let top = Edges(rawValue: 1 << 3)
-    }
-
-    /// 按下时的窗口框与鼠标位置
-    private var startFrame: NSRect = .zero
-    private var startMouse: NSPoint = .zero
-    private var activeEdges: Edges = []
-
-    private var margin: CGFloat { DesignTokens.Size.resizeMargin }
-
-    override var isFlipped: Bool { false }
-
-    /// 窗口没被激活时，第一次按下也要能拖
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    /// 只有贴着四边的那圈命中自己，内容区放行
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        guard let superview else { return nil }
-        let local = convert(point, from: superview)
-        guard bounds.contains(local) else { return nil }
-        return edges(at: local).isEmpty ? nil : self
-    }
-
-    private func edges(at point: NSPoint) -> Edges {
-        var edges: Edges = []
-        if point.x <= margin { edges.insert(.left) }
-        if point.x >= bounds.width - margin { edges.insert(.right) }
-        if point.y <= margin { edges.insert(.bottom) }
-        if point.y >= bounds.height - margin { edges.insert(.top) }
-        return edges
-    }
-
-    override func resetCursorRects() {
-        let m = margin
-        let b = bounds
-        guard b.width > 0, b.height > 0 else { return }
-        // AppKit 没有对角缩放光标，角上落到后加的水平光标即可
-        addCursorRect(NSRect(x: 0, y: 0, width: b.width, height: m), cursor: .resizeUpDown)
-        addCursorRect(NSRect(x: 0, y: b.height - m, width: b.width, height: m), cursor: .resizeUpDown)
-        addCursorRect(NSRect(x: 0, y: 0, width: m, height: b.height), cursor: .resizeLeftRight)
-        addCursorRect(NSRect(x: b.width - m, y: 0, width: m, height: b.height), cursor: .resizeLeftRight)
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        guard let window else { return }
-        activeEdges = edges(at: convert(event.locationInWindow, from: nil))
-        guard !activeEdges.isEmpty else { return }
-        startFrame = window.frame
-        startMouse = NSEvent.mouseLocation
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard let window, !activeEdges.isEmpty else { return }
-        let dx = NSEvent.mouseLocation.x - startMouse.x
-        let dy = NSEvent.mouseLocation.y - startMouse.y
-
-        let screen = window.screen ?? NSScreen.main
-        let maxWidth = screen?.visibleFrame.width ?? startFrame.width
-        let maxHeight = screen?.visibleFrame.height ?? startFrame.height
-
-        var frame = startFrame
-
-        if activeEdges.contains(.left) {
-            let width = PalettePreferences.clampedPanelWidth(startFrame.width - dx, maxWidth: maxWidth)
-            frame.origin.x = startFrame.maxX - width
-            frame.size.width = width
-        } else if activeEdges.contains(.right) {
-            frame.size.width = PalettePreferences.clampedPanelWidth(startFrame.width + dx, maxWidth: maxWidth)
-        }
-
-        if activeEdges.contains(.bottom) {
-            let height = PalettePreferences.clampedPanelHeight(startFrame.height - dy, maxHeight: maxHeight)
-            frame.origin.y = startFrame.maxY - height
-            frame.size.height = height
-        } else if activeEdges.contains(.top) {
-            frame.size.height = PalettePreferences.clampedPanelHeight(
-                startFrame.height + dy, maxHeight: maxHeight)
-        }
-
-        window.setFrame(frame, display: true)
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        guard let window, !activeEdges.isEmpty else { return }
-        activeEdges = []
-        PalettePreferences.setPanelSize(window.frame.size)
     }
 }
