@@ -123,8 +123,8 @@ enum ScreenshotCommand {
         case .fullScreen:
             break
         case .window:
-            // -i 交互式，-w 窗口选择模式（点击选择要截取的窗口，参考 jietu 的窗口截图）
-            arguments += ["-i", "-w"]
+            // -W：交互式从「点窗口」开始（参考 jietu 窗口截图），比单靠 -w 更稳
+            arguments += ["-i", "-W"]
         case .delayed(let seconds):
             // -T 后跟秒数；秒数为 0 时也照样传，不做特判
             arguments += ["-T", "\(seconds)"]

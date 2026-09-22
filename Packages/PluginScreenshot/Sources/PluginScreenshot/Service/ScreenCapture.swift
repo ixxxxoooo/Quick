@@ -22,6 +22,8 @@ final class ScreenCapture {
     /// 是否正在截图中
     private(set) var isCapturing = false
 
+    private let log = QuickLog.plugin("screenshot")
+
     /// 截图保存目录
     private var saveDirectory: String {
         NSSearchPathForDirectoriesInDomains(.desktopDirectory, .userDomainMask, true).first
@@ -69,7 +71,7 @@ final class ScreenCapture {
         await capture(mode: .fullScreen)
     }
 
-    /// 窗口截图（使用 screencapture -w 交互式选择窗口，参考 jietu 的窗口截图）
+    /// 窗口截图（使用 screencapture -W 交互式选择窗口，参考 jietu 的窗口截图）
     /// - Returns: 是否成功
     func captureWindow() async -> Bool {
         await capture(mode: .window)
@@ -80,6 +82,17 @@ final class ScreenCapture {
     /// - Returns: 是否成功
     func captureWithDelay(_ delay: Int) async -> Bool {
         await capture(mode: .delayed(seconds: delay))
+    }
+
+    /// 取可贴图的图片：优先剪贴板，其次最近一次落盘截图
+    func imageForPin() -> NSImage? {
+        if let image = NSPasteboard.general.readScreenshotImage() {
+            return image
+        }
+        if let path = lastCapturePath, let image = NSImage(contentsOfFile: path) {
+            return image
+        }
+        return nil
     }
 
     // MARK: - 设置 → 命令行
@@ -112,7 +125,15 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
-        return await runScreenCapture(request(for: mode))
+        let req = request(for: mode)
+        log.notice("开始截图 mode=\(String(describing: mode), privacy: .public)")
+        let success = await runScreenCapture(req)
+        if success {
+            log.notice("截图成功 destination=\(String(describing: req.destination), privacy: .public)")
+        } else {
+            log.warning("截图失败或已取消 mode=\(String(describing: mode), privacy: .public)")
+        }
+        return success
     }
 
     /// 执行 screencapture 命令
@@ -124,20 +145,52 @@ final class ScreenCapture {
 
             task.terminationHandler = { [weak self] process in
                 let success = process.terminationStatus == 0
-                if success {
-                    Task { @MainActor in
+                Task { @MainActor in
+                    if success {
                         // 只有写文件的截图才有路径：以前从 arguments.last 取，进剪贴板时
                         // 会把 "-c" 当成路径记下来
                         self?.lastCapturePath = request.destination.filePath
+                        // 落盘后同步塞进剪贴板，贴图与粘贴才跟得上
+                        if let path = request.destination.filePath {
+                            self?.copyFileToPasteboard(path)
+                        }
                     }
+                    continuation.resume(returning: success)
                 }
-                continuation.resume(returning: success)
             }
             do {
                 try task.run()
             } catch {
+                Task { @MainActor in
+                    self.log.error("无法启动 screencapture: \(error.localizedDescription, privacy: .public)")
+                }
                 continuation.resume(returning: false)
             }
         }
+    }
+
+    /// 把刚落盘的截图再写进剪贴板，方便贴图与粘贴
+    private func copyFileToPasteboard(_ path: String) {
+        guard let image = NSImage(contentsOfFile: path) else {
+            log.warning("截图文件无法读入剪贴板")
+            return
+        }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.writeObjects([image])
+    }
+}
+
+/// 从剪贴板读截图用的图片
+extension NSPasteboard {
+    /// 优先 TIFF，其次 PNG
+    func readScreenshotImage() -> NSImage? {
+        if let data = data(forType: .tiff), let image = NSImage(data: data) {
+            return image
+        }
+        if let data = data(forType: .png), let image = NSImage(data: data) {
+            return image
+        }
+        return nil
     }
 }

@@ -9,7 +9,7 @@ import SwiftUI
 ///
 /// 每个功能插件的设置页结构：
 /// 1. 启用开关
-/// 2. 触发词列表（展示中英双语唤醒命令）
+/// 2. 触发词列表（中英文混排，不拆成两栏）
 /// 3. 全局快捷键绑定（快速打开插件面板）
 /// 4. 插件身份的说明（内置插件、日志分类）
 /// 5. 插件专属配置项
@@ -95,30 +95,17 @@ struct FeatureSettingsPane: View {
         }
     }
 
-    /// 触发词列表区域
+    /// 触发词列表区域：中英文混排展示，不按语言拆栏
     @ViewBuilder
     private var triggerWordsSection: some View {
         if let info = pluginInfo, !info.triggerWords.isEmpty {
             Section {
-                let chinese = info.triggerWords.filter { $0.containsCJK }
-                let english = info.triggerWords.filter { !$0.containsCJK }
-
-                if !chinese.isEmpty {
-                    SettingsRow(
-                        title: "中文命令",
-                        icon: { SettingsRowIcon(systemImage: "character.textbox.zh") }
-                    ) {
-                        triggerChips(chinese)
-                    }
-                }
-
-                if !english.isEmpty {
-                    SettingsRow(
-                        title: "英文命令",
-                        icon: { SettingsRowIcon(systemImage: "character.textbox.en") }
-                    ) {
-                        triggerChips(english)
-                    }
+                SettingsRow(
+                    title: "关键字",
+                    subtitle: "输入其中任一关键词即可唤醒。中英文通用，无需切换语言。",
+                    icon: { SettingsRowIcon(systemImage: "text.magnifyingglass") }
+                ) {
+                    triggerChips(info.triggerWords)
                 }
             } header: {
                 Text("唤醒命令")
@@ -275,19 +262,6 @@ struct FeatureSettingsPane: View {
 
         default:
             EmptyView()
-        }
-    }
-}
-
-// MARK: - String 扩展
-
-private extension String {
-    /// 是否包含 CJK 字符
-    var containsCJK: Bool {
-        contains { char in
-            guard let scalar = char.unicodeScalars.first else { return false }
-            return (0x4E00...0x9FFF).contains(scalar.value)
-                || (0x3400...0x4DBF).contains(scalar.value)
         }
     }
 }
@@ -638,7 +612,7 @@ private struct TranslatorFeatureSection: View {
         } header: {
             Text("语言偏好")
         } footer: {
-            Text("使用「翻译 <文本>」或「tr <文本>」触发翻译。")
+            Text("使用「翻译 <文本>」或「translate <文本>」触发翻译。")
         }
     }
 }

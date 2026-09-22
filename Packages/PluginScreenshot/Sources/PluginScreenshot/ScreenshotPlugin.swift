@@ -2,6 +2,7 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
+import AppKit
 import QuickCore
 import QuickUI
 import SwiftUI
@@ -70,7 +71,7 @@ public final class ScreenshotPlugin: QuickPlugin {
                 pluginID: id,
                 pluginName: name,
                 title: "贴图",
-                subtitle: "将剪贴板图片钉在桌面",
+                subtitle: "将剪贴板或最近截图钉在桌面",
                 keywords: pinKeywords,
                 icon: "pin"
             )
@@ -86,7 +87,7 @@ public final class ScreenshotPlugin: QuickPlugin {
         case "screenshot.window":
             Task { await captureWindow() }
         case "screenshot.pin":
-            pinFromClipboard()
+            pinImage()
         default:
             break
         }
@@ -136,7 +137,7 @@ public final class ScreenshotPlugin: QuickPlugin {
                     id: "screenshot.window",
                     pluginID: Self.id,
                     title: "窗口截图",
-                    subtitle: "截取指定窗口",
+                    subtitle: "点击选择要截取的窗口",
                     icon: "macwindow",
                     relevance: 0.7,
                     action: { [weak self] in
@@ -151,11 +152,11 @@ public final class ScreenshotPlugin: QuickPlugin {
                     id: "screenshot.pin",
                     pluginID: Self.id,
                     title: "贴图",
-                    subtitle: "将剪贴板图片钉在桌面",
+                    subtitle: "将剪贴板或最近截图钉在桌面",
                     icon: "pin",
                     relevance: 0.7,
                     action: { [weak self] in
-                        self?.pinFromClipboard()
+                        self?.pinImage()
                     }
                 )
             )
@@ -174,7 +175,7 @@ public final class ScreenshotPlugin: QuickPlugin {
     }
 
     public func makeView() -> AnyView {
-        AnyView(ScreenshotView(capture: capture))
+        AnyView(ScreenshotView(capture: capture, onPin: { [weak self] in self?.pinImage() }))
     }
 
     public func activate() {
@@ -187,45 +188,42 @@ public final class ScreenshotPlugin: QuickPlugin {
 
     /// 区域截图
     private func captureArea() async {
-        EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
-        try? await Task.sleep(for: .milliseconds(200))
-
-        if await capture.captureArea() {
-            EventBus.shared.post(ShowHUDEvent(message: successMessage, tone: .success))
-        }
+        await runCapture { await capture.captureArea() }
     }
 
     /// 全屏截图
     private func captureFullScreen() async {
-        EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
-        try? await Task.sleep(for: .milliseconds(200))
-
-        if await capture.captureFullScreen() {
-            EventBus.shared.post(ShowHUDEvent(message: successMessage, tone: .success))
-        }
+        await runCapture { await capture.captureFullScreen() }
     }
 
-    /// 窗口截图（参考 jietu 的 handleWindowCapture，使用 screencapture -w 交互式窗口选择）
+    /// 窗口截图
     private func captureWindow() async {
+        await runCapture { await capture.captureWindow() }
+    }
+
+    /// 隐藏面板 → 截图 → 成功/失败 HUD
+    private func runCapture(_ work: () async -> Bool) async {
         EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
         try? await Task.sleep(for: .milliseconds(200))
 
-        if await capture.captureWindow() {
+        if await work() {
             EventBus.shared.post(ShowHUDEvent(message: successMessage, tone: .success))
+        } else {
+            EventBus.shared.post(ShowHUDEvent(message: "截图已取消或失败", tone: .warning))
         }
     }
 
-    /// 贴图：从剪贴板读取图片并钉在桌面（参考 jietu 的 PinWindowController）
-    private func pinFromClipboard() {
+    /// 贴图：剪贴板优先，其次最近一次落盘截图
+    private func pinImage() {
         EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
 
-        guard let image = NSPasteboard.general.readImage() else {
-            EventBus.shared.post(ShowHUDEvent(message: "剪贴板中没有图片", tone: .warning))
+        guard let image = capture.imageForPin() else {
+            EventBus.shared.post(ShowHUDEvent(message: "没有可贴的图片，请先截图", tone: .warning))
             return
         }
 
         PinWindowController.pin(image: image)
-        log.notice("已将剪贴板图片钉在桌面")
+        log.notice("已将图片钉在桌面")
         EventBus.shared.post(ShowHUDEvent(message: "已钉在桌面", tone: .success))
     }
 
@@ -233,20 +231,6 @@ public final class ScreenshotPlugin: QuickPlugin {
     ///
     /// 只进剪贴板的截图没有文件，这时还说「已保存到桌面」会让用户去桌面找一个不存在的文件。
     private var successMessage: String {
-        capture.lastCapturePath == nil ? "截图已复制到剪贴板" : "截图已保存到桌面"
-    }
-}
-
-/// NSPasteboard 图片读取扩展
-private extension NSPasteboard {
-    /// 从剪贴板读取图片
-    func readImage() -> NSImage? {
-        if let data = data(forType: .tiff), let image = NSImage(data: data) {
-            return image
-        }
-        if let data = data(forType: .png), let image = NSImage(data: data) {
-            return image
-        }
-        return nil
+        capture.lastCapturePath == nil ? "截图已复制到剪贴板" : "截图已保存（可搜「贴图」钉到桌面）"
     }
 }

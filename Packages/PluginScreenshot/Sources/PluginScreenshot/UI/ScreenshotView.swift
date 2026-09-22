@@ -10,6 +10,7 @@ import SwiftUI
 struct ScreenshotView: View {
 
     let capture: ScreenCapture
+    var onPin: (() -> Void)?
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.xxl) {
@@ -30,8 +31,8 @@ struct ScreenshotView: View {
                 screenshotButton("窗口截图", icon: "macwindow") {
                     Task { await capture.captureWindow() }
                 }
-                screenshotButton("延时截图 (3s)", icon: "timer") {
-                    Task { await capture.captureWithDelay(3) }
+                screenshotButton("贴图", icon: "pin") {
+                    onPin?()
                 }
             }
 
@@ -44,7 +45,7 @@ struct ScreenshotView: View {
 
             Spacer()
 
-            Text(capture.savesToDesktop ? "截图将保存到桌面" : "截图将复制到剪贴板")
+            Text(capture.savesToDesktop ? "截图将保存到桌面，并可搜「贴图」钉住" : "截图将复制到剪贴板")
                 .font(DesignTokens.Typography.keyCap)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
         }

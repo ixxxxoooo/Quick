@@ -44,7 +44,7 @@ struct ScreenshotCommandTests {
         #expect(
             ScreenshotCommand.arguments(
                 mode: .window, destination: .file(path: path), format: .png, includePointer: false)
-                == ["-i", "-w", "-t", "png", path])
+                == ["-i", "-W", "-t", "png", path])
     }
 
     @Test("延时截图把秒数放在 -T 后面，路径仍在最后")
