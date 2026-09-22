@@ -2,6 +2,7 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
+import AppKit
 import SwiftUI
 
 /// 语法高亮的渲染
@@ -27,6 +28,35 @@ public enum SyntaxHighlighter {
             attributed[range].foregroundColor = color(for: token.kind)
         }
         return attributed
+    }
+
+    /// AppKit 版本：直接产出 `NSAttributedString`，供**可编辑**的 `NSTextView` 用
+    ///
+    /// 可编辑编辑器要的是「只改属性、不换字符」：调用方拿到它之后在 `NSTextStorage` 上
+    /// 做 `setAttributes` / `addAttribute`，光标与选区都不受影响。
+    ///
+    /// - Parameters:
+    ///   - text: 原始文本
+    ///   - language: 语言
+    ///   - font: 基础字体（等宽）
+    ///   - baseColor: 基础前景色
+    public static func nsAttributed(
+        _ text: String,
+        language: CodeLanguage,
+        font: NSFont,
+        baseColor: NSColor
+    ) -> NSMutableAttributedString {
+        let result = NSMutableAttributedString(
+            string: text,
+            attributes: [.font: font, .foregroundColor: baseColor]
+        )
+        for token in language.tokens(in: text) {
+            let range = NSRange(token.range, in: text)
+            guard range.location != NSNotFound, range.length > 0 else { continue }
+            result.addAttribute(
+                .foregroundColor, value: NSColor(color(for: token.kind)), range: range)
+        }
+        return result
     }
 
     /// token 类别 → 颜色

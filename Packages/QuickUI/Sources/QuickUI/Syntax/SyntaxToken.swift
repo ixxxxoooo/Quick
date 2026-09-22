@@ -42,15 +42,27 @@ public struct SyntaxToken: Sendable, Equatable {
 }
 
 /// 编辑器支持的语言
-public enum CodeLanguage: Sendable, Equatable {
+public enum CodeLanguage: Sendable, Equatable, CaseIterable {
+    /// 不做语法高亮（对比任意文本时的默认值）
+    case plain
     case json
     case sql
 
     /// 取该语言的 tokenizer
     func tokens(in text: String) -> [SyntaxToken] {
         switch self {
+        case .plain: []
         case .json: JSONSyntax.tokens(in: text)
         case .sql: SQLSyntax.tokens(in: text)
+        }
+    }
+
+    /// 选择器里显示的名字
+    public var displayName: String {
+        switch self {
+        case .plain: "纯文本"
+        case .json: "JSON"
+        case .sql: "SQL"
         }
     }
 }
