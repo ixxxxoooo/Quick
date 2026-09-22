@@ -125,12 +125,26 @@ enum SystemSettingsAnchor {
 
 /// 把面板贴到系统设置右侧内容区的正下方
 enum PermissionSnapGeometry {
-    static func frame(settings: CGRect, screen: CGRect, panelHeight: CGFloat) -> CGRect {
+
+    /// 面板宽度：跟系统设置右侧内容区一样宽，再按屏幕收一收
+    ///
+    /// 内容区宽度 = 设置窗口宽度 − 侧边栏（`systemSettingsSidebar`）。以前这里还夹了一个
+    /// `permissionPanelWidth` 的固定上限，导致面板比内容区窄一截、和系统设置的列表对不齐；
+    /// 现在直接跟随内容区宽度（屏幕装不下时才收窄）。
+    static func width(settings: CGRect, screen: CGRect) -> CGFloat {
         let sidebar = DesignTokens.Size.systemSettingsSidebar
         let inset = DesignTokens.Spacing.lg
-        let preferred = DesignTokens.Size.permissionPanelWidth
         let contentWidth = max(0, settings.width - sidebar)
-        let width = min(preferred, contentWidth, screen.width - inset * 2)
+        return max(0, min(contentWidth, screen.width - inset * 2))
+    }
+
+    /// 面板落点：水平贴住内容区左缘，垂直贴在设置窗口正下方
+    static func frame(
+        settings: CGRect, screen: CGRect, panelWidth: CGFloat, panelHeight: CGFloat
+    ) -> CGRect {
+        let sidebar = DesignTokens.Size.systemSettingsSidebar
+        let inset = DesignTokens.Spacing.lg
+        let width = panelWidth
         let height = panelHeight
         var origin = CGPoint(x: settings.minX + sidebar, y: settings.minY - height)
         origin.x = max(screen.minX + inset, min(origin.x, screen.maxX - width - inset))
@@ -170,6 +184,8 @@ final class PermissionSnapPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         isMovableByWindowBackground = false
         hidesOnDeactivate = false
+        // 让宿主视图真去合成透明度：圆角裁掉的那部分要透出去，窗口阴影才会是圆角
+        hostingView.wantsLayer = true
         hostingView.sizingOptions = []
         contentView = hostingView
     }
@@ -194,9 +210,12 @@ final class PermissionSnapPanel: NSPanel {
         let screen =
             NSScreen.screens.first { $0.frame.intersects(target.appKitFrame) }?.visibleFrame
             ?? target.appKitFrame
-        let height = measuredHeight(for: DesignTokens.Size.permissionPanelWidth)
+        // 先按内容区定宽，再按这个宽度量高度（宽度会影响文字换行与卡片高度）
+        let width = PermissionSnapGeometry.width(settings: target.appKitFrame, screen: screen)
+        let height = measuredHeight(for: width)
         setFrame(
-            PermissionSnapGeometry.frame(settings: target.appKitFrame, screen: screen, panelHeight: height),
+            PermissionSnapGeometry.frame(
+                settings: target.appKitFrame, screen: screen, panelWidth: width, panelHeight: height),
             display: false
         )
         order(.above, relativeTo: Int(target.windowNumber))
@@ -307,8 +326,12 @@ private struct PermissionDragSheet: View {
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
         }
         .padding(DesignTokens.Spacing.xl)
-        .frame(width: DesignTokens.Size.permissionPanelWidth)
+        // 宽度不再写死：由宿主窗口按系统设置内容区定宽，这里只负责铺满
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(PaletteBackground())
+        // 面板是无边框窗口，必须自己裁圆角 —— 否则 vibrancy 会铺满矩形四角，
+        // 窗口阴影（取自 alpha 通道）也跟着变方。主面板/分离窗口同款做法。
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
     }
 }
 

@@ -556,3 +556,7 @@ collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 - 申请前后都要 `QuickLog`，用户报「功能不工作」时第一条要查的就是权限。
 - 授权状态会随重建签名失效（TCC 认签名）。开发期频繁重建导致权限反复丢失是正常的，
   不是代码 bug。
+- **拖拽授权面板吸附在系统设置窗口正下方，宽度跟随右侧内容区**（设置窗口宽度 −
+  `systemSettingsSidebar`，屏幕装不下时才收窄），高度按这个宽度量出来。面板是无边框窗口，
+  **四角必须自己裁圆**（`clipShape(Radius.panel)`）—— 否则 vibrancy 会铺满矩形四角，
+  取自窗口 alpha 的阴影也跟着变方。

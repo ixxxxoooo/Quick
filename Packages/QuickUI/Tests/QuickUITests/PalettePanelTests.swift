@@ -265,14 +265,32 @@ struct PaletteGeometryTests {
         #expect(PalettePreferences.clampedPanelWidth(900, maxWidth: 3000) == 900)
     }
 
+    @Test("授权面板宽度跟随系统设置右侧内容区")
+    func permissionPanelWidthMatchesContentArea() {
+        let settings = CGRect(x: 100, y: 400, width: 900, height: 700)
+        let screen = CGRect(x: 0, y: 0, width: 1600, height: 1000)
+        let width = PermissionSnapGeometry.width(settings: settings, screen: screen)
+        #expect(width == settings.width - DesignTokens.Size.systemSettingsSidebar)
+    }
+
+    @Test("内容区比屏幕还宽时按屏幕收窄")
+    func permissionPanelWidthClampsToScreen() {
+        let settings = CGRect(x: 0, y: 400, width: 5000, height: 700)
+        let screen = CGRect(x: 0, y: 0, width: 1600, height: 1000)
+        let width = PermissionSnapGeometry.width(settings: settings, screen: screen)
+        #expect(width == screen.width - DesignTokens.Spacing.lg * 2)
+    }
+
     @Test("授权面板贴在系统设置右侧内容区的正下方")
     func snapsUnderSystemSettings() {
         let settings = CGRect(x: 100, y: 400, width: 900, height: 700)
         let screen = CGRect(x: 0, y: 0, width: 1600, height: 1000)
-        let frame = PermissionSnapGeometry.frame(settings: settings, screen: screen, panelHeight: 160)
+        let width = PermissionSnapGeometry.width(settings: settings, screen: screen)
+        let frame = PermissionSnapGeometry.frame(
+            settings: settings, screen: screen, panelWidth: width, panelHeight: 160)
         #expect(frame.minX == settings.minX + DesignTokens.Size.systemSettingsSidebar)
         #expect(frame.maxY == settings.minY)
-        #expect(frame.width == DesignTokens.Size.permissionPanelWidth)
+        #expect(frame.width == width)
         #expect(frame.height == 160)
     }
 }

@@ -106,7 +106,10 @@ public enum DesignTokens {
         public static let compactKeyCap = scaled(15)
         /// 设置项别名框与快捷键录制框标准宽度（参考 Tinycast）
         public static let shortcutRecorder: CGFloat = 120
-        /// 拖拽授权面板宽度。贴在系统设置右侧内容区下面，不跟主面板缩放
+        /// 拖拽授权面板的初始宽度（吸附前 / 量不到系统设置窗口时的兜底）
+        ///
+        /// **吸附后不用它定宽**：宽度跟随系统设置右侧内容区（`PermissionSnapGeometry.width`），
+        /// 这样面板才和设置列表等宽对齐。不跟主面板缩放。
         public static let permissionPanelWidth: CGFloat = 460
         /// 系统设置左侧栏宽度，用来把授权面板和右侧列表对齐
         public static let systemSettingsSidebar: CGFloat = 230
