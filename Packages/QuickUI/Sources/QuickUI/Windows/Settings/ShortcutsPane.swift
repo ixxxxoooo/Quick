@@ -2,6 +2,7 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
+import AppKit
 import QuickCore
 import SwiftUI
 
@@ -235,6 +236,13 @@ private struct DraftBinding: Identifiable {
 }
 
 /// 右侧的关键字输入框。关键字就是要唤醒的功能
+///
+/// **这里用 `NSTextField` 而不是 SwiftUI 的 `TextField`。** 在 `Form` 里，`TextField` 的
+/// 第一个参数会被当成**标签**真的画出来（一段 static text 贴左边），可编辑区只剩右边一截：
+/// 表现就是「左边点不动、光标总在后面」，而且那段标签不随输入消失；`prompt:` 也治不好
+/// 内容被排到尾部的问题（`.multilineTextAlignment(.leading)` 对单行 macOS 字段无效）。
+/// 这个输入框要的是「内容居左、占位符在框内、点任意处都能聚焦、光标落最前」，直接下沉到
+/// AppKit 最省事。
 private struct KeywordField: View {
 
     let text: String
@@ -242,7 +250,7 @@ private struct KeywordField: View {
     let onSubmit: (String) -> Void
 
     @State private var draft: String
-    @FocusState private var focused: Bool
+    @State private var isEditing = false
 
     init(text: String, placeholder: String, onSubmit: @escaping (String) -> Void) {
         self.text = text
@@ -252,23 +260,125 @@ private struct KeywordField: View {
     }
 
     var body: some View {
-        TextField(placeholder, text: $draft)
-            .textFieldStyle(.plain)
-            .font(DesignTokens.Typography.rowTitle)
-            .focused($focused)
-            .onSubmit { onSubmit(draft) }
-            .onChange(of: focused) { _, isFocused in
-                if !isFocused { onSubmit(draft) }
-            }
-            .onChange(of: text) { _, newValue in
-                if !focused { draft = newValue }
-            }
+        let shape = RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+
+        KeywordTextField(text: $draft, isEditing: $isEditing, placeholder: placeholder, onSubmit: onSubmit)
+            .frame(height: 24)
             .padding(.horizontal, DesignTokens.Spacing.sm)
-            .padding(.vertical, DesignTokens.Spacing.xs)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                    .fill(DesignTokens.Colors.controlSurface)
+            // 与左边的快捷键录制框同一套外观：`cardFill` 底 + `cardStroke` 边。
+            .background(shape.fill(DesignTokens.Colors.cardFill))
+            // 聚焦反馈：边框变强调色。系统聚焦圈被关掉了，不给这个的话点上去和没点
+            // 几乎看不出区别（见 ShortcutRecorder 的录制态同款处理）。
+            .overlay(
+                shape.strokeBorder(
+                    isEditing ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: 1)
             )
+            .clipShape(shape)
+            .animation(.easeOut(duration: DesignTokens.Duration.hover), value: isEditing)
+            .onChange(of: text) { _, newValue in
+                if !isEditing { draft = newValue }
+            }
+    }
+}
+
+/// 点哪都把插入点放回开头
+///
+/// `controlTextDidBeginEditing` 只赶上 Tab / 编程聚焦；鼠标点击是在它之后才按点击位置
+/// 落插入点的，所以得在 `mouseDown` 之后再纠正一次。
+private final class CaretHomeTextField: NSTextField {
+
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        guard let editor = currentEditor() else { return }
+        editor.selectedRange = NSRange(location: 0, length: 0)
+    }
+}
+
+/// AppKit 背书的单行输入：内容居左、占位符在字段内、聚焦时光标归位到最前
+private struct KeywordTextField: NSViewRepresentable {
+
+    @Binding var text: String
+    @Binding var isEditing: Bool
+    let placeholder: String
+    let onSubmit: (String) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = CaretHomeTextField()
+        field.delegate = context.coordinator
+        field.isBordered = false
+        field.isBezeled = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.alignment = .left
+        field.font = .preferredFont(forTextStyle: .body)
+        field.lineBreakMode = .byTruncatingTail
+        field.cell?.usesSingleLineMode = true
+        field.cell?.wraps = false
+        field.placeholderString = placeholder
+        field.stringValue = text
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return field
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        context.coordinator.text = $text
+        context.coordinator.isEditing = $isEditing
+        context.coordinator.onSubmit = onSubmit
+        nsView.alignment = .left
+        nsView.placeholderString = placeholder
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+
+        var text: Binding<String>
+        var isEditing: Binding<Bool>
+        var onSubmit: (String) -> Void
+
+        init(_ parent: KeywordTextField) {
+            text = parent.$text
+            isEditing = parent.$isEditing
+            onSubmit = parent.onSubmit
+        }
+
+        /// 聚焦即把光标放到最前：无论点哪儿都从开头输入，而不是落在点击处
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            isEditing.wrappedValue = true
+            if let editor = field.currentEditor() {
+                editor.selectedRange = NSRange(location: 0, length: 0)
+            }
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            text.wrappedValue = field.stringValue
+        }
+
+        /// 失焦时提交（切到别的行也不丢输入）
+        func controlTextDidEndEditing(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            text.wrappedValue = field.stringValue
+            isEditing.wrappedValue = false
+            onSubmit(field.stringValue)
+        }
+
+        /// 回车：结束编辑，提交交给 `controlTextDidEndEditing`
+        func control(
+            _ control: NSControl,
+            textView: NSTextView,
+            doCommandBy commandSelector: Selector
+        ) -> Bool {
+            guard commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
+            control.window?.makeFirstResponder(nil)
+            return true
+        }
     }
 }
