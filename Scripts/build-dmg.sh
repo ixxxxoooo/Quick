@@ -58,8 +58,10 @@ echo "==> 1/6 构建（${CONFIG}）"
 # 检测证书时不带 -v：自签名证书通常是 CSSMERR_TP_NOT_TRUSTED（未受系统信任），
 # 带 -v 只列「有效」证书会漏掉它，导致本地也退回 ad-hoc，签名身份变了 TCC 授权就丢了。
 # 也不能用 CODE_SIGNING_ALLOWED=NO：产物没有签名身份，TCC 直接认不出来。
+# 不能用 `grep -q`：命中后它立刻关管道，`security` 收到 SIGPIPE，pipefail 下整条管道
+# 被判为失败，于是有证书也落进 ad-hoc 分支。
 SIGN_OVERRIDES=""
-if security find-identity -p codesigning 2>/dev/null | grep -q '"Quick"'; then
+if security find-identity -p codesigning 2>/dev/null | grep '"Quick"' >/dev/null; then
     :
 elif [ "${QUICK_ALLOW_ADHOC:-}" = "1" ]; then
     echo "    ⚠️  QUICK_ALLOW_ADHOC=1 → 改用 ad-hoc 签名"

@@ -56,8 +56,11 @@ fi
 
 # 自签名证书缺失时：本机构建退回 ad-hoc（开发尚可，但 TCC 身份每次会变）；
 # 正式 DMG 由 build-dmg.sh 守门，不允许悄悄 ad-hoc。
+#
+# 不能用 `grep -q`：它在命中后立刻关掉管道，`security` 随即收到 SIGPIPE，
+# 在 `set -o pipefail` 下整条管道被判为失败 —— 有证书也会落进 ad-hoc 分支。
 SIGN_OVERRIDES=()
-if ! security find-identity -p codesigning 2>/dev/null | grep -q '"Quick"'; then
+if ! security find-identity -p codesigning 2>/dev/null | grep '"Quick"' >/dev/null; then
     echo "    ⚠️  找不到自签名证书「Quick」，本次用 ad-hoc 签名"
     echo "        正式发布前请跑：bash Scripts/generate-signing-cert.sh"
     SIGN_OVERRIDES+=(CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Automatic)

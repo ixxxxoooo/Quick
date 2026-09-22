@@ -26,7 +26,7 @@ OUT_DIR="${QUICK_CERT_OUT_DIR:-$HOME/.config/quick}"
 DAYS="${QUICK_CERT_DAYS:-3650}"   # 默认 10 年
 COMMON_NAME="$IDENTITY_NAME"
 
-if security find-identity -p codesigning 2>/dev/null | grep -q "\"${IDENTITY_NAME}\""; then
+if security find-identity -p codesigning 2>/dev/null | grep "\"${IDENTITY_NAME}\"" >/dev/null; then
     echo "已经存在代码签名身份「${IDENTITY_NAME}」，拒绝重新生成。" >&2
     echo "" >&2
     echo "重新生成会换掉 certificate leaf，用户升级后屏幕录制授权会丢。" >&2
@@ -82,7 +82,14 @@ LOGIN_KC="$(security default-keychain | tr -d '" ')"
 security import "$TMP/quick.p12" -k "$LOGIN_KC" -P "$P12_PASSWORD" \
     -T /usr/bin/codesign -T /usr/bin/security >/dev/null
 # 允许 codesign 静默用私钥（否则每次构建弹「要使用钥匙串」）。
-security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$LOGIN_KC" >/dev/null 2>&1 || true
+#
+# **不要写 `-k ""`**：`-k` 已废弃，传空密码在带密码的登录钥匙串上必定失败；失败又被
+# `|| true` 吞掉，于是证书装好了、构建时却卡在钥匙串授权框上。这里不带 `-k`，
+# 让 `security` 就地提示输入登录钥匙串密码（本脚本是一次性交互脚本，可以提示）。
+if ! security set-key-partition-list -S apple-tool:,apple:,codesign: -s "$LOGIN_KC"; then
+    echo "    ⚠️  未能自动授权 codesign 使用私钥。" >&2
+    echo "        首次构建会弹一次钥匙串授权框，选「始终允许」并输入登录密码即可，之后不再弹。" >&2
+fi
 
 echo "==> 3/4 写出 p12 / 密码 / base64 → ${OUT_DIR}"
 cp "$TMP/quick.p12" "$OUT_DIR/quick-signing.p12"

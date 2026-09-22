@@ -29,7 +29,7 @@ for arg in "$@"; do
     esac
 done
 
-if ! security find-identity -p codesigning 2>/dev/null | grep -q "\"${IDENTITY_NAME}\""; then
+if ! security find-identity -p codesigning 2>/dev/null | grep "\"${IDENTITY_NAME}\"" >/dev/null; then
     echo "本机找不到代码签名身份「${IDENTITY_NAME}」。" >&2
     echo "若是全新机器，先跑：bash Scripts/generate-signing-cert.sh" >&2
     exit 1
