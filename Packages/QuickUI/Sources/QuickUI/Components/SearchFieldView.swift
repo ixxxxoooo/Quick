@@ -20,8 +20,8 @@ public struct SearchFieldView: View {
     /// 占位文本
     public let placeholder: String
 
-    /// 左侧图标（SF Symbol 名称）
-    public let icon: String
+    /// 左侧图标（SF Symbol 名称）。`nil` 表示不显示图标
+    public let icon: String?
 
     /// 出现时是否自动取焦点。主搜索传 true；插件头部传 false（按 ⌘F 才聚焦）
     public let autoFocus: Bool
@@ -43,7 +43,7 @@ public struct SearchFieldView: View {
     public init(
         query: Binding<String>,
         placeholder: String = "搜索…",
-        icon: String = "magnifyingglass",
+        icon: String? = "magnifyingglass",
         autoFocus: Bool = true,
         focusTrigger: Int = 0
     ) {
@@ -56,11 +56,13 @@ public struct SearchFieldView: View {
 
     public var body: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            Image(systemName: icon)
-                .font(DesignTokens.Typography.headerIcon)
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-                .frame(width: DesignTokens.Size.headerIconSlot)
-                .accessibilityHidden(true)
+            if let icon {
+                Image(systemName: icon)
+                    .font(DesignTokens.Typography.headerIcon)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .frame(width: DesignTokens.Size.headerIconSlot)
+                    .accessibilityHidden(true)
+            }
 
             TextField(placeholder, text: $query)
                 .textFieldStyle(.plain)

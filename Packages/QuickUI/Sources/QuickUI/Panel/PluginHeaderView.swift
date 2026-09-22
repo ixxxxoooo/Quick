@@ -41,7 +41,9 @@ struct PluginHeaderView: View {
                         set: { search.text = $0 }
                     ),
                     placeholder: "在 \(pluginName) 中搜索…",
-                    icon: "magnifyingglass",
+                    // 子面板里不放搜索图标：返回按钮已经把这一行的视觉锚点占住了，
+                    // 再加一个放大镜就是两个图标挤在一起抢注意力
+                    icon: nil,
                     // 默认不抢焦点：焦点属于插件视图（方向键切换）。⌘F 才把焦点要过来
                     autoFocus: false,
                     focusTrigger: search.focusToken
