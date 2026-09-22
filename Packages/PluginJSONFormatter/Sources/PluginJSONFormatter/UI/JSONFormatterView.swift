@@ -183,17 +183,21 @@ struct JSONFormatterView: View {
                     collapsed = []
                 } label: {
                     Label("展开全部", systemImage: "chevron.down.square")
+                        .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
                 .controlSize(.small)
+                .help("展开全部")
 
                 Button {
                     if let root { collapsed = JSONTreeLayout.allCollapsed(root) }
                 } label: {
                     Label("折叠全部", systemImage: "chevron.right.square")
+                        .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
                 .controlSize(.small)
+                .help("折叠全部")
             }
 
             Picker("", selection: $mode) {
