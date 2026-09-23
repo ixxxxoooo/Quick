@@ -22,6 +22,14 @@ struct Base64CodecView: View {
     @State private var mode: Mode = .encode
     @State private var errorMessage: String?
 
+    /// 编解码规则与设置页共用同一个键：那边改了这边立即生效
+    @AppStorage(PluginSettingKey.Base64Codec.urlSafe) private var urlSafe = false
+    @AppStorage(PluginSettingKey.Base64Codec.wrapLines) private var wrapLines = false
+
+    private var options: Base64CodecLogic.Options {
+        .init(isURLSafe: urlSafe, wrapsLines: wrapLines)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // 工具栏
@@ -115,6 +123,8 @@ struct Base64CodecView: View {
             .padding(.vertical, DesignTokens.Spacing.xs)
         }
         .onChange(of: input) { _, _ in transform() }
+        .onChange(of: urlSafe) { _, _ in transform() }
+        .onChange(of: wrapLines) { _, _ in transform() }
     }
 
     private func transform() {
@@ -122,8 +132,8 @@ struct Base64CodecView: View {
         do {
             output =
                 mode == .encode
-                ? try Base64CodecLogic.encode(input)
-                : try Base64CodecLogic.decode(input)
+                ? try Base64CodecLogic.encode(input, options: options)
+                : try Base64CodecLogic.decode(input, options: options)
             errorMessage = nil
         } catch {
             output = ""

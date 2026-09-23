@@ -4,58 +4,28 @@
 
 import PluginAI
 import PluginBase64Codec
-
 import PluginCalculator
 import PluginCalendar
 import PluginClipboard
 import PluginColorCompare
-
 import PluginFileSearch
-import PluginFileSearch
-
 import PluginHashCalculator
-
 import PluginJSONFormatter
-
-import PluginLauncher
-import PluginLauncher
-
-import PluginMarkdownPreview
-
-import PluginNetworkTools
-import PluginNetworkTools
-
-import PluginNotes
-import PluginNotes
-
-import PluginOCR
-import PluginOCR
-
-import PluginSQLFormatter
-
-import PluginScreenshot
-import PluginScreenshot
-
-import PluginSnippets
-import PluginSnippets
-
-import PluginSystemControl
-import PluginSystemControl
-
-import PluginSystemMonitor
-import PluginSystemMonitor
-
 import PluginKillProcess
-
+import PluginLauncher
+import PluginMarkdownPreview
+import PluginNetworkTools
+import PluginNotes
+import PluginOCR
+import PluginSQLFormatter
+import PluginScreenshot
+import PluginSnippets
+import PluginSystemControl
+import PluginSystemMonitor
 import PluginTextDiff
-
 import PluginTimestampConverter
-
 import PluginTranslator
-import PluginTranslator
-
 import PluginURLCodec
-
 import PluginUUIDGenerator
 
 import Carbon.HIToolbox
@@ -108,6 +78,9 @@ final class AppCore {
     /// 应用索引
     let appIndex = AppIndex()
 
+    /// 应用图标缓存（与 `IconCache.shared` 同一实例，避免宿主与 UI 各持一份）
+    let iconCache = IconCache.shared
+
     /// HUD 控制器
     let hudController = HUDController()
 
@@ -135,11 +108,14 @@ final class AppCore {
     /// 而失败的兜底需要写日志（`log` 是实例属性）。
     private(set) lazy var database: SQLiteDatabase = Self.openDatabase()
 
+    /// 设置窗口的数据源桥接
+    private(set) lazy var settingsBridge = SettingsBridge(core: self)
+
     /// 设置窗口控制器
     ///
-    /// `lazy` 是因为它需要 `self` 作为数据源，而初始化器里不能引用 `self`。
+    /// `lazy` 是因为它需要 `settingsBridge` 作为数据源，而初始化器里不能引用 `self`。
     /// 窗口本身也是惰性创建的：没打开过设置就不该有窗口。
-    private(set) lazy var settingsWindowController = SettingsWindowController(dataSource: self)
+    private(set) lazy var settingsWindowController = SettingsWindowController(dataSource: settingsBridge)
 
     /// 第一次启动的引导
     private let onboardingController = OnboardingWindowController()
@@ -186,14 +162,14 @@ final class AppCore {
     private var superPanelDefaultsObserver: NSObjectProtocol?
 
     /// 最近使用（与协调器共用同一份，设置页清空时也动它）
-    private var usageHistory: UsageHistory?
+    var usageHistory: UsageHistory?
 
     /// 实际生效外观的观察者（必须强引用）
     private var effectiveAppearanceObserver: NSKeyValueObservation?
 
     /// 设置数据源缓存（避免设置面板切换时重复全量计算与反序列化）
-    private var cachedIndexedApps: [SettingsAppItem]?
-    private var cachedCustomCommands: [SettingsCustomCommandItem]?
+    var cachedIndexedApps: [SettingsAppItem]?
+    var cachedCustomCommands: [SettingsCustomCommandItem]?
 
     private init() {}
 
@@ -205,6 +181,9 @@ final class AppCore {
     /// 按顺序完成：创建插件 → 注册事件 → 启动服务 → 激活插件。
     func start() {
         log.notice("AppCore 启动，bundle id=\(Bundle.main.bundleIdentifier ?? "-", privacy: .public)")
+
+        // 0. API Key：UserDefaults 明文 → Keychain（失败保留旧值，下次再试）
+        AIConfig.migrateAPIKeyIfNeeded()
 
         // 1. 打开数据库并应用宿主自己的 schema
         //    必须在注册插件之前：需要真表的插件在构造时就要拿到存储句柄
@@ -261,10 +240,10 @@ final class AppCore {
         statusItemController.install()
         statusItemController.applyVisibility()
         onboardingController.isLaunchAtLoginEnabled = { [weak self] in
-            self?.isLaunchAtLoginEnabled ?? false
+            self?.settingsBridge.isLaunchAtLoginEnabled ?? false
         }
         onboardingController.setLaunchAtLogin = { [weak self] enabled in
-            self?.setLaunchAtLogin(enabled)
+            self?.settingsBridge.setLaunchAtLogin(enabled)
         }
         onboardingController.presentIfNeeded()
         observeDebugWakeSignals()
@@ -284,44 +263,56 @@ final class AppCore {
         }
         rebuildCommandCatalog()
 
-        // 9. 开发启动参数：立即显示面板（验收用）
-        if ProcessInfo.processInfo.arguments.contains("-showPalette") {
-            log.notice("命中启动参数 -showPalette，立即显示面板")
-            paletteCoordinator.show()
+        // 9–13. 开发启动参数（验收用）：统一在这里处理，AppDelegate 不再重复解析
+        applyLaunchArguments(ProcessInfo.processInfo.arguments)
+
+        log.notice("AppCore 启动完成")
+    }
+
+    /// 解析开发启动参数并执行对应动作
+    ///
+    /// 优先级：`-showPlugin` > `-showSettingsTab` > `-showSettings` > `-showPalette` /
+    /// `-showSuperPanel` / `-showTranslator`（后三者可并存在不同路径上，但设置类互斥）。
+    private func applyLaunchArguments(_ arguments: [String]) {
+        if let index = arguments.firstIndex(of: "-showPlugin"),
+            index + 1 < arguments.count
+        {
+            let pluginID = arguments[index + 1]
+            log.notice("命中启动参数 -showPlugin \(pluginID, privacy: .public)")
+            paletteCoordinator.show(pluginID: pluginID)
+            return
         }
 
-        // 10. 开发启动参数：立即显示设置窗口（验收用）
-        if ProcessInfo.processInfo.arguments.contains("-showSettings") {
-            log.notice("命中启动参数 -showSettings，立即显示设置窗口")
-            paletteCoordinator.hide()
-            settingsWindowController.show()
-        }
-
-        // 11. 开发启动参数：立即显示超级面板（验收用）
-        if ProcessInfo.processInfo.arguments.contains("-showSuperPanel") {
-            log.notice("命中启动参数 -showSuperPanel，立即显示超级面板")
-            superPanelController.show()
-        }
-
-        // 12. 开发启动参数：打开设置窗口的指定分栏（验收用）
-        //
-        //   -showSettingsTab screenshot   → 打开「截图工具」设置页
-        //
-        // 分栏名就是 `SettingsTab` 的 raw value。
-        let arguments = ProcessInfo.processInfo.arguments
-        if let index = arguments.firstIndex(of: "-showSettingsTab"), index + 1 < arguments.count,
+        if let index = arguments.firstIndex(of: "-showSettingsTab"),
+            index + 1 < arguments.count,
             let tab = SettingsTab(rawValue: arguments[index + 1])
         {
             log.notice("命中启动参数 -showSettingsTab \(tab.rawValue, privacy: .public)")
             paletteCoordinator.hide()
             settingsWindowController.show(tab: tab)
+            return
         }
 
-        // 13. 开发启动参数：打开翻译面板并携带一段文本（验收用）
-        //
-        // 走真实的导航事件 + 上下文通道（与超级面板跳转同一条路），这样验收的就是
+        if arguments.contains("-showSettings") {
+            log.notice("命中启动参数 -showSettings，立即显示设置窗口")
+            paletteCoordinator.hide()
+            settingsWindowController.show()
+            return
+        }
+
+        if arguments.contains("-showPalette") {
+            log.notice("命中启动参数 -showPalette，立即显示面板")
+            paletteCoordinator.show()
+        }
+
+        if arguments.contains("-showSuperPanel") {
+            log.notice("命中启动参数 -showSuperPanel，立即显示超级面板")
+            superPanelController.show()
+        }
+
+        // 走真实的导航事件 + 上下文通道（与超级面板跳转同一条路），验收的就是
         // `.prefillFromPluginContext` 本身，而不是某条旁路。
-        if ProcessInfo.processInfo.arguments.contains("-showTranslator") {
+        if arguments.contains("-showTranslator") {
             log.notice("命中启动参数 -showTranslator，打开翻译面板并携带文本")
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(1.5))
@@ -331,13 +322,12 @@ final class AppCore {
                         context: ["query": "Hello, how are you today?"]))
             }
         }
-
-        log.notice("AppCore 启动完成")
     }
 
     /// 监听开发调试唤醒信号（分布式通知）
     ///
-    /// 用法：`notifyutil -p com.ixxxxoooo.quick.togglePalette`
+    /// 应用内用 `DistributedNotificationCenter` 发
+    /// `com.ixxxxoooo.quick.togglePalette` 即可切换面板（不要用 `notifyutil -p`）。
     private func observeDebugWakeSignals() {
         debugWakeObserver = DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("com.ixxxxoooo.quick.togglePalette"),
@@ -584,17 +574,6 @@ final class AppCore {
         }
     }
 
-    /// 注册一个插件，并恢复用户上次的启用状态
-    ///
-    /// 启用状态在这里从设置里读出来应用，而不是让插件自己去读：
-    /// 插件不认识设置存储，依赖方向保持单向。
-    ///
-    /// - Parameter plugin: 插件实例
-    private func register(_ plugin: any QuickPlugin) {
-        plugin.isEnabled = settingsStore.isPluginEnabled(type(of: plugin).id)
-        plugins.append(plugin)
-    }
-
     // MARK: - 事件总线连接
 
     /// 连接 EventBus 订阅
@@ -691,7 +670,7 @@ final class AppCore {
     /// 都由这里注入进去。鼠标监听也归宿主：它是一项系统能力，不该跟着某个插件生死。
     private func wireSuperPanel() {
         let controller = superPanelController
-        controller.captureSelection = { SelectionCapture.captureText() }
+        controller.captureSelection = { await SelectionCapture.captureText() }
         controller.canPaste = { [weak self] in self?.pasteService.canSynthesize ?? false }
         controller.paste = { [weak self] in _ = self?.pasteService.paste() }
         controller.recentItems = { [weak self] in self?.resolveRecentItems() ?? [] }
@@ -807,7 +786,7 @@ final class AppCore {
 
     // MARK: - 自定义命令存储辅助
 
-    private func loadCustomCommands() -> [CustomCommand] {
+    func loadCustomCommands() -> [CustomCommand] {
         guard let data = settingsStore.customCommandsData,
             let list = try? JSONDecoder().decode([CustomCommand].self, from: data)
         else {
@@ -816,7 +795,7 @@ final class AppCore {
         return list
     }
 
-    private func saveCustomCommands(_ commands: [CustomCommand]) {
+    func saveCustomCommands(_ commands: [CustomCommand]) {
         let data = try? JSONEncoder().encode(commands)
         settingsStore.setCustomCommandsData(data)
         cachedCustomCommands = nil
@@ -852,22 +831,17 @@ final class AppCore {
         plugin.perform(commandID: commandID)
     }
 
-    /// 按 id 前缀找到负责执行的插件
+    /// 按命令 id 找到负责执行的插件
     private func plugin(forCommand commandID: String) -> (any QuickPlugin)? {
-        if commandID.hasPrefix("launcher.") {
-            return plugins.first { type(of: $0).id == LauncherPlugin.id }
-        }
-        if commandID.hasPrefix("systemcontrol.") {
-            return plugins.first { type(of: $0).id == SystemControlPlugin.id }
-        }
         if let owner = plugins.first(where: { type(of: $0).commands.contains { $0.id == commandID } }) {
             return owner
         }
+        // 动态命令（如 launcher.app.*、launcher.shell.*）不在静态 `commands` 里，只能按插件 id 前缀回退。
         return plugins.first { commandID.hasPrefix(type(of: $0).id + ".") }
     }
 
     /// 用当前插件声明和开关重建静态命令快照，并按开关注册热键
-    private func rebuildCommandCatalog() {
+    func rebuildCommandCatalog() {
         var indexed: [IndexedCommand] = []
         for plugin in plugins where plugin.isEnabled {
             let meta = type(of: plugin)
@@ -891,548 +865,5 @@ final class AppCore {
                 || settingsStore.isCommandEnabled(commandID)
         }
         log.notice("命令目录已更新，静态命令 \(indexed.count, privacy: .public) 条")
-    }
-}
-
-// MARK: - 设置窗口的数据源
-
-/// `AppCore` 是设置界面的数据源
-///
-/// 设置界面在 `QuickUI`，而插件实例与系统能力（登录项、快捷键）只有组装层看得到，
-/// 所以由这里实现协议、把两边接起来。
-extension AppCore: SettingsDataSource {
-
-    // MARK: - 通用设置
-
-    var isLaunchAtLoginEnabled: Bool { launchAtLogin.isEnabled }
-
-    func setLaunchAtLogin(_ enabled: Bool) {
-        launchAtLogin.setEnabled(enabled)
-    }
-
-    var hotKeyDescription: String {
-        hotKeyService.binding(for: CommandID.togglePalette)?.displayString
-            ?? HotKeyService.defaultHotKeyDescription
-    }
-
-    var togglePaletteKeycaps: [String] {
-        hotKeyService.binding(for: CommandID.togglePalette)?.keycaps ?? ["⌥", "Space"]
-    }
-
-    func shortcutKeycaps(keyCode: Int, carbonModifiers: Int) -> [String] {
-        KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers).keycaps
-    }
-
-    func boundCommandBindings() -> [SettingsCommandBinding] {
-        hotKeyService.boundCommandIDs().compactMap { commandID in
-            guard commandID != CommandID.togglePalette else { return nil }
-            // 超级面板的快捷键在它自己的设置页里改，不在快捷键页重复出现
-            guard commandID != CommandID.superPanel else { return nil }
-            guard hotKeyService.binding(for: commandID) != nil else { return nil }
-            return describe(commandID: commandID)
-        }
-    }
-
-    func resolveKeyword(_ keyword: String) -> SettingsCommandBinding? {
-        var descriptors: [CommandDescriptor] = []
-        for plugin in plugins where plugin.isEnabled {
-            descriptors.append(contentsOf: type(of: plugin).commands)
-        }
-        for cmd in loadCustomCommands() where cmd.isEnabled {
-            var words = [cmd.name]
-            if let alias = cmd.alias, !alias.isEmpty { words.append(alias) }
-            descriptors.append(
-                CommandDescriptor(
-                    id: CommandID.shell(cmd.id.uuidString),
-                    pluginID: LauncherPlugin.id,
-                    pluginName: "终端命令",
-                    title: cmd.name,
-                    keywords: words,
-                    icon: "terminal"
-                )
-            )
-        }
-        if let hit = KeywordResolver.match(query: keyword, commands: descriptors) {
-            return describe(commandID: hit.id)
-        }
-
-        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        let apps = appIndex.apps.filter {
-            $0.name.compare(trimmed, options: .caseInsensitive) == .orderedSame
-        }
-        guard apps.count == 1, let app = apps.first else { return nil }
-        return describe(commandID: CommandID.launchApp(app.bundleID))
-    }
-
-    func retargetShortcut(from commandID: String, keyword: String) -> String? {
-        let current = describe(commandID: commandID)
-        if keyword.trimmingCharacters(in: .whitespacesAndNewlines)
-            .compare(current.wakeKeyword, options: .caseInsensitive) == .orderedSame
-        {
-            return nil
-        }
-        guard let shortcut = hotKeyService.binding(for: commandID) else {
-            return "这条绑定已经没有快捷键。"
-        }
-        guard let target = resolveKeyword(keyword) else {
-            return "没有唯一对上的关键字。写插件声明的唤醒词，或功能标题。"
-        }
-        guard target.id != commandID else { return nil }
-        hotKeyService.setBinding(nil, for: commandID, registerNow: false)
-        let registerNow = settingsStore.isCommandEnabled(target.id)
-        let outcome = hotKeyService.setBinding(shortcut, for: target.id, registerNow: registerNow)
-        if case .conflict = outcome {
-            let restore = commandID == CommandID.togglePalette || settingsStore.isCommandEnabled(commandID)
-            hotKeyService.setBinding(shortcut, for: commandID, registerNow: restore)
-            return "这个组合键已经绑给别的命令，没有改动。"
-        }
-        return nil
-    }
-
-    func pluginCommands(_ pluginID: String) -> [SettingsCommandBinding] {
-        if pluginID == LauncherPlugin.id {
-            return loadCustomCommands().map { describe(commandID: CommandID.shell($0.id.uuidString)) }
-        }
-        guard let plugin = plugins.first(where: { type(of: $0).id == pluginID }) else { return [] }
-        return type(of: plugin).commands.map { bindingRow(for: $0) }
-    }
-
-    /// 把命令 id 解析成设置行。应用和终端命令不在静态声明里，要单独认前缀
-    private func describe(commandID: String) -> SettingsCommandBinding {
-        if let command = plugins.lazy.compactMap({ plugin in
-            type(of: plugin).commands.first { $0.id == commandID }
-        }).first {
-            return bindingRow(for: command)
-        }
-        if commandID.hasPrefix(CommandID.launchAppPrefix) {
-            let bundleID = String(commandID.dropFirst(CommandID.launchAppPrefix.count))
-            let name = appIndex.apps.first { $0.bundleID == bundleID }?.name ?? bundleID
-            return SettingsCommandBinding(
-                id: commandID,
-                title: name,
-                pluginName: LauncherPlugin.name,
-                icon: "app",
-                isInvocationEnabled: settingsStore.isCommandEnabled(commandID),
-                keycaps: hotKeyService.binding(for: commandID)?.keycaps,
-                keywords: [name]
-            )
-        }
-        if commandID.hasPrefix(CommandID.shellPrefix) {
-            let raw = String(commandID.dropFirst(CommandID.shellPrefix.count))
-            let command = loadCustomCommands().first { $0.id.uuidString.lowercased() == raw }
-            let name = command?.name ?? raw
-            var words = [name]
-            if let alias = command?.alias, !alias.isEmpty { words.append(alias) }
-            return SettingsCommandBinding(
-                id: commandID,
-                title: name,
-                pluginName: "终端命令",
-                icon: "terminal",
-                isInvocationEnabled: settingsStore.isCommandEnabled(commandID),
-                keycaps: hotKeyService.binding(for: commandID)?.keycaps,
-                keywords: words
-            )
-        }
-        return SettingsCommandBinding(
-            id: commandID,
-            title: commandID,
-            pluginName: "命令",
-            icon: "command",
-            isInvocationEnabled: settingsStore.isCommandEnabled(commandID),
-            keycaps: hotKeyService.binding(for: commandID)?.keycaps,
-            keywords: [commandID]
-        )
-    }
-
-    func setCommandShortcut(keyCode: Int, carbonModifiers: Int, for commandID: String) -> Bool {
-        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        let registerNow =
-            commandID == CommandID.togglePalette
-            || commandID == CommandID.superPanel
-            || settingsStore.isCommandEnabled(commandID)
-        let outcome = hotKeyService.setBinding(shortcut, for: commandID, registerNow: registerNow)
-        if case .conflict = outcome { return false }
-        return true
-    }
-
-    func clearCommandShortcut(for commandID: String) {
-        if commandID == CommandID.togglePalette {
-            let defaultShortcut = KeyShortcut(carbonKeyCode: kVK_Space, carbonModifiers: optionKey)
-            hotKeyService.setBinding(defaultShortcut, for: commandID, registerNow: true)
-            return
-        }
-        hotKeyService.setBinding(nil, for: commandID, registerNow: false)
-    }
-
-    func isCommandEnabled(_ commandID: String) -> Bool {
-        if commandID == CommandID.togglePalette || commandID == CommandID.superPanel { return true }
-        return settingsStore.isCommandEnabled(commandID)
-    }
-
-    func setCommandEnabled(_ commandID: String, enabled: Bool) {
-        guard commandID != CommandID.togglePalette else { return }
-        settingsStore.setCommandEnabled(commandID, enabled: enabled)
-        rebuildCommandCatalog()
-    }
-
-    var searchSources: [SettingsSearchSource] {
-        pluginEntries.map { plugin in
-            SettingsSearchSource(
-                id: plugin.id,
-                title: plugin.name,
-                subtitle: "关闭后，主面板不再搜索这个插件的命令和结果。",
-                icon: plugin.icon,
-                isEnabled: settingsStore.isSearchSourceEnabled(plugin.id)
-            )
-        }
-    }
-
-    func setSearchSourceEnabled(_ pluginID: String, enabled: Bool) {
-        settingsStore.setSearchSourceEnabled(pluginID, enabled: enabled)
-        rebuildCommandCatalog()
-    }
-
-    private func bindingRow(for command: CommandDescriptor) -> SettingsCommandBinding {
-        SettingsCommandBinding(
-            id: command.id,
-            title: command.title,
-            subtitle: command.subtitle,
-            pluginName: command.pluginName,
-            icon: command.icon,
-            isInvocationEnabled: settingsStore.isCommandEnabled(command.id),
-            keycaps: hotKeyService.binding(for: command.id)?.keycaps,
-            keywords: command.keywords.isEmpty ? [command.title] : command.keywords
-        )
-    }
-
-    // MARK: - 启动器：应用与搜索范围
-
-    var searchScopes: [String] {
-        settingsStore.searchScopes(defaultScopes: SearchScopes.defaults)
-    }
-
-    func setSearchScopes(_ scopes: [String]) {
-        settingsStore.setSearchScopes(scopes)
-        Task {
-            await appIndex.refresh(scopes: scopes)
-            self.cachedIndexedApps = nil
-        }
-    }
-
-    func restoreDefaultSearchScopes() {
-        setSearchScopes(SearchScopes.defaults)
-    }
-
-    var indexedApplications: [SettingsAppItem] {
-        if let cached = cachedIndexedApps {
-            return cached
-        }
-        let items = appIndex.apps.map { entry in
-            let alias = settingsStore.alias(for: "app." + entry.bundleID)
-            return SettingsAppItem(
-                id: entry.id,
-                name: entry.name,
-                bundleID: entry.bundleID,
-                path: entry.path,
-                isSystemApp: entry.isSystemApp,
-                alias: alias
-            )
-        }
-        if !items.isEmpty {
-            cachedIndexedApps = items
-        }
-        return items
-    }
-
-    func appIcon(for path: String) -> NSImage? {
-        IconCache.shared.icon(forBundlePath: path)
-    }
-
-    func setAppAlias(_ alias: String?, for bundleID: String) {
-        settingsStore.setAlias(alias, for: "app." + bundleID)
-        cachedIndexedApps = nil
-    }
-
-    // MARK: - 启动器：系统操作
-
-    var systemActions: [SettingsSystemActionItem] {
-        SystemAction.allCases.map { action in
-            let alias = settingsStore.alias(for: "system." + action.rawValue)
-            let commandID = CommandID.systemAction(action.rawValue)
-            return SettingsSystemActionItem(
-                id: action.rawValue,
-                title: action.title,
-                description: action.description,
-                icon: action.icon,
-                alias: alias,
-                isEnabled: settingsStore.isCommandEnabled(commandID)
-            )
-        }
-    }
-
-    func setSystemActionAlias(_ alias: String?, for id: String) {
-        settingsStore.setAlias(alias, for: "system." + id)
-        rebuildCommandCatalog()
-    }
-
-    // MARK: - 启动器：Shell 与自定义命令
-
-    var isRunShellFallbackEnabled: Bool {
-        settingsStore.isRunShellFallbackEnabled
-    }
-
-    func setRunShellFallbackEnabled(_ enabled: Bool) {
-        settingsStore.setRunShellFallbackEnabled(enabled)
-    }
-
-    var customCommands: [SettingsCustomCommandItem] {
-        if let cached = cachedCustomCommands {
-            return cached
-        }
-        let list = loadCustomCommands()
-        let items = list.map { cmd in
-            return SettingsCustomCommandItem(
-                id: cmd.id,
-                name: cmd.name,
-                command: cmd.command,
-                isEnabled: cmd.isEnabled,
-                alias: cmd.alias,
-                workingDirectory: cmd.workingDirectory,
-                loadsShellEnvironment: cmd.loadsShellEnvironment
-            )
-        }
-        cachedCustomCommands = items
-        return items
-    }
-
-    func addCustomCommand(
-        name: String, command: String, workingDirectory: String?, loadsShellEnvironment: Bool
-    ) {
-        var list = loadCustomCommands()
-        let item = CustomCommand(
-            name: name,
-            command: command,
-            isEnabled: true,
-            loadsShellEnvironment: loadsShellEnvironment,
-            workingDirectory: workingDirectory
-        )
-        list.append(item)
-        saveCustomCommands(list)
-    }
-
-    func updateCustomCommand(
-        id: UUID,
-        name: String,
-        command: String,
-        isEnabled: Bool,
-        alias: String?,
-        workingDirectory: String?,
-        loadsShellEnvironment: Bool
-    ) {
-        var list = loadCustomCommands()
-        guard let index = list.firstIndex(where: { $0.id == id }) else { return }
-        list[index].name = name
-        list[index].command = command
-        list[index].isEnabled = isEnabled
-        list[index].alias = alias
-        list[index].workingDirectory = workingDirectory
-        list[index].loadsShellEnvironment = loadsShellEnvironment
-        saveCustomCommands(list)
-    }
-
-    func deleteCustomCommand(id: UUID) {
-        var list = loadCustomCommands()
-        list.removeAll { $0.id == id }
-        saveCustomCommands(list)
-        hotKeyService.setBinding(nil, for: CommandID.shell(id.uuidString), registerNow: false)
-    }
-
-    // MARK: - 功能插件设置
-
-    /// 系统里可选的键盘布局
-    var keyboardLayouts: [SettingsKeyboardLayout] {
-        keyboardLayoutService.availableLayouts().map {
-            SettingsKeyboardLayout(id: $0.id, name: $0.name)
-        }
-    }
-
-    var forcedKeyboardLayoutID: String? {
-        UserDefaults.standard.string(forKey: SettingsKey.paletteForceKeyboardLayout)
-    }
-
-    func setForcedKeyboardLayout(_ layoutID: String?) {
-        if let layoutID, !layoutID.isEmpty {
-            UserDefaults.standard.set(layoutID, forKey: SettingsKey.paletteForceKeyboardLayout)
-        } else {
-            UserDefaults.standard.removeObject(forKey: SettingsKey.paletteForceKeyboardLayout)
-        }
-    }
-
-    /// 全部插件，按显示名排序
-    ///
-    /// 排序而不是按注册顺序：注册顺序是代码结构，用户不该看到它。
-    var pluginEntries: [SettingsPlugin] {
-        plugins
-            .map {
-                SettingsPlugin(
-                    id: type(of: $0).id,
-                    name: type(of: $0).name,
-                    icon: type(of: $0).icon,
-                    description: type(of: $0).description,
-                    triggerWords: type(of: $0).triggerWords
-                )
-            }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-    }
-
-    func isPluginEnabled(_ id: String) -> Bool {
-        settingsStore.isPluginEnabled(id)
-    }
-
-    /// 切换插件启用状态
-    ///
-    /// 三件事必须一起做：持久化、改插件实例、启停插件。
-    /// 只改设置不启停，用户会看到开关变了但功能还在跑（或反过来）。
-    func setPluginEnabled(_ id: String, enabled: Bool) {
-        settingsStore.setPluginEnabled(id, enabled: enabled)
-
-        guard let plugin = plugins.first(where: { type(of: $0).id == id }) else {
-            log.warning("找不到插件 \(id, privacy: .public)，设置已保存但未同步实例")
-            return
-        }
-        guard plugin.isEnabled != enabled else { return }
-
-        plugin.isEnabled = enabled
-        if enabled {
-            plugin.activate()
-        } else {
-            plugin.deactivate()
-        }
-        log.notice("插件 \(id, privacy: .public) 已\(enabled ? "启用" : "停用", privacy: .public)并同步实例")
-        rebuildCommandCatalog()
-    }
-
-    func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView? {
-        guard let pluginID = tab.pluginID,
-            let plugin = plugins.first(where: { type(of: $0).id == pluginID })
-        else {
-            return nil
-        }
-        return plugin.makeSettingsView()
-    }
-
-    // MARK: - 超级面板
-
-    func makeSuperPanelSettingsView() -> AnyView {
-        AnyView(SuperPanelSettingsView(dataSource: self))
-    }
-
-    var superPanelShortcutKeycaps: [String]? {
-        hotKeyService.binding(for: CommandID.superPanel)?.keycaps
-    }
-
-    func setSuperPanelShortcut(keyCode: Int, carbonModifiers: Int) -> Bool {
-        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        let outcome = hotKeyService.setBinding(shortcut, for: CommandID.superPanel, registerNow: true)
-        if case .conflict = outcome { return false }
-        return true
-    }
-
-    func clearSuperPanelShortcut() {
-        hotKeyService.setBinding(nil, for: CommandID.superPanel, registerNow: false)
-    }
-
-    func clearRecentUsage() {
-        usageHistory?.removeAll()
-        log.notice("最近使用记录已清空")
-    }
-
-    // MARK: - AI 基座
-
-    func makeAISettingsView() -> AnyView {
-        AnyView(AISettingsPane(dataSource: self))
-    }
-
-    func testAIConnection() async -> SettingsAITestResult {
-        do {
-            let reply = try await AIService.testConnection()
-            let snippet = reply.isEmpty ? "OK" : String(reply.prefix(40))
-            log.notice("AI 连接测试成功")
-            return SettingsAITestResult(isSuccess: true, message: "连接成功：\(snippet)")
-        } catch {
-            log.warning("AI 连接测试失败：\(error.localizedDescription, privacy: .public)")
-            return SettingsAITestResult(
-                isSuccess: false, message: error.localizedDescription)
-        }
-    }
-
-    // MARK: - 权限
-
-    /// 权限状态
-    ///
-    /// `canRequest` 的判定依据是「系统还会不会再弹框」：
-    /// 未决定的可以申请，已经拒绝过的只能去系统设置里手动打开 ——
-    /// 这时给一个「申请」按钮是骗人的，点了什么都不会发生。
-    func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState {
-        switch permission {
-        case .accessibility:
-            let granted = permissionService.isAccessibilityGranted()
-            return SettingsPermissionState(isGranted: granted, canRequest: !granted)
-
-        case .screenCapture:
-            let granted = permissionService.isScreenCaptureGranted()
-            return SettingsPermissionState(isGranted: granted, canRequest: !granted)
-
-        case .location:
-            switch permissionService.locationStatus() {
-            case .granted:
-                return SettingsPermissionState(isGranted: true, canRequest: false)
-            case .notDetermined:
-                return SettingsPermissionState(isGranted: false, canRequest: true)
-            case .denied:
-                return SettingsPermissionState(isGranted: false, canRequest: false)
-            }
-        }
-    }
-
-    func requestPermission(_ permission: SettingsPermission) {
-        log.notice("用户从设置页申请权限 \(permission.rawValue, privacy: .public)")
-        switch permission {
-        case .accessibility:
-            permissionService.requestAccessibility()
-        case .screenCapture:
-            permissionService.requestScreenCapture()
-        case .location:
-            // 定位的申请入口只有天气插件那一处（用户主动查看天气时），
-            // 设置页只负责把状态显示出来、把人带到系统设置。
-            permissionService.openLocationSettings()
-        }
-    }
-
-    func openPermissionSettings(_ permission: SettingsPermission) {
-        switch permission {
-        case .accessibility:
-            permissionService.openAccessibilitySettings()
-        case .screenCapture:
-            permissionService.openScreenCaptureSettings()
-        case .location:
-            permissionService.openLocationSettings()
-        }
-    }
-
-    // MARK: - 关于
-
-    var versionDescription: String {
-        let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "—"
-        let build = info?["CFBundleVersion"] as? String ?? "—"
-        return "\(version) (\(build))"
-    }
-
-    var bundleIdentifier: String { Bundle.main.bundleIdentifier ?? "—" }
-
-    var panelGeometryDescription: String {
-        "\(Int(DesignTokens.Size.panelWidth)) × \(Int(DesignTokens.Size.panelHeight)) · 圆角 \(Int(DesignTokens.Radius.panel))"
     }
 }

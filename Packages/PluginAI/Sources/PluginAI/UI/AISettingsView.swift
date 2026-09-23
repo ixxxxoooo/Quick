@@ -1,4 +1,4 @@
-// ChatView.swift
+// AISettingsView.swift
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
@@ -10,7 +10,7 @@ import SwiftUI
 ///
 /// 管理各 Provider 的启用状态和窗口偏好。
 struct AISettingsView: View {
-    @AppStorage(PluginSettingKey.AI.defaultAlwaysOnTop) private var alwaysOnTop = false
+    @AppStorage(PluginSettingKey.AIPortal.defaultAlwaysOnTop) private var alwaysOnTop = false
 
     var body: some View {
         Form {
@@ -48,7 +48,8 @@ private struct AIProviderSettingsRow: View {
 
     init(provider: AIProvider) {
         self.provider = provider
-        self._isEnabled = AppStorage(wrappedValue: true, "ai.provider.\(provider.id).enabled")
+        self._isEnabled = AppStorage(
+            wrappedValue: true, PluginSettingKey.AIPortal.providerEnabled(provider.id))
     }
 
     var body: some View {

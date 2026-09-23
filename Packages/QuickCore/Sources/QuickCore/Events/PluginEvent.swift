@@ -155,12 +155,6 @@ public struct AppIndexRefreshedEvent: PluginEvent {
     public init() {}
 }
 
-/// 剪贴板内容发生了变化
-///
-/// 由剪贴板插件的监听器发出（它在轮询 `NSPasteboard.changeCount`，是唯一知道
-/// 「刚刚复制过」的地方）。宿主订阅它做两件事：面板打开时判断要不要把内容填进搜索框。
-///
-/// 只带时间点，不带内容：内容谁需要谁去读剪贴板，避免把可能很大的文本在事件里传一遍。
 /// 命令开关、别名或搜索来源变了
 ///
 /// 设置页和插件设置写完偏好后发它，宿主据此重建命令快照并重新注册热键。
@@ -171,14 +165,35 @@ public struct CommandCatalogChangedEvent: PluginEvent {
     public init() {}
 }
 
+/// 剪贴板内容发生了变化
+///
+/// 由剪贴板插件的监听器发出（它在轮询 `NSPasteboard.changeCount`，是唯一知道
+/// 「刚刚复制过」的地方）。宿主订阅它：面板打开时判断要不要把内容填进搜索框。
+///
+/// 只带时间点，不带内容：内容谁需要谁去读剪贴板，避免把可能很大的文本在事件里传一遍。
 public struct ClipboardChangedEvent: PluginEvent {
 
-    public static var name: String { "quick.clipboard.changed" }
+    public static let name = "quick.clipboard.changed"
 
     /// 变化发生的时刻
     public let at: Date
 
     public init(at: Date = Date()) {
         self.at = at
+    }
+}
+
+/// 主面板可见性变化
+///
+/// `hide()` 走 `orderOut`，SwiftUI 视图树不会销毁，`.task` / `onDisappear` 都收不到。
+/// 需要在隐藏后停后台工作（如系统监控采样）的插件订阅本事件，不要只靠视图生命周期。
+public struct PaletteVisibilityChangedEvent: PluginEvent {
+    public static let name = "quick.palette.visibility"
+
+    /// 面板当前是否可见
+    public let isVisible: Bool
+
+    public init(isVisible: Bool) {
+        self.isVisible = isVisible
     }
 }

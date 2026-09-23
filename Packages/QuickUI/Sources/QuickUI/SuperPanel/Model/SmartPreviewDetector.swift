@@ -267,6 +267,9 @@ public enum SmartPreviewDetector {
         let hasOp = text.contains(where: { "+-*/".contains($0) })
         guard hasOp else { return nil }
 
+        // 日期/时间也是「数字 + 分隔符」，字符集检查拦不住（2024-01-01 会被算成 2022）
+        guard !isDateOrTimeShape(text) else { return nil }
+
         guard let value = evaluateArithmetic(text) else { return nil }
         let result: String
         if value == floor(value), abs(value) < 1e15 {
@@ -275,6 +278,23 @@ public enum SmartPreviewDetector {
             result = String(format: "%g", value)
         }
         return .math(expr: text, result: result)
+    }
+
+    /// 整体形如日期/时间（yyyy-MM-dd、yyyy/MM/dd、HH:mm[:ss]、带前导零的分隔数字串）
+    private static func isDateOrTimeShape(_ text: String) -> Bool {
+        let patterns = [
+            #"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$"#,
+            #"^\d{1,2}:\d{2}(:\d{2})?$"#
+        ]
+        if patterns.contains(where: { text.range(of: $0, options: .regularExpression) != nil }) {
+            return true
+        }
+        // 纯「数字段 + 分隔符」且任一段带前导零（01-02-03）：没有人会写前导零的算式
+        let segments = text.split(whereSeparator: { "-/:".contains($0) })
+        guard segments.count >= 2,
+            segments.reduce(0, { $0 + $1.count }) + segments.count - 1 == text.count
+        else { return false }
+        return segments.contains { $0.count > 1 && $0.hasPrefix("0") }
     }
 
     /// 极简四则求值（中缀，支持括号），失败返回 nil

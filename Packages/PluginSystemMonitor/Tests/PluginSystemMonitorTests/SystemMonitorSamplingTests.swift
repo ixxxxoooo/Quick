@@ -111,6 +111,51 @@ struct SystemMonitorSamplingLoopTests {
         #expect(count == 1)
     }
 
+    @Test("stopSampling 会取消由 startSamplingIfNeeded 拉起的循环")
+    func stopSamplingCancelsManagedTask() async throws {
+        let scanner = ProcessScanner(defaults: try #require(Self.makeDefaults(interval: 1)))
+        let counter = TickCounter()
+
+        scanner.startSamplingIfNeeded(tick: { counter.tick() })
+        try? await Task.sleep(for: .milliseconds(300))
+        #expect(scanner.isSampling)
+        let mid = counter.count
+        #expect(mid >= 1)
+
+        scanner.stopSampling()
+        #expect(!scanner.isSampling)
+        try? await Task.sleep(for: .milliseconds(400))
+        #expect(counter.count == mid, "停止后不应再产生 tick，中点 \(mid) 最终 \(counter.count)")
+    }
+
+    @Test("面板隐藏停采样，视图仍挂着时再显示会恢复")
+    func panelVisibilityPausesAndResumes() async throws {
+        let scanner = ProcessScanner(defaults: try #require(Self.makeDefaults(interval: 1)))
+        let counter = TickCounter()
+
+        // 不走 noteViewAppeared，避免测试里拉起真实 ps/sysctl
+        scanner.setResumeWhenVisible(true)
+        scanner.startSamplingIfNeeded(tick: { counter.tick() })
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(scanner.isSampling)
+
+        scanner.notePanelVisibility(false)
+        #expect(!scanner.isSampling)
+        let paused = counter.count
+        try? await Task.sleep(for: .milliseconds(400))
+        #expect(counter.count == paused)
+
+        scanner.notePanelVisibility(true)
+        #expect(scanner.isSampling)
+        scanner.stopSampling()
+        scanner.noteViewDisappeared()
+        #expect(!scanner.isSampling)
+
+        // 视图已消失：再显示面板也不该空转
+        scanner.notePanelVisibility(true)
+        #expect(!scanner.isSampling)
+    }
+
     @Test("扫描器把设置里的间隔透出来")
     func scannerExposesTheConfiguredInterval() throws {
         let scanner = ProcessScanner(defaults: try #require(Self.makeDefaults(interval: 10)))

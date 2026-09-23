@@ -17,8 +17,8 @@ alwaysApply: false
 ```swift
 import QuickCore
 
-// 模块：分类用模块自己的 id
-private let log = QuickLog.module(ClipboardModule.id)
+// 插件：分类用插件自己的 id
+private let log = QuickLog.plugin(ClipboardPlugin.id)
 
 // 应用/框架层：固定区域
 private let log = QuickLog.palette   // 或 .app / .hotKey / .platform / .ui / .eventBus
@@ -40,15 +40,15 @@ private let log = QuickLog.palette   // 或 .app / .hotKey / .platform / .ui / .
 | --- | --- | --- |
 | `.debug` | 每次按键、每行渲染、循环内部 | 否 |
 | `.info` | 面板显隐耗时、搜索耗时等实时观察项 | 否 |
-| `.notice` | 应用启停、模块激活、快捷键注册结果、扫描结果、加载条数 | **是** |
+| `.notice` | 应用启停、插件激活、快捷键注册结果、扫描结果、加载条数 | **是** |
 | `.warning` | 可恢复的问题、降级 | 是 |
 | `.error` | 操作失败且用户会受影响 | 是 |
 | `.fault` | 不变量被打破 | 是 |
 
 ## 必须打日志的位置
 
-- 模块 `activate()` / `deactivate()`，含加载了多少条数据（`.notice`）。
-- 应用启动各阶段：模块注册完成数、事件总线接线条数（`.notice`）。
+- 插件 `activate()` / `deactivate()`，含加载了多少条数据（`.notice`）。
+- 应用启动各阶段：插件注册完成数、事件总线接线条数（`.notice`）。
 - 全局快捷键注册成功（含组合键）/ 失败（含 `OSStatus`）、注销。
 - 权限检查与申请的结果。
 - 外部命令 / 网络请求：发起、退出码或状态码、耗时。失败必须 `.error`。
@@ -69,6 +69,6 @@ private let log = QuickLog.palette   // 或 .app / .hotKey / .platform / .ui / .
 print("[Clipboard] 已保存")                       // ❌ 不进统一日志，生产环境抓不到
 do { try store.save() } catch {}                  // ❌ 空 catch，出事什么都看不到
 log.info("搜索关键词: \(query)")                   // ❌ 高频 + 关键词不该记录
-log.info("模块已激活")                             // ❌ 生命周期必须 notice 才能事后查
+log.info("插件已激活")                             // ❌ 生命周期必须 notice 才能事后查
 log.error("写入失败: \(error.localizedDescription, privacy: .public)")  // ✅
 ```

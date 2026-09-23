@@ -33,8 +33,8 @@ final class SuperPanelPanel: NSPanel {
         super.init(
             contentRect: NSRect(
                 x: 0, y: 0,
-                width: SuperPanelMetrics.width,
-                height: SuperPanelMetrics.initialHeight
+                width: DesignTokens.Size.superPanelWidth,
+                height: DesignTokens.Size.superPanelInitialHeight
             ),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -55,8 +55,10 @@ final class SuperPanelPanel: NSPanel {
         animationBehavior = .none
         isReleasedWhenClosed = false
         // 固定宽度，高度由内容量出来后由协调器设置
-        minSize = NSSize(width: SuperPanelMetrics.width, height: SuperPanelMetrics.minHeight)
-        maxSize = NSSize(width: SuperPanelMetrics.width, height: SuperPanelMetrics.maxHeight)
+        minSize = NSSize(
+            width: DesignTokens.Size.superPanelWidth, height: DesignTokens.Size.superPanelMinHeight)
+        maxSize = NSSize(
+            width: DesignTokens.Size.superPanelWidth, height: DesignTokens.Size.superPanelMaxHeight)
 
         let hosting = NSHostingView(rootView: rootView)
         hosting.wantsLayer = true

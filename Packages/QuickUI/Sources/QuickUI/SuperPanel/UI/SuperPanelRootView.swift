@@ -67,10 +67,10 @@ struct SuperPanelRootView: View {
                 }
             )
         }
-        .frame(width: SuperPanelMetrics.width)
+        .frame(width: DesignTokens.Size.superPanelWidth)
         .background(SuperPanelBackground(appearance: model.appearance))
         .clipShape(
-            RoundedRectangle(cornerRadius: SuperPanelMetrics.cornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.superPanel, style: .continuous)
         )
         .overlay(alignment: .topTrailing) {
             if let toast = model.toast {
@@ -148,7 +148,7 @@ struct SuperPanelBackground: View {
     @Environment(\.displayScale) private var displayScale
 
     private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: SuperPanelMetrics.cornerRadius, style: .continuous)
+        RoundedRectangle(cornerRadius: DesignTokens.Radius.superPanel, style: .continuous)
     }
 
     /// 不透明度映射到底色 alpha：文字始终不透明，只压背景

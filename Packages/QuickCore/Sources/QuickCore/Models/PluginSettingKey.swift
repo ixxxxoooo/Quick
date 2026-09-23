@@ -78,8 +78,10 @@ public enum PluginSettingKey {
         public static let showWeekNumber = "calendar.showWeekNumber"
     }
 
-    /// AI 聚合
-    public enum AI {
+    /// AI 聚合插件的 UI 行为（置顶、Provider 开关）。键前缀 `ai.*`。
+    ///
+    /// 与 `SettingsKey.AI`（`quick.ai.*`）不同：后者是宿主 AI 基座，供 `AIService` 读 API/模型等。
+    public enum AIPortal {
         public static let defaultAlwaysOnTop = "ai.defaultAlwaysOnTop"
         /// 单个 Provider 的开关
         public static func providerEnabled(_ providerID: String) -> String {

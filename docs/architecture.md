@@ -87,10 +87,10 @@
 ### 新增状态的规矩
 
 - 新的长生命周期状态**挂到 `AppCore` 上**，在 `start()` 里接线。
-- **绝不**另起一个 `static let shared` 单例来放状态。目前只有两个有意的单例：
-  `AppCore.shared` 和 `EventBus.shared`，不要加第三个。跨窗口的控件（例如
-  `IconCache`、`ShortcutRecorderCoordinator`）也是单例，但它们是无状态的工具，
-  不是状态的所有者 —— 新增长生命周期状态时不要照着它们抄。
+- **绝不**另起一个 `static let shared` 单例来放状态。长生命周期状态的所有者只有
+  `AppCore.shared` 与事件总线 `EventBus.shared`。另有少量**工具**单例：
+  `IconCache.shared`（宿主经 `AppCore.iconCache` 引用同一实例）、`KeychainStore.shared`
+ （密钥读写；生产路径应注入 `SecretStoring`）。不要加第四个「状态单例」。
 - 视图**不要**直接拿 `AppCore`。视图通过 `@Environment` 拿协调器，或通过构造参数注入
   依赖（例如 `LauncherPlugin(appIndex:)`）。
 
@@ -125,9 +125,28 @@ public protocol QuickPlugin: AnyObject, Sendable {
 `defaultItems` 默认取「触发词裸查询的第一条」。**只实现你需要的那些**，
 不要写空实现占位。
 
-主面板搜索不再对每个插件调用 `searchItems`。静态命令进内存索引，在后台线程打分；
-只有 `accepts` 返回 true 的插件才会跑 `dynamicSearch`。空查询每个插件至多一条
-`showsWhenQueryEmpty` 的命令，再加上最近使用。命令 id 和插件 id 一样，发布后不能改。
+### 主面板搜索：双轨
+
+[`PaletteSearchEngine`](../Packages/QuickUI/Sources/QuickUI/Panel/PaletteSearchEngine.swift)
+负责主面板聚合搜索；协调器只注入插件列表、静态命令快照与执行回调。
+
+**主路径（新插件必须走这条）**
+
+- 静态：`static var commands` → 启动时快照为 `CommandIndex`，按键时在后台线程打分。
+- 动态：实现 `accepts(query:)` 闸门 + `dynamicSearch(query:)`，只有闸门为真时才并发调用，
+  单插件超时 2 秒即放弃等待。
+- 执行：命中静态命令走 `perform(commandID:)`（与快捷键同 id）。
+
+**Legacy 路径（逐步废弃，新插件不要实现）**
+
+- `searchItems(query:)` —— **主面板聚合搜索已不再调用**；仍留在协议里供旧插件与
+  `defaultItems` 默认实现内部使用。
+- `defaultItems()` —— **仅供首屏遗留用途**（空查询时每个插件至多贡献一条入口）；
+  新插件应靠 `commands` 里 `showsWhenQueryEmpty` 的静态命令出现在首屏，不要覆盖
+  `defaultItems` 去调 `searchItems`。
+
+空查询还会在聚合排序后用 `UsageHistory` 做 `PaletteSearchEngine.promotingRecents`（最近 12 条）。
+命令 id 和插件 id 一样，发布后不能改。
 
 快捷键只有一张表，键是 `hotkey.command.<命令 id>`。一条组合键只对应一个命令。
 命令关掉后绑定还在，但 Carbon 不注册，搜索索引里也没有它。设置侧边栏上面是
@@ -147,16 +166,15 @@ public protocol QuickPlugin: AnyObject, Sendable {
 
 - **`static var id` 一旦发布就不能改。** 它是 `SettingsKey.pluginEnabled(id)` 的键，
   改了等于用户设置丢失。
-- **`searchItems` 必须是纯查询。** 不要在里面激活插件、写盘、发网络请求、改 `isEnabled`。
-  它可能在每次按键时被调用（虽然并发，但不是免费的）。要缓存就在 `activate()` 里预热。
-- **`defaultItems()` 在首屏每条最多出一次，而且必须走 `searchItems`。** 空查询时
-  `searchItems(query: "")` 会被插件自己的触发词闸门挡掉、返回空数组，所以首屏不能靠它 ——
-  这就是 `defaultItems()` 存在的原因。默认实现「用触发词当查询词、取第一条」，
-  于是每个插件都自动有一个入口，而不会把首屏铺成插件自己的列表页。走同一条搜索路径的
-  意义在于：首屏那条和搜到的那条是同一份代码产出的，标题、图标、动作永远一致。
-  `LauncherPlugin` 覆盖它返回空 —— 它贡献的应用列表本身就是首屏主体。
-- **`searchItems` 必须尊重防抖与取消。** 调用方（`PaletteCoordinator`）只在防抖后调用，
-  但插件内部若有昂贵准备，要检查 `Task.isCancelled`。
+- **新插件不要实现 `searchItems` / `defaultItems` 作为主搜索路径。** 主搜索走
+  `commands` + `dynamicSearch`（见上文双轨）；遗留 API 长期将从协议移除。
+- **`searchItems`（Legacy）必须是纯查询。** 不要在里面激活插件、写盘、发网络请求、改
+  `isEnabled`。仅在被 `defaultItems` 等遗留路径调用时才会跑；要缓存就在 `activate()` 里预热。
+- **`defaultItems()`（Legacy）** 在首屏每条最多出一次；新插件用静态命令的
+  `showsWhenQueryEmpty` 代替。仍覆盖它的插件：默认实现会经 `searchItems` 取触发词第一条；
+  `LauncherPlugin` 覆盖返回空 —— 应用列表本身就是首屏主体。
+- **`dynamicSearch` 必须尊重取消。** 调用方（`PaletteSearchEngine`）并发且带超时，
+  插件内部若有昂贵准备，要检查 `Task.isCancelled`。
 - **`makeView()` 返回的视图不要持有 `AppCore`。** 需要能力就通过插件构造器注入。
 - **`activate()` / `deactivate()` 必须成对且幂等。** 插件可能被反复启停。
 - **`deactivate()` 里要落盘。** 未保存的运行时状态在退出时就丢了。
@@ -169,7 +187,7 @@ public protocol QuickPlugin: AnyObject, Sendable {
 2. 在 `AppCore.registerPlugins()` 里 `plugins.append(...)`。
 3. 在 `project.yml` 的 `packages:` 加路径、在 `Quick` target 的 `dependencies:` 加
    `- package: Plugin<Name>`，然后 `xcodegen generate`。
-4. 在 `docs/features/<id>.md` 写下这个插件的不变量。
+4. 在 `docs/features.md` 写下这个插件的不变量。
 
 第 2 步是唯一实例化点。如果你发现自己在别处 `new` 一个插件，那就是错了。
 
@@ -258,7 +276,7 @@ public struct SearchableItem: Identifiable, Sendable {
 - `withRelevance(_:)` 复制一份、换掉相关度，用于「同一条目在不同场景下权重不同」。
   它只改这一个字段，`id` / 图标 / 动作原样带过去 —— 换权重不该换掉条目本身。
 - **空查询（首屏）的顺序由协调器最后再排一次。** 聚合、去重、按相关度排序之后，
-  协调器把「最近使用过的」条目提到最前（`PaletteCoordinator.promotingRecents`，
+  协调器把「最近使用过的」条目提到最前（`PaletteSearchEngine.promotingRecents`，
   取最近 12 条），其余保持原顺序。首屏回答的是「我刚用过什么」，不是「谁的分数高」；
   **非空查询完全不参与这次重排** —— 那时相关度才是用户要的，按时间插队只会打乱搜索结果。
 - `action` 在按下回车/点击时于主 actor 执行。它应该**只发事件或调用已注入的依赖**，

@@ -17,20 +17,58 @@ enum URLCodecLogic {
         case malformedPercentSequence
     }
 
+    /// 编码选项
+    ///
+    /// 视图从 `@AppStorage`（`urlCodec.encodeSpacesAsPluses` / `urlCodec.encodeFullUrl`，
+    /// 与设置页同一个键）读出来后传进来，逻辑层不碰 `UserDefaults`。
+    struct Options: Equatable, Sendable {
+        /// 空格编成 `+`（application/x-www-form-urlencoded 约定）而不是 `%20`
+        var encodesSpacesAsPluses = false
+        /// 完整 URL 模式：保留 `://` 等结构分隔符，只编非保留字符
+        var encodesFullURL = false
+
+        /// 默认行为：查询串组件编码
+        static let `default` = Options()
+    }
+
+    /// 查询组件模式：从 `.urlQueryAllowed` 去掉结构分隔符，仍保留 `&` `=` 方便粘贴进查询串
+    ///
+    /// Foundation 的 `.urlQueryAllowed` 仍放行冒号与斜杠，拿来当「组件编码」会让
+    /// `https://…` 原样通过，和「完整 URL 模式」分不出差别。
+    private static let queryComponentAllowed: CharacterSet = {
+        var set = CharacterSet.urlQueryAllowed
+        set.remove(charactersIn: ":/?#[]@")
+        return set
+    }()
+
+    /// 完整 URL 模式的放行字符集：在查询组件基础上补回结构分隔符
+    private static let fullURLAllowed: CharacterSet = {
+        var set = queryComponentAllowed
+        set.insert(charactersIn: ":/?#[]@")
+        return set
+    }()
+
     /// 百分号编码
     ///
-    /// 沿用 `.urlQueryAllowed`：空格编成 `%20` 而不是 `+`，
-    /// 且 `&` `=` 等分隔符保持原样，粘贴进查询串不会被二次转义。
-    static func encode(_ input: String) -> String {
-        input.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? input
+    /// 默认编码 `:` `/` 等结构字符，但 `&` `=` 保持原样以便粘贴进查询串。
+    /// 打开 `encodesFullURL` 后保留 URL 结构，只编非保留字符。
+    static func encode(_ input: String, options: Options = .default) -> String {
+        let allowed = options.encodesFullURL ? fullURLAllowed : queryComponentAllowed
+        let encoded = input.addingPercentEncoding(withAllowedCharacters: allowed) ?? input
+        guard options.encodesSpacesAsPluses else { return encoded }
+        return encoded.replacingOccurrences(of: "%20", with: "+")
     }
 
     /// 百分号解码
     ///
     /// 非法序列返回错误而不是回退原文：回退会让界面显示「解码完成」却原样输出，
     /// 用户无从发现输入本身有问题，也会把非法输入当成解码结果复制走。
-    static func decode(_ input: String) throws -> String {
-        guard let decoded = input.removingPercentEncoding else {
+    static func decode(_ input: String, options: Options = .default) throws -> String {
+        // 编码侧把空格写成了 +，解码侧就得认回来，否则往返不一致
+        let normalized =
+            options.encodesSpacesAsPluses
+            ? input.replacingOccurrences(of: "+", with: " ") : input
+        guard let decoded = normalized.removingPercentEncoding else {
             throw DecodeError.malformedPercentSequence
         }
         return decoded

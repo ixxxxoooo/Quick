@@ -20,7 +20,7 @@ macOS 26+、Swift 6 语言模式，没有兼容下限要守。
 
 ## 并发（严格并发 complete，数据竞争是编译错误）
 
-- UI 相关类型一律 `@MainActor`；`QuickModule` 协议本身已是 `@MainActor`。
+- UI 相关类型一律 `@MainActor`；`QuickPlugin` 协议本身已是 `@MainActor`。
 - **不要新增 actor。** 本项目只有「主 actor」与「无隔离」两档。重活、IO 用
   `nonisolated` 函数 + `Task.detached`。
 - **不要用 `DispatchQueue`**，尤其不要 `DispatchQueue.main.async` 来回切；用
@@ -90,10 +90,11 @@ macOS 26+、Swift 6 语言模式，没有兼容下限要守。
 
 ## 所有权红线
 
-- `AppCore` 是唯一所有者，新状态挂它上面、在 `start()` 里接线。**不要新增单例**
-  （现有只有 `AppCore.shared` 与 `EventBus.shared`）。
-- 模块只在 `AppCore.registerModules()` 里实例化，模块**不自注册**。
-- 模块之间只通过 `EventBus` 通信，**永不互相 import 或持有引用**。
+- `AppCore` 是唯一所有者，新状态挂它上面、在 `start()` 里接线。**不要新增状态单例**
+  （允许的工具单例：`AppCore.shared`、`EventBus.shared`、`IconCache.shared`、
+  `KeychainStore.shared`）。
+- 插件只在 `AppCore.registerPlugins()` 里实例化，插件**不自注册**。
+- 插件之间只通过 `EventBus` 通信，**永不互相 import 或持有引用**。
 - 订阅要保存 `EventSubscription`，丢弃返回值等于随 ARC 一起取消订阅。
 - `Model/` 下的文件**不允许 `import AppKit` 或 `import SwiftUI`**，环境事实一律注入。
 - **`project.yml` 是工程唯一真相**：改完必须 `xcodegen generate` 并一起提交，

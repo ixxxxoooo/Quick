@@ -1,6 +1,6 @@
 ---
 description: UI 与设计系统规范：面板几何、DesignTokens、组件复用
-globs: Packages/QuickUI/**,Packages/Module*/Sources/**/UI/**,Packages/Module*/Sources/**/*View.swift,Packages/Module*/Sources/**/*Module.swift
+globs: Packages/QuickUI/**,Packages/Plugin*/Sources/**/UI/**,Packages/Plugin*/Sources/**/*View.swift,Packages/Plugin*/Sources/**/*Plugin.swift
 alwaysApply: false
 ---
 
@@ -34,15 +34,18 @@ withAnimation(.easeOut(duration: DesignTokens.Duration.hover)) { ... }
 
 ## 面板几何（改动前必须确认视觉无回归）
 
-| 令牌 | 值 |
-| --- | --- |
-| `Size.panelWidth` / `panelHeight` | **750 × 475**（与 Tinycast 一致） |
-| `Radius.panel` | **26**（「系统组件感」的主要来源，不要随意调小） |
-| `Size.headerHeight` / `headerIconSlot` / `headerPadding` | 44 / 22 / 10 |
-| `Size.bottomBarHeight` / `barButtonHeight` | 52 / 28 |
-| `Size.rowIcon` / `keyCap` / `hairline` | 24 / 18 / 1 |
-| `Size.paletteTopMarginFraction` | 0.18 |
-| `Radius.row` / `keyCap` / `barControl` | 10 / 6 / 8 |
+基础令牌是 Tinycast 对齐的 750×475 / 圆角 26；当前默认缩放 `panelScale = 1.1`：
+
+| 令牌 | 基础值 | 当前默认（×1.1） |
+| --- | --- | --- |
+| `Size.panelWidth` / `panelHeight` | 750 × 475 | **825 × 523** |
+| `Radius.panel` | 26 | **29** |
+| `Size.headerHeight` / `headerIconSlot` / `headerPadding` | 44 / 22 / 10 | 随缩放 |
+| `Size.bottomBarHeight` / `barButtonHeight` | 52 / 28 | 随缩放 |
+| `Size.rowIcon` / `keyCap` / `hairline` | 24 / 18 / 1 | 随缩放 |
+| `Size.paletteTopMarginFraction` | 0.18 | 不缩放 |
+| `Radius.row` / `keyCap` / `barControl` | 10 / 6 / 8 | 随缩放 |
+| 超级面板 `Size.superPanelWidth` / `Radius.superPanel` | 390 / 16 | **不缩放**（Fasty 对齐） |
 
 面板是三段式：**header（搜索栏，高度恒定，输入时不许位移）/ content（弹性）/
 bottom bar（快捷键教学位）**。
@@ -69,7 +72,7 @@ bottom bar（快捷键教学位）**。
   不要堆叠多层玻璃。
 - **组件复用**：面板内一切复用 `QuickUI` 的组件（`SearchFieldView`、`ResultListView`、
   `KeyCapChip`、`BarButton`、`SectionHeader`、`PaletteBackground`）。
-  模块自己的视图**只管内容区**，不要设外层尺寸、圆角、背景 —— 外壳负责。
+  插件自己的视图**只管内容区**，不要设外层尺寸、圆角、背景 —— 外壳负责。
   **不要复制粘贴组件**，需要变体就给现有组件加参数或样式枚举。
 - **不要用 `NSAlert`**（与无边框玻璃面板的视觉语言冲突）。确认用自定义对话框面板，
   轻量反馈走 `HUDController`（`HUDTone`：`.success` / `.info` / `.warning` / `.danger`）。

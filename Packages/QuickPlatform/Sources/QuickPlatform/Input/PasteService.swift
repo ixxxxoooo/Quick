@@ -5,6 +5,7 @@
 import AppKit
 import ApplicationServices
 import CoreGraphics
+import QuickCore
 
 /// 合成系统粘贴（⌘V）
 ///
@@ -16,6 +17,7 @@ public final class PasteService {
 
     /// kVK_ANSI_V：字母 V 的虚拟键码
     private static let vKeyCode: CGKeyCode = 0x09
+    private let log = QuickLog.platform
 
     public init() {}
 
@@ -27,13 +29,17 @@ public final class PasteService {
     /// - Returns: `false` 表示没有辅助功能权限，事件没有发出；调用方应退化成「只完成复制」。
     @discardableResult
     public func paste() -> Bool {
-        guard canSynthesize else { return false }
+        guard canSynthesize else {
+            log.warning("合成粘贴失败：未授予辅助功能权限")
+            return false
+        }
 
         // `.combinedSessionState` 跟随当前登录会话；用 HID 事件源投递才能被前台应用当成真实按键
         guard let source = CGEventSource(stateID: .combinedSessionState),
             let keyDown = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: true),
             let keyUp = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: false)
         else {
+            log.error("合成粘贴失败：无法创建 ⌘V 键盘事件")
             return false
         }
 

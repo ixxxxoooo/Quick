@@ -46,6 +46,25 @@ struct SmartPreviewDetectorTests {
             })
     }
 
+    @Test("带括号的算式")
+    func detectsMathWithParentheses() {
+        let previews = SmartPreviewDetector.detect("(1+2)*3")
+        #expect(
+            previews.contains {
+                if case .math(_, let result) = $0 { return result == "9" } else { return false }
+            })
+    }
+
+    @Test("日期不当算式")
+    func datesAreNotMath() {
+        for text in ["2024-01-01", "2024/01/01", "09:30:00", "01-02-03"] {
+            let previews = SmartPreviewDetector.detect(text)
+            #expect(
+                !previews.contains { if case .math = $0 { return true } else { return false } },
+                "\(text) 被误识别成算式")
+        }
+    }
+
     @Test("SQL：SELECT ... WHERE")
     func detectsSelectWhere() {
         let previews = SmartPreviewDetector.detect(

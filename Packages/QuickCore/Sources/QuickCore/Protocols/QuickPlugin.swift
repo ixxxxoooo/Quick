@@ -32,6 +32,9 @@ public protocol QuickPlugin: AnyObject, Sendable {
     static var triggerWords: [String] { get }
 
     /// 插件是否已启用
+    ///
+    /// **协议不提供默认实现**：开关状态必须真实落地（默认值曾是一个静默吞掉写入的
+    /// 空 setter —— 插件忘了实现时，用户在设置里关掉插件、重启后又回来了）。
     var isEnabled: Bool { get set }
 
     /// 面板模式下是否在头部保留一个「插件内搜索」框
@@ -42,7 +45,11 @@ public protocol QuickPlugin: AnyObject, Sendable {
     /// **默认不聚焦**，按 ⌘F 才把焦点放进去。
     static var supportsPanelSearch: Bool { get }
 
-    /// 返回该插件能响应的搜索结果
+    /// **Legacy：** 旧版逐插件搜索入口
+    ///
+    /// 主面板聚合搜索（`PaletteSearchEngine`）**不再调用**此方法。
+    /// 新插件应走 `commands` + `accepts`/`dynamicSearch`；仅保留供尚未迁移的插件与
+    /// `defaultItems` 默认实现内部使用。
     /// - Parameter query: 用户在搜索框中输入的文本
     /// - Returns: 匹配的搜索结果项
     func searchItems(query: String) async -> [SearchableItem]
@@ -59,13 +66,13 @@ public protocol QuickPlugin: AnyObject, Sendable {
     /// 插件停用（应用退出或插件被禁用时调用）
     func deactivate()
 
-    /// 首屏（空查询）时想展示的条目
+    /// **Legacy：** 首屏（空查询）时想展示的条目
     ///
-    /// 首屏不该只有应用 —— 用户也想直接看到插件的命令。默认实现取「触发词裸查询的第一条」，
-    /// 于是绝大多数插件（每个开发者工具、翻译、OCR……）自动获得一个入口，不必各写一遍。
+    /// 主搜索首屏优先靠 `commands` 里 `showsWhenQueryEmpty` 的静态命令。
+    /// 此方法仅供尚未迁移的插件；新插件不要覆盖它。
     ///
-    /// **只取一条**是有意的：一个插件在首屏铺开一屏结果会把它变成插件自己的列表页。
-    /// 想给首屏一组精选条目的插件可以覆盖它。
+    /// 默认实现取「触发词裸查询经 `searchItems` 的第一条」—— 只取一条是有意的，
+    /// 避免首屏变成插件自己的列表页。
     func defaultItems() async -> [SearchableItem]
 
     /// 插件自己声明的功能命令（不含「打开本插件」）
@@ -103,18 +110,15 @@ public protocol QuickPlugin: AnyObject, Sendable {
     ///
     /// 表结构归插件自己所有：宿主不预先建任何插件表，也不读插件表。迁移 id 一旦
     /// 发布就不能改，它是「这段 DDL 跑过没有」的唯一判据。
+    ///
+    /// **DDL 必须幂等**（`CREATE TABLE IF NOT EXISTS` 等）：迁移中途失败时只回滚
+    /// 账本写入、不回滚已执行的 DDL，下次启动会重跑这段迁移。
     static var storageMigrations: [SQLiteMigration] { get }
 }
 
 // MARK: - 默认实现
 
 public extension QuickPlugin {
-
-    /// 默认启用
-    var isEnabled: Bool {
-        get { true }
-        set {}
-    }
 
     /// 默认无触发词
     static var triggerWords: [String] { [] }
@@ -128,7 +132,7 @@ public extension QuickPlugin {
     /// 默认无设置视图
     func makeSettingsView() -> AnyView? { nil }
 
-    /// 默认空搜索结果
+    /// Legacy：默认空搜索结果（主面板不再聚合调用）
     func searchItems(query: String) async -> [SearchableItem] { [] }
 
     /// 默认无操作
@@ -173,16 +177,7 @@ public extension QuickPlugin {
         EventBus.shared.post(NavigateEvent(pluginID: Self.id))
     }
 
-    /// 默认取触发词裸查询的第一条
-    ///
-    /// 走插件自己的搜索路径而不是另造一份数据，所以首屏那条和搜索到的那条永远一致
-    /// （标题、图标、动作都同一份代码产出）。启动器插件会覆盖它 —— 它提供的应用列表
-    /// 是首屏的主体，不该再额外贡献一条。
-    ///
-    /// **相关度保持插件自己的取值**（通常 0.6~0.8，高于启动器应用条目的 0.5），
-    /// 于是首屏顺序是「最近使用 → 插件命令 → 应用」：命令是启动器真正要做的事，
-    /// 应用是一长串可以在搜索框里打名字的尾巴。这与 Fasty 的首屏一致
-    /// （默认插件条目 + 最近使用），也避免了「首屏全是应用、一条命令都看不到」。
+    /// Legacy：默认取触发词经 `searchItems` 的第一条（新插件应用静态 `showsWhenQueryEmpty` 命令）
     func defaultItems() async -> [SearchableItem] {
         guard let trigger = Self.triggerWords.first else { return [] }
         return Array(await searchItems(query: trigger).prefix(1))

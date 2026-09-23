@@ -4,6 +4,7 @@
 
 import AppKit
 import QuickCore
+import QuickPlatform
 import SwiftUI
 
 /// 超级面板的宿主组件
@@ -11,8 +12,8 @@ import SwiftUI
 /// 与 `PaletteCoordinator` 平级：它拥有一个独立浮窗，在鼠标处弹出，识别选区/剪贴板后
 /// 给出即时动作或工作台。它**不是插件** —— 不进主面板搜索、不进插件列表，设置也自成一处。
 ///
-/// 系统能力（抓选区、合成粘贴、最近使用解析）由 `AppCore` 注入：`QuickUI` 不认识
-/// `QuickPlatform`，也不认识插件，依赖方向保持单向。
+/// 抓选区、合成粘贴、最近使用解析等系统能力由 `AppCore` 注入；剪贴板全类型快照共用
+/// `QuickPlatform.PasteboardSnapshot`。`QuickUI` 不认识插件。
 @MainActor
 public final class SuperPanelController {
 
@@ -25,7 +26,7 @@ public final class SuperPanelController {
     // MARK: - 宿主注入的能力
 
     /// 抓当前选区文本（合成 ⌘C）。可能返回 nil（无权限 / 无选区）
-    public var captureSelection: (@Sendable () -> String?)?
+    public var captureSelection: (@Sendable () async -> String?)?
     /// 是否具备合成粘贴的能力（辅助功能权限）
     public var canPaste: (() -> Bool)?
     /// 合成一次 ⌘V
@@ -67,6 +68,8 @@ public final class SuperPanelController {
     private static let focusProtection: TimeInterval = 0.35
     /// 交还焦点后合成 ⌘V 的等待
     private static let pasteSettleDelay = Duration.milliseconds(160)
+    /// 合成 ⌘V 之后、恢复用户剪贴板之前的等待（目标应用收到事件后才异步读剪贴板）
+    private static let clipboardRestoreDelay = Duration.milliseconds(200)
 
     public init() {}
 
@@ -101,7 +104,7 @@ public final class SuperPanelController {
         let visibleFrame = screen.visibleFrame
         targetVisibleFrame = visibleFrame
         let initialSize = CGSize(
-            width: SuperPanelMetrics.width, height: SuperPanelMetrics.initialHeight)
+            width: DesignTokens.Size.superPanelWidth, height: DesignTokens.Size.superPanelInitialHeight)
         let placement = SuperPanelPlacement.resolve(
             cursor: cursor, panelSize: initialSize, visibleFrame: visibleFrame)
         self.placement = placement
@@ -131,7 +134,7 @@ public final class SuperPanelController {
         let capture = captureSelection
         Task.detached(priority: .userInitiated) {
             let clipboard = NSPasteboard.general.string(forType: .string) ?? ""
-            let selected = capture?()
+            let selected = await capture?()
             let source = (selected?.isEmpty == false ? selected : nil) ?? clipboard
             let previews = SmartPreviewDetector.detect(source)
             await MainActor.run { [weak self, weak panel] in
@@ -231,8 +234,10 @@ public final class SuperPanelController {
             contentHeight > 0
         else { return }
 
-        let height = min(max(contentHeight, SuperPanelMetrics.minHeight), SuperPanelMetrics.maxHeight)
-        let size = CGSize(width: SuperPanelMetrics.width, height: height)
+        let height = min(
+            max(contentHeight, DesignTokens.Size.superPanelMinHeight),
+            DesignTokens.Size.superPanelMaxHeight)
+        let size = CGSize(width: DesignTokens.Size.superPanelWidth, height: height)
         if abs(panel.frame.height - height) > 1 {
             panel.setContentSize(size)
             panel.setFrameOrigin(placement.origin(for: size, visibleFrame: visibleFrame))
@@ -270,12 +275,16 @@ public final class SuperPanelController {
             return
         }
         let board = NSPasteboard.general
+        // 备份要抢在清空之前：替换只是借剪贴板递一次文本，完事得把用户原内容还回去
+        let snapshot = PasteboardSnapshot.capture(board)
         board.clearContents()
         board.setString(text, forType: .string)
         target?.activate()
         Task { @MainActor in
             try? await Task.sleep(for: Self.pasteSettleDelay)
             paste()
+            try? await Task.sleep(for: Self.clipboardRestoreDelay)
+            snapshot.restore(onto: board)
         }
         log.notice("超级面板替换原文，长度 \(text.count)")
     }

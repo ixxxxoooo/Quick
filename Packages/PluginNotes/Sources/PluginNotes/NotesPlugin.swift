@@ -106,7 +106,10 @@ public final class NotesPlugin: QuickPlugin {
                 subtitle: note.preview,
                 icon: "note.text",
                 relevance: 0.5,
-                action: {}
+                action: {
+                    EventBus.shared.post(
+                        NavigateEvent(pluginID: Self.id, context: ["noteID": note.id.uuidString]))
+                }
             )
         }
     }

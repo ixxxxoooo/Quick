@@ -70,7 +70,7 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 | 11 个开发者工具 | 各自的纯逻辑（编解码、格式化、diff、字数统计…） | 有覆盖 |
 | 其余插件 | 插件契约 + 从服务里抽出来的纯逻辑 | 有覆盖 |
 
-**29 个包全部有测试目标，由 `Scripts/run-tests.sh` 强制**：少一个包就红。
+**28 个包全部有测试目标，由 `Scripts/run-tests.sh` 强制**：少一个包就红。
 规则是「每个包都要有测试」而不是「想测才测」—— 系统依赖重不等于没有可测的东西，
 见下面一节。
 

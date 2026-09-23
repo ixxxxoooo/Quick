@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import QuickCore
 import Testing
 
 @testable import PluginCalendar
@@ -203,5 +204,21 @@ struct CalendarPluginTests {
         #expect(await plugin.searchItems(query: "天气").isEmpty)
         #expect(await plugin.searchItems(query: "clipboard").isEmpty)
         #expect(await plugin.searchItems(query: "").isEmpty)
+    }
+
+    /// 无权限时走「今日无日程」占位项，回车仍应跳进日历面板
+    @Test("今日占位项执行 action 会发布 NavigateEvent")
+    func todayPlaceholderNavigatesToPlugin() async throws {
+        let plugin = CalendarPlugin()
+        let item = try #require(await plugin.searchItems(query: "日历").first)
+
+        var navigated: [NavigateEvent] = []
+        let subscription = EventBus.shared.on(NavigateEvent.self) { navigated.append($0) }
+        defer { subscription.cancel() }
+
+        item.action()
+        #expect(navigated.count == 1)
+        #expect(navigated.first?.pluginID == CalendarPlugin.id)
+        #expect(navigated.first?.context.isEmpty == true)
     }
 }

@@ -17,20 +17,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 没有菜单就完全没人处理（见 MainMenu 的说明）
         MainMenu.install()
 
-        // accessory 模式已在 QuickMain 中设置；此处仅启动核心
+        // accessory 模式已在 QuickMain 中设置；此处仅启动核心。
+        // 开发启动参数（-showPalette / -showSettings / -showPlugin 等）统一由 AppCore.start() 处理。
         AppCore.shared.start()
-
-        // 开发参数：直接打开某个插件的面板（验收用，和 -showPalette / -showSettings 同类）
-        if let index = CommandLine.arguments.firstIndex(of: "-showPlugin"),
-            index + 1 < CommandLine.arguments.count
-        {
-            let pluginID = CommandLine.arguments[index + 1]
-            AppCore.shared.paletteCoordinator.show(pluginID: pluginID)
-        } else if CommandLine.arguments.contains("-showSettings") {
-            AppCore.shared.settingsWindowController.show(tab: .applications)
-        } else if CommandLine.arguments.contains("-showPalette") {
-            AppCore.shared.paletteCoordinator.show()
-        }
     }
 
     /// 应用即将退出

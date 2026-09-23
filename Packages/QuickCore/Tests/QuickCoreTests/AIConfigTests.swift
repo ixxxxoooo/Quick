@@ -57,17 +57,18 @@ struct AIConfigTests {
         #expect(AIConfig.clampedTemperature(5) == 2)
     }
 
-    @Test("从偏好读出配置")
-    func loadsFromDefaults() {
+    @Test("从偏好读出配置，API Key 来自 SecretStore")
+    func loadsFromDefaultsAndSecrets() throws {
         let defaults = makeDefaults()
+        let secrets = InMemorySecretStore()
         defaults.set(true, forKey: SettingsKey.AI.enabled)
         defaults.set("anthropic", forKey: SettingsKey.AI.provider)
-        defaults.set("sk-test", forKey: SettingsKey.AI.apiKey)
         defaults.set("claude-3-5-haiku-latest", forKey: SettingsKey.AI.model)
         defaults.set(1024, forKey: SettingsKey.AI.maxTokens)
         defaults.set(0.3, forKey: SettingsKey.AI.temperature)
+        try secrets.set("sk-test", for: AIConfig.apiKeyAccount)
 
-        let config = AIConfig.load(from: defaults)
+        let config = AIConfig.load(from: defaults, secrets: secrets)
         #expect(config.enabled)
         #expect(config.provider == .anthropic)
         #expect(config.apiKey == "sk-test")
@@ -78,10 +79,56 @@ struct AIConfigTests {
 
     @Test("没设置过时用默认：未启用、DeepSeek")
     func defaultsWhenUnset() {
-        let config = AIConfig.load(from: makeDefaults())
+        let config = AIConfig.load(from: makeDefaults(), secrets: InMemorySecretStore())
         #expect(!config.enabled)
         #expect(config.provider == .deepseek)
+        #expect(config.apiKey.isEmpty)
         #expect(config.maxTokens == AIConfig.defaultMaxTokens)
         #expect(abs(config.temperature - AIConfig.defaultTemperature) < 0.0001)
+    }
+
+    @Test("UserDefaults 旧 Key 迁入 SecretStore 后偏好里不再留明文")
+    func migratesLegacyAPIKey() throws {
+        let defaults = makeDefaults()
+        let secrets = InMemorySecretStore()
+        defaults.set("sk-legacy-secret", forKey: SettingsKey.AI.apiKey)
+
+        AIConfig.migrateAPIKeyIfNeeded(defaults: defaults, secrets: secrets)
+
+        #expect(try secrets.get(AIConfig.apiKeyAccount) == "sk-legacy-secret")
+        #expect(defaults.string(forKey: SettingsKey.AI.apiKey) == nil)
+        #expect(defaults.bool(forKey: AIConfig.apiKeyMigratedFlag))
+
+        let config = AIConfig.load(from: defaults, secrets: secrets)
+        #expect(config.apiKey == "sk-legacy-secret")
+    }
+
+    @Test("迁移幂等：Keychain 已有值时不覆盖，只清偏好残留")
+    func migrationPrefersExistingSecret() throws {
+        let defaults = makeDefaults()
+        let secrets = InMemorySecretStore()
+        try secrets.set("sk-keychain", for: AIConfig.apiKeyAccount)
+        defaults.set("sk-stale", forKey: SettingsKey.AI.apiKey)
+
+        AIConfig.migrateAPIKeyIfNeeded(defaults: defaults, secrets: secrets)
+        AIConfig.migrateAPIKeyIfNeeded(defaults: defaults, secrets: secrets)
+
+        #expect(try secrets.get(AIConfig.apiKeyAccount) == "sk-keychain")
+        #expect(defaults.string(forKey: SettingsKey.AI.apiKey) == nil)
+    }
+
+    @Test("saveAPIKey 写入 SecretStore 并清掉偏好键")
+    func saveAPIKeyPersists() throws {
+        let defaults = makeDefaults()
+        let secrets = InMemorySecretStore()
+        defaults.set("sk-old", forKey: SettingsKey.AI.apiKey)
+
+        try AIConfig.saveAPIKey("sk-new", defaults: defaults, secrets: secrets)
+
+        #expect(try secrets.get(AIConfig.apiKeyAccount) == "sk-new")
+        #expect(defaults.string(forKey: SettingsKey.AI.apiKey) == nil)
+
+        try AIConfig.saveAPIKey("", defaults: defaults, secrets: secrets)
+        #expect(try secrets.get(AIConfig.apiKeyAccount) == nil)
     }
 }

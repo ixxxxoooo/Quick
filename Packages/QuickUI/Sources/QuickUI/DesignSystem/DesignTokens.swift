@@ -64,6 +64,8 @@ public enum DesignTokens {
         public static let menu = scaled(6)
         /// 菜单面板圆角
         public static let menuPanel = scaled(16)
+        /// 超级面板圆角（对齐 Fasty，**不跟** `panelScale`）
+        public static let superPanel: CGFloat = 16
         /// 对话框圆角
         public static let dialog = scaled(20)
         /// 缩略图圆角
@@ -241,6 +243,17 @@ public enum DesignTokens {
         ///
         /// 搜索框不与窗口等宽：右侧剩下的空白留给标题栏拖拽区，窗口才不会「除了按钮全是输入框」。
         public static let detachedSearchFieldMaxWidth = scaled(360)
+
+        // MARK: 超级面板
+
+        /// 超级面板固定宽度（对齐 Fasty 390pt，**不跟** `panelScale`）
+        public static let superPanelWidth: CGFloat = 390
+        /// 超级面板最矮高度（仅一行提示时）
+        public static let superPanelMinHeight: CGFloat = 120
+        /// 超级面板最高高度（超出则内容区内部滚动）
+        public static let superPanelMaxHeight: CGFloat = 620
+        /// 超级面板初始高度（内容量出来前的占位）
+        public static let superPanelInitialHeight: CGFloat = 320
 
         // MARK: 悬浮胶囊
 

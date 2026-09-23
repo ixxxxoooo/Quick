@@ -51,9 +51,10 @@ struct SystemMonitorView: View {
         }
         .onAppear {
             selectedTab = SystemMonitorPreferences.tab(storedValue: defaultTabRaw)
+            scanner.noteViewAppeared()
         }
-        .task {
-            await scanner.startSampling()
+        .onDisappear {
+            scanner.noteViewDisappeared()
         }
     }
 

@@ -46,7 +46,7 @@ SwiftUI + AppKit，以 accessory 模式运行（`LSUIElement`，无 Dock 图标�
 | `Packages/QuickUI/` | 共享 UI：`DesignTokens`、面板外壳（`PalettePanel`/`PaletteCoordinator`/`PaletteRootView`）、设计系统组件、`HUDController` |
 | `Packages/QuickPlatform/` | 系统能力封装：热键、应用扫描、权限、剪贴板、图标缓存、路径 |
 | `Packages/Plugin*/` | 25 个内置插件，每个一个包；大插件内部再分 `Model/` `Service/` `UI/` `Settings/` |
-| `Scripts/` | 所有可执行脚本：测试、构建、lint、格式化、脚手架 |
+| `Scripts/` | 所有可执行脚本：测试、构建、重启、脚手架、发版 |
 | `docs/` | 规范文档（本目录）；每个功能插件的约束写在 `docs/features.md` |
 | `.githooks/` | 版本控制的 git 钩子，通过 `Scripts/setup.sh` 启用 |
 
@@ -85,6 +85,11 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 
 - **`AppCore` 是唯一的所有者。** 新的长生命周期状态挂到 `AppCore` 上，在 `start()` 里接线，
   **绝不**另起一个并行的单例。视图通过 `@Environment` 拿协调器，不直接拿 `AppCore`。
+  除 `AppCore.shared`、`EventBus.shared` 外，仅允许有意的工具单例：`IconCache.shared`、
+  `KeychainStore.shared`（宿主应通过 `AppCore.iconCache` 与注入的 `SecretStoring` 使用）。
+- **新插件主搜索只走 `commands` + `dynamicSearch`。** 禁止把 `searchItems` / `defaultItems`
+  当作主路径；二者为遗留 API，长期将从 `QuickPlugin` 移除（勿在协议要求上加 `@available` 废弃，
+  否则会全仓警告）。
 - **插件只在 `AppCore.registerPlugins()` 里实例化。** 这是全仓唯一 `plugins.append(...)` 的地方。
   插件**不自注册**，没有插件扫描，没有服务定位器。
 - **插件之间只通过 `EventBus` 通信。** 插件互不 `import`、互不持有引用、互不直接调用。

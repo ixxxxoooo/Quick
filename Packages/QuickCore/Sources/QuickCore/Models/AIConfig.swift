@@ -68,7 +68,10 @@ public enum AIProviderKind: String, CaseIterable, Sendable, Identifiable {
 /// 宿主级 AI 配置
 ///
 /// 一份配置、所有插件共用：翻译、摘要、改写这类能力都通过 `AIService` 读它，
-/// 而不是每个插件各自记一份 Key 与模型。存 `UserDefaults`（它是用户可改、可重置的偏好）。
+/// 而不是每个插件各自记一份 Key 与模型。
+///
+/// **API Key 只存 Keychain**，其余偏好仍在 `UserDefaults`。启动时会把旧版写在
+/// `UserDefaults` 里的 Key 迁走并清掉。
 public struct AIConfig: Sendable, Equatable {
 
     public var enabled: Bool
@@ -85,6 +88,12 @@ public struct AIConfig: Sendable, Equatable {
     public static let minMaxTokens = 256
     public static let maxMaxTokens = 32768
     public static let defaultTemperature = 0.7
+
+    /// Keychain 账号名
+    public static let apiKeyAccount = "ai.apiKey"
+
+    /// 迁移完成标记（成功迁完才置位；失败保留 UserDefaults 原值以便重试）
+    public static let apiKeyMigratedFlag = "quick.ai.apiKey.migratedToKeychain.v1"
 
     public init(
         enabled: Bool = false,
@@ -104,8 +113,13 @@ public struct AIConfig: Sendable, Equatable {
         self.temperature = temperature
     }
 
-    /// 从偏好读出配置
-    public static func load(from defaults: UserDefaults = .standard) -> AIConfig {
+    /// 从偏好 + Keychain 读出配置
+    public static func load(
+        from defaults: UserDefaults = .standard,
+        secrets: any SecretStoring = KeychainStore.shared
+    ) -> AIConfig {
+        migrateAPIKeyIfNeeded(defaults: defaults, secrets: secrets)
+
         let provider =
             defaults.string(forKey: SettingsKey.AI.provider)
             .flatMap(AIProviderKind.init(rawValue:)) ?? .deepseek
@@ -113,15 +127,70 @@ public struct AIConfig: Sendable, Equatable {
         let rawTemp =
             defaults.object(forKey: SettingsKey.AI.temperature) as? Double
             ?? defaultTemperature
+        let apiKey = (try? secrets.get(apiKeyAccount)) ?? ""
         return AIConfig(
             enabled: defaults.bool(forKey: SettingsKey.AI.enabled),
             provider: provider,
-            apiKey: defaults.string(forKey: SettingsKey.AI.apiKey) ?? "",
+            apiKey: apiKey,
             baseURL: defaults.string(forKey: SettingsKey.AI.baseURL) ?? "",
             model: defaults.string(forKey: SettingsKey.AI.model) ?? "",
             maxTokens: clampedMaxTokens(rawMax),
             temperature: clampedTemperature(rawTemp)
         )
+    }
+
+    /// 把 API Key 写入 Keychain，并清掉 UserDefaults 里的旧值
+    public static func saveAPIKey(
+        _ key: String,
+        defaults: UserDefaults = .standard,
+        secrets: any SecretStoring = KeychainStore.shared
+    ) throws {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            try secrets.delete(apiKeyAccount)
+        } else {
+            try secrets.set(trimmed, for: apiKeyAccount)
+        }
+        defaults.removeObject(forKey: SettingsKey.AI.apiKey)
+        defaults.set(true, forKey: apiKeyMigratedFlag)
+    }
+
+    /// 一次性：UserDefaults 旧 Key → Keychain，成功后清掉偏好里的明文
+    public static func migrateAPIKeyIfNeeded(
+        defaults: UserDefaults = .standard,
+        secrets: any SecretStoring = KeychainStore.shared
+    ) {
+        let log = QuickLog.persistence
+        let legacy = defaults.string(forKey: SettingsKey.AI.apiKey) ?? ""
+        let existing = (try? secrets.get(apiKeyAccount)) ?? ""
+
+        // Keychain 已有值：只清偏好残留，并记迁移完成
+        if !existing.isEmpty {
+            if !legacy.isEmpty {
+                defaults.removeObject(forKey: SettingsKey.AI.apiKey)
+                log.notice("已清除 UserDefaults 中残留的 API Key（Keychain 优先）")
+            }
+            defaults.set(true, forKey: apiKeyMigratedFlag)
+            return
+        }
+
+        guard !legacy.isEmpty else {
+            // 两边都空：也算迁完，避免每次启动空跑
+            if defaults.bool(forKey: apiKeyMigratedFlag) == false {
+                defaults.set(true, forKey: apiKeyMigratedFlag)
+            }
+            return
+        }
+
+        do {
+            try secrets.set(legacy, for: apiKeyAccount)
+            defaults.removeObject(forKey: SettingsKey.AI.apiKey)
+            defaults.set(true, forKey: apiKeyMigratedFlag)
+            log.notice("API Key 已迁入 Keychain")
+        } catch {
+            log.error("API Key 迁移失败：\(error.localizedDescription, privacy: .public)")
+            // 失败不置 flag，下次启动再试；UserDefaults 原值保留
+        }
     }
 
     /// 实际使用的 Base URL（去掉末尾斜杠）

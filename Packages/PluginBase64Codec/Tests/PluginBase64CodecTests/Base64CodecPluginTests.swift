@@ -45,6 +45,57 @@ struct Base64CodecLogicTests {
         }
     }
 
+    // MARK: - urlSafe
+
+    @Test("URL-Safe 编码替换字母表并省略填充")
+    func urlSafeEncoding() throws {
+        let options = Base64CodecLogic.Options(isURLSafe: true)
+        // "ÿÿ" 的标准 Base64 是 w7/Dvw==：含 / 且带填充，正好覆盖两条规则
+        #expect(try Base64CodecLogic.encode("ÿÿ", options: options) == "w7_Dvw")
+        #expect(try Base64CodecLogic.encode("hello", options: options) == "aGVsbG8")
+    }
+
+    @Test("URL-Safe 往返一致，含标准字母表会出 +/ 的输入")
+    func urlSafeRoundTrip() throws {
+        let options = Base64CodecLogic.Options(isURLSafe: true)
+        for original in ["hello", "你好，世界", "a+b/c=", "ÿÿ", ""] {
+            let encoded = try Base64CodecLogic.encode(original, options: options)
+            #expect(!encoded.contains("+") && !encoded.contains("/") && !encoded.contains("="))
+            #expect(try Base64CodecLogic.decode(encoded, options: options) == original)
+        }
+    }
+
+    @Test("URL-Safe 解码补回缺失的填充")
+    func urlSafeDecodeRestoresPadding() throws {
+        let options = Base64CodecLogic.Options(isURLSafe: true)
+        // 缺填充的 "aGVsbG8" 在标准模式下是非法输入，URL-Safe 模式必须能解
+        #expect(try Base64CodecLogic.decode("aGVsbG8", options: options) == "hello")
+    }
+
+    // MARK: - wrapLines
+
+    @Test("折行编码每行 64 个字符")
+    func wrapLinesEncoding() throws {
+        let options = Base64CodecLogic.Options(wrapsLines: true)
+        let input = String(repeating: "a", count: 100)
+        let encoded = try Base64CodecLogic.encode(input, options: options)
+        let lines = encoded.split(separator: "\n", omittingEmptySubsequences: false)
+
+        #expect(lines.allSatisfy { $0.count <= 64 })
+        #expect(lines.dropLast().allSatisfy { $0.count == 64 })
+        // 去掉换行后与标准编码一致 —— 折行只是排版，不改变内容
+        #expect(encoded.replacingOccurrences(of: "\n", with: "") == (try Base64CodecLogic.encode(input)))
+    }
+
+    @Test("折行输出能原样粘回来解码")
+    func wrappedOutputDecodes() throws {
+        let options = Base64CodecLogic.Options(wrapsLines: true)
+        let original = String(repeating: "你好", count: 50)
+        let encoded = try Base64CodecLogic.encode(original, options: options)
+        #expect(encoded.contains("\n"))
+        #expect(try Base64CodecLogic.decode(encoded, options: options) == original)
+    }
+
     @Test("模式原始值是中文标签且覆盖编解码")
     func modeLabels() {
         #expect(Base64CodecLogic.Mode.allCases.count == 2)

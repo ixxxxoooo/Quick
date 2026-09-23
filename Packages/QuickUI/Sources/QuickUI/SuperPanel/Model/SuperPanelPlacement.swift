@@ -4,20 +4,6 @@
 
 import CoreGraphics
 
-/// 超级面板的几何常量
-public enum SuperPanelMetrics {
-    /// 面板固定宽度（对齐 Fasty 的 390）
-    public static let width: CGFloat = 390
-    /// 面板最矮高度（只有一行提示时）
-    public static let minHeight: CGFloat = 120
-    /// 面板最高高度（超过就内部滚动）
-    public static let maxHeight: CGFloat = 620
-    /// 面板圆角
-    public static let cornerRadius: CGFloat = 16
-    /// 初始高度，内容量出来之前先用它
-    public static let initialHeight: CGFloat = 320
-}
-
 /// 面板相对光标的落点与展开方向（纯计算，可单测）
 ///
 /// 坐标系是 AppKit 的全局坐标（原点在主屏左下、y 轴向上）。

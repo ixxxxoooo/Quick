@@ -76,6 +76,6 @@ fix(palette): keep the panel on screen when the app deactivates
 
 - 启动参数 `-showPalette`：启动后立即显示面板，省掉手按快捷键。
 - 分布式通知：应用内用 `DistributedNotificationCenter` 监听
-  `com.ygw.quick.togglePalette` 切换面板。**不要用 `notifyutil -p`**，那是另一套 notify API。
+  `com.ixxxxoooo.quick.togglePalette` 切换面板。**不要用 `notifyutil -p`**，那是另一套 notify API。
 - 日志：`./Scripts/logs.sh`（实时，含 debug）。
 - 窗口可见性：`CGWindowListCopyWindowInfo` 查名为 `Quick` 的窗口及其尺寸。

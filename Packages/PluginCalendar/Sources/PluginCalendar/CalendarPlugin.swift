@@ -72,7 +72,9 @@ public final class CalendarPlugin: QuickPlugin {
                     subtitle: Date().formatted(date: .complete, time: .omitted),
                     icon: "calendar",
                     relevance: 0.5,
-                    action: {}
+                    action: {
+                        EventBus.shared.post(NavigateEvent(pluginID: Self.id))
+                    }
                 )
             ]
         }
@@ -85,7 +87,10 @@ public final class CalendarPlugin: QuickPlugin {
                 subtitle: event.timeRange,
                 icon: "calendar",
                 relevance: 0.6,
-                action: {}
+                action: {
+                    EventBus.shared.post(
+                        NavigateEvent(pluginID: Self.id, context: ["eventID": event.id]))
+                }
             )
         }
     }

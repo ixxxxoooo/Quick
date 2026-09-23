@@ -16,12 +16,13 @@ public struct AISettingsPane: View {
 
     @AppStorage(SettingsKey.AI.enabled) private var enabled = false
     @AppStorage(SettingsKey.AI.provider) private var providerRaw = AIProviderKind.deepseek.rawValue
-    @AppStorage(SettingsKey.AI.apiKey) private var apiKey = ""
     @AppStorage(SettingsKey.AI.baseURL) private var baseURL = ""
     @AppStorage(SettingsKey.AI.model) private var model = ""
     @AppStorage(SettingsKey.AI.maxTokens) private var maxTokens = AIConfig.defaultMaxTokens
     @AppStorage(SettingsKey.AI.temperature) private var temperature = AIConfig.defaultTemperature
 
+    /// API Key 只走 Keychain，不用 @AppStorage
+    @State private var apiKey = ""
     @State private var showKey = false
     @State private var isTesting = false
     @State private var testResult: SettingsAITestResult?
@@ -41,6 +42,12 @@ public struct AISettingsPane: View {
             advancedSection
         }
         .formStyle(.grouped)
+        .onAppear {
+            apiKey = AIConfig.load().apiKey
+        }
+        .onChange(of: apiKey) { _, newValue in
+            persistAPIKey(newValue)
+        }
         .onChange(of: providerRaw) { _, _ in
             // 换服务商就把覆盖值清空，回到新服务商的默认 Base URL / 模型
             baseURL = ""
@@ -85,7 +92,9 @@ public struct AISettingsPane: View {
 
             SettingsRow(
                 title: "API Key",
-                subtitle: provider.requiresAPIKey ? "只存在本机偏好里，不会上传。" : "本地 Ollama 无需填写。",
+                subtitle: provider.requiresAPIKey
+                    ? "只存在本机 Keychain，不会进偏好 plist，也不会上传。"
+                    : "本地 Ollama 无需填写。",
                 icon: { SettingsRowIcon(systemImage: "key") }
             ) {
                 HStack(spacing: DesignTokens.Spacing.sm) {
@@ -215,6 +224,15 @@ public struct AISettingsPane: View {
 
     private func defaultDescription(_ value: String, emptyHint: String) -> String {
         value.isEmpty ? emptyHint : "留空使用默认：\(value)"
+    }
+
+    private func persistAPIKey(_ key: String) {
+        do {
+            try AIConfig.saveAPIKey(key)
+        } catch {
+            QuickLog.persistence.error(
+                "写入 API Key 到 Keychain 失败：\(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func runTest() {

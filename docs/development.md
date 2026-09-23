@@ -223,7 +223,7 @@ Packages/PluginFoo/
 ```
 
 **别忘的三步**：在 `AppCore.registerPlugins()` 注册、在 `project.yml` 加两处、
-在 `docs/features/<id>.md` 写不变量。
+在 `docs/features.md` 写不变量。
 
 ---
 

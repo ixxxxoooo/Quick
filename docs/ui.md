@@ -69,6 +69,20 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 
 `Radius.panel` 是「系统组件感」的主要来源，不要随意调小。
 
+### 超级面板（与主面板独立）
+
+光标旁弹出的上下文面板，几何对齐 **Fasty**，**不跟** `panelScale`（主面板 825×523
+与它无关）。窗口宽高由内容在下列范围内自适应；落点偏移见
+`SuperPanelPlacement`（纯模型，可单测）。
+
+| 令牌 | 值 | 说明 |
+| --- | --- | --- |
+| `Size.superPanelWidth` | 390 | 固定宽度 |
+| `Size.superPanelInitialHeight` | 320 | 首次布局占位 |
+| `Size.superPanelMinHeight` | 120 | 最矮 |
+| `Size.superPanelMaxHeight` | 620 | 最高，超出内部滚动 |
+| `Radius.superPanel` | 16 | 窗口与背景圆角 |
+
 ### 面板结构：内容从浮动栏下面穿过
 
 ```

@@ -23,6 +23,14 @@ struct URLCodecView: View {
     /// 空结果和「输入为空」在界面上无法区分。
     @State private var error: String?
 
+    /// 编码选项与设置页共用同一个键：那边改了这边立即生效
+    @AppStorage(PluginSettingKey.URLCodec.encodeSpacesAsPluses) private var spacesAsPluses = false
+    @AppStorage(PluginSettingKey.URLCodec.encodeFullUrl) private var encodeFullUrl = false
+
+    private var options: URLCodecLogic.Options {
+        .init(encodesSpacesAsPluses: spacesAsPluses, encodesFullURL: encodeFullUrl)
+    }
+
     enum Mode: String, CaseIterable {
         case encode = "编码"
         case decode = "解码"
@@ -120,16 +128,18 @@ struct URLCodecView: View {
             .padding(.vertical, DesignTokens.Spacing.xs)
         }
         .onChange(of: input) { _, _ in transform() }
+        .onChange(of: spacesAsPluses) { _, _ in transform() }
+        .onChange(of: encodeFullUrl) { _, _ in transform() }
     }
 
     private func transform() {
         guard !input.isEmpty else { output = ""; error = nil; return }
         if mode == .encode {
-            output = URLCodecLogic.encode(input)
+            output = URLCodecLogic.encode(input, options: options)
             error = nil
         } else {
             do {
-                output = try URLCodecLogic.decode(input)
+                output = try URLCodecLogic.decode(input, options: options)
                 error = nil
             } catch {
                 output = ""

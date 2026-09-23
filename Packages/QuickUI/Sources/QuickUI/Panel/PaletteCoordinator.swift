@@ -163,6 +163,8 @@ public final class PaletteCoordinator {
             面板已显示：插件=\(self.activePluginID ?? "主搜索", privacy: .public)，\
             耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
             """)
+
+        EventBus.shared.post(PaletteVisibilityChangedEvent(isVisible: true))
     }
 
     /// 打开面板时的自动行为
@@ -266,6 +268,7 @@ public final class PaletteCoordinator {
 
         if wasVisible {
             log.info("面板已隐藏，恢复焦点=\(restoreFocus, privacy: .public)")
+            EventBus.shared.post(PaletteVisibilityChangedEvent(isVisible: false))
         }
     }
 
@@ -362,167 +365,17 @@ public final class PaletteCoordinator {
 
     // MARK: - 搜索
 
-    /// 单次搜索的结果上限
-    ///
-    /// 没有上限时，一个失控的插件会把几千条塞进 SwiftUI 列表、还要在主线程排序。
-    private static let resultLimit = 60
-
-    /// 单个插件的搜索超时
-    ///
-    /// 插件的 `searchItems` 跑在主 actor 上（协议本身是 `@MainActor`），
-    /// 所以一个慢查询（EventKit、Spotlight、定位）会把**整批**结果卡住 ——
-    /// 聚合是等所有插件都返回才结束的。超时之后放弃这个插件，
-    /// 而不是让整块面板陪它等。
-    private static let pluginTimeout = Duration.seconds(2)
-
-    /// 聚合搜索：静态命令索引 + 声明了动态结果的插件
-    ///
-    /// 静态打分不碰插件对象，可以离开主线程。动态插件只有 `accepts` 为真才调用，
-    /// 并且超时会取消等待。
-    ///
-    /// - Parameter query: 搜索关键词
-    /// - Returns: 去重、排序、限流之后的结果
+    /// 聚合搜索入口：依赖注入后委托给 `PaletteSearchEngine`
     public func search(query: String) async -> [SearchableItem] {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let signpost = QuickLog.signposter(QuickLog.Category.palette)
-        let interval = signpost.beginInterval("palette.search")
-        let started = Date()
-        let commands = staticCommands
-
-        let staticHits = await Task.detached {
-            CommandIndex.matching(commands, query: trimmed)
-        }.value
-        if Task.isCancelled {
-            signpost.endInterval("palette.search", interval)
-            return []
-        }
-
-        let staticItems = staticHits.map { hit in
-            let descriptor = hit.command.descriptor
-            return SearchableItem(
-                id: descriptor.id,
-                pluginID: descriptor.pluginID,
-                pluginName: descriptor.pluginName,
-                title: descriptor.title,
-                subtitle: descriptor.subtitle,
-                icon: descriptor.icon,
-                relevance: hit.relevance,
-                action: { [weak self] in
-                    self?.invokeCommand(descriptor.id)
-                }
-            )
-        }
-
-        let dynamicPlugins = plugins.filter { plugin in
-            let pluginID = type(of: plugin).id
-            return plugin.isEnabled && isSearchSourceEnabled(pluginID) && plugin.accepts(query: trimmed)
-        }
-
-        let dynamicItems = await withTaskGroup(of: [SearchableItem].self) { group in
-            for plugin in dynamicPlugins {
-                let pluginName = type(of: plugin).name
-                let pluginID = type(of: plugin).id
-                group.addTask {
-                    let items = await self.searchDynamic(plugin: plugin, pluginID: pluginID, query: trimmed)
-                    return items.map { $0.pluginName == nil ? $0.withPluginName(pluginName) : $0 }
-                }
-            }
-            var results: [SearchableItem] = []
-            for await items in group {
-                results.append(contentsOf: items)
-            }
-            return results
-        }
-
-        if Task.isCancelled {
-            signpost.endInterval("palette.search", interval)
-            return []
-        }
-
-        let collected = staticItems + dynamicItems
-
-        // 去重：`SearchableItem` 的 `Hashable` 只看 id。重复 id 会让 `ForEach` 进入未定义行为。
-        var seen = Set<String>()
-        let deduped = collected.filter { seen.insert($0.id).inserted }
-
-        var sorted = deduped.sorted {
-            $0.relevance == $1.relevance ? $0.id < $1.id : $0.relevance > $1.relevance
-        }
-
-        if trimmed.isEmpty {
-            sorted = Self.promotingRecents(sorted, recents: usageHistory?.recentItemIDs(limit: 12) ?? [])
-        }
-
-        let limited = Array(sorted.prefix(Self.resultLimit))
-
-        signpost.endInterval("palette.search", interval)
-        let elapsedMS = Date().timeIntervalSince(started) * 1000
-        if elapsedMS > 50 {
-            log.warning(
-                """
-                聚合搜索超过 50ms：动态插件 \(dynamicPlugins.count, privacy: .public) 个，\
-                返回 \(limited.count, privacy: .public) 条，\
-                耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
-                """
-            )
-        } else {
-            log.debug(
-                """
-                聚合搜索完成：静态 \(staticItems.count, privacy: .public) 条，\
-                动态插件 \(dynamicPlugins.count, privacy: .public) 个，\
-                返回 \(limited.count, privacy: .public) 条，\
-                耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
-                """
-            )
-        }
-
-        return limited
-    }
-
-    /// 查询单个动态插件，超时即取消等待
-    private func searchDynamic(
-        plugin: any QuickPlugin, pluginID: String, query: String
-    ) async -> [SearchableItem] {
-        let started = Date()
-        return await withTaskGroup(of: [SearchableItem]?.self) { group in
-            group.addTask {
-                await plugin.dynamicSearch(query: query)
-            }
-            group.addTask {
-                try? await Task.sleep(for: Self.pluginTimeout)
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            if first == nil {
-                let elapsedMS = Date().timeIntervalSince(started) * 1000
-                log.warning(
-                    """
-                    插件 \(pluginID, privacy: .public) 搜索超时，已取消等待，\
-                    耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
-                    """
-                )
-                return []
-            }
-            return first ?? []
-        }
-    }
-
-    /// 把最近使用过的条目提到前面，其余保持原顺序
-    ///
-    /// 抽成静态函数是为了能单独测：这里只做重排，不碰数据库、不碰插件。
-    static func promotingRecents(
-        _ items: [SearchableItem],
-        recents: [String]
-    ) -> [SearchableItem] {
-        guard !recents.isEmpty else { return items }
-
-        let rank = Dictionary(uniqueKeysWithValues: recents.enumerated().map { ($1, $0) })
-        let (recent, rest) = items.reduce(into: ([SearchableItem](), [SearchableItem]())) {
-            if rank[$1.id] != nil { $0.0.append($1) } else { $0.1.append($1) }
-        }
-        // 按「最近」的顺序排，而不是按它们原来的相关度 —— 这里要的就是时间顺序
-        return recent.sorted { (rank[$0.id] ?? 0) < (rank[$1.id] ?? 0) } + rest
+        await PaletteSearchEngine.search(
+            query: query,
+            staticCommands: staticCommands,
+            plugins: plugins,
+            isSearchSourceEnabled: isSearchSourceEnabled,
+            recentItemIDs: usageHistory?.recentItemIDs(limit: 12) ?? [],
+            invokeCommand: invokeCommand,
+            log: log
+        )
     }
 
     // MARK: - 内部方法

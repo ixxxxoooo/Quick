@@ -131,9 +131,12 @@ log.info("面板已显示，耗时 " + String(elapsed) + " ms")
 
 - 剪贴板正文、笔记正文、代码片段内容、AI 对话内容、翻译原文。
   → 只记**长度**或**类型**：`log.debug("剪贴板新增条目，类型 \(kind, privacy: .public)，\(text.count) 字符")`
-- 密码、令牌、API Key。
+- 密码、令牌、API Key（Keychain 迁移成功/失败只记结果类别，永不记 Key 正文）。
 - 完整的用户文件路径（记最后一段或数量即可，除非路径本身就是排错必需）。
 - 搜索结果的具体内容（记条数即可）。
+
+宿主 AI 的 API Key 存在 Keychain（`KeychainStore` / `AIConfig.saveAPIKey`），不进
+`UserDefaults`；启动时 `AIConfig.migrateAPIKeyIfNeeded()` 会把旧版偏好里的明文迁走。
 
 ---
 

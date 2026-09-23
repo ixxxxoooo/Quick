@@ -77,13 +77,15 @@ public enum SettingsKey {
 
     // MARK: - AI 基座
 
-    /// 宿主级 AI 配置。其他插件通过 `AIService` 读这份配置访问 AI，不各自维护一份。
+    /// 宿主级 AI 配置（`quick.ai.*`），供 `AIService` 使用。
+    ///
+    /// AI 聚合插件的 UI 偏好（置顶、Provider 开关）在 `PluginSettingKey.AIPortal`（`ai.*`）。
     public enum AI {
         /// 是否启用 AI 能力
         public static let enabled = "quick.ai.enabled"
         /// 服务商（`AIProviderKind.rawValue`）
         public static let provider = "quick.ai.provider"
-        /// API Key
+        /// 旧版 API Key（仅迁移用；正式存储在 Keychain，见 `AIConfig.apiKeyAccount`）
         public static let apiKey = "quick.ai.apiKey"
         /// 自定义 Base URL（空 = 用服务商默认）
         public static let baseURL = "quick.ai.baseURL"

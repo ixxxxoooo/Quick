@@ -72,10 +72,21 @@ public enum ShellCommandRunner {
     private static let standardOutputLimit = 4 * 1024
     private static let standardErrorLimit = 8 * 1024
 
+    /// 后台执行的默认超时
+    ///
+    /// 后台执行面向「无交互、很快出结果」的命令；30 秒还没退出的几乎一定挂住了，
+    /// 留着它只会一直占着执行线程与临时文件。
+    public static let defaultTimeout: TimeInterval = 30
+
+    /// 并发上限：每条在跑的命令占一个阻塞在 `waitUntilExit` 上的线程和两个临时文件，
+    /// 不设限会让一批慢命令耗尽线程与文件描述符。4 条足够覆盖面板里并排触发的场景。
+    private static let maxConcurrentCommands = 4
+    private static let slots = DispatchSemaphore(value: maxConcurrentCommands)
+
     /// `waitUntilExit` 会阻塞线程，所以执行放在专用并发队列上
     ///
     /// 不能用 `Task.detached`：那占的是 Swift 协作线程池的线程，池子只有核心数个，
-    /// 一条卡住的命令就可能让面板的其他异步活一起排队。并发而非串行 —— 多命令互不排队。
+    /// 一条卡住的命令就可能让面板的其他异步活一起排队。
     private static let queue = DispatchQueue(
         label: "com.ixxxxoooo.quick.shell-command", qos: .userInitiated, attributes: .concurrent)
 
@@ -86,30 +97,44 @@ public enum ShellCommandRunner {
     ///   - command: 待运行的命令行字符串
     ///   - workingDirectory: 可选的工作目录（默认为用户主目录）；不存在则不执行
     ///   - loadingShellEnvironment: 是否用 `-ilc`（交互式）起 shell，见 `shellArguments`
-    /// - Returns: 执行结果
+    ///   - timeout: 超时秒数（默认 `defaultTimeout`）；超时后 terminate 进程并返回失败结果
+    /// - Returns: 执行结果；超时、取消、无法启动等失败以 exitCode -1 + standardError 描述返回
     public static func run(
         _ command: String,
         workingDirectory: String? = nil,
-        loadingShellEnvironment: Bool = false
+        loadingShellEnvironment: Bool = false,
+        timeout: TimeInterval = defaultTimeout
     ) async -> ShellCommandResult {
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return ShellCommandResult(exitCode: 0, standardOutput: "", standardError: "")
         }
 
-        return await withCheckedContinuation { continuation in
-            queue.async {
-                continuation.resume(
-                    returning: execute(
-                        trimmed, workingDirectory: workingDirectory,
-                        loadingShellEnvironment: loadingShellEnvironment))
+        let running = RunningProcess()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                queue.async {
+                    slots.wait()
+                    defer { slots.signal() }
+                    continuation.resume(
+                        returning: execute(
+                            trimmed, workingDirectory: workingDirectory,
+                            loadingShellEnvironment: loadingShellEnvironment,
+                            timeout: timeout, running: running))
+                }
             }
+        } onCancel: {
+            running.terminate()
         }
     }
 
     private static func execute(
-        _ command: String, workingDirectory: String?, loadingShellEnvironment: Bool
+        _ command: String, workingDirectory: String?, loadingShellEnvironment: Bool,
+        timeout: TimeInterval, running: RunningProcess
     ) -> ShellCommandResult {
+        guard !running.terminationRequested else {
+            return failure("命令已取消")
+        }
         guard let directory = resolvedWorkingDirectory(workingDirectory) else {
             log.error("工作目录不存在，命令未执行：\(workingDirectory ?? "", privacy: .public)")
             return failure(missingDirectory(workingDirectory))
@@ -142,7 +167,32 @@ public enum ShellCommandRunner {
             log.error("启动 Shell 进程失败：\(error.localizedDescription, privacy: .public)")
             return failure("无法启动 \(shell)：\(error.localizedDescription)")
         }
+        running.attach(process)
+
+        // 轮询而不是裸 waitUntilExit：超时与取消都得有机会插进来终止进程，
+        // 否则永不退出的命令（如 cat 等输入）会把线程和 continuation 永久泄漏
+        let deadline = Date().addingTimeInterval(timeout)
+        var timedOut = false
+        while process.isRunning {
+            if Date() >= deadline {
+                timedOut = true
+                break
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        if timedOut || running.terminationRequested {
+            process.terminate()
+        }
         process.waitUntilExit()
+
+        if timedOut {
+            log.error("命令超过 \(Int(timeout), privacy: .public) 秒未退出，已终止")
+            return failure("命令执行超时（超过 \(Int(timeout)) 秒），进程已终止")
+        }
+        if running.terminationRequested {
+            log.info("命令已取消，进程已终止")
+            return failure("命令已取消")
+        }
 
         let status = process.terminationStatus
         log.info("命令执行完毕，退出码=\(status, privacy: .public)")
@@ -322,6 +372,39 @@ public enum ShellCommandRunner {
                 EventBus.shared.post(ShowHUDEvent(message: "没有可用的终端，命令未执行", tone: .warning))
             }
         }
+    }
+}
+
+/// 一次后台执行的「终止请求」信箱
+///
+/// `onCancel` 回调与执行线程不在同一个线程上，而且取消可能先于进程创建到达，
+/// 所以请求要记账（`NSLock` 保护），而不是直接对一个可能还不存在的 `Process` 发信号。
+/// `@unchecked Sendable` 的依据：所有可变状态都在 `lock` 临界区内访问。
+private final class RunningProcess: @unchecked Sendable {
+    private let lock = NSLock()
+    private var process: Process?
+    private var requested = false
+
+    var terminationRequested: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return requested
+    }
+
+    func attach(_ process: Process) {
+        lock.lock()
+        self.process = process
+        let shouldTerminate = requested
+        lock.unlock()
+        if shouldTerminate { process.terminate() }
+    }
+
+    func terminate() {
+        lock.lock()
+        requested = true
+        let process = self.process
+        lock.unlock()
+        process?.terminate()
     }
 }
 

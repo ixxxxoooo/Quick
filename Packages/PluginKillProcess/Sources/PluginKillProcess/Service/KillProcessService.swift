@@ -31,10 +31,75 @@ final class KillProcessService {
         defaults.set(mode.rawValue, forKey: PluginSettingKey.KillProcess.sortMode)
     }
 
-    /// 按设置间隔连续刷新，直到取消
-    func startSampling() async {
+    /// 视图仍希望采样（面板隐藏时保留，以便再次显示时恢复）
+    private var resumeWhenVisible = false
+
+    /// 采样循环句柄；面板 `orderOut` 不会取消 SwiftUI `.task`，必须自己持有并取消
+    private var samplingTask: Task<Void, Never>?
+
+    /// 当前是否持有采样任务（测试与排查用）
+    var isSampling: Bool { samplingTask != nil }
+
+    /// 视图出现：标记需要采样并立刻开始
+    func noteViewAppeared() {
+        setResumeWhenVisible(true)
+        startSamplingIfNeeded()
+    }
+
+    /// 视图消失（退回主搜索 / 分离后主面板 pop）：彻底停，且不再自动恢复
+    func noteViewDisappeared() {
+        setResumeWhenVisible(false)
+        stopSampling()
+    }
+
+    /// 标记「视图仍挂着、面板再显示时应恢复采样」
+    func setResumeWhenVisible(_ value: Bool) {
+        resumeWhenVisible = value
+    }
+
+    /// 主面板显隐。隐藏一律停；显示时仅当视图仍挂着才恢复
+    func notePanelVisibility(_ isVisible: Bool) {
+        if isVisible {
+            if resumeWhenVisible {
+                startSamplingIfNeeded()
+            }
+        } else {
+            stopSampling()
+        }
+    }
+
+    /// 若尚未在采，启动采样循环
+    func startSamplingIfNeeded(tick: (@MainActor () async -> Void)? = nil) {
+        guard samplingTask == nil else { return }
+        log.notice("开始进程采样，间隔 \(self.refreshInterval, privacy: .public) 秒")
+        samplingTask = Task { [weak self] in
+            await self?.runSamplingLoop(tick: tick)
+        }
+    }
+
+    /// 取消采样循环
+    func stopSampling() {
+        guard samplingTask != nil else { return }
+        samplingTask?.cancel()
+        samplingTask = nil
+        log.notice("已停止进程采样")
+    }
+
+    /// 按设置间隔连续刷新，直到任务被取消
+    ///
+    /// 测试可直接 `Task { await startSampling(tick:) }` 再 `cancel`；生产路径走
+    /// `startSamplingIfNeeded` / `stopSampling`。
+    func startSampling(tick: (@MainActor () async -> Void)? = nil) async {
+        await runSamplingLoop(tick: tick)
+    }
+
+    private func runSamplingLoop(tick: (@MainActor () async -> Void)?) async {
         while !Task.isCancelled {
-            await refresh()
+            if let tick {
+                await tick()
+            } else {
+                await refresh()
+            }
             try? await Task.sleep(for: .seconds(refreshInterval))
         }
     }
@@ -44,6 +109,14 @@ final class KillProcessService {
         let records = await Task.detached(priority: .userInitiated) {
             KillProcessService.scan(sort: mode)
         }.value
+        applyScanResults(records)
+    }
+
+    /// 把一次扫描结果落到状态
+    ///
+    /// internal 而不是 private：「永不列出宿主自身 PID」这条安全不变量要能在
+    /// 不真的起 `ps` 的前提下被测试钉住。
+    func applyScanResults(_ records: [ProcessRecord]) {
         // 永远不展示自己，避免误杀宿主
         processes = records.filter { $0.id != selfPID }
     }
@@ -81,6 +154,9 @@ final class KillProcessService {
         return false
     }
 
+    /// `scan` 在 detached 任务里跑，不能碰 `@MainActor` 的 `KillProcessPlugin.id`
+    nonisolated private static let scanLog = QuickLog.plugin("killprocess")
+
     nonisolated private static func scan(sort: KillProcessSortMode) -> [ProcessRecord] {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: KillProcessListing.commandPath)
@@ -92,6 +168,15 @@ final class KillProcessService {
             try task.run()
             task.waitUntilExit()
         } catch {
+            scanLog.error(
+                "进程列表扫描启动失败：\(error.localizedDescription, privacy: .public)"
+            )
+            return []
+        }
+        guard task.terminationStatus == 0 else {
+            scanLog.error(
+                "进程列表扫描失败：ps 退出码 \(task.terminationStatus, privacy: .public)"
+            )
             return []
         }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()

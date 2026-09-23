@@ -14,6 +14,13 @@ import QuickCore
 /// 这些操作大多走 AppleScript，而 AppleScript 要「自动化」权限 —— 它按代码签名授予，
 /// 每重新构建一次 dev 版就可能失效。所以 `runAppleScript` **返回**执行结果，调用方按结果
 /// 说话：不做「不管成没成都弹一条成功提示」这种事，那会让用户以为功能坏了却看不出原因。
+/// 自动化类操作的失败提示文案（单测可钉住格式）
+enum SystemActionAutomationCopy: Sendable {
+    static func permissionHint(action: String) -> String {
+        "\(action)失败：需要「自动化」权限"
+    }
+}
+
 @MainActor
 final class SystemActionRunner {
 
@@ -135,7 +142,10 @@ final class SystemActionRunner {
     /// 成败都给一句话
     private func report(_ succeeded: Bool, done: String) {
         guard succeeded else {
-            EventBus.shared.post(ShowHUDEvent(message: "\(done)失败：需要「自动化」权限", tone: .warning))
+            EventBus.shared.post(
+                ShowHUDEvent(
+                    message: SystemActionAutomationCopy.permissionHint(action: done),
+                    tone: .warning))
             return
         }
         EventBus.shared.post(ShowHUDEvent(message: done, tone: .success))
@@ -146,6 +156,9 @@ final class SystemActionRunner {
     /// 成功时机器已经睡了 / 重启了 / 注销了，没有机会再显示 HUD。
     private func reportFailure(_ succeeded: Bool, what: String) {
         guard !succeeded else { return }
-        EventBus.shared.post(ShowHUDEvent(message: "\(what)失败：需要「自动化」权限", tone: .warning))
+        EventBus.shared.post(
+            ShowHUDEvent(
+                message: SystemActionAutomationCopy.permissionHint(action: what),
+                tone: .warning))
     }
 }

@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import QuickCore
 import Testing
 
 @testable import PluginSystemControl
@@ -73,5 +74,81 @@ struct SystemControlPluginTests {
         for item in results {
             #expect(item.relevance >= 0 && item.relevance <= 1, "相关度越界: \(item.relevance)")
         }
+    }
+
+    @Test("functionCommands 与 CommandID 一致且别名键为 system.<rawValue>")
+    func functionCommandsAlignWithCommandID() {
+        for descriptor in SystemControlPlugin.functionCommands {
+            #expect(descriptor.id.hasPrefix("systemcontrol."))
+            #expect(descriptor.pluginID == SystemControlPlugin.id)
+            let raw = String(descriptor.id.dropFirst("systemcontrol.".count))
+            #expect(descriptor.aliasKey == "system.\(raw)")
+            #expect(SystemAction(rawValue: raw) != nil)
+        }
+    }
+}
+
+@Suite("系统操作元数据")
+struct SystemActionMetadataTests {
+
+    @Test("命令 id 格式为 systemcontrol.<rawValue>")
+    func commandIDFormat() {
+        for action in SystemAction.allCases {
+            #expect(CommandID.systemAction(action.rawValue) == "systemcontrol.\(action.rawValue)")
+        }
+    }
+
+    @Test("英文关键词能命中对应操作")
+    func englishKeywordsMapToActions() {
+        let samples: [(String, SystemAction)] = [
+            ("lock screen", .lockScreen),
+            ("sleep", .sleep),
+            ("reboot", .restart),
+            ("shut down", .shutdown),
+            ("log out", .logout),
+            ("screen saver", .screenSaver),
+            ("empty trash", .emptyTrash),
+            ("eject all", .ejectAll),
+            ("dark mode", .toggleDarkMode),
+            ("do not disturb", .toggleDoNotDisturb)
+        ]
+        for (keyword, expected) in samples {
+            #expect(
+                expected.keywords.contains { $0.caseInsensitiveCompare(keyword) == .orderedSame },
+                "\(expected.rawValue) 应包含关键词 \(keyword)")
+        }
+    }
+
+    @Test("中文口语关键词覆盖主要操作")
+    func chineseKeywordsCoverCoreActions() {
+        let samples: [(String, SystemAction)] = [
+            ("锁屏", .lockScreen),
+            ("睡眠", .sleep),
+            ("重启", .restart),
+            ("关机", .shutdown),
+            ("注销", .logout),
+            ("屏保", .screenSaver),
+            ("废纸篓", .emptyTrash),
+            ("推出磁盘", .ejectAll),
+            ("深色模式", .toggleDarkMode),
+            ("勿扰", .toggleDoNotDisturb)
+        ]
+        for (keyword, expected) in samples {
+            #expect(
+                expected.keywords.contains(keyword),
+                "\(expected.rawValue) 应包含中文关键词 \(keyword)")
+        }
+    }
+}
+
+@Suite("系统操作自动化提示")
+struct SystemActionAutomationCopyTests {
+
+    @Test("权限不足时的 HUD 文案格式固定")
+    func permissionHintFormat() {
+        #expect(SystemActionAutomationCopy.permissionHint(action: "睡眠") == "睡眠失败：需要「自动化」权限")
+        #expect(
+            SystemActionAutomationCopy.permissionHint(action: "清空废纸篓")
+                == "清空废纸篓失败：需要「自动化」权限")
     }
 }

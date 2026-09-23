@@ -30,10 +30,11 @@ public struct AIMessage: Sendable, Equatable {
 }
 
 /// AI 调用失败的原因
-public enum AIError: LocalizedError, Sendable {
+public enum AIError: LocalizedError, Sendable, Equatable {
     case notEnabled
     case missingAPIKey
     case invalidURL(String)
+    case insecureBaseURL(String)
     case transport(String)
     case http(status: Int, body: String)
     case emptyResponse
@@ -46,6 +47,8 @@ public enum AIError: LocalizedError, Sendable {
             return "还没填 API Key。请到「设置 › AI 服务」填写。"
         case .invalidURL(let url):
             return "Base URL 无效：\(url)"
+        case .insecureBaseURL(let url):
+            return "Base URL 是不加密的 http 且不是本机地址，API Key 会明文出网，已拒绝：\(url)。请改用 https 或 localhost。"
         case .transport(let message):
             return "请求失败：\(message)"
         case .http(let status, let body):
@@ -68,6 +71,8 @@ public enum AIError: LocalizedError, Sendable {
 /// Anthropic 走 `/messages` 并带自己的鉴权头。
 public enum AIService {
 
+    private static let log = QuickLog.logger("ai")
+
     /// 当前配置快照
     public static func currentConfig(from defaults: UserDefaults = .standard) -> AIConfig {
         AIConfig.load(from: defaults)
@@ -82,10 +87,36 @@ public enum AIService {
         {
             throw AIError.missingAPIKey
         }
+        if let error = baseURLError(config.resolvedBaseURL, provider: config.provider) {
+            throw error
+        }
         if config.provider == .anthropic {
             return try await anthropicChat(config: config, messages: messages)
         }
         return try await openAIChat(config: config, messages: messages)
+    }
+
+    /// 校验 Base URL：不合法、或会让 API Key 明文出网时返回应抛出的错误，否则返回 nil
+    ///
+    /// 自定义服务商的地址由用户手填：填成非本机的 `http://` 会让 Key 随请求头明文出网，
+    /// 这种配置直接拒绝，比事后提醒有效。抽成纯函数是为了不起请求就能直接断言。
+    static func baseURLError(_ base: String, provider: AIProviderKind) -> AIError? {
+        guard provider == .custom else { return nil }
+        guard !base.isEmpty, let url = URL(string: base), url.scheme != nil else {
+            return .invalidURL(base)
+        }
+        guard url.scheme?.lowercased() == "http" else { return nil }
+        guard let host = url.host, isLocalHost(host) else {
+            return .insecureBaseURL(base)
+        }
+        return nil
+    }
+
+    /// 本机回环地址的 http 不出网，Key 没有明文泄露面
+    private static func isLocalHost(_ host: String) -> Bool {
+        let lowercased = host.lowercased()
+        return lowercased == "localhost" || lowercased == "127.0.0.1" || lowercased == "::1"
+            || lowercased.hasSuffix(".localhost")
     }
 
     /// 连接自检：发一条最短消息，能拿到回复就算通
@@ -138,7 +169,10 @@ public enum AIService {
         request.httpMethod = "POST"
         request.timeoutInterval = 60
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(config.apiKey, forHTTPHeaderField: "x-api-key")
+        // Key 可能带着粘贴来的首尾空白，与 OpenAI 分支一样先 trim，否则鉴权头永远对不上
+        request.setValue(
+            config.apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
+            forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
         // Anthropic 把 system 放在顶层，不放进 messages
@@ -164,21 +198,39 @@ public enum AIService {
 
     // MARK: - 传输
 
+    /// 发起请求并按 logging.md 记录：只记 host / 状态码 / 耗时，Key 与正文永远不进日志
     private static func send(_ request: URLRequest) async throws -> Data {
+        let host = request.url?.host ?? "unknown"
+        log.info("AI 请求发起：\(host, privacy: .public)")
+        let signpost = QuickLog.signposter("ai")
+        let interval = signpost.beginInterval("AIService.request")
+        let started = Date()
+        defer { signpost.endInterval("AIService.request", interval) }
+
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
+            log.error(
+                "AI 请求失败：\(host, privacy: .public) — \(error.localizedDescription, privacy: .public)")
             throw AIError.transport(error.localizedDescription)
         }
+        let milliseconds = Date().timeIntervalSince(started) * 1000
         guard let http = response as? HTTPURLResponse else {
+            log.error("AI 响应无效：\(host, privacy: .public)")
             throw AIError.transport("无效响应")
         }
         guard (200..<300).contains(http.statusCode) else {
+            log.error(
+                "AI 服务返回 \(http.statusCode, privacy: .public)：\(host, privacy: .public)，耗时 \(milliseconds, format: .fixed(precision: 0)) ms"
+            )
             let body = String(data: data, encoding: .utf8) ?? ""
             throw AIError.http(status: http.statusCode, body: String(body.prefix(400)))
         }
+        log.notice(
+            "AI 响应 \(http.statusCode, privacy: .public)：\(host, privacy: .public)，耗时 \(milliseconds, format: .fixed(precision: 0)) ms"
+        )
         return data
     }
 }

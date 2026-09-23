@@ -19,6 +19,7 @@
 		4B431AEF9D4BE531431145DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4AD2A44C727483F56A0A316D /* Assets.xcassets */; };
 		4FB5C899DD337B31D55F59DE /* PluginClipboard in Frameworks */ = {isa = PBXBuildFile; productRef = 967C96E3F4CC521690436415 /* PluginClipboard */; };
 		52363DE2F513149A6038375A /* QuickUI in Frameworks */ = {isa = PBXBuildFile; productRef = 783AEBF3F1FAE829DCAFC004 /* QuickUI */; };
+		524D1EC52B497EBF1E980A28 /* SettingsBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */; };
 		53A985DAB5B69501293E3EC9 /* PluginLauncher in Frameworks */ = {isa = PBXBuildFile; productRef = 101707495A6AF30BDD48497F /* PluginLauncher */; };
 		5BD9CB4EF1094389D50EC0AB /* PluginURLCodec in Frameworks */ = {isa = PBXBuildFile; productRef = F60EBFA34FFC8FDDF0CB8678 /* PluginURLCodec */; };
 		76B868B658D790B18C10FC2C /* PluginSQLFormatter in Frameworks */ = {isa = PBXBuildFile; productRef = 1FFF450730B0758258EE887F /* PluginSQLFormatter */; };
@@ -71,6 +72,7 @@
 		885C95C97CFC23FD83D482C7 /* PluginClipboard */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginClipboard; path = Packages/PluginClipboard; sourceTree = SOURCE_ROOT; };
 		A11F20BEC5F97F5EC79606AC /* PluginUUIDGenerator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginUUIDGenerator; path = Packages/PluginUUIDGenerator; sourceTree = SOURCE_ROOT; };
 		A336738EEED8ECCEAF064C6D /* PluginHashCalculator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginHashCalculator; path = Packages/PluginHashCalculator; sourceTree = SOURCE_ROOT; };
+		A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsBridge.swift; sourceTree = "<group>"; };
 		A7873A36EB616CB4FE27F295 /* AppCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCore.swift; sourceTree = "<group>"; };
 		BFEB3A087185F195EDE752D1 /* PluginSnippets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginSnippets; path = Packages/PluginSnippets; sourceTree = SOURCE_ROOT; };
 		C756B0BA63E770C910A9E89B /* PluginBase64Codec */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginBase64Codec; path = Packages/PluginBase64Codec; sourceTree = SOURCE_ROOT; };
@@ -140,6 +142,7 @@
 				4AD2A44C727483F56A0A316D /* Assets.xcassets */,
 				29D3223EB25304FC1C719BA9 /* Quick.entitlements */,
 				1701F76E22B29388E212E6DA /* QuickApp.swift */,
+				A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */,
 				E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */,
 				7BB92E5F9C0104DB071DFF81 /* Resources */,
 			);
@@ -254,7 +257,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					B237EB8A317339159C2A6828 = {
 						DevelopmentTeam = "";
@@ -331,6 +334,7 @@
 				3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */,
 				F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */,
 				9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */,
+				524D1EC52B497EBF1E980A28 /* SettingsBridge.swift in Sources */,
 				A5F5BA05FBA565DA840A590D /* StatusItemController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

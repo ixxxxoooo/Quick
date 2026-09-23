@@ -64,6 +64,40 @@ struct URLCodecLogicTests {
     func roundTrip(_ original: String) throws {
         #expect(try URLCodecLogic.decode(URLCodecLogic.encode(original)) == original)
     }
+
+    // MARK: - 空格编成加号
+
+    @Test("表单模式下空格编成 + 且能解回来")
+    func spacesAsPluses() throws {
+        let options = URLCodecLogic.Options(encodesSpacesAsPluses: true)
+        #expect(URLCodecLogic.encode("a b", options: options) == "a+b")
+        #expect(try URLCodecLogic.decode("a+b", options: options) == "a b")
+        // 默认模式不变：%20 是标准，+ 原样保留
+        #expect(URLCodecLogic.encode("a b") == "a%20b")
+        #expect(try URLCodecLogic.decode("a+b") == "a+b")
+    }
+
+    // MARK: - 完整 URL 模式
+
+    @Test("完整 URL 模式保留协议与路径分隔符")
+    func fullURLKeepsStructure() {
+        let options = URLCodecLogic.Options(encodesFullURL: true)
+        let encoded = URLCodecLogic.encode("https://example.com/路径?q=值", options: options)
+        #expect(encoded.hasPrefix("https://example.com/"))
+        #expect(encoded.contains("%E8%B7%AF%E5%BE%84"))
+    }
+
+    @Test("默认模式仍会编码冒号等结构字符")
+    func defaultModeEncodesStructure() {
+        #expect(URLCodecLogic.encode("https://example.com").contains("%3A"))
+    }
+
+    @Test("完整 URL 模式往返一致")
+    func fullURLRoundTrip() throws {
+        let options = URLCodecLogic.Options(encodesFullURL: true)
+        let original = "https://example.com/路径?q=值&p=2"
+        #expect(try URLCodecLogic.decode(URLCodecLogic.encode(original, options: options), options: options) == original)
+    }
 }
 
 @Suite("URL 编解码插件契约")
@@ -93,12 +127,21 @@ struct URLCodecPluginTests {
         #expect(!URLCodecPlugin.triggerWords.isEmpty)
     }
 
-    @Test("任一触发词都能唤醒插件，且只返回一个入口", arguments: ["url", "编码", "解码", "URL 编解码"])
+    @Test(
+        "任一触发词都能唤醒插件，且只返回一个入口",
+        arguments: ["url", "url编码", "网址解码", "URL 编解码", "urlencode"])
     func searchItemsMatchTrigger(_ trigger: String) async {
         let items = await URLCodecPlugin().searchItems(query: trigger)
         #expect(items.count == 1)
         #expect(items.first?.id == "url-codec.open")
         #expect(items.first?.pluginID == URLCodecPlugin.id)
+    }
+
+    /// 通用词归 Base64 插件所有，URL 插件只能用带限定的触发词
+    @Test("通用词「编码 / 解码」不再命中", arguments: ["编码", "解码", "encode", "decode"])
+    func genericCodecWordsDoNotMatch(_ trigger: String) async {
+        let items = await URLCodecPlugin().searchItems(query: trigger)
+        #expect(items.isEmpty)
     }
 
     @Test("无关查询不返回结果")

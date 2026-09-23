@@ -44,6 +44,34 @@ struct EventBusTests {
         #expect(count == 1)
     }
 
+    /// 独立实例与 shared 互不干扰
+    @Test("独立 EventBus 实例与 shared 隔离")
+    func isolatedInstanceDoesNotCrossTalkWithShared() {
+        let isolated = EventBus()
+        defer { isolated.removeAll() }
+
+        var isolatedReceived = false
+        isolated.on(NavigateEvent.self) { _ in
+            isolatedReceived = true
+        }
+
+        var sharedReceived = false
+        let sharedSub = EventBus.shared.on(NavigateEvent.self) { _ in
+            sharedReceived = true
+        }
+        defer {
+            sharedSub.cancel()
+            EventBus.shared.removeAll()
+        }
+
+        isolated.post(NavigateEvent(pluginID: "isolated-only", context: [:]))
+        #expect(isolatedReceived)
+        #expect(!sharedReceived)
+
+        EventBus.shared.post(NavigateEvent(pluginID: "shared-only", context: [:]))
+        #expect(sharedReceived)
+    }
+
     /// 测试分离面板事件发布与接收
     @Test("DetachPanelEvent 正确传递插件 ID")
     func detachPanelEvent() {

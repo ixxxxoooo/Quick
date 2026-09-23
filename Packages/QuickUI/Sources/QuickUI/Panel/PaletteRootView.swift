@@ -72,7 +72,6 @@ struct PaletteRootView: View {
     /// 而且搜索框的焦点也没人负责还回去。
     var onReturnToSearch: () -> Void
 
-    @State private var query: String = ""
     @State private var results: [SearchableItem] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
@@ -99,13 +98,12 @@ struct PaletteRootView: View {
         .background(PaletteBackground(scrimBoost: Double(panelTransparency) / 100))
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.panel, style: .continuous))
         .onAppear {
-            query = paletteQuery.text
             log.debug("面板视图已出现，开始首次搜索")
-            runSearch(query)
+            runSearch(paletteQuery.text)
             if appIndexSubscription == nil {
                 appIndexSubscription = EventBus.shared.on(AppIndexRefreshedEvent.self) { _ in
                     Task { @MainActor in
-                        if query.isEmpty {
+                        if paletteQuery.text.isEmpty {
                             runSearch("")
                         }
                     }
@@ -114,11 +112,10 @@ struct PaletteRootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             if results.isEmpty && !paletteMode.isPluginMode {
-                runSearch(query)
+                runSearch(paletteQuery.text)
             }
         }
         .onChange(of: paletteQuery.text) { oldValue, newValue in
-            query = newValue
             // 粘贴检测：一次性增量超过阈值时检测内容类型
             let delta = newValue.count - oldValue.count
             if delta >= PasteContentDetector.pasteThreshold {
@@ -184,9 +181,10 @@ struct PaletteRootView: View {
             if isSearching {
                 ProgressView()
                     .controlSize(.small)
-            } else if !query.isEmpty {
+            } else if !paletteQuery.text.isEmpty {
                 Button {
-                    query = ""
+                    // 查询的唯一真相是 paletteQuery：写它会经 onChange 触发重新搜索
+                    paletteQuery.text = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(DesignTokens.Typography.iconGlyph)
@@ -202,13 +200,13 @@ struct PaletteRootView: View {
     /// 搜索结果区域
     @ViewBuilder
     private var searchResultsArea: some View {
-        if results.isEmpty && !query.isEmpty && !isSearching {
+        if results.isEmpty && !paletteQuery.text.isEmpty && !isSearching {
             emptyState(
                 icon: "questionmark.circle",
                 message: "没有找到结果",
                 detail: "换个关键词试试，或检查对应插件是否已启用"
             )
-        } else if results.isEmpty && query.isEmpty {
+        } else if results.isEmpty && paletteQuery.text.isEmpty {
             if isSearching {
                 ProgressView("正在加载应用程序…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

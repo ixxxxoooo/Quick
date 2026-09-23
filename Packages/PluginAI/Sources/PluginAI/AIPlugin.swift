@@ -102,6 +102,11 @@ public final class AIPlugin: QuickPlugin {
         let windows = windowManager
 
         for provider in AIProviderRegistry.all {
+            // 设置页关掉的 Provider 不进搜索结果
+            guard PluginDefaults.isEnabled(
+                PluginSettingKey.AIPortal.providerEnabled(provider.id), default: true
+            ) else { continue }
+
             let matchScore =
                 provider.keywords.compactMap { word -> Double? in
                     let score = word.fuzzyScore(keyword)

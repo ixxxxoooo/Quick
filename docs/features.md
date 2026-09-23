@@ -33,7 +33,7 @@
 - **匹配不到就一条都不返回。** 相关度为 0 的应用不进结果 —— 兜底条目只是列表底部
   那个 `$ <query>`，不要用「全给 0」代替过滤。
 - **空查询的候选顺序是「收藏优先，否则按使用频率」—— 但这只决定候选，不决定最终顺序。**
-  首屏在聚合之后还会被 `PaletteCoordinator.promotingRecents` 用跨插件的 `UsageHistory`
+  首屏在聚合之后还会被 `PaletteSearchEngine.promotingRecents` 用跨插件的 `UsageHistory`
   重排一次，最近使用过的条目会被提到最前。收藏为空时退化为频率顺序，这是刻意的 ——
   没有收藏的新用户也该看到点东西，而不是一片空白。**排查首屏顺序时不要只看这个文件。**
 - **`defaultItems()` 必须返回空。** 首屏的主体就是这里给出的应用列表；
@@ -149,9 +149,8 @@
   类型标签只是噪音；内容类型仍用于图标（`leadingContent`）与「关掉预览」时的搜索副标题。
 - **`preview` 截断到 80 字符并追加 `…`**，所以最长是 81 个字符。
   列表行靠 `lineLimit(1)` 兜底，但截断本身必须在这里做 —— 列表不该为长文本付布局代价。
-- **落盘是防抖 2 秒的，不是即时的。** 剪贴板可能连续变化多次，每次都写盘既浪费又会
-  互相打断。所以**进程被强杀时最后 2 秒的内容会丢**，这是接受的代价。
-  `deactivate()` 里的 `save()` 是唯一的即时落盘点。
+- **落盘是即时的，没有防抖。** 每条记录一行写入 `clipboard_history`；`add` 的代价与历史长度无关，
+  攒批只会让「复制完立刻崩溃」丢掉刚复制的内容。以前整份历史是一个 JSON 文件时才需要 2 秒防抖。
 - **列表的悬停高亮归 `ClipboardListView` 持有，`ClipboardRowView` 无状态。**
   行自己记 `@State isHovered` 的话，键盘移动导致列表滚动时没人来清它，旧的灰色高亮
   会留在原地与选中项同时亮着（一层残影）。状态放 `ClipboardHoverState`（一个引用类型，
@@ -174,7 +173,7 @@
 | --- | --- |
 | `ClipboardPlugin` | 插件入口，把 `ClipboardMonitor` 的新内容转给 `ClipboardStore` |
 | `ClipboardMonitor` | 轮询系统剪贴板，回调 `onNewContent` |
-| `ClipboardStore` | 内存缓存 + 去重 + 上限裁剪 + 防抖落盘 |
+| `ClipboardStore` | 内存缓存 + 去重 + 上限裁剪 + 即时落库 |
 | `ClipboardEntry` | 值类型条目（`Codable` + `Sendable`） |
 | `ClipboardListView` | 插件主视图（含 `ClipboardHoverState` / 缩略图与预览缓存） |
 | `ClipboardListNavigation` | 上下键移动下标的纯函数（两端夹取、下标越界时也要能走） |
@@ -244,10 +243,9 @@
   - 代码判定要求**同时**含代码特征词（`{`、`func `、`let ` 等）**和换行**，
     所以单行代码片段会被归为 `.text`。
   - 不要为了「更准」随意调整这个顺序 —— 先改的规则会吃掉后面的所有情况。
-- **不忽略密码管理器标记的机密内容。** 某些密码管理器会在剪贴板里标记条目为机密，
-  当前实现不做区分。
-- **不加密落盘。** 剪贴板历史以明文 JSON 存在 Application Support 下，
-  所以剪贴板里出现过的密码会留在磁盘上。这是已知的安全权衡，改动前需要明确讨论。
+- **不加密落盘。** 剪贴板历史以明文存在 `quick.db`，
+  所以剪贴板里出现过的密码会留在磁盘上（密码管理器挂了 ConcealedType 的除外）。
+  这是已知的安全权衡，改动前需要明确讨论。
 - **轮询而非监听。** macOS 没有剪贴板变化通知，只能轮询（当前 500 ms）。
   所以「复制后立刻在历史里看到」最多有半秒延迟，这是设计而非缺陷。
 
@@ -437,6 +435,296 @@
 
 - 受保护的系统进程可能结束失败（权限不足），HUD 会提示。
 - 未实现 Raycast 的「结束后关窗 / 清搜索 / 回根搜索」选项。
+
+### 系统控制（systemcontrol）
+
+在主搜索或功能命令里一键执行锁屏、睡眠、重启、关机、清空废纸篓等 macOS 系统操作；也可进入插件面板浏览全部操作。
+
+#### 不变量
+
+- **每条操作都是一条独立功能命令**（`functionCommands`），主搜索走静态 `CommandIndex` 打分，
+  **不是**动态插件路径（未实现 `accepts` / `dynamicSearch`）。
+- **命令 id 形如 `systemcontrol.<rawValue>`**（如 `systemcontrol.lock`），与 `SystemAction.rawValue`
+  一一对应；热键、`perform(commandID:)` 与搜索结果共用同一 id。
+- **用户在设置里关闭某条命令后必须拒绝执行**（`SettingsStore.isCommandEnabled`）；关闭时打
+  `.notice` 日志，不静默忽略。
+- **空查询不产出 `searchItems` 结果**（避免首屏被系统命令淹没）；首屏若出现某条命令，来自
+  `defaultItems()` 对触发词的首条 `searchItems` 取样。
+- **执行后关闭主面板**（`HidePaletteEvent`），与面板内点击一致。
+- **反馈必须如实**：走 AppleScript 的操作失败时 HUD 提示需「自动化」权限；成功且机器即将
+  休眠/重启/注销时**不**伪造成功 HUD。锁屏走 `/usr/bin/pmset displaysleepnow`。
+- **`toggleDoNotDisturb` 尚未实现**，执行时只发 info HUD「勿扰模式切换暂未实现」。
+- **`Model/SystemAction.swift` 禁止 AppKit / SwiftUI**；AppleScript、`pmset`、`NSWorkspace`
+  只出现在 `Service/SystemActionRunner.swift`。
+
+#### 内部结构
+
+| 文件 | 职责 |
+| --- | --- |
+| `Model/SystemAction.swift` | 操作枚举：标题、描述、SF Symbol、中英文关键词 |
+| `Service/SystemActionRunner.swift` | 执行操作、AppleScript 辅助、HUD 反馈 |
+| `UI/SystemControlView.swift` | 操作列表；点击执行并关面板 |
+| `SystemControlPlugin.swift` | 命令注册、`perform`、搜索与别名 |
+
+#### 持久化
+
+| 键 | 含义 | 默认 |
+| --- | --- | --- |
+| `command.enabled.systemcontrol.<rawValue>` | 单条命令是否启用 | 未写过视为启用 |
+| `quick.alias.system.<rawValue>` | 命令别名（经 `SettingsStore`） | 无 |
+
+#### 已知限制
+
+- 大量操作依赖「系统设置 → 隐私与安全性 → 自动化」；Dev 构建签名变化后权限可能失效。
+- 「锁屏」实为立即关闭显示器睡眠，是否需密码取决于系统「锁屏」设置。
+- 勿扰模式切换为占位。
+
+### 文件搜索（filesearch）
+
+在主搜索用 `f ` / `file ` / `文件 ` 前缀按文件名（可选内容）查 Spotlight；插件面板内可持续输入关键词并打开文件。
+
+#### 不变量
+
+- **主搜索触发词必须带尾随空格**（`f `、`file `、`文件 `）；去掉前缀后关键词不能为空，
+  否则不查 Spotlight、不占用结果位。
+- **动态插件**：实现 `accepts` + `dynamicSearch`，只有前缀合法时才参与聚合搜索。
+- **查询引擎为 `NSMetadataQuery`**，范围 `NSMetadataQueryLocalComputerScope`；谓词由
+  `FileSearchQuery.predicate` 纯逻辑构造。
+- **每次搜索开始时读一遍设置**（`FileSearchPreferences.current`）：谓词、隐藏过滤、上限
+  必须同一次查询内一致。
+- **结果上限以设置为准**（20 / 50 / 100 / 200，非法值回落 50）；**禁止**在插件里二次写死
+  `prefix(10)`。
+- **忽略隐藏文件**：路径任一段以 `.` 开头的目录或文件名视为隐藏。
+- **新搜索会取消上一次查询**；**2 秒超时**后返回已收集结果。
+- **主搜索回车打开文件**（`NSWorkspace.open`）并关面板；插件视图内点击结果同样行为。
+- **面板内搜索与主搜索分离**：插件视图不要求 `f ` 前缀，输入变化即触发搜索。
+- **`Model/` 禁止 AppKit / SwiftUI**；图标映射只返回 SF Symbol 名。
+
+#### 内部结构
+
+| 文件 | 职责 |
+| --- | --- |
+| `Model/FileSearchQuery.swift` | 前缀解析、Spotlight 谓词描述 |
+| `Model/FileSearchPreferences.swift` | 设置映射、过滤规则 |
+| `Model/FileIconMapper.swift` | 扩展名 → 图标名 |
+| `Service/FileSearchSession.swift` | `NSMetadataQuery` 生命周期与结果映射 |
+| `UI/FileSearchView.swift` | 内嵌搜索框 + 结果列表 |
+| `FileSearchPlugin.swift` | 动态搜索、命令 `filesearch.content` |
+
+#### 持久化
+
+| 键 | 含义 | 默认 |
+| --- | --- | --- |
+| `fileSearch.maxResults` | 单次最多返回条数 | 50 |
+| `fileSearch.ignoreHidden` | 过滤隐藏路径段 | true（未写过） |
+| `fileSearch.includeContents` | 匹配文件正文索引 | false（未写过） |
+
+#### 已知限制
+
+- 依赖系统 Spotlight 索引状态；新文件、未索引卷可能搜不到。
+- 内容搜索只覆盖已被 Spotlight 索引的文本类型。
+- 超时 2 秒可能截断慢盘上的大结果集。
+
+### 文本片段（snippets）
+
+管理可复用文本模板；主搜索命中后复制到剪贴板（可展开 `{date}` 等占位符），插件面板提供列表与编辑。
+
+#### 不变量
+
+- **数据在 SQLite 表 `snippets`**（迁移 id `snippets.items`），由 `AppCore` 注入的
+  `PluginStorage` 执行；**数据库为真相**，内存缓存每次写后重载。
+- **增删改各一条 SQL**，禁止整表 JSON 重写；读失败时插件仍可启动（空列表 + `.error` 日志）。
+- **动态搜索**：`accepts` 要求查询至少 2 个字符，或命中触发词，或已有片段的 keyword/title
+  子串匹配。
+- **主搜索最多返回 10 条**；选中条目发 `CopyToClipboardEvent` 并关面板。
+- **`autoExpand` 与 `showSnippetHint` 在使用一刻读取**（`PluginDefaults.isEnabled`，
+  未写过时默认均为 true）。
+- **模板变量**：`{date}`、`{time}`、`{datetime}`、`{clipboard}`、`{random}`、`{timestamp}`；
+  读剪贴板仅在模板含 `{clipboard}` 时发生。
+- **日志不得写入片段正文**（只记条数）。
+- **`Model/Snippet.swift` 禁止 AppKit / SwiftUI**。
+
+#### 内部结构
+
+| 文件 | 职责 |
+| --- | --- |
+| `Model/Snippet.swift` | 片段模型与 60 字预览 |
+| `Service/SnippetStore.swift` | SQLite CRUD、搜索过滤 |
+| `Service/TemplateEngine.swift` | 占位符展开 |
+| `UI/SnippetsView.swift` | 双栏列表 + 编辑器 |
+| `SnippetsPlugin.swift` | 迁移声明、搜索、复制动作 |
+
+#### 持久化
+
+| 键 | 含义 | 默认 |
+| --- | --- | --- |
+| `snippets.autoExpand` | 插入前展开模板变量 | true（未写过） |
+| `snippets.showSnippetHint` | 结果行显示 `:keyword` | true（未写过） |
+| SQLite `snippets` 表 | id、title、content、keyword、category、时间戳 | — |
+
+#### 已知限制
+
+- `category` 字段已入库，当前 UI 未提供分类编辑。
+- 无「粘贴到前台应用」；用户需自行 ⌘V。
+
+### 文字识别（ocr）
+
+调用 Vision 对屏幕区域截图做 OCR；结果可在插件面板查看，并可选自动复制到剪贴板。
+
+#### 不变量
+
+- **截图前关面板且不归还焦点**（`HidePaletteEvent(restoreFocus: false)`），短暂延迟后调
+  `/usr/sbin/screencapture -i -s` 交互选区。
+- **识别使用 Vision `RecognizeTextRequest`**（`.accurate`、语言纠正开启）；**每次识别前**
+  重读语言设置。
+- **语言档位**：自动检测时不写死候选语言；指定语言时优先该语言，并追加固定兜底列表。
+- **非法语言存储值一律当作 `auto`**。
+- **空识别结果** HUD「未识别到文字」；**非空**时按 `ocr.autoCopy`（未写过默认 true）决定是否
+  `CopyToClipboardEvent`；关自动复制时 HUD 不得声称「已复制」。
+- **多行文本**按 Vision 观测顺序用换行拼接，不重排。
+- **`Model/` 禁止 AppKit / SwiftUI**；Vision 与 `screencapture` 只在 Service / Plugin 层。
+
+#### 内部结构
+
+| 文件 | 职责 |
+| --- | --- |
+| `Model/OCRQuery.swift` | 触发词与匹配规则 |
+| `Model/OCRPreferences.swift` | 语言档位 → Vision 参数 |
+| `Model/OCRText.swift` | 观测文本拼接 |
+| `Service/OCREngine.swift` | Vision 异步识别、状态 |
+| `UI/OCRResultView.swift` | 结果展示与手动复制 |
+| `OCRPlugin.swift` | 截图流程、`deliver`、命令 `ocr.capture` |
+
+#### 持久化
+
+| 键 | 含义 | 默认 |
+| --- | --- | --- |
+| `ocr.language` | `auto` / `zh-Hans` / `en` / `ja` | `auto` |
+| `ocr.autoCopy` | 识别完成后自动复制 | true（未写过） |
+
+#### 已知限制
+
+- 需要屏幕录制 / 截图相关系统权限；用户取消选区时无文字结果。
+- 临时 PNG 写在系统临时目录，读后删除。
+- 识别语言为「优先」策略，极端混合语种可能排序不理想。
+
+### 日历（calendar）
+
+读取系统日历今日日程并在插件视图展示；主搜索可预览今日前几条事件；支持农历日期文案。
+
+#### 不变量
+
+- **EventKit 权限**：`activate()` 调用 `requestFullAccessToEvents()`；**未授权时
+  `todayEvents()` 返回空数组**，不伪造日程。
+- **事件模型为纯值类型 `CalendarEvent`**：排序与时间展示在 Model 层可测；`EKEvent` 只在
+  `CalendarService` 翻译一次。
+- **动态搜索**：命中触发词后拉取今日事件；无事件时仍返回一条「今日无日程」占位项；有事件时
+  **最多 5 条**；选中任一条结果 `action` 发布 `NavigateEvent`（事件项可带 `eventID` 上下文）。
+- **农历文案**由 `CalendarFormatting.lunar`（中国历 + `zh_CN` 长日期）生成。
+- **`Model/` 禁止 AppKit / SwiftUI**。
+
+#### 内部结构
+
+| 文件 | 职责 |
+| --- | --- |
+| `Model/CalendarEvent.swift` | 事件值类型、时间范围、排序 |
+| `Model/CalendarFormatting.swift` | 农历格式化 |
+| `Service/CalendarService.swift` | 权限、今日事件查询 |
+| `UI/CalendarView.swift` | 公历 + 农历头、今日列表 |
+| `CalendarPlugin.swift` | 搜索、命令声明 |
+
+#### 持久化
+
+| 键 | 含义 | 默认 |
+| --- | --- | --- |
+| `calendar.reminderMinutes` | 设置页：提醒提前分钟 | 10（尚未接入 Service） |
+| `calendar.autoExtractMeetingLinks` | 设置页：自动提取会议链接 | true（尚未接入） |
+| `calendar.showWeekNumber` | 设置页：显示周数 | false（尚未接入） |
+
+#### 已知限制
+
+- 设置页三项偏好尚未接入 `CalendarService` / `CalendarView`。
+- 功能命令默认 `perform` 仅打开插件面板。
+- 描述中的「节假日安排」暂无独立数据源，仅农历字符串。
+
+### 笔记（notes）
+
+轻量笔记与待办清单：SQLite 持久化，插件面板双标签（笔记 / 待办），主搜索可列出匹配笔记。
+
+#### 不变量
+
+- **两张表**：`notes`（迁移 `notes.items`）、`todos`（`notes.todos`）；排序规则固定——笔记
+  `created_at DESC, rowid DESC`，待办 `created_at ASC, rowid ASC`。
+- **数据库为真相**：逐条 SQL 写入，失败后重载对齐库内状态。
+- **动态搜索**：触发词用**整词匹配**（`matchesAnyTrigger`），避免 `memory` 误命中 `memo`；
+  剥离触发词后的关键词搜 title/content，空关键词列出笔记（最多 5 条）；选中结果 `action`
+  发布 `NavigateEvent`（可带 `noteID` 上下文）。
+- **笔记编辑需点「保存」**才 `updateNote`；`notes.autoSave` 尚未接线。
+- **日志不得写入笔记/待办正文**。
+- **`Model/NoteModel.swift` 禁止 AppKit / SwiftUI**。
+
+#### 内部结构
+
+| 文件 | 职责 |
+| --- | --- |
+| `Model/NoteModel.swift` | `NoteItem`、`TodoItem`、`NoteCategory` |
+| `Service/NoteStore.swift` | SQLite CRUD、搜索 |
+| `UI/NotesView.swift` | 分段控件、笔记双栏、待办列表 |
+| `NotesPlugin.swift` | 迁移、搜索、生命周期 |
+
+#### 持久化
+
+| 键 | 含义 | 默认 |
+| --- | --- | --- |
+| `notes.autoSave` | 设置页：自动保存 | true（**未接入编辑流程**） |
+| `notes.defaultFormat` | 设置页：默认格式 `plain` | plain（**未接入**） |
+| SQLite `notes` / `todos` | 业务数据 | — |
+
+#### 已知限制
+
+- 无桌面浮动便签窗口；`NoteCategory.sticky` 仅为数据枚举。
+- 设置页「自动保存 / 默认格式」为占位，行为以手动保存为准。
+- 描述中的「Markdown / 富文本」当前为纯文本 `TextEditor`。
+
+### 网络工具（networktools）
+
+查看本机局域网 IP、可选公网 IP、以及 `/etc/resolv.conf` 解析出的 DNS；支持复制各项结果。
+
+#### 不变量
+
+- **主搜索触发词用整词匹配**（`matchesAnyTrigger`），避免 `clipboard`、`multiply` 等误触发。
+- **命中后返回一条导航项**，`NavigateEvent(pluginID: "networktools")` 进入插件面板，
+  不在搜索层直接展示 IP。
+- **`refresh()` 每次读取 `networkTools.showExternalIP`**（未写过默认 true）：关闭时**不发起**
+  公网 IP 请求，UI 也不展示公网行。
+- **本机 IP**：遍历 `getifaddrs`，仅 IPv4，接口名 **`en0` 或 `en1`**，取第一个命中。
+- **DNS**：读 `/etc/resolv.conf` 全文，由纯函数 `ResolvConf.dnsServers` 解析行首 `nameserver`。
+- **公网 IP 查询可注入**（`NetworkService.init(fetchPublicIP:)`）供测试替换网络。
+- **`Model/ResolvConf.swift` 禁止 AppKit / SwiftUI**。
+
+#### 内部结构
+
+| 文件 | 职责 |
+| --- | --- |
+| `Model/ResolvConf.swift` | resolv.conf 文本 → DNS 列表 |
+| `Service/NetworkService.swift` | IP/DNS 采集、加载状态 |
+| `UI/NetworkToolsView.swift` | 刷新按钮、信息行、复制 |
+| `NetworkToolsPlugin.swift` | 搜索导航、功能命令声明 |
+
+#### 持久化
+
+| 键 | 含义 | 默认 |
+| --- | --- | --- |
+| `networkTools.showExternalIP` | 查询并展示公网 IP | true（未写过） |
+| `networkTools.pingCount` | 设置页：Ping 次数 | 4（**未接入**） |
+| `networkTools.timeout` | 设置页：超时秒数 | 5（**未接入**） |
+
+#### 已知限制
+
+- **网络测速**、**Ping**、**DNS 切换** 仅在 `functionCommands` 与触发词文案中出现，**无**
+  `perform` 实现与 UI。
+- 公网 IP 依赖第三方 HTTPS 服务，离线或被封时显示「无法获取」。
+- 本机 IP 只反映以太网/Wi‑Fi 常见接口，VPN / 桥接 / 其它接口可能看不到。
 
 ### 超级面板（Super Panel）
 

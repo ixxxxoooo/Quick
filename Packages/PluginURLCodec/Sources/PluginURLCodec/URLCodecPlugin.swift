@@ -17,7 +17,11 @@ public final class URLCodecPlugin: QuickPlugin {
     public static let name = "URL 编解码"
     public static let icon = "link.circle.fill"
     public static let description = "URL 百分号编码与解码工具，支持整条链接保留结构编码或纯参数组件编码。"
-    public static let triggerWords = ["URL 编解码", "url", "编码", "解码", "encode", "decode"]
+    /// 通用词「编码 / 解码 / encode / decode」归 Base64 插件，这里只保留带 URL 限定的词，
+    /// 否则两个插件会在同一条查询上撞车
+    public static let triggerWords = [
+        "URL 编解码", "url", "url编码", "url解码", "网址编码", "网址解码", "urlencode", "urldecode"
+    ]
 
     public static var functionCommands: [CommandDescriptor] {
         [

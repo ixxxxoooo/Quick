@@ -20,6 +20,7 @@ struct PluginCommandsTests {
         static let id = "fake"
         static let name = "Fake"
         static let icon = "star"
+        var isEnabled = true
         static let triggerWords = ["fake"]
         static var functionCommands: [CommandDescriptor] {
             [
@@ -45,6 +46,7 @@ struct PluginCommandsTests {
             static let id = "plain"
             static let name = "Plain"
             static let icon = "circle"
+            var isEnabled = true
             func makeView() -> AnyView { AnyView(EmptyView()) }
         }
         #expect(PlainPlugin.commands.map(\.id) == [CommandID.openPlugin("plain")])

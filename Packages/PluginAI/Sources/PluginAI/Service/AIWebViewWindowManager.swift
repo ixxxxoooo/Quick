@@ -42,6 +42,13 @@ final class AIWebViewWindowManager {
             log.error("未知 Provider: \(providerId, privacy: .public)")
             return
         }
+        // 设置页关掉的 Provider 不能被打开：门户卡片与搜索动作都汇聚到这一个入口
+        guard PluginDefaults.isEnabled(
+            PluginSettingKey.AIPortal.providerEnabled(provider.id), default: true
+        ) else {
+            log.notice("Provider 已在设置中停用，忽略打开请求: \(providerId, privacy: .public)")
+            return
+        }
 
         let window: AIWebViewWindow
         if let existing = windows[providerId] {
@@ -275,6 +282,12 @@ final class AIWebViewWindowManager {
         capsule.positionInSuperview()
 
         panel.contentView = hostView
+
+        // 「窗口默认置顶」只决定新窗口的初始层级，之后用户用胶囊上的图钉随时改
+        if PluginDefaults.isEnabled(PluginSettingKey.AIPortal.defaultAlwaysOnTop, default: false) {
+            panel.level = .floating
+            capsule.setToggle(Self.pinActionID, isOn: true, tooltip: "取消置顶")
+        }
 
         return AIWebViewWindow(
             panel: panel, webView: webView, providerId: provider.id, capsule: capsule)

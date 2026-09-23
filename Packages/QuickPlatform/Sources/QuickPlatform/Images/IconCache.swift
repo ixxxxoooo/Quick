@@ -9,10 +9,13 @@ import Synchronization
 ///
 /// 缓存已加载的应用图标，避免重复读取文件系统。
 /// 支持深色/浅色模式切换时清除缓存。
+///
+/// 优先由宿主（`AppCore.iconCache`）持有实例并注入；`shared` 供尚无法注入的 UI
+///（例如 `ClipboardListView`）复用同一份缓存。
 @MainActor
 public final class IconCache {
 
-    /// 全局单例
+    /// 全局单例（与 `AppCore.iconCache` 应为同一实例）
     public static let shared = IconCache()
 
     /// 图标缓存（key: bundle path 或 bundle ID）
@@ -21,7 +24,7 @@ public final class IconCache {
     /// 缓存大小上限
     private let maxCacheSize = 500
 
-    private init() {}
+    public init() {}
 
     /// 获取应用图标
     /// - Parameter bundlePath: 应用 Bundle 路径
