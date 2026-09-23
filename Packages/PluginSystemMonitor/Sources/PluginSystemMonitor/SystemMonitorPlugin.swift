@@ -21,6 +21,27 @@ public final class SystemMonitorPlugin: QuickPlugin {
         "cpu", "内存", "磁盘", "网络", "电池", "电源"
     ]
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "sysmonitor.cpu", pluginID: id, pluginName: name, title: "CPU 监控",
+                subtitle: "查看 CPU 占用", keywords: ["cpu", "cpu监控"], icon: "cpu"),
+            CommandDescriptor(
+                id: "sysmonitor.memory", pluginID: id, pluginName: name, title: "内存监控",
+                subtitle: "查看内存占用", keywords: ["内存", "memory"], icon: "memorychip"),
+            CommandDescriptor(
+                id: "sysmonitor.disk", pluginID: id, pluginName: name, title: "磁盘监控",
+                subtitle: "查看磁盘占用", keywords: ["磁盘", "disk"], icon: "internaldrive"),
+            CommandDescriptor(
+                id: "sysmonitor.network", pluginID: id, pluginName: name, title: "网络监控",
+                subtitle: "查看网络吞吐", keywords: ["网络监控"], icon: "network"),
+            CommandDescriptor(
+                id: "sysmonitor.temperature", pluginID: id, pluginName: name, title: "温度监控",
+                subtitle: "查看机身温度", keywords: ["温度", "temperature"],
+                icon: "thermometer.medium")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(SystemMonitorPlugin.id)

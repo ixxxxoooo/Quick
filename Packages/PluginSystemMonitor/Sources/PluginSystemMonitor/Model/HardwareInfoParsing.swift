@@ -4,8 +4,11 @@
 
 import Foundation
 
-/// 硬件规格（来自 `system_profiler`）
-struct HardwareInfo: Sendable, Equatable {
+/// 硬件规格
+///
+/// 大部分字段来自 `sysctl` / IOKit（毫秒级，见 `HardwareSampler`）；只有 GPU 三项
+/// 需要 `system_profiler SPDisplaysDataType`，在后台补齐。整体可编码，用于跨启动缓存。
+struct HardwareInfo: Sendable, Equatable, Codable {
     let modelName: String
     let modelIdentifier: String
     let modelNumber: String
@@ -16,6 +19,39 @@ struct HardwareInfo: Sendable, Equatable {
     let gpuChipset: String
     let gpuCores: String
     let gpuMemory: String
+
+    /// GPU 三项的占位文案（后台还没补上时显示）
+    static let gpuPlaceholder = "读取中…"
+
+    /// 已拿到的 GPU 信息；还是占位时返回 nil
+    var gpu: GPUInfo? {
+        guard gpuChipset != Self.gpuPlaceholder, gpuChipset != "—" else { return nil }
+        return GPUInfo(chipset: gpuChipset, cores: gpuCores, memory: gpuMemory)
+    }
+
+    /// 只替换 GPU 三项，其余原样
+    func mergingGPU(_ gpu: GPUInfo?) -> HardwareInfo {
+        guard let gpu else { return self }
+        return HardwareInfo(
+            modelName: modelName,
+            modelIdentifier: modelIdentifier,
+            modelNumber: modelNumber,
+            chip: chip,
+            totalCores: totalCores,
+            memory: memory,
+            serialNumber: serialNumber,
+            gpuChipset: gpu.chipset,
+            gpuCores: gpu.cores,
+            gpuMemory: gpu.memory
+        )
+    }
+}
+
+/// GPU 信息
+struct GPUInfo: Sendable, Equatable, Codable {
+    let chipset: String
+    let cores: String
+    let memory: String
 }
 
 /// 软件版本
@@ -26,29 +62,23 @@ struct SoftwareInfo: Sendable, Equatable {
     let uptime: String
 }
 
-/// 解析 `system_profiler SPHardwareDataType` / `SPDisplaysDataType`
+/// 解析 `system_profiler SPDisplaysDataType`（只用来补 GPU）
 enum HardwareInfoParsing {
 
-    static func parseHardware(_ output: String, displayOutput: String) -> HardwareInfo {
-        let memory = field(output, "Memory") ?? "未知"
-        let vram = field(displayOutput, "VRAM (Total)") ?? field(displayOutput, "VRAM")
+    /// 从显示器输出里解析 GPU；拿不到核心字段时返回 nil
+    static func parseGPU(_ output: String, memory: String) -> GPUInfo? {
+        guard let chipset = field(output, "Chipset Model"), !chipset.isEmpty else { return nil }
+        let vram = field(output, "VRAM (Total)") ?? field(output, "VRAM")
         let isUnified = vram == nil
         let gpuMemory = isUnified ? "共享（\(memory) 系统内存）" : (vram ?? "未知")
-
-        return HardwareInfo(
-            modelName: field(output, "Model Name") ?? "未知",
-            modelIdentifier: field(output, "Model Identifier") ?? "未知",
-            modelNumber: field(output, "Model Number") ?? "未知",
-            chip: field(output, "Chip") ?? field(output, "Processor Name") ?? "未知",
-            totalCores: field(output, "Total Number of Cores") ?? "未知",
-            memory: memory,
-            serialNumber: field(output, "Serial Number (system)") ?? "未知",
-            gpuChipset: field(displayOutput, "Chipset Model") ?? "未知",
-            gpuCores: field(displayOutput, "Total Number of Cores") ?? "未知",
-            gpuMemory: gpuMemory
+        return GPUInfo(
+            chipset: chipset,
+            cores: field(output, "Total Number of Cores") ?? "未知",
+            memory: gpuMemory
         )
     }
 
+    /// 取 `Label: value` 形式的一行
     static func field(_ output: String, _ label: String) -> String? {
         let escaped = NSRegularExpression.escapedPattern(for: label)
         let pattern = try? NSRegularExpression(

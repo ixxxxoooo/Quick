@@ -182,30 +182,66 @@ struct PowerStatsParsingTests {
 @Suite("硬件信息解析")
 struct HardwareInfoParsingTests {
 
-    @Test("解析 SPHardwareDataType 字段")
-    func parseHardware() {
-        let hardware = """
-            Hardware Overview:
+    private func makeHardware(gpu: String = HardwareInfo.gpuPlaceholder) -> HardwareInfo {
+        HardwareInfo(
+            modelName: "Mac", modelIdentifier: "Mac16,1", modelNumber: "—",
+            chip: "Apple M4", totalCores: "10", memory: "24 GB", serialNumber: "X",
+            gpuChipset: gpu, gpuCores: gpu, gpuMemory: gpu)
+    }
 
-              Model Name: Mac mini
-              Model Identifier: Mac16,10
-              Model Number: MU9D3CH/A
-              Chip: Apple M4
-              Total Number of Cores: 10 (4 performance and 6 efficiency)
-              Memory: 16 GB
-              Serial Number (system): ABCD1234
-            """
+    @Test("解析 SPDisplaysDataType 的 GPU 字段（统一内存）")
+    func parseGPUUnified() {
         let display = """
             Graphics/Displays:
 
                 Chipset Model: Apple M4
                 Total Number of Cores: 10
             """
-        let info = HardwareInfoParsing.parseHardware(hardware, displayOutput: display)
-        #expect(info.modelName == "Mac mini")
-        #expect(info.chip == "Apple M4")
-        #expect(info.gpuMemory.contains("共享"))
-        #expect(info.serialNumber == "ABCD1234")
+        let gpu = HardwareInfoParsing.parseGPU(display, memory: "24 GB")
+        #expect(gpu?.chipset == "Apple M4")
+        #expect(gpu?.cores == "10")
+        #expect(gpu?.memory.contains("共享") == true)
+    }
+
+    @Test("独立显存时直接用 VRAM")
+    func parseGPUSeparateVRAM() {
+        let display = """
+              Chipset Model: AMD Radeon Pro
+              Total Number of Cores: 20
+              VRAM (Total): 8 GB
+            """
+        #expect(HardwareInfoParsing.parseGPU(display, memory: "32 GB")?.memory == "8 GB")
+    }
+
+    @Test("拿不到 Chipset Model 时返回 nil")
+    func parseGPUMissing() {
+        #expect(HardwareInfoParsing.parseGPU("no gpu here", memory: "16 GB") == nil)
+    }
+
+    @Test("机型标识符能确定就映射成可读名，否则原样返回")
+    func modelDisplayName() {
+        #expect(HardwareSampler.modelDisplayName("MacBookPro18,3") == "MacBook Pro")
+        #expect(HardwareSampler.modelDisplayName("Macmini9,1") == "Mac mini")
+        #expect(HardwareSampler.modelDisplayName("Mac16,1") == "Mac16,1")
+    }
+
+    @Test("GPU 占位时 gpu 为 nil；合并后只替换 GPU 三项")
+    func mergingGPU() {
+        #expect(makeHardware().gpu == nil)
+        let merged = makeHardware().mergingGPU(
+            GPUInfo(chipset: "Apple M4", cores: "10", memory: "共享"))
+        #expect(merged.gpuChipset == "Apple M4")
+        #expect(merged.chip == "Apple M4")
+        #expect(merged.modelIdentifier == "Mac16,1")
+    }
+
+    @Test("缓存可写可读")
+    func cacheRoundTrip() {
+        let defaults = UserDefaults(suiteName: "sysmonitor.cache.\(UUID().uuidString)")!
+        let info = makeHardware(gpu: "Apple M4")
+        HardwareCache.save(info, defaults: defaults)
+        #expect(HardwareCache.load(defaults: defaults) == info)
+        #expect(HardwareCache.load(defaults: UserDefaults(suiteName: UUID().uuidString)!) == nil)
     }
 }
 

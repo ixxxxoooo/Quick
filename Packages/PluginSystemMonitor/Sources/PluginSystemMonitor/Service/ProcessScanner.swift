@@ -51,9 +51,13 @@ final class ProcessScanner {
     private var previousCoreTicks: [CpuTickSample]?
     private var previousNetworkCounters: [NetworkCounterSample]?
     private var didLoadHardware = false
+    /// GPU 那一步每次运行只补一次（它要起 `system_profiler`，是硬件里唯一慢的部分）
+    private var didStartGPU = false
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        // 先用上次的缓存秒开（含 GPU），首屏不再等 system_profiler
+        hardware = HardwareCache.load(defaults: defaults)
     }
 
     /// 当前的采样间隔（秒）
@@ -219,21 +223,44 @@ final class ProcessScanner {
         )
     }
 
+    /// 采集硬件信息
+    ///
+    /// 快路径（sysctl / IOKit）毫秒级，直接出；GPU 三项要靠 `system_profiler`，
+    /// 丢到后台补，不阻塞这一轮刷新。结果写进缓存，下次启动秒开。
     private func refreshHardware() async {
-        let info = await Task.detached(priority: .utility) {
-            let hardware = LocalCommand.run(
-                path: "/usr/sbin/system_profiler", arguments: ["SPHardwareDataType"])
-            let display = LocalCommand.run(
-                path: "/usr/sbin/system_profiler", arguments: ["SPDisplaysDataType"])
-            guard !hardware.isEmpty else { return nil as HardwareInfo? }
-            return HardwareInfoParsing.parseHardware(hardware, displayOutput: display)
+        let fast = await Task.detached(priority: .userInitiated) {
+            HardwareSampler.sample()
         }.value
-        if let info {
-            hardware = info
+
+        if let fast {
+            hardware = fast.mergingGPU(hardware?.gpu)
+            HardwareCache.save(hardware, defaults: defaults)
             didLoadHardware = true
-            log.notice("硬件信息已缓存：\(info.modelIdentifier, privacy: .public)")
+            log.notice("硬件信息已就绪（sysctl）：\(fast.modelIdentifier, privacy: .public)")
+        } else if hardware == nil {
+            // 连机型都读不到：这一轮不算就绪，下个 tick 再试
+            log.error("sysctl 读取硬件信息失败")
+            return
         } else {
-            log.error("读取 system_profiler 硬件信息失败")
+            didLoadHardware = true
+        }
+
+        startGPUIfNeeded()
+    }
+
+    /// GPU 后台补齐（每次运行一次）
+    private func startGPUIfNeeded() {
+        guard !didStartGPU, let current = hardware else { return }
+        didStartGPU = true
+        let memory = current.memory
+        Task { [weak self] in
+            let gpu = await Task.detached(priority: .utility) {
+                HardwareSampler.sampleGPU(memory: memory)
+            }.value
+            guard let self, let gpu, let latest = self.hardware else { return }
+            self.hardware = latest.mergingGPU(gpu)
+            HardwareCache.save(self.hardware, defaults: self.defaults)
+            self.log.notice("GPU 信息已补全")
         }
     }
 
