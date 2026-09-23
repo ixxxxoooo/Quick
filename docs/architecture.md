@@ -70,16 +70,20 @@
 
 顺序是有意的，改动前想清楚依赖：
 
-1. `registerPlugins()` —— 组装插件（**唯一实例化插件的地方**）
-2. `paletteCoordinator.setPlugins(plugins)` —— 让面板能搜索
-3. `wireEventBus()` —— 订阅事件，把事件接到协调器/剪贴板/HUD
-4. 热键：设 `onCommand` 回调 → `hotKeyService.start()` → `wireSuperPanel()`（注入系统能力、
-   起鼠标监听、补默认 ⌥C）→ 按命令目录同步注册
-5. `statusItemController.install()` —— 菜单栏图标
-6. `observeDebugWakeSignals()` —— 调试用分布式通知
-7. `Task { await appIndex.refresh() }` —— **异步**扫描应用，不阻塞启动
-8. 对每个已启用插件调用 `activate()`
-9. 若启动参数带 `-showPalette`，立即显示面板
+1. `AIConfig.migrateAPIKeyIfNeeded()` —— API Key 从 UserDefaults 迁入 Keychain（一次性）
+2. `migrateHostStorage()` —— 打开数据库、应用宿主 schema。**必须先于注册插件**：
+   需要真表的插件在构造时就要拿到存储句柄
+3. `registerPlugins()` —— 组装插件（**唯一实例化插件的地方**）
+4. `paletteCoordinator.setPlugins(plugins)` —— 注入插件，接上「最近使用」与键盘布局回调
+5. `wireEventBus()` —— 订阅事件，把事件接到协调器/剪贴板/HUD
+6. 分离回调 `onDetach`
+7. 热键：设 `onCommand` 回调 → `hotKeyService.start()` → `wireSuperPanel()`（注入系统能力、
+   起鼠标监听、补默认 ⌥C）→ `invokeCommand` / 搜索范围回调
+8. `statusItemController.install()` —— 菜单栏图标；onboarding 与外观随后接线
+9. `observeDebugWakeSignals()` —— 调试用分布式通知
+10. `Task { await appIndex.refresh(scopes:) }` —— **异步**扫描应用，不阻塞启动
+11. 对每个已启用插件调用 `activate()` → `rebuildCommandCatalog()`
+12. `applyLaunchArguments()` —— 开发启动参数（`-showPalette` 等验收开关统一在这里处理）
 
 退出走 `prepareForTermination()`：停热键 → 摘菜单栏 → `deactivate()` 各插件 →
 `EventBus.shared.removeAll()`。

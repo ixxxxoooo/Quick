@@ -59,8 +59,9 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
             只有 Quick/ 目标能同时看到插件
 ```
 
-`QuickCore` 不认识任何插件，`QuickUI` / `QuickPlatform` 也不认识任何插件。只有 `Quick/AppCore.swift`
-能 `import Plugin*`。
+`QuickCore` 不认识任何插件，`QuickUI` / `QuickPlatform` 也不认识任何插件。只有 `Quick/`
+目标（`AppCore.swift` 注册插件、`SettingsBridge.swift` 提供命令目录桥接）能 `import Plugin*`。
+这条按 **target 边界**理解：插件类型不得渗入 `QuickCore` / `QuickUI` / `QuickPlatform` 或其他插件。
 
 ---
 

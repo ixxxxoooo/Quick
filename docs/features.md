@@ -177,7 +177,6 @@
 | `ClipboardEntry` | 值类型条目（`Codable` + `Sendable`） |
 | `ClipboardListView` | 插件主视图（含 `ClipboardHoverState` / 缩略图与预览缓存） |
 | `ClipboardListNavigation` | 上下键移动下标的纯函数（两端夹取、下标越界时也要能走） |
-| `ClipboardSettingsView` | 设置页 |
 
 `ClipboardStore` 标了 `@Observable`，供 `ClipboardListView` 观察。
 **注意这不违反「不要给持有 NSPanel 的对象加 `@Observable`」** —— 那条规则针对的是
@@ -732,8 +731,8 @@
 即时动作；没有内容时提供工作台（常用工具 + 最近使用 + 剪贴板预览）。
 
 **它不是插件，而是宿主级组件。** 面板不进主面板搜索、不进插件列表，设置自成一处。
-实现挂在 `Quick/SuperPanel/`（窗口与接线）与
-`Packages/QuickUI/Sources/QuickUI/SuperPanel/`（模型、动作、视图、设置页）。
+实现全部挂在 `Packages/QuickUI/Sources/QuickUI/SuperPanel/`（模型、动作、视图、
+窗口与接线），`AppCore` 持有控制器实例并注入系统能力。
 
 - 组件：`SuperPanelController`（`AppCore` 持有）
 - 设置页：宿主级「超级面板」分栏
