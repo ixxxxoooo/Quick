@@ -9,7 +9,7 @@
 # 生成的内容遵循 AGENTS.md 的插件契约。生成后仍需手动做三件事（脚本会打印提醒）：
 #   1. 在 Quick/AppCore.swift#registerPlugins() 注册
 #   2. 在 project.yml 加 packages + dependencies 两处，然后 xcodegen generate
-#   3. 在 docs/features/<id>.md 写下这个插件的不变量
+#   3. 在 docs/features.md 写下这个插件的不变量
 #
 set -euo pipefail
 
@@ -126,7 +126,7 @@ import SwiftUI
 /// $prefix 功能插件
 ///
 /// TODO: 一句话说明这个插件做什么。
-/// 不变量与内部约定见 docs/features/$plugin_id.md
+/// 不变量与内部约定见 docs/features.md
 @MainActor
 public final class ${prefix}Plugin: QuickPlugin {
 
@@ -313,7 +313,7 @@ echo "         path: Packages/$name"
 echo "     targets.Quick.dependencies:"
 echo "       - package: $name"
 echo
-echo "  3) 在 docs/features/$plugin_id.md 写下这个插件的不变量"
+echo "  3) 在 docs/features.md 写下这个插件的不变量"
 echo
 echo "  然后：./Scripts/run-tests.sh $name"
 echo

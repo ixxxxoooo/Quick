@@ -47,7 +47,7 @@ SwiftUI + AppKit，以 accessory 模式运行（`LSUIElement`，无 Dock 图标�
 | `Packages/QuickPlatform/` | 系统能力封装：热键、应用扫描、权限、剪贴板、图标缓存、路径 |
 | `Packages/Plugin*/` | 25 个内置插件，每个一个包；大插件内部再分 `Model/` `Service/` `UI/` `Settings/` |
 | `Scripts/` | 所有可执行脚本：测试、构建、lint、格式化、脚手架 |
-| `docs/` | 规范文档（本目录）；每个功能插件的约束写在 `docs/features/` |
+| `docs/` | 规范文档（本目录）；每个功能插件的约束写在 `docs/features.md` |
 | `.githooks/` | 版本控制的 git 钩子，通过 `Scripts/setup.sh` 启用 |
 
 **依赖方向是单向的，永不反向：**
@@ -74,7 +74,7 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 | 声称一个改动「做完了」 | [docs/testing.md](docs/testing.md) |
 | 编译、运行、调试、生成工程 | [docs/development.md](docs/development.md) |
 | 新增或调整任何视图 | [docs/ui.md](docs/ui.md) |
-| 动某个插件的内部 | [docs/features/](docs/features/) —— 每份以不变量开头 |
+| 动某个插件的内部 | [docs/features.md](docs/features.md) —— 每节以不变量开头 |
 
 ---
 
@@ -153,7 +153,7 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
    然后 `xcodegen generate`。
 5. 加测试，`./Scripts/run-tests.sh` 必须全绿。
 6. 加日志：`QuickLog.plugin("<id>")`，覆盖 `activate()` / `deactivate()` / 错误路径。
-7. 在 `docs/features/<id>.md` 写下这个插件的不变量。
+7. 在 `docs/features.md` 写下这个插件的不变量。
 8. 提交。
 
 ### 定义「做完」
