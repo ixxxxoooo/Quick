@@ -96,6 +96,9 @@ final class ClipboardStore {
             try storage.database.transaction(statements)
         } catch {
             log.error("剪贴板写入失败：\(error)")
+            // 事务失败时，内存里的「去重 + 插入」已经发生，可能与库不一致 ——
+            // 以数据库为准重读，保持「库是唯一真相」
+            reloadCacheFromDatabase()
             return
         }
         pruneImageBudget()

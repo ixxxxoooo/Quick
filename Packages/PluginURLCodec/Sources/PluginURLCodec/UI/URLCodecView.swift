@@ -65,7 +65,9 @@ struct URLCodecView: View {
                 }.buttonStyle(.bordered).controlSize(.small)
 
                 Button {
-                    input = ""; output = ""
+                    input = ""
+                    output = ""
+                    error = nil
                 } label: {
                     Label("清空", systemImage: "trash")
                 }.buttonStyle(.bordered).controlSize(.small)

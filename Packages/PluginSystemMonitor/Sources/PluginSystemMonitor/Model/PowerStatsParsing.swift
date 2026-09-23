@@ -43,7 +43,10 @@ enum PowerStatsParsing {
             && !trimmed.localizedCaseInsensitiveContains("not charging")
 
         guard hasBatteryLine else {
-            return (false, nil, false, isOnAC || true)
+            // 台式机没有电池，必然接通电源。不能写成 `isOnAC || true`：那是恒真表达式，
+            // 真实意图是「无电池 = 一定在用交流电」—— 部分机型/UPS 的 pmset 输出
+            // 可能不含 "AC Power" 字样
+            return (false, nil, false, true)
         }
 
         let percent: Int?

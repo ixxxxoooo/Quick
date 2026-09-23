@@ -55,6 +55,12 @@ struct KillProcessView: View {
             search?.wantsNavigation = true
             isFocused = true
             syncSelection()
+            // 采样走 service 持有的受控循环：面板被 orderOut 隐藏时 SwiftUI 的
+            // .task 不会取消，受控循环才能由面板显隐事件叫停
+            service.noteViewAppeared()
+        }
+        .onDisappear {
+            service.noteViewDisappeared()
         }
         .onChange(of: search?.commandToken ?? 0) { _, _ in
             guard let command = search?.lastCommand else { return }
@@ -62,9 +68,6 @@ struct KillProcessView: View {
         }
         .onChange(of: visibleProcesses.map(\.id)) { _, _ in
             syncSelection()
-        }
-        .task {
-            await service.startSampling()
         }
     }
 

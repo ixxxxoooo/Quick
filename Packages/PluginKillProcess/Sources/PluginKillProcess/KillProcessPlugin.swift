@@ -39,6 +39,9 @@ public final class KillProcessPlugin: QuickPlugin {
     /// 进程列表服务（与视图共享同一实例）
     let service = KillProcessService()
 
+    /// 面板显隐订阅；不保存会被 ARC 立刻取消
+    private var visibilitySubscription: EventSubscription?
+
     public init() {}
 
     public func searchItems(query: String) async -> [SearchableItem] {
@@ -63,10 +66,18 @@ public final class KillProcessPlugin: QuickPlugin {
     }
 
     public func activate() {
+        // 面板隐藏（orderOut）不会触发视图的 onDisappear，采样必须由面板显隐事件叫停
+        visibilitySubscription = EventBus.shared.on(PaletteVisibilityChangedEvent.self) {
+            [weak self] event in
+            self?.service.notePanelVisibility(event.isVisible)
+        }
         log.notice("插件已激活")
     }
 
     public func deactivate() {
+        visibilitySubscription?.cancel()
+        visibilitySubscription = nil
+        service.noteViewDisappeared()
         log.notice("插件已停用")
     }
 }
