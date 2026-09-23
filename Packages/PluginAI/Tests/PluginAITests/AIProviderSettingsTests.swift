@@ -73,10 +73,31 @@ struct AIProviderSettingsTests {
                 false, forKey: PluginSettingKey.AIPortal.providerEnabled(Self.providerID))
 
             let manager = AIWebViewWindowManager()
-            manager.openOrFocus(providerId: Self.providerID)
+            let opened = manager.openOrFocus(providerId: Self.providerID)
+            #expect(
+                !opened,
+                "被停用的 Provider 不能报告打开成功 —— 面板上那句「已打开」是照它说的")
             #expect(
                 !manager.isWindowOpen(for: Self.providerID),
                 "停用的 Provider 不该被打开")
+        }
+    }
+
+    @Test("面板能看出哪些 Provider 被停用")
+    func portalSeesDisabledProviders() async throws {
+        try await Self.withStandardDefaults {
+            let manager = AIWebViewWindowManager()
+            UserDefaults.standard.removeObject(
+                forKey: PluginSettingKey.AIPortal.providerEnabled(Self.providerID))
+            #expect(
+                !manager.disabledProviderIDs().contains(Self.providerID),
+                "默认应当是启用的，不该出现在停用集合里")
+
+            UserDefaults.standard.set(
+                false, forKey: PluginSettingKey.AIPortal.providerEnabled(Self.providerID))
+            #expect(
+                manager.disabledProviderIDs().contains(Self.providerID),
+                "停用后门户卡片要能知道这个 Provider 打不开")
         }
     }
 

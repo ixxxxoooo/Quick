@@ -861,6 +861,11 @@
   控制长在标题栏里，不用胶囊（见 `docs/architecture.md`）。
 - **Provider 关键词表是匹配的唯一事实来源。** `AIProviderRegistry.all` 里每个 Provider 的
   `keywords` 同时用于触发词闸门与打分，不要在别处再抄一份。
+- **「这个 Provider 能不能用」只有一个判定，而且必须画出来。** 判定是
+  `AIWebViewWindowManager.isProviderEnabled(_:)` —— 门户卡片、搜索结果、`openOrFocus`
+  三处都问它。**设置页停用的 Provider，在面板上要显示成「已停用」加一个不可点的按钮**，
+  不能照样画一张「就绪 / 打开窗口」的卡片：那样用户点下去什么都没有，只会以为功能坏了。
+  同理 `openOrFocus` 返回「是否真的打开了」，面板那句「已打开」要照它说话，不能无条件弹。
 - **闸门认前缀，但要求查询词至少 3 个字符。** Provider 名是「打一半就该收窄」的东西：
   `deep` 要能出 DeepSeek、`chatgp` 要能出 ChatGPT。整词规则（`String.matchesAnyTrigger`，
   用来挡住 `email`→`ai` 那类误命中）做不到这件事，所以闸门用的是
@@ -877,9 +882,9 @@
 | --- | --- |
 | `AIPlugin` | 插件入口：搜索结果（门户入口 + 命中的 Provider）与 `makeView()` |
 | `AIProvider` / `AIProviderRegistry` | Provider 元数据与注册表（名称、URL、图标、强调色、关键词） |
-| `AIWebViewWindowManager` | 每个 Provider 一个 WebView 窗口，生命周期与 Dock 身份 |
+| `AIWebViewWindowManager` | 每个 Provider 一个 WebView 窗口，生命周期与 Dock 身份，以及「能不能用」的判定 |
 | `AIWebViewPanel` | 自定义 NSPanel：点红绿灯只隐藏不销毁 |
-| `AIPortalView` | 插件视图：卡片列表，显示每个 Provider 的「运行中 / 就绪」与打开/刷新/关闭 |
+| `AIPortalView` | 插件视图：卡片列表，显示每个 Provider 的「运行中 / 就绪 / 已停用」与打开/刷新/关闭 |
 
 `AIWebViewWindowManager` 由 `AIPlugin` 持有而**不是单例**：窗口是插件的一部分，
 插件停用时窗口应当一起收掉（`AIPlugin.deactivate()` → `closeAll()`）。

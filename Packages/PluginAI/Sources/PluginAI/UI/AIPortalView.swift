@@ -18,6 +18,7 @@ struct AIPortalView: View {
     let manager: AIWebViewWindowManager
 
     @State private var activeProviders: Set<String> = []
+    @State private var disabledProviders: Set<String> = []
     @State private var feedbackMessage: String?
     @State private var reloadingID: String?
 
@@ -83,13 +84,20 @@ struct AIPortalView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
-                Image(systemName: "gearshape")
-                    .font(DesignTokens.Typography.inlineIcon)
-                Text("管理中心")
-                    .font(DesignTokens.Typography.inlineIcon)
+            // 长得像控件的文字必须是控件：Provider 开关在设置页里，这里给一条真能走的路
+            Button {
+                EventBus.shared.post(ShowPaletteSettingsEvent())
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "gearshape")
+                        .font(DesignTokens.Typography.inlineIcon)
+                    Text("管理中心")
+                        .font(DesignTokens.Typography.inlineIcon)
+                }
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
-            .foregroundStyle(DesignTokens.Colors.textTertiary)
+            .buttonStyle(.plain)
+            .help("打开设置窗口")
         }
         .padding(.bottom, DesignTokens.Spacing.sm)
     }
@@ -111,7 +119,10 @@ struct AIPortalView: View {
     }
 
     private func providerCard(_ provider: AIProvider) -> some View {
-        let isActive = activeProviders.contains(provider.id)
+        // 停用优先于运行状态：停用的 Provider 打不开，说它「就绪」就是骗人 ——
+        // 用户看到的就是「点了没反应」。
+        let isEnabled = !disabledProviders.contains(provider.id)
+        let isActive = isEnabled && activeProviders.contains(provider.id)
         let accentColor = Color(hex: provider.accent) ?? Color.accentColor
 
         return VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
@@ -120,11 +131,11 @@ struct AIPortalView: View {
                 // Provider 图标
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                        .fill(accentColor.opacity(0.12))
+                        .fill(accentColor.opacity(isEnabled ? 0.12 : 0.05))
                         .frame(width: 32, height: 32)
                     Image(systemName: provider.icon)
                         .font(DesignTokens.Typography.iconGlyph)
-                        .foregroundStyle(accentColor)
+                        .foregroundStyle(isEnabled ? accentColor : DesignTokens.Colors.textTertiary)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -133,8 +144,8 @@ struct AIPortalView: View {
                             .font(DesignTokens.Typography.sectionHeader)
                             .foregroundStyle(DesignTokens.Colors.textPrimary)
 
-                        // 在线状态指示
-                        Text(isActive ? "运行中" : "就绪")
+                        // 状态指示
+                        Text(isEnabled ? (isActive ? "运行中" : "就绪") : "已停用")
                             .font(DesignTokens.Typography.compactKeyCap)
                             .padding(.horizontal, DesignTokens.Spacing.sm)
                             .padding(.vertical, DesignTokens.Spacing.xxs)
@@ -148,11 +159,15 @@ struct AIPortalView: View {
                                 isActive ? DesignTokens.Colors.success : DesignTokens.Colors.textTertiary)
                     }
 
-                    // URL 显示
-                    Text(provider.url.replacingOccurrences(of: "https://", with: ""))
-                        .font(DesignTokens.Typography.compactKeyCap)
-                        .foregroundStyle(DesignTokens.Colors.textTertiary)
-                        .lineLimit(1)
+                    // 副标题：停用时换成「去哪儿重新打开」，比一个点不动的按钮有用
+                    Text(
+                        isEnabled
+                            ? provider.url.replacingOccurrences(of: "https://", with: "")
+                            : "已在「设置 › AI 聚合」中停用"
+                    )
+                    .font(DesignTokens.Typography.compactKeyCap)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .lineLimit(1)
                 }
 
                 Spacer()
@@ -162,23 +177,30 @@ struct AIPortalView: View {
             HStack(spacing: 6) {
                 // 主操作：打开/聚焦
                 Button {
-                    manager.openOrFocus(providerId: provider.id)
-                    showFeedback("已打开 \(provider.name)")
+                    if manager.openOrFocus(providerId: provider.id) {
+                        showFeedback("已打开 \(provider.name)")
+                    }
                     refreshActive()
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "macwindow")
+                        Image(systemName: isEnabled ? "macwindow" : "nosign")
                             .font(DesignTokens.Typography.inlineIcon)
-                        Text(isActive ? "聚焦窗口" : "打开窗口")
-                            .font(DesignTokens.Typography.bar)
+                        Text(
+                            isEnabled
+                                ? (isActive ? "聚焦窗口" : "打开窗口")
+                                : "已在设置中停用"
+                        )
+                        .font(DesignTokens.Typography.bar)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 28)
-                    .background(accentColor.opacity(0.12))
-                    .foregroundStyle(accentColor)
+                    .background(
+                        isEnabled ? accentColor.opacity(0.12) : DesignTokens.Colors.controlSurface)
+                    .foregroundStyle(isEnabled ? accentColor : DesignTokens.Colors.textTertiary)
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl))
                 }
                 .buttonStyle(.plain)
+                .disabled(!isEnabled)
 
                 // 刷新
                 Button {
@@ -276,6 +298,7 @@ struct AIPortalView: View {
 
     private func refreshActive() {
         activeProviders = manager.activeProviderIDs()
+        disabledProviders = manager.disabledProviderIDs()
     }
 
     private func showFeedback(_ message: String) {

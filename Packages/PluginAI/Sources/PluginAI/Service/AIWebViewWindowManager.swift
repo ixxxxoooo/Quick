@@ -32,22 +32,40 @@ final class AIWebViewWindowManager {
 
     // MARK: - 窗口生命周期
 
+    /// 设置页是否允许使用这个 Provider
+    ///
+    /// 门户卡片、搜索结果、打开动作问的是同一件事，判定只留这一份 —— 抄成两份，
+    /// 就会出现「卡片能点、点了没反应」。
+    static func isProviderEnabled(_ providerId: String) -> Bool {
+        PluginDefaults.isEnabled(
+            PluginSettingKey.AIPortal.providerEnabled(providerId), default: true)
+    }
+
+    /// 设置页里被停用的 Provider
+    ///
+    /// 门户视图拿它把停用的卡片画成停用，而不是画成一张能点的卡片。
+    func disabledProviderIDs() -> Set<String> {
+        Set(AIProviderRegistry.all.map(\.id).filter { !Self.isProviderEnabled($0) })
+    }
+
     /// 打开或聚焦指定 Provider 的窗口
     ///
     /// 三句都是必需的，少一句就会「唤醒了却不在最前面」：`NSApp.activate` 让应用成为前台
     /// （accessory 应用同样有效），`makeKeyAndOrderFront` 拿到键盘焦点，`orderFrontRegardless`
     /// 让它越过其他应用已经排在前面的窗口 —— 新建的窗口尤其容易因为少了这一句而留在后面。
-    func openOrFocus(providerId: String) {
+    ///
+    /// - Returns: 窗口是否真的打开了。调用方要照这个说话：面板上那句「已打开」如果无条件弹，
+    ///   用户看到的就是「提示成功、什么都没有」，比不提示更糟。
+    @discardableResult
+    func openOrFocus(providerId: String) -> Bool {
         guard let provider = AIProviderRegistry.provider(for: providerId) else {
             log.error("未知 Provider: \(providerId, privacy: .public)")
-            return
+            return false
         }
         // 设置页关掉的 Provider 不能被打开：门户卡片与搜索动作都汇聚到这一个入口
-        guard PluginDefaults.isEnabled(
-            PluginSettingKey.AIPortal.providerEnabled(provider.id), default: true
-        ) else {
+        guard Self.isProviderEnabled(provider.id) else {
             log.notice("Provider 已在设置中停用，忽略打开请求: \(providerId, privacy: .public)")
-            return
+            return false
         }
 
         let window: AIWebViewWindow
@@ -67,6 +85,7 @@ final class AIWebViewWindowManager {
         syncDockPresence()
 
         EventBus.shared.post(HidePaletteEvent())
+        return true
     }
 
     /// 检查指定 Provider 窗口是否打开
