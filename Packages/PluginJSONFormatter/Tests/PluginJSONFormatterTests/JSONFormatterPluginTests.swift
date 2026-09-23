@@ -25,6 +25,14 @@ struct JSONFormatterLogicTests {
         #expect(!result.text.contains("\n  \"a\" : ["))
     }
 
+    /// 4 空格缩进只能改行首，字符串值内部的空格必须原样保留
+    @Test("4 空格缩进不改动字符串值内部的空格")
+    func fourSpaceIndentKeepsStringInnerSpaces() throws {
+        let result = try JSONFormatterLogic.prettyPrint(#"{"a":"x  y"}"#, indent: 4)
+        #expect(result.text.contains("\"x  y\""))
+        #expect(!result.text.contains("\"x    y\""))
+    }
+
     @Test("压缩移除所有非必要空白")
     func minifyStripsWhitespace() throws {
         let compact = try JSONFormatterLogic.minify("{\n  \"a\" : 1,\n  \"b\" : 2\n}")

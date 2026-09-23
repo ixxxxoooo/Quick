@@ -28,8 +28,9 @@ enum JSONFormatterLogic {
 
     /// 美化输出
     ///
-    /// JSONSerialization 只肯输出 2 空格缩进，4 空格只能靠文本替换 ——
-    /// 这是它唯一能改缩进的手段，所以不要换成别的写法。
+    /// JSONSerialization 只肯输出 2 空格缩进，4 空格只能把每行的行首缩进翻倍 ——
+    /// 字符串值里的换行已被转义成 `\n`，真实换行只可能是结构性的，所以行首空格
+    /// 一定是缩进；绝不能做全局替换，那会改掉字符串值内部的空格。
     static func prettyPrint(_ input: String, indent: Int) throws -> Outcome {
         let json = try parse(input)
         let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .fragmentsAllowed]
@@ -39,9 +40,18 @@ enum JSONFormatterLogic {
             throw Failure.invalidJSON
         }
         return Outcome(
-            text: indent == 4 ? text.replacingOccurrences(of: "  ", with: "    ") : text,
+            text: indent == 4 ? doublingLeadingIndentation(text) : text,
             nodeCount: countNodes(json)
         )
+    }
+
+    /// 把每行的行首空格数翻倍（2 空格缩进 → 4 空格缩进）
+    private static func doublingLeadingIndentation(_ text: String) -> String {
+        text.components(separatedBy: .newlines).map { line in
+            guard let firstMeaningful = line.firstIndex(where: { $0 != " " }) else { return line }
+            let depth = line.distance(from: line.startIndex, to: firstMeaningful)
+            return String(repeating: " ", count: depth * 2) + line[firstMeaningful...]
+        }.joined(separator: "\n")
     }
 
     /// 压缩输出

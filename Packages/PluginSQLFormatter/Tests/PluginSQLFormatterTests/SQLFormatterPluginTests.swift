@@ -40,6 +40,40 @@ struct SQLFormatterLogicTests {
         #expect(result.components(separatedBy: "\n").allSatisfy { !$0.isEmpty })
     }
 
+    /// 字符串字面量整体透传，关键字形态的内容不能被插入换行
+    @Test("格式化不改写字符串字面量内部的关键字")
+    func formatPreservesStringLiterals() {
+        let result = SQLFormatterLogic.format(
+            "select * from t where name = 'FROM' or note = 'SELECT x'", indent: 2)
+        #expect(result.contains("'FROM'"))
+        #expect(result.contains("'SELECT x'"))
+        #expect(!result.contains("\nFROM'"))
+        #expect(!result.contains("\nSELECT x'"))
+    }
+
+    /// 多词子句作为整体换行，`LEFT JOIN` 不能被拆成 `LEFT` + `JOIN`；限定名不能被拆成 `a. id`
+    @Test("多词关键字与限定名的间距保持正确")
+    func formatKeepsMultiWordClausesTogether() {
+        let result = SQLFormatterLogic.format("select * from a left join b on a.id = b.id", indent: 2)
+        #expect(result.contains("LEFT JOIN b"))
+        #expect(!result.contains("\nJOIN b"))
+        #expect(result.contains("a.id = b.id"))
+        #expect(!result.contains("a. id"))
+    }
+
+    /// 裸 UNION 与 UNION ALL 是两个词法形态：前者单词、后者双词，都必须独占一行
+    @Test("UNION 与 UNION ALL 都独占一行")
+    func formatHandlesUnionVariants() {
+        let result = SQLFormatterLogic.format("select 1 union select 2 union all select 3", indent: 2)
+        #expect(result == "SELECT 1\nUNION\nSELECT 2\nUNION ALL\nSELECT 3")
+    }
+
+    @Test("压缩保留字符串字面量内部的空白")
+    func minifyPreservesLiteralWhitespace() {
+        let result = SQLFormatterLogic.minify("SELECT 'x  y'\nFROM t")
+        #expect(result == "SELECT 'x  y' FROM t")
+    }
+
     @Test("压缩把折行归一成单个空格")
     func minifyCollapsesWhitespace() {
         let result = SQLFormatterLogic.minify("SELECT\n  a\nFROM   t")
