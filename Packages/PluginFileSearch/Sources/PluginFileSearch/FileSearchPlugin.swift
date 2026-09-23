@@ -19,6 +19,15 @@ public final class FileSearchPlugin: QuickPlugin {
     public static let description = "基于 macOS Spotlight 原生索引的高性能文件搜索，支持全盘文件名匹配与内容深度检索。"
     public static let triggerWords = ["f", "file", "文件"]
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "filesearch.content", pluginID: id, pluginName: name, title: "搜索文件内容",
+                subtitle: "在文件内容里搜索关键词", keywords: ["文件内容", "内容搜索"],
+                icon: "doc.text.magnifyingglass")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(FileSearchPlugin.id)

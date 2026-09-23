@@ -8,8 +8,11 @@ import CoreGraphics
 
 /// 通过合成 ⌘C 抓取当前选区文本（对齐 Fasty `get_selected_text`）
 ///
-/// 流程：备份剪贴板 → 清空 → ⌘C → 短轮询 → 有新文本则返回并**保留**在剪贴板
-/// （超级面板读剪贴板做上下文）；无新内容则恢复备份。
+/// 流程：备份剪贴板 → 清空 → ⌘C → 短轮询 → 无论是否抓到都**恢复备份**，抓到则返回文本。
+///
+/// **恢复剪贴板是对 Fasty 的一处有意优化。** Fasty 抓到选区后把它留在剪贴板里，
+/// 于是每次右键唤出都会顶掉用户原本的剪贴板内容。选区文本已经通过返回值交给超级面板，
+/// 不需要借剪贴板传这一手，所以这里恢复原内容，让唤出没有副作用。
 public enum SelectionCapture {
 
     /// ANSI C 虚拟键码
@@ -39,12 +42,9 @@ public enum SelectionCapture {
             }
         }
 
-        if selected.isEmpty {
-            restore(saved, onto: board)
-            return nil
-        }
-        // 有选区：留给超级面板读剪贴板，不恢复旧内容
-        return selected
+        // 无论抓到没有都恢复备份：抓到的话文本已经通过返回值交出去了
+        restore(saved, onto: board)
+        return selected.isEmpty ? nil : selected
     }
 
     private static func synthesizeCommandC() -> Bool {

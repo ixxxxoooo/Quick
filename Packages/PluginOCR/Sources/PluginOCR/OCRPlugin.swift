@@ -28,7 +28,7 @@ public final class OCRPlugin: QuickPlugin {
 
     public init() {}
 
-    public static var commands: [CommandDescriptor] {
+    public static var functionCommands: [CommandDescriptor] {
         [
             CommandDescriptor(
                 id: "ocr.capture",
@@ -37,8 +37,7 @@ public final class OCRPlugin: QuickPlugin {
                 title: "截图识别文字",
                 subtitle: "截取屏幕区域并识别文字",
                 keywords: triggerWords,
-                icon: icon,
-                showsWhenQueryEmpty: true
+                icon: icon
             )
         ]
     }

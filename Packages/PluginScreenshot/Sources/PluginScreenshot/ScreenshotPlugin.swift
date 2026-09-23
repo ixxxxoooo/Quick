@@ -34,7 +34,7 @@ public final class ScreenshotPlugin: QuickPlugin {
 
     // MARK: - 命令
 
-    public static var commands: [CommandDescriptor] {
+    public static var functionCommands: [CommandDescriptor] {
         [
             CommandDescriptor(
                 id: "screenshot.area",
@@ -43,8 +43,7 @@ public final class ScreenshotPlugin: QuickPlugin {
                 title: "区域截图",
                 subtitle: "框选屏幕区域并标注",
                 keywords: areaKeywords,
-                icon: "rectangle.dashed",
-                showsWhenQueryEmpty: true
+                icon: "rectangle.dashed"
             ),
             CommandDescriptor(
                 id: "screenshot.full",

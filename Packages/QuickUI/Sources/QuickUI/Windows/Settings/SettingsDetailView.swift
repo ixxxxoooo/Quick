@@ -42,6 +42,10 @@ struct SettingsDetailView: View {
                 SystemActionsSettingsPane(dataSource: dataSource)
             case .commands:
                 CommandsSettingsPane(dataSource: dataSource)
+            case .superPanel:
+                dataSource.makeSuperPanelSettingsView()
+            case .aiService:
+                dataSource.makeAISettingsView()
             case .about:
                 AboutPane(dataSource: dataSource)
             default:

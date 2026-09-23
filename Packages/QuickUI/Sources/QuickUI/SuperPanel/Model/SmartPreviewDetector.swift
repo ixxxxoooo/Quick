@@ -8,7 +8,7 @@ import Foundation
 ///
 /// 纯函数、无 IO 副作用（文件路径存在性除外，由注入的 `fileExists` 提供，
 /// 测试可注入假文件系统）。返回所有命中的预览类型。
-enum SmartPreviewDetector {
+public enum SmartPreviewDetector {
 
     /// 检测文本类型
     ///
@@ -18,7 +18,7 @@ enum SmartPreviewDetector {
     ///   - isDirectory: 路径是否为目录
     ///   - now: 当前时间（时间戳相对描述用，测试可注入）
     /// - Returns: 匹配到的预览列表；空输入返回空数组
-    static func detect(
+    public static func detect(
         _ text: String,
         fileExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
         isDirectory: (String) -> Bool = { path in
@@ -57,6 +57,9 @@ enum SmartPreviewDetector {
         if let preview = detectJSON(trimmed) {
             previews.append(preview)
         }
+        if let preview = detectSQL(trimmed) {
+            previews.append(preview)
+        }
         if let preview = detectMath(trimmed) {
             previews.append(preview)
         }
@@ -85,10 +88,8 @@ enum SmartPreviewDetector {
         fileExists: (String) -> Bool,
         isDirectory: (String) -> Bool
     ) -> SmartPreview? {
-        // 绝对路径或 ~ 开头；排除 URL
         guard text.hasPrefix("/") || text.hasPrefix("~") else { return nil }
         guard !text.contains("://") else { return nil }
-        // 路径字符：不要整段句子
         guard !text.contains("\n"), text.count < 512 else { return nil }
 
         let expanded: String
@@ -132,7 +133,6 @@ enum SmartPreviewDetector {
     }
 
     private static func detectURL(_ text: String) -> SmartPreview? {
-        // 纯 IPv4 交给 IP 检测器；邮箱交给邮箱检测器
         if detectIP(text) != nil { return nil }
         if text.contains("@") { return nil }
 
@@ -147,7 +147,6 @@ enum SmartPreviewDetector {
 
         guard let url = URL(string: candidate), let host = url.host, !host.isEmpty else { return nil }
         if text.hasPrefix("/") { return nil }
-        // 主机名至少含一个字母，避免把 `1.2.3` 之类当成网址
         guard host.unicodeScalars.contains(where: { CharacterSet.letters.contains($0) }) else {
             return nil
         }
@@ -164,13 +163,11 @@ enum SmartPreviewDetector {
     }
 
     private static func detectBase64(_ text: String) -> SmartPreview? {
-        // 太短或含空格不算
         guard text.count >= 16, !text.contains(" "), !text.contains("\n") else { return nil }
         let allowed = CharacterSet(
             charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
         guard text.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return nil }
         guard let data = Data(base64Encoded: text), !data.isEmpty else { return nil }
-        // 必须是可打印文本
         guard let decoded = String(data: data, encoding: .utf8), !decoded.isEmpty else { return nil }
         guard
             decoded.unicodeScalars.allSatisfy({ $0.isASCII && ($0.value >= 32 || $0 == "\n" || $0 == "\t") })
@@ -221,15 +218,52 @@ enum SmartPreviewDetector {
         return .json(summary: summary, lineCount: lines)
     }
 
+    /// SQL 语句的起始关键字
+    private static let sqlStarters: Set<String> = [
+        "SELECT", "WITH", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP",
+        "MERGE", "REPLACE", "TRUNCATE", "GRANT", "REVOKE", "EXPLAIN", "SHOW", "DESCRIBE", "USE", "CALL"
+    ]
+
+    /// `SELECT` / `WITH` 特有的强信号：没有它就很可能只是以 Select 开头的英文句子
+    private static let selectStrongMarkers = [
+        " WHERE ", " GROUP ", " ORDER ", " JOIN ", " LIMIT ", " HAVING ", " UNION ", " OFFSET ", " *"
+    ]
+
+    /// DML / DDL 关键字后跟的结构标记
+    private static let statementStructureMarkers = [
+        " FROM ", " VALUES ", " SET ", " INTO ", " TABLE ", " ON ", " ("
+    ]
+
+    /// 识别 SQL 语句
+    ///
+    /// 只看「起始关键字 + 结构标记」两个信号，不做真正的语法分析 —— 目标是认出
+    /// 用户复制/选中的一段 SQL 并给出「用 SQL 格式化打开」的入口，不是校验语法。
+    /// 因为「Select … from …」也可能是英文句子，`SELECT` / `WITH` 需要额外强信号
+    /// （WHERE / JOIN / `*` …）才判为 SQL。
+    private static func detectSQL(_ text: String) -> SmartPreview? {
+        guard text.count >= 12, text.count <= 20_000 else { return nil }
+        let upper = text.uppercased()
+        let leading = upper.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstWord =
+            leading.split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" || $0 == "(" })
+            .first.map(String.init) ?? ""
+        guard sqlStarters.contains(firstWord) else { return nil }
+
+        let markers =
+            (firstWord == "SELECT" || firstWord == "WITH")
+            ? selectStrongMarkers : statementStructureMarkers
+        guard markers.contains(where: { upper.contains($0) }) else { return nil }
+
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).count
+        return .sql(statement: firstWord, lineCount: lines)
+    }
+
     private static func detectMath(_ text: String) -> SmartPreview? {
-        // 至少含一个运算符，且以数字或括号开头
         guard text.count >= 3, text.count <= 120 else { return nil }
         guard text.first?.isNumber == true || text.first == "(" else { return nil }
 
-        // 只允许数字、空白与四则运算符（不用 NSExpression：非法格式会抛不可捕 ObjC 异常）
         let allowed = CharacterSet(charactersIn: "0123456789.+-*/() ")
         guard text.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return nil }
-        // 必须真的有运算符，不能是纯数字
         let hasOp = text.contains(where: { "+-*/".contains($0) })
         guard hasOp else { return nil }
 
@@ -304,7 +338,6 @@ enum SmartPreviewDetector {
 
     private static func detectPhone(_ text: String) -> SmartPreview? {
         let digits = text.filter(\.isNumber)
-        // 中国手机号 11 位，或以 +86 开头
         if digits.count == 11, digits.hasPrefix("1") {
             let formatted =
                 "\(digits.prefix(3)) \(digits.dropFirst(3).prefix(4)) \(digits.dropFirst(7))"
@@ -329,7 +362,6 @@ enum SmartPreviewDetector {
     }
 
     private static func detectTranslationCandidate(_ text: String) -> SmartPreview? {
-        // 短句才给翻译候选，避免整篇文档
         guard text.count >= 2, text.count <= 500 else { return nil }
         let hasHan = text.contains { $0.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) } }
         let letters = text.filter { $0.isLetter }
@@ -338,7 +370,6 @@ enum SmartPreviewDetector {
         if hasHan {
             return .translation(source: String(text.prefix(80)), detectedLang: "zh")
         }
-        // 纯拉丁且像词句
         let latinRatio = Double(letters.count) / Double(max(text.count, 1))
         guard latinRatio > 0.6 else { return nil }
         return .translation(source: String(text.prefix(80)), detectedLang: "en")

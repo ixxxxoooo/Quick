@@ -1,39 +1,68 @@
 # 超级面板（Super Panel）
 
-对齐 Fasty 的双态超级面板：识别剪贴板内容给出即时动作；空白时提供工作台；
-并保留 IDE 前台项目检测。支持与 Fasty 相同的**中键 / 右键长按**全局唤出。
+对齐 Fasty 的双态超级面板：在**鼠标处**弹出一块独立浮层，识别选区 / 剪贴板内容给出
+即时动作；没有内容时提供工作台（常用工具 + 最近使用 + 剪贴板预览）。
 
-- 插件 id：`superPanel`
-- 触发词：`sp`、`super`、`超级`、`超级面板`
+**它不是插件，而是宿主级组件。** 面板不进主面板搜索、不进插件列表，设置自成一处。
+实现挂在 `Quick/SuperPanel/`（窗口与接线）与
+`Packages/QuickUI/Sources/QuickUI/SuperPanel/`（模型、动作、视图、设置页）。
+
+- 组件：`SuperPanelController`（`AppCore` 持有）
+- 设置页：宿主级「超级面板」分栏
+- 快捷键：默认 `⌥C`（对齐 Fasty `Option+C`）
 
 ---
 
 ## 不变量
 
-1. **面板有三态：上下文 / 工作台 / 项目。** 打开时若剪贴板有文本，默认进上下文；
-   否则进工作台。项目页由用户切换或从工作台项目卡片进入。
-2. **智能预览是纯逻辑。** `SmartPreviewDetector` 不依赖 AppKit，路径存在性通过
-   注入的闭包判断，测试可脱离磁盘。
-3. **项目检测只在前台应用变化时执行。** 同一应用重复触发返回缓存，
-   不做文件系统轮询。
-4. **Git 分支名通过读 `.git/HEAD` 文件获取。** 不跑 `git` 进程。
-5. **操作列表按项目路径缓存。** 上下文不变不重算。
-6. **插件之间只通过 `EventBus` 跳转。** 打开翻译 / JSON / 颜色等工具走
-   `NavigateEvent`，不直接 `import` 其他插件。
-7. **鼠标唤出由 `MouseTriggerMonitor`（QuickPlatform）实现。** 插件只持有监听器并
-   在 `activate` / `deactivate` 与设置变更时启停；中键与右键长按可独立开关。
-8. **鼠标触发需要辅助功能权限。** 无权限时监听不启动，设置页提示授权。
-9. **中键触发会吞掉 down/up**，避免宿主取消划词选中；长按触发后吞掉
-   `rightMouseUp`，避免弹出系统右键菜单。触发前尝试 `SelectionCapture`（⌘C）
-   把选区写入剪贴板供上下文态使用。
+1. **超级面板不是插件。** 它不在 `AppCore.registerPlugins()` 里实例化，不出现在
+   `pluginEntries`，也不出现在「插件」设置分栏。它是 `AppCore` 直接持有的宿主组件，
+   与 `PaletteCoordinator` 平级。
+2. **没有主面板入口。** 输入 `sp` / `超级面板` 不会打开它；只有鼠标（右键长按 / 中键）
+   与全局快捷键能唤出。它在主面板里当子面板是一条被明确否掉的路径。
+3. **独立浮窗，在鼠标处弹出。** `SuperPanelPanel` 是无边框、非激活、跨空间的浮窗；
+   落点由 `SuperPanelPlacement` 纯函数决定：默认在光标右下 6pt，右侧 / 下方空间不足
+   自动翻到左 / 上，并严格夹进屏幕可见区。
+4. **高度随内容自适应。** 根视图量出内容自然高度，协调器把窗口高度夹在 120…620 之间；
+   高度变化以光标为锚点重定位（向下的面板顶边不动，向上的底边不动）。
+5. **失焦与外部点击收起。** 失焦收起带 350ms 保护期，避免刚弹出就被底层窗口抢焦；
+   面板外的鼠标按下也收起。
+6. **智能预览是纯逻辑。** `SmartPreviewDetector` 不依赖 AppKit，路径存在性通过注入的闭包
+   判断，测试可脱离磁盘。
+7. **系统能力由宿主注入。** 抓选区（`SelectionCapture`）、合成粘贴（`PasteService`）、
+   最近使用解析都由 `AppCore.wireSuperPanel()` 注入；`QuickUI` 不认识 `QuickPlatform`，
+   也不认识插件，依赖方向保持单向。
+8. **跳转插件走 `EventBus`。** 打开翻译 / JSON / 颜色等工具走 `NavigateEvent`，
+   不直接 `import` 其他插件。
+9. **鼠标唤出需要辅助功能权限。** 无权限时监听不启动，设置页提示授权。
+10. **`Model/` 下不 import AppKit / SwiftUI。** `SmartPreview`、`SmartPreviewDetector`、
+    `SuperPanelPlacement`、`SuperPanelPreferences` 都是纯逻辑，可被测试独立编译。
 
 ## 打开方式
 
 | 方式 | 说明 |
 | --- | --- |
-| 触发词 | ⌥Space → `sp` / `超级面板` → 回车 |
-| 中键单击 | 设置里开启「鼠标中键单击触发」（默认开） |
-| 右键长按 | 设置里开启「长按鼠标右键触发」（默认开），可调 50–1000ms |
+| 全局快捷键 | 默认 `⌥C`，可在「设置 → 超级面板」改或清空 |
+| 右键长按 | 按住右键约 450ms（可调 50–1000ms） |
+| 中键单击 | 按下鼠标滚轮键，会保留划词选中 |
+
+鼠标唤出前会先尝试用 ⌘C 抓当前选区（`SelectionCapture`）；没有选区时回落到剪贴板。
+
+## 交互（对齐 Fasty）
+
+| 键 | 行为 |
+| --- | --- |
+| ← / → | 上下文 ↔ 工作台切换（有内容时才可切） |
+| ↑ / ↓ | 在上下文动作列表里移动选中 |
+| ↵ | 执行选中项 |
+| 1–9 | 直接执行第 n 个动作 / 快捷工具 |
+| ⌥↵ | 把结果替换回原应用的选区 |
+| esc | 收起 |
+| ⌘, | 打开超级面板设置 |
+
+- 点击动作：复制类会给一眼 toast 再收起；跳转类会先收起再打开主面板到目标插件。
+- 点击工作台卡片：跳转到对应插件。
+- 点击剪贴板预览：把内容替换回原处。
 
 ## 智能预览类型（上下文）
 
@@ -52,32 +81,27 @@
 
 ## 工作台
 
-默认常用工具（对齐 Fasty）：截图、剪贴板、翻译、AI、备忘、计算、监控、JSON。
-可在设置中关闭工具网格或剪贴板预览。
-
-## 项目
-
-| 类型 | 标记文件 | 特有操作 |
-| --- | --- | --- |
-| Xcode / Swift | `Package.swift`、`*.xcodeproj` | swift build/test、Scripts |
-| Node.js | `package.json` | npm/yarn/pnpm scripts |
-| Python | `requirements.txt`、`pyproject.toml` | pytest、pip |
-| Rust | `Cargo.toml` | cargo build/run/test |
-| Go | `go.mod` | go build/test/run |
-| Java | `pom.xml`、`build.gradle` | maven/gradle |
-| 通用 | `.git` | Git + 文件操作 |
+- **常用工具**：默认八宫格（截图、剪贴板、翻译、AI、备忘、计算、监控、JSON），
+  可在设置里增删与排序，点卡片跳转到对应插件。
+- **最近使用**：宿主从 `UsageHistory` 解析出最近的应用与工具（最多 4 条）。
+- **剪贴板预览**：最近一条剪贴板内容，点击替换回原处，右侧可复制。
 
 ## 设置
 
+设置页是宿主级「超级面板」分栏，不走插件页。
+
 | 键 | 类型 | 说明 |
 | --- | --- | --- |
-| `superPanel.autoDetect` | Bool | 自动检测前台应用的项目 |
-| `superPanel.showGitActions` | Bool | 显示 Git 操作 |
-| `superPanel.showBuildActions` | Bool | 显示构建命令 |
-| `superPanel.showFileNav` | Bool | 显示文件导航 |
-| `superPanel.preferredTerminal` | String | 首选终端应用 |
-| `superPanel.showClipboard` | Bool | 工作台显示剪贴板预览 |
-| `superPanel.showQuickTools` | Bool | 工作台显示常用工具 |
 | `superPanel.mouseLongPressEnabled` | Bool | 长按右键唤出（默认 true） |
 | `superPanel.mouseLongPressThresholdMs` | Int | 长按阈值 ms，50…1000（默认 450） |
 | `superPanel.middleClickEnabled` | Bool | 中键单击唤出（默认 true） |
+| `superPanel.opacity` | Double | 背景不透明度 0.30…1.0（默认 0.85） |
+| `superPanel.material` | String | 背景材质：`hud` / `popover` / `solid`（默认 `hud`） |
+| `superPanel.showRecents` | Bool | 工作台显示最近使用 |
+| `superPanel.showClipboard` | Bool | 工作台显示剪贴板预览 |
+| `superPanel.quickTools` | [String] | 常用工具 id 列表 |
+
+> **关于「模糊度」：** macOS 的 `NSVisualEffectView` 不暴露连续的模糊半径，
+> 能换的只有材质本身。所以这里给的是**背景材质**三档，而不是一个调了没用的模糊滑块。
+
+快捷键存在宿主热键服务里，命令 id 为 `core.superPanel`（不进主搜索命令目录）。

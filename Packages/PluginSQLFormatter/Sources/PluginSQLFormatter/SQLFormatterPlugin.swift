@@ -19,6 +19,19 @@ public final class SQLFormatterPlugin: QuickPlugin {
     public static let description = "SQL 查询语句美化排版与单行压缩，支持关键字大小写规范化与自定义缩进风格。"
     public static let triggerWords = ["SQL 格式化", "sql", "SQL格式化", "format sql", "mysql"]
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "sql-formatter.format", pluginID: id, pluginName: name, title: "SQL 格式化",
+                subtitle: "缩进并美化 SQL", keywords: ["sql格式化", "格式化sql", "sqlformat"],
+                icon: "cylinder"),
+            CommandDescriptor(
+                id: "sql-formatter.minify", pluginID: id, pluginName: name, title: "SQL 压缩",
+                subtitle: "压成单行、去掉空白", keywords: ["sql压缩", "压缩sql", "sqlmin"],
+                icon: "arrow.down.right.and.arrow.up.left")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(SQLFormatterPlugin.id)

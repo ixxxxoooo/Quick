@@ -24,7 +24,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Sendable {
     /// 宿主页面。插件列表不写死在这里，侧边栏按已注册插件生成
     public var tabs: [SettingsTab] {
         switch self {
-        case .host: [.general, .appearance, .shortcuts, .permissions, .search]
+        case .host: [.general, .appearance, .superPanel, .aiService, .shortcuts, .permissions, .search]
         case .plugins: []
         case .about: [.about]
         }
@@ -37,6 +37,8 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     // MARK: - 通用
     case general
     case appearance
+    /// 宿主级 AI 基座（不是「AI 聚合」插件）
+    case aiService
     case shortcuts
     case plugins
     case permissions
@@ -83,6 +85,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .general: "通用"
         case .appearance: "外观"
+        case .aiService: "AI 服务"
         case .shortcuts: "快捷键"
         case .plugins: "插件"
         case .permissions: "权限"
@@ -126,6 +129,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .general: "gearshape.fill"
         case .appearance: "paintbrush.fill"
+        case .aiService: "brain.fill"
         case .shortcuts: "keyboard.fill"
         case .plugins: "puzzlepiece.extension.fill"
         case .permissions: "lock.fill"
@@ -169,6 +173,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .general: "gray"
         case .appearance: "pink"
+        case .aiService: "purple"
         case .shortcuts: "orange"
         case .plugins: "indigo"
         case .permissions: "red"
@@ -235,7 +240,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .networkTools: "networktools"
         case .ocr: "ocr"
         case .screenshot: "screenshot"
-        case .superPanel: "superPanel"
+        // 超级面板是宿主级页面，不是插件：它不参与 `pluginEntries` 的映射
         default: nil
         }
     }

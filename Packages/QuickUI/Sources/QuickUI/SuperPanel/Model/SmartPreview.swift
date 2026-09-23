@@ -7,7 +7,7 @@ import Foundation
 /// 智能预览结果（对齐 Fasty smart_preview）
 ///
 /// 纯数据：不依赖 AppKit / SwiftUI，可在测试中独立断言。
-enum SmartPreview: Sendable, Equatable {
+public enum SmartPreview: Sendable, Equatable {
     case url(url: String, domain: String)
     case filePath(path: String, exists: Bool, isDirectory: Bool)
     case color(hex: String, rgb: String)
@@ -18,12 +18,13 @@ enum SmartPreview: Sendable, Equatable {
     case email(email: String)
     case ip(address: String)
     case json(summary: String, lineCount: Int)
+    case sql(statement: String, lineCount: Int)
     case phone(formatted: String)
     case translation(source: String, detectedLang: String)
     case plainText(summary: String, charCount: Int)
 
     /// Spotlight 卡片标题
-    var title: String {
+    public var title: String {
         switch self {
         case .url: "网址"
         case .filePath: "文件路径"
@@ -35,6 +36,7 @@ enum SmartPreview: Sendable, Equatable {
         case .email: "邮箱"
         case .ip: "IP 地址"
         case .json: "JSON"
+        case .sql: "SQL"
         case .phone: "电话"
         case .translation(_, let lang): lang == "en" ? "英文文本" : "中文文本"
         case .plainText: "文本"
@@ -42,7 +44,7 @@ enum SmartPreview: Sendable, Equatable {
     }
 
     /// Spotlight 卡片副标题 / 预览摘要
-    var detail: String {
+    public var detail: String {
         switch self {
         case .url(let url, _): url
         case .filePath(let path, let exists, _): exists ? path : "\(path)（不存在）"
@@ -54,6 +56,7 @@ enum SmartPreview: Sendable, Equatable {
         case .email(let email): email
         case .ip(let address): address
         case .json(let summary, let lines): "\(summary) · \(lines) 行"
+        case .sql(let statement, let lines): "\(statement) · \(lines) 行"
         case .phone(let formatted): formatted
         case .translation(let source, _): source
         case .plainText(let summary, let count): "\(summary)（\(count) 字）"
@@ -61,7 +64,7 @@ enum SmartPreview: Sendable, Equatable {
     }
 
     /// SF Symbol
-    var icon: String {
+    public var icon: String {
         switch self {
         case .url: "link"
         case .filePath: "folder"
@@ -73,6 +76,7 @@ enum SmartPreview: Sendable, Equatable {
         case .email: "envelope"
         case .ip: "network"
         case .json: "curlybraces"
+        case .sql: "cylinder"
         case .phone: "phone"
         case .translation: "character.book.closed"
         case .plainText: "text.alignleft"
@@ -80,7 +84,7 @@ enum SmartPreview: Sendable, Equatable {
     }
 
     /// 类型徽章（列表右侧短标签）
-    var badge: String {
+    public var badge: String {
         switch self {
         case .url(_, let domain): domain
         case .filePath(_, _, let isDir): isDir ? "目录" : "文件"
@@ -92,6 +96,7 @@ enum SmartPreview: Sendable, Equatable {
         case .email: "Email"
         case .ip: "IP"
         case .json: "JSON"
+        case .sql(let statement, _): statement
         case .phone: "Phone"
         case .translation(_, let lang): lang.uppercased()
         case .plainText: "Text"
@@ -99,7 +104,7 @@ enum SmartPreview: Sendable, Equatable {
     }
 
     /// 是否为「有意义」的预览（非纯文本兜底）
-    var isMeaningful: Bool {
+    public var isMeaningful: Bool {
         if case .plainText = self { return false }
         return true
     }

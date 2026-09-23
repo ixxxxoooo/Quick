@@ -21,6 +21,15 @@ public final class CalculatorPlugin: QuickPlugin {
     public static let description = "在主搜索框中直接输入数学表达式即可快速求值，支持四则运算、函数计算、千分位显示与自动复制结果。"
     public static let triggerWords = ["计算稿纸", "计算", "calculator", "calc"]
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "calculator.history", pluginID: id, pluginName: name, title: "计算历史",
+                subtitle: "查看历史计算记录", keywords: ["计算历史", "历史计算"],
+                icon: "clock.arrow.circlepath")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(CalculatorPlugin.id)
@@ -114,7 +123,9 @@ public final class CalculatorPlugin: QuickPlugin {
     private let buffer = TextBuffer()
 
     public func makeView() -> AnyView {
-        AnyView(CalculatorView(engine: engine, store: store, buffer: buffer))
+        AnyView(
+            CalculatorView(engine: engine, store: store, buffer: buffer)
+                .prefillFromPluginContext(buffer))
     }
 
     public func activate() {

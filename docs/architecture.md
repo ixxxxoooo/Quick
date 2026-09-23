@@ -58,6 +58,8 @@
 | `keyboardLayoutService` | `KeyboardLayoutService` | 系统输入源枚举与切换（面板打开时强制到指定布局） |
 | `appIndex` | `AppIndex` | 应用清单与模糊搜索 |
 | `hud` | `HUDController` | 底部轻量提示 |
+| `superPanelController` | `SuperPanelController` | 超级面板（鼠标处弹出的独立浮层，不是插件） |
+| `mouseTriggerMonitor` | `MouseTriggerMonitor` | 右键长按 / 中键单击唤出超级面板 |
 | `pluginPanelController` | `PluginPanelController` | 分离窗口管理（创建、单例、尺寸记忆） |
 | `launchAtLogin` | `LaunchAtLogin` | 登录项（`SMAppService`） |
 | `statusItemController` | `StatusItemController` | 菜单栏图标与菜单 |
@@ -71,7 +73,8 @@
 1. `registerPlugins()` —— 组装插件（**唯一实例化插件的地方**）
 2. `paletteCoordinator.setPlugins(plugins)` —— 让面板能搜索
 3. `wireEventBus()` —— 订阅事件，把事件接到协调器/剪贴板/HUD
-4. 热键：设 `onCommand` 回调 → `hotKeyService.start()` → 按命令目录同步注册
+4. 热键：设 `onCommand` 回调 → `hotKeyService.start()` → `wireSuperPanel()`（注入系统能力、
+   起鼠标监听、补默认 ⌥C）→ 按命令目录同步注册
 5. `statusItemController.install()` —— 菜单栏图标
 6. `observeDebugWakeSignals()` —— 调试用分布式通知
 7. `Task { await appIndex.refresh() }` —— **异步**扫描应用，不阻塞启动

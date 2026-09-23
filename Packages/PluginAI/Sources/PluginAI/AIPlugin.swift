@@ -43,7 +43,7 @@ public final class AIPlugin: QuickPlugin {
 
     // MARK: - 搜索
 
-    public static var commands: [CommandDescriptor] {
+    public static var functionCommands: [CommandDescriptor] {
         [
             CommandDescriptor(
                 id: "ai.portal",
@@ -52,8 +52,7 @@ public final class AIPlugin: QuickPlugin {
                 title: "AI 聚合门户",
                 subtitle: "管理所有 AI 官网窗口",
                 keywords: triggerWords,
-                icon: icon,
-                showsWhenQueryEmpty: true
+                icon: icon
             )
         ]
     }

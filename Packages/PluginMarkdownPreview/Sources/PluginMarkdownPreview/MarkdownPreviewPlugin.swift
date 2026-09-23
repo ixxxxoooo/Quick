@@ -19,6 +19,15 @@ public final class MarkdownPreviewPlugin: QuickPlugin {
     public static let description = "实时 Markdown 编辑与渲染预览，支持 GitHub 风格语法、代码高亮、表格排版与数学公式。"
     public static let triggerWords = ["Markdown 预览", "markdown", "md", "预览"]
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "markdown-preview.preview", pluginID: id, pluginName: name,
+                title: "Markdown 预览", subtitle: "实时渲染 Markdown",
+                keywords: ["markdown预览", "md预览"], icon: "text.alignleft")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(MarkdownPreviewPlugin.id)
@@ -62,7 +71,7 @@ public final class MarkdownPreviewPlugin: QuickPlugin {
         """)
 
     public func makeView() -> AnyView {
-        AnyView(MarkdownPreviewView(buffer: buffer))
+        AnyView(MarkdownPreviewView(buffer: buffer).prefillFromPluginContext(buffer))
     }
 
     public func activate() {

@@ -8,30 +8,56 @@ import SwiftUI
 
 /// 翻译插件
 ///
-/// 使用系统 NLLanguageRecognizer 自动检测语言，
-/// 调用 Translation 框架进行多语言翻译。
+/// 端上翻译（Apple `Translation` 框架）+ 系统词典（`DictionaryServices`）+ 系统朗读
+/// （`AVSpeechSynthesizer`），全部离线、零第三方依赖。主面板里输入 `翻译 …` / `词典 …`
+/// 直接给结果，打开插件面板则是完整的输入 / 译文 / 词典三卡片工作台。
 @MainActor
 public final class TranslatorPlugin: QuickPlugin {
 
     public static let id = "translator"
     public static let name = "翻译"
-    public static let icon = "character.bubble.fill"
-    public static let description = "多语言文本实时互译，支持自动识别源语言、词典释义查询与一键复制译文。"
-    public static let triggerWords = ["翻译助手", "翻译", "translate", "translation"]
+    public static let icon = "character.book.closed.fill"
+    public static let description =
+        "端上翻译与系统词典：自动识别语言、中英日韩等多语互译，单词给音标与释义，支持朗读与历史记录。"
+    public static let triggerWords = ["翻译", "translate", "translation", "词典", "dict", "dictionary"]
+
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "translator.translate", pluginID: id, pluginName: name, title: "翻译文本",
+                subtitle: "端上翻译一段文本", keywords: ["翻译", "tr", "translate"],
+                icon: "character.book.closed"),
+            CommandDescriptor(
+                id: "translator.dict", pluginID: id, pluginName: name, title: "查词",
+                subtitle: "查单词的音标与释义", keywords: ["词典", "dict", "dictionary"],
+                icon: "text.book.closed")
+        ]
+    }
 
     public var isEnabled = true
 
     private let log = QuickLog.plugin(TranslatorPlugin.id)
 
     /// 翻译服务
-    private let service = TranslationService()
+    let service = TranslationService()
+    /// 系统词典
+    let dictionary = DictionaryService()
+    /// 朗读
+    let speech = SpeechService()
+    /// 历史
+    let history: TranslationHistoryStore
 
-    public init() {}
+    /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
+    private let buffer = TextBuffer()
+
+    public init(storage: PluginStorage) {
+        history = TranslationHistoryStore(storage: storage)
+    }
 
     // MARK: - QuickPlugin 协议
 
     public func accepts(query: String) -> Bool {
-        TranslatorQuery.text(in: query) != nil
+        TranslatorQuery.intent(in: query) != nil
     }
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
@@ -40,33 +66,70 @@ public final class TranslatorPlugin: QuickPlugin {
     }
 
     public func searchItems(query: String) async -> [SearchableItem] {
-        // 触发词解析是纯逻辑，见 TranslatorQuery（"翻译 ..." / "tr ..." / "translate ..." / "fy ..."）
-        guard let text = TranslatorQuery.text(in: query) else { return [] }
+        guard let intent = TranslatorQuery.intent(in: query) else { return [] }
+        switch intent {
+        case .dictionary(let word):
+            return dictionaryItems(for: word)
+        case .translate(let text):
+            return await translationItems(for: text)
+        }
+    }
 
-        let result = await service.translate(text)
-        guard let result, !result.isEmpty else { return [] }
-
+    /// 单词：词典条目 + 译文各一条
+    private func dictionaryItems(for word: String) -> [SearchableItem] {
+        guard let entry = dictionary.lookup(word), !entry.isEmpty else { return [] }
+        let brief = entry.briefMeaning ?? entry.word
+        let subtitle = [entry.word, entry.phonetic].filter { !$0.isEmpty }.joined(separator: " · ")
         return [
             SearchableItem(
-                id: "translator.result",
+                id: "translator.dict",
                 pluginID: Self.id,
-                title: result,
-                subtitle: "翻译结果",
-                icon: "character.book.closed",
-                relevance: 0.85,
-                shortcutHint: "⏎ 复制",
+                title: brief,
+                subtitle: subtitle.isEmpty ? "词典" : subtitle,
+                icon: "text.book.closed",
+                relevance: 0.9,
+                shortcutHint: "⏎ 打开",
                 action: {
-                    EventBus.shared.post(CopyToClipboardEvent(text: result))
+                    EventBus.shared.post(
+                        NavigateEvent(pluginID: Self.id, context: ["query": word]))
                 }
             )
         ]
     }
 
-    /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
-    private let buffer = TextBuffer()
+    /// 文本：一条译文
+    private func translationItems(for text: String) async -> [SearchableItem] {
+        do {
+            let outcome = try await service.translateOnce(
+                text, source: TranslationLanguages.autoCode, target: PluginDefaults.targetLanguage())
+            guard !outcome.result.isEmpty else { return [] }
+            let from = TranslationLanguages.label(for: outcome.effective.source)
+            let to = TranslationLanguages.label(for: outcome.effective.target)
+            return [
+                SearchableItem(
+                    id: "translator.result",
+                    pluginID: Self.id,
+                    title: outcome.result,
+                    subtitle: "\(from) → \(to)",
+                    icon: "character.book.closed",
+                    relevance: 0.85,
+                    shortcutHint: "⏎ 复制",
+                    action: { [weak self] in
+                        self?.history.record(
+                            source: text, result: outcome.result,
+                            from: outcome.effective.source, to: outcome.effective.target)
+                        EventBus.shared.post(CopyToClipboardEvent(text: outcome.result))
+                    }
+                )
+            ]
+        } catch {
+            log.warning("内联翻译失败：\(error.localizedDescription, privacy: .public)")
+            return []
+        }
+    }
 
     public func makeView() -> AnyView {
-        AnyView(TranslatorView(service: service, buffer: buffer))
+        AnyView(TranslatorView(plugin: self, buffer: buffer).prefillFromPluginContext(buffer))
     }
 
     public func activate() {

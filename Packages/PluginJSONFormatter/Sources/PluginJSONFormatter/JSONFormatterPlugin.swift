@@ -22,6 +22,23 @@ public final class JSONFormatterPlugin: QuickPlugin {
     /// 面板头部保留搜索框：树视图里用它定位字段
     public static var supportsPanelSearch: Bool { true }
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "json-formatter.format", pluginID: id, pluginName: name, title: "JSON 格式化",
+                subtitle: "缩进并美化 JSON", keywords: ["json格式化", "格式化json", "jsonformat"],
+                icon: "curlybraces"),
+            CommandDescriptor(
+                id: "json-formatter.minify", pluginID: id, pluginName: name, title: "JSON 压缩",
+                subtitle: "压成单行、去掉空白", keywords: ["json压缩", "压缩json", "jsonmin"],
+                icon: "arrow.down.right.and.arrow.up.left"),
+            CommandDescriptor(
+                id: "json-formatter.unescape", pluginID: id, pluginName: name, title: "JSON 去转义",
+                subtitle: "把转义后的 JSON 字符串还原", keywords: ["json去转义", "jsonunescape"],
+                icon: "textformat")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(JSONFormatterPlugin.id)

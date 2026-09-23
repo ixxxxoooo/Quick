@@ -20,6 +20,17 @@ public final class NotesPlugin: QuickPlugin {
     public static let description = "轻量级便签与待办备忘录，支持极简富文本与 Markdown 记录，编辑即时自动保存且本地安全存储。"
     public static let triggerWords = ["备忘录", "memo", "note", "笔记", "便签"]
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "notes.new", pluginID: id, pluginName: name, title: "新建笔记",
+                subtitle: "创建一条新笔记", keywords: ["新建笔记"], icon: "square.and.pencil"),
+            CommandDescriptor(
+                id: "notes.todo", pluginID: id, pluginName: name, title: "待办",
+                subtitle: "打开待办列表", keywords: ["待办", "todo"], icon: "checklist")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(NotesPlugin.id)

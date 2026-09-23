@@ -90,7 +90,6 @@ public enum PluginSettingKey {
     /// 翻译
     public enum Translator {
         public static let targetLang = "translator.targetLang"
-        public static let autoDetect = "translator.autoDetect"
     }
 
     /// 系统监控
@@ -196,27 +195,6 @@ public enum PluginSettingKey {
         public static let preferredTerminal = "shell.preferredTerminal"
     }
 
-    /// 超级面板
-    public enum SuperPanel {
-        /// 是否自动检测前台应用的项目
-        public static let autoDetect = "superPanel.autoDetect"
-        /// 是否显示 Git 操作
-        public static let showGitActions = "superPanel.showGitActions"
-        /// 是否显示构建操作
-        public static let showBuildActions = "superPanel.showBuildActions"
-        /// 是否显示文件导航
-        public static let showFileNav = "superPanel.showFileNav"
-        /// 首选终端应用
-        public static let preferredTerminal = "superPanel.preferredTerminal"
-        /// 工作台是否显示剪贴板预览
-        public static let showClipboard = "superPanel.showClipboard"
-        /// 工作台是否显示常用工具
-        public static let showQuickTools = "superPanel.showQuickTools"
-        /// 长按右键唤出超级面板（对齐 Fasty）
-        public static let mouseLongPressEnabled = "superPanel.mouseLongPressEnabled"
-        /// 右键长按判定阈值（毫秒，50…1500）
-        public static let mouseLongPressThresholdMs = "superPanel.mouseLongPressThresholdMs"
-        /// 鼠标中键单击唤出超级面板（对齐 Fasty）
-        public static let middleClickEnabled = "superPanel.middleClickEnabled"
-    }
+    // 超级面板的偏好键不在插件命名空间里：它已升级为宿主组件，
+    // 键定义随实现移到 `QuickUI/SuperPanel/Model/SuperPanelPreferences.swift`。
 }

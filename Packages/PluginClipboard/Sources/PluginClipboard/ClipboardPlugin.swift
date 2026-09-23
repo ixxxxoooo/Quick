@@ -23,6 +23,23 @@ public final class ClipboardPlugin: QuickPlugin {
     /// 面板头部保留搜索框：输入即过滤剪贴板历史
     public static var supportsPanelSearch: Bool { true }
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "clipboard.clear", pluginID: id, pluginName: name, title: "清空剪贴板",
+                subtitle: "清空全部历史记录", keywords: ["清空剪贴板", "清空历史"],
+                icon: "trash"),
+            CommandDescriptor(
+                id: "clipboard.images", pluginID: id, pluginName: name, title: "剪贴板图片",
+                subtitle: "只看图片类型的记录", keywords: ["剪贴板图片", "图片剪贴板"],
+                icon: "photo.on.rectangle"),
+            CommandDescriptor(
+                id: "clipboard.favorites", pluginID: id, pluginName: name, title: "剪贴板收藏",
+                subtitle: "只看收藏 / 置顶的记录", keywords: ["剪贴板收藏", "收藏剪贴板"],
+                icon: "star")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(ClipboardPlugin.id)

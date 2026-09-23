@@ -48,7 +48,7 @@ public final class SystemControlPlugin: QuickPlugin {
     }
 
     /// 每条系统操作都是一条命令。锁屏作为空查询时的那一条入口
-    public static var commands: [CommandDescriptor] {
+    public static var functionCommands: [CommandDescriptor] {
         SystemAction.allCases.map { action in
             CommandDescriptor(
                 id: CommandID.systemAction(action.rawValue),
@@ -58,7 +58,7 @@ public final class SystemControlPlugin: QuickPlugin {
                 subtitle: action.description,
                 keywords: action.keywords,
                 icon: action.icon,
-                showsWhenQueryEmpty: action == .lockScreen,
+                showsWhenQueryEmpty: false,
                 aliasKey: "system.\(action.rawValue)"
             )
         }

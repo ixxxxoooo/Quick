@@ -86,11 +86,28 @@ enum SettingsSearchCatalog {
         .init(id: "features.screenshot", tab: .screenshot, title: "Screenshot / 截图工具", subtitle: "插件"),
         .init(
             id: "features.superpanel", tab: .superPanel, title: "Super Panel / 超级面板",
-            subtitle: "插件"),
+            subtitle: "超级面板"),
         .init(
             id: "features.superpanel.mouse", tab: .superPanel,
             title: "Middle Click / Right Long Press / 中键 / 右键长按",
             subtitle: "超级面板鼠标唤出"),
+        .init(
+            id: "features.superpanel.appearance", tab: .superPanel,
+            title: "Opacity & Material / 不透明度与背景材质",
+            subtitle: "超级面板外观"),
+        .init(
+            id: "features.superpanel.tools", tab: .superPanel,
+            title: "Quick Tools / 常用工具与最近使用",
+            subtitle: "超级面板工作台"),
+        .init(
+            id: "ai.service", tab: .aiService, title: "AI Service / AI 服务",
+            subtitle: "AI 基座"),
+        .init(
+            id: "ai.provider", tab: .aiService, title: "AI Provider / 服务商与 API Key",
+            subtitle: "AI 服务"),
+        .init(
+            id: "ai.model", tab: .aiService, title: "AI Model / 模型与生成参数",
+            subtitle: "AI 服务"),
         .init(id: "about.version", tab: .about, title: "About / 关于 Quick", subtitle: "Advanced")
     ]
 

@@ -170,6 +170,8 @@ public struct SettingsPermissionState: Sendable {
 public struct SettingsCommandBinding: Identifiable, Sendable {
     public let id: String
     public let title: String
+    /// 命令的补充说明（功能一句话），没有则不显示
+    public let subtitle: String?
     public let pluginName: String
     public let icon: String
     public let isInvocationEnabled: Bool
@@ -180,6 +182,7 @@ public struct SettingsCommandBinding: Identifiable, Sendable {
     public init(
         id: String,
         title: String,
+        subtitle: String? = nil,
         pluginName: String,
         icon: String,
         isInvocationEnabled: Bool,
@@ -188,6 +191,7 @@ public struct SettingsCommandBinding: Identifiable, Sendable {
     ) {
         self.id = id
         self.title = title
+        self.subtitle = subtitle
         self.pluginName = pluginName
         self.icon = icon
         self.isInvocationEnabled = isInvocationEnabled
@@ -215,6 +219,17 @@ public struct SettingsSearchSource: Identifiable, Sendable {
         self.subtitle = subtitle
         self.icon = icon
         self.isEnabled = isEnabled
+    }
+}
+
+/// AI 连接自检结果
+public struct SettingsAITestResult: Sendable {
+    public let isSuccess: Bool
+    public let message: String
+
+    public init(isSuccess: Bool, message: String) {
+        self.isSuccess = isSuccess
+        self.message = message
     }
 }
 
@@ -287,6 +302,28 @@ public protocol SettingsDataSource: AnyObject {
     func isPluginEnabled(_ id: String) -> Bool
     func setPluginEnabled(_ id: String, enabled: Bool)
     func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView?
+
+    // MARK: - 超级面板（宿主级）
+
+    /// 超级面板的设置页
+    ///
+    /// 超级面板不是插件，它的设置页由组装层直接提供，不走 `pluginEntries`。
+    func makeSuperPanelSettingsView() -> AnyView
+
+    /// 唤出超级面板的全局快捷键键帽
+    var superPanelShortcutKeycaps: [String]? { get }
+    /// 录制超级面板快捷键；冲突返回 false
+    func setSuperPanelShortcut(keyCode: Int, carbonModifiers: Int) -> Bool
+    func clearSuperPanelShortcut()
+    /// 清空「最近使用」记录
+    func clearRecentUsage()
+
+    // MARK: - AI 基座
+
+    /// 宿主级 AI 服务设置页
+    func makeAISettingsView() -> AnyView
+    /// 连接自检（发一条最短消息）
+    func testAIConnection() async -> SettingsAITestResult
 
     // MARK: - 权限
     func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState

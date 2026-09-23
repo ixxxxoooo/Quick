@@ -19,6 +19,18 @@ public final class URLCodecPlugin: QuickPlugin {
     public static let description = "URL 百分号编码与解码工具，支持整条链接保留结构编码或纯参数组件编码。"
     public static let triggerWords = ["URL 编解码", "url", "编码", "解码", "encode", "decode"]
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "url-codec.encode", pluginID: id, pluginName: name, title: "URL 编码",
+                subtitle: "把文本编码为百分号形式", keywords: ["urlencode", "url编码"], icon: "link"),
+            CommandDescriptor(
+                id: "url-codec.decode", pluginID: id, pluginName: name, title: "URL 解码",
+                subtitle: "把百分号编码还原为文本", keywords: ["urldecode", "url解码"],
+                icon: "arrow.uturn.left")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(URLCodecPlugin.id)
@@ -44,7 +56,7 @@ public final class URLCodecPlugin: QuickPlugin {
     private let buffer = TextBuffer()
 
     public func makeView() -> AnyView {
-        AnyView(URLCodecView(buffer: buffer))
+        AnyView(URLCodecView(buffer: buffer).prefillFromPluginContext(buffer))
     }
 
     public func activate() {

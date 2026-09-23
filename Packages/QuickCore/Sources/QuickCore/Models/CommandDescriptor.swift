@@ -108,6 +108,12 @@ public enum CommandID {
     /// 唤出或隐藏主面板
     public static let togglePalette = "core.togglePalette"
 
+    /// 唤出或隐藏超级面板
+    ///
+    /// 超级面板是宿主组件而不是插件，所以用 `core` 前缀。它**不进主搜索的命令目录** ——
+    /// 只在热键注册与设置页里用得到，能被搜到反而是多出来的入口。
+    public static let superPanel = "core.superPanel"
+
     /// 打开某个插件的面板
     public static func openPlugin(_ pluginID: String) -> String {
         "plugin.open.\(pluginID)"

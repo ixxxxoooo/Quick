@@ -68,10 +68,16 @@ public protocol QuickPlugin: AnyObject, Sendable {
     /// 想给首屏一组精选条目的插件可以覆盖它。
     func defaultItems() async -> [SearchableItem]
 
+    /// 插件自己声明的功能命令（不含「打开本插件」）
+    ///
+    /// **必须是协议要求，不能只在扩展里给默认实现** —— 否则默认的 `commands`
+    /// 会静态派发到这个空默认，而不是各插件自己的实现，功能命令会被悄悄丢掉。
+    static var functionCommands: [CommandDescriptor] { get }
+
     /// 这个插件声明的静态命令
     ///
-    /// 默认是一条「打开本插件」。结果会随输入变化的插件改走 `dynamicSearch`，
-    /// 并把这里留空或只放不会重复的入口。命令 id 一旦发布就不能改。
+    /// 默认是一条「打开本插件」+ `functionCommands`。结果会随输入变化的插件改走
+    /// `dynamicSearch`，并把这里留空或只放不会重复的入口。命令 id 一旦发布就不能改。
     static var commands: [CommandDescriptor] { get }
 
     /// 这次查询要不要走动态搜索
@@ -132,7 +138,13 @@ public extension QuickPlugin {
     /// 默认不建表：只有用真表的插件才声明 schema
     static var storageMigrations: [SQLiteMigration] { [] }
 
-    /// 默认一条「打开本插件」，关键词用触发词和名字
+    /// 插件自己声明的功能命令（不含「打开本插件」）
+    ///
+    /// 每个功能一条命令、各自带关键字。设置页的「触发关键字」按它逐条展示；
+    /// 主面板里输入某个功能的关键字也能直接命中那一条。默认没有。
+    static var functionCommands: [CommandDescriptor] { [] }
+
+    /// 默认一条「打开本插件」+ 插件声明的功能命令
     static var commands: [CommandDescriptor] {
         [
             CommandDescriptor.openPlugin(
@@ -142,7 +154,7 @@ public extension QuickPlugin {
                 keywords: triggerWords + [name],
                 subtitle: description.isEmpty ? nil : description
             )
-        ]
+        ] + functionCommands
     }
 
     /// 默认不参与动态搜索，避免每次按键把所有插件都叫醒
@@ -151,9 +163,13 @@ public extension QuickPlugin {
     /// 默认没有随查询变化的结果
     func dynamicSearch(query: String) async -> [SearchableItem] { [] }
 
-    /// 默认把「打开本插件」导航进插件面板
+    /// 默认把本插件的命令导航进插件面板
+    ///
+    /// 「打开本插件」与各功能命令都落到这里。功能命令若需要真正执行（截图、系统控制
+    /// 那样），由插件自己覆盖 `perform`；否则打开插件面板，由用户接着操作。
     func perform(commandID: String) {
-        guard commandID == CommandID.openPlugin(Self.id) else { return }
+        guard commandID == CommandID.openPlugin(Self.id) || commandID.hasPrefix("\(Self.id).")
+        else { return }
         EventBus.shared.post(NavigateEvent(pluginID: Self.id))
     }
 

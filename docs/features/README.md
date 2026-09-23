@@ -15,6 +15,7 @@
 | `screenshot` | [screenshot.md](screenshot.md) | 已写（自绘遮罩 + 原地标注 + 钉图） |
 | `sysmonitor` | [sysmonitor.md](sysmonitor.md) | 已写（Raycast 风格双栏 + 设置口径） |
 | `killprocess` | [killprocess.md](killprocess.md) | 已写（标题栏搜索 + CPU/内存切换） |
+| `translator` | [translator.md](translator.md) | 已写（端上翻译 + 系统词典 + 朗读） |
 | 10 个开发者工具 | [json-formatter](json-formatter.md) · [sql-formatter](sql-formatter.md) · [base64-codec](base64-codec.md) · [url-codec](url-codec.md) · [uuid-generator](uuid-generator.md) · [hash-calculator](hash-calculator.md) · [timestamp-converter](timestamp-converter.md) · [text-diff](text-diff.md) · [markdown-preview](markdown-preview.md) · [color-compare](color-compare.md) | 已写（从 `devtools` 容器拆出后补上，重点是各自的既有取舍） |
 | 其余 10 个 | — | 待补。新增或深改一个插件时同步补上 |
 

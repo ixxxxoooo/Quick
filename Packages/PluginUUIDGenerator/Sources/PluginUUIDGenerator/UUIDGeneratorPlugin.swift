@@ -19,6 +19,15 @@ public final class UUIDGeneratorPlugin: QuickPlugin {
     public static let description = "批量生成标准 RFC 4122 v4 UUID/GUID，支持大写字母、去除连字符与一键批量复制。"
     public static let triggerWords = ["UUID 生成器", "uuid", "guid", "生成"]
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "uuid-generator.generate", pluginID: id, pluginName: name, title: "生成 UUID",
+                subtitle: "生成一个新的 UUID", keywords: ["uuid", "guid", "生成uuid"],
+                icon: "number")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(UUIDGeneratorPlugin.id)

@@ -8,128 +8,173 @@ import Testing
 
 @testable import PluginTranslator
 
-// MARK: - 纯逻辑
+// MARK: - 语言探测
 
-@Suite("翻译方向")
-struct TranslationDirectionTests {
+@Suite("语言探测")
+struct LanguageDetectorTests {
 
-    @Test("中文（简体与繁体）译成英文")
-    func chineseGoesToEnglish() {
-        #expect(TranslationDirection.direction(forSourceLanguage: "zh-Hans") == .toEnglish)
-        #expect(TranslationDirection.direction(forSourceLanguage: "zh-Hant") == .toEnglish)
+    @Test("假名优先于汉字：含汉字的日文判成日语")
+    func kanaBeatsKanji() {
+        #expect(LanguageDetector.detect("これはテストです") == "ja")
+        #expect(LanguageDetector.detect("日本語のテスト") == "ja")
     }
 
-    @Test("非中文与识别不出语言都译成中文")
-    func everythingElseGoesToChinese() {
-        #expect(TranslationDirection.direction(forSourceLanguage: "en") == .toChinese)
-        #expect(TranslationDirection.direction(forSourceLanguage: "ja") == .toChinese)
-        #expect(TranslationDirection.direction(forSourceLanguage: "ko") == .toChinese)
-        #expect(TranslationDirection.direction(forSourceLanguage: nil) == .toChinese)
-        #expect(TranslationDirection.direction(forSourceLanguage: "") == .toChinese)
+    @Test("韩文谚文、西里尔、阿拉伯、泰文")
+    func otherScripts() {
+        #expect(LanguageDetector.detect("안녕하세요") == "ko")
+        #expect(LanguageDetector.detect("Привет мир") == "ru")
+        #expect(LanguageDetector.detect("مرحبا") == "ar")
+        #expect(LanguageDetector.detect("สวัสดี") == "th")
     }
 
-    @Test("目标语言 tag 与展示名")
-    func targetMetadataMatchesDirection() {
-        #expect(TranslationDirection.toEnglish.targetCode == "en")
-        #expect(TranslationDirection.toEnglish.targetDisplayName == "英文")
-        #expect(TranslationDirection.toChinese.targetCode == "zh-Hans")
-        #expect(TranslationDirection.toChinese.targetDisplayName == "中文")
-    }
-}
-
-@Suite("内置词典")
-struct TranslationDictionaryTests {
-
-    @Test("词表内中译英")
-    func chineseEntriesTranslateToEnglish() {
-        #expect(TranslationDictionary.lookup("你好") == "Hello")
-        #expect(TranslationDictionary.lookup("谢谢") == "Thank you")
-        #expect(TranslationDictionary.lookup("再见") == "Goodbye")
-    }
-
-    @Test("词表内英译中且大小写不敏感")
-    func englishEntriesAreCaseInsensitive() {
-        #expect(TranslationDictionary.lookup("hello") == "你好")
-        #expect(TranslationDictionary.lookup("Hello") == "你好")
-        #expect(TranslationDictionary.lookup("HELLO") == "你好")
-        #expect(TranslationDictionary.lookup("thank you") == "谢谢")
-        #expect(TranslationDictionary.lookup("Thank You") == "谢谢")
-    }
-
-    @Test("词表外查不到，返回 nil")
-    func unknownTextIsNotInTheTable() {
-        #expect(TranslationDictionary.lookup("苹果") == nil)
-        #expect(TranslationDictionary.lookup("") == nil)
-        #expect(TranslationDictionary.lookup("hell") == nil)
-        #expect(TranslationDictionary.lookup("你好 ") == nil, "词典是精确匹配，不做首尾去空白")
-    }
-
-    @Test("兜底文案带目标语言标注")
-    func fallbackIsLabelledWithTargetLanguage() {
-        #expect(TranslationDictionary.fallback("苹果", direction: .toChinese) == "[中文翻译] 苹果")
-        #expect(TranslationDictionary.fallback("pear", direction: .toEnglish) == "[英文翻译] pear")
-        #expect(TranslationDictionary.fallback("", direction: .toChinese) == "[中文翻译] ")
-    }
-
-    @Test("先查词，查不到才兜底")
-    func translatePrefersTheTable() {
-        #expect(TranslationDictionary.translate("你好", direction: .toEnglish) == "Hello")
-        #expect(TranslationDictionary.translate("苹果", direction: .toChinese) == "[中文翻译] 苹果")
-        // 方向只影响兜底文案，不影响查词结果
-        #expect(TranslationDictionary.translate("你好", direction: .toChinese) == "Hello")
-    }
-
-    @Test("词表的键全部是小写，否则大小写不敏感就失效了")
-    func keysAreLowercased() {
-        #expect(TranslationDictionary.entries.keys.allSatisfy { $0 == $0.lowercased() })
-        #expect(!TranslationDictionary.entries.isEmpty)
+    @Test("汉字判成简体中文，其余归英语")
+    func kanjiAndLatin() {
+        #expect(LanguageDetector.detect("今天天气很好") == "zh-Hans")
+        #expect(LanguageDetector.detect("Hello world") == "en")
+        #expect(LanguageDetector.detect("") == "en")
+        #expect(LanguageDetector.detect("   ") == "en")
     }
 }
 
-@Suite("翻译触发词解析")
+// MARK: - 语言对取舍
+
+@Suite("语言对取舍")
+struct LanguageResolutionTests {
+
+    @Test("源语言不是自动时原样返回")
+    func explicitSourceWins() {
+        let pair = LanguageResolution.effective(source: "fr", target: "en", detected: "en")
+        #expect(pair.source == "fr")
+        #expect(pair.target == "en")
+    }
+
+    @Test("自动检测时用探测结果")
+    func autoUsesDetection() {
+        let pair = LanguageResolution.effective(source: "auto", target: "zh-Hans", detected: "en")
+        #expect(pair.source == "en")
+        #expect(pair.target == "zh-Hans")
+    }
+
+    @Test("探测语言与目标相同时自动翻到另一种")
+    func sameLanguageFlipsTarget() {
+        let pair = LanguageResolution.effective(source: "auto", target: "zh-Hans", detected: "zh-Hans")
+        #expect(pair.source == "zh-Hans")
+        #expect(pair.target == "en")
+
+        let pair2 = LanguageResolution.effective(source: "auto", target: "en", detected: "en")
+        #expect(pair2.source == "en")
+        #expect(pair2.target == "zh-Hans")
+    }
+
+    @Test("交换语言：显式源语言直接对调")
+    func swapExplicit() {
+        let swapped = LanguageResolution.swapped(
+            source: "fr", target: "en", effective: EffectiveLanguages(source: "fr", target: "en"))
+        #expect(swapped.source == "en")
+        #expect(swapped.target == "fr")
+    }
+
+    @Test("交换语言：自动源语言用上次生效的语言对")
+    func swapAutoUsesEffective() {
+        let swapped = LanguageResolution.swapped(
+            source: "auto", target: "zh-Hans",
+            effective: EffectiveLanguages(source: "en", target: "zh-Hans"))
+        #expect(swapped.source == "zh-Hans")
+        #expect(swapped.target == "en")
+    }
+}
+
+// MARK: - 词典解析
+
+@Suite("词典解析")
+struct DictionaryParserTests {
+
+    @Test("英文词条：词头 / 音标 / 词性 / 释义 / 例句")
+    func parsesEnglishEntry() {
+        let raw =
+            "apple | BrE ˈapl, AmE ˈæp(ə)l | noun (fruit) 苹果 píngguǒ; (tree) 苹果树 píngguǒ shù▸ the apple of sb's eye 掌上明珠"
+        let entry = DictionaryParser.parse(raw: raw, query: "apple")
+        #expect(entry.word == "apple")
+        #expect(entry.phonetic.contains("BrE"))
+        #expect(entry.senses.count == 1)
+        #expect(entry.senses.first?.pos == "n.")
+        #expect(entry.senses.first?.meaning.contains("苹果") == true)
+        #expect(entry.examples.count == 1)
+    }
+
+    @Test("多义项按 ①② 切分")
+    func splitsMultipleSenses() {
+        let raw = "beautiful | BrE x, AmE y | adjective ① (attractive) 美丽的 ② (wonderful) 令人愉悦的"
+        let entry = DictionaryParser.parse(raw: raw, query: "beautiful")
+        #expect(entry.senses.count == 2)
+        #expect(entry.senses.allSatisfy { $0.pos == "adj." })
+        #expect(entry.senses[1].meaning.contains("令人愉悦"))
+    }
+
+    @Test("没有竖线分隔时退回整段释义")
+    func fallsBackToWholeBody() {
+        let raw = "苹果 píngguǒ 名 落叶乔木，叶子椭圆形。"
+        let entry = DictionaryParser.parse(raw: raw, query: "苹果")
+        #expect(entry.word == "苹果")
+        #expect(entry.senses.count == 1)
+        #expect(entry.senses.first?.meaning.contains("落叶乔木") == true)
+    }
+
+    @Test("空文本返回空词条")
+    func emptyRaw() {
+        #expect(DictionaryParser.parse(raw: "", query: "x").isEmpty)
+        #expect(DictionaryParser.parse(raw: "   ", query: "x").isEmpty)
+    }
+
+    @Test("可复制文本包含词头与释义")
+    func displayText() {
+        let entry = DictionaryParser.parse(
+            raw: "sync | BrE sɪŋk | noun = synchronization", query: "sync")
+        #expect(entry.displayText.contains("sync"))
+        #expect(entry.displayText.contains("synchronization"))
+    }
+}
+
+// MARK: - 触发词
+
+@Suite("触发词解析")
 struct TranslatorQueryTests {
 
-    @Test("四个前缀都能剥掉")
-    func everyPrefixIsStripped() {
+    @Test("翻译前缀")
+    func translatePrefixes() {
+        #expect(TranslatorQuery.intent(in: "翻译 你好") == .translate("你好"))
+        #expect(TranslatorQuery.intent(in: "tr hello") == .translate("hello"))
+        #expect(TranslatorQuery.intent(in: "translate hello") == .translate("hello"))
+        #expect(TranslatorQuery.intent(in: "fy hello") == .translate("hello"))
+    }
+
+    @Test("词典前缀")
+    func dictionaryPrefixes() {
+        #expect(TranslatorQuery.intent(in: "词典 apple") == .dictionary("apple"))
+        #expect(TranslatorQuery.intent(in: "dict apple") == .dictionary("apple"))
+        #expect(TranslatorQuery.intent(in: "dictionary apple") == .dictionary("apple"))
+        #expect(TranslatorQuery.intent(in: "查词 apple") == .dictionary("apple"))
+    }
+
+    @Test("前缀大小写不敏感，正文原样保留")
+    func caseInsensitivePrefix() {
+        #expect(TranslatorQuery.intent(in: "TR Hello") == .translate("Hello"))
+        #expect(TranslatorQuery.intent(in: "Dict Apple") == .dictionary("Apple"))
+    }
+
+    @Test("只打触发词返回 nil")
+    func bareTrigger() {
+        #expect(TranslatorQuery.intent(in: "tr ") == nil)
+        #expect(TranslatorQuery.intent(in: "词典 ") == nil)
+        #expect(TranslatorQuery.intent(in: "dict") == nil)
+        #expect(TranslatorQuery.intent(in: "hello") == nil)
+        #expect(TranslatorQuery.intent(in: "") == nil)
+    }
+
+    @Test("text(in:) 只取翻译意图")
+    func textHelper() {
         #expect(TranslatorQuery.text(in: "翻译 你好") == "你好")
-        #expect(TranslatorQuery.text(in: "tr hello") == "hello")
-        #expect(TranslatorQuery.text(in: "translate hello") == "hello")
-        #expect(TranslatorQuery.text(in: "fy hello") == "hello")
-    }
-
-    @Test("触发词大小写不敏感，正文大小写原样保留")
-    func prefixIsCaseInsensitiveButBodyIsNot() {
-        #expect(TranslatorQuery.text(in: "TR Hello") == "Hello")
-        #expect(TranslatorQuery.text(in: "Translate HELLO") == "HELLO")
-    }
-
-    @Test("只打触发词（正文为空）返回 nil")
-    func bareTriggerYieldsNothing() {
-        #expect(TranslatorQuery.text(in: "tr ") == nil)
-        #expect(TranslatorQuery.text(in: "翻译 ") == nil)
-        #expect(TranslatorQuery.text(in: "tr") == nil)
-        #expect(TranslatorQuery.text(in: "translate") == nil)
-    }
-
-    @Test("前缀必须带空格，中文触发词也不能省")
-    func prefixNeedsTrailingSpace() {
-        #expect(TranslatorQuery.text(in: "翻译你好") == nil)
-        #expect(TranslatorQuery.text(in: " 翻译 你好") == nil, "前导空白不匹配，触发词必须出现在开头")
-        #expect(TranslatorQuery.text(in: "") == nil)
-        #expect(TranslatorQuery.text(in: "hello") == nil)
-    }
-
-    @Test("translate 不会被更短的 tr 抢走")
-    func longerPrefixWinsByBeingTheOnlyMatch() {
-        #expect(TranslatorQuery.text(in: "translate hello") == "hello")
-        #expect(TranslatorQuery.text(in: "fy 你好") == "你好")
-    }
-
-    @Test("触发前缀非空且无重复")
-    func prefixesAreWellFormed() {
-        #expect(!TranslatorQuery.prefixes.isEmpty)
-        #expect(TranslatorQuery.prefixes.allSatisfy { !$0.isEmpty })
-        #expect(Set(TranslatorQuery.prefixes).count == TranslatorQuery.prefixes.count)
+        #expect(TranslatorQuery.text(in: "词典 apple") == nil)
     }
 }
 
@@ -139,13 +184,16 @@ struct TranslatorQueryTests {
 @MainActor
 struct TranslatorPluginTests {
 
+    private func makePlugin() throws -> TranslatorPlugin {
+        let database = try SQLiteDatabase()
+        try database.migrate([.corePluginData])
+        return TranslatorPlugin(
+            storage: PluginStorage(pluginID: TranslatorPlugin.id, database: database))
+    }
+
     @Test("id 是约定的字面量且为 kebab-case")
     func identifierConvention() {
         #expect(TranslatorPlugin.id == "translator")
-        #expect(
-            TranslatorPlugin.id.allSatisfy { $0.isLowercase || $0.isNumber || $0 == "-" },
-            "id 是事件路由与设置存储的主键，必须是 kebab-case，实际为 \(TranslatorPlugin.id)"
-        )
     }
 
     @Test("名称、图标与触发词非空")
@@ -155,37 +203,22 @@ struct TranslatorPluginTests {
         #expect(!TranslatorPlugin.triggerWords.isEmpty)
     }
 
-    @Test("触发词能翻译出词典里的词")
-    func triggerWordYieldsTranslation() async {
-        let plugin = TranslatorPlugin()
-        let items: [SearchableItem] = await plugin.searchItems(query: "tr hello")
-
-        #expect(items.count == 1, "一个查询只给一条译文，实际 \(items.count) 条")
-        #expect(items.first?.title == "你好")
-        #expect(items.first?.pluginID == TranslatorPlugin.id)
-        #expect(items.first?.id == "translator.result")
-    }
-
-    @Test("中文触发词同样可用")
-    func chineseTriggerAlsoWorks() async {
-        let plugin = TranslatorPlugin()
-        let items = await plugin.searchItems(query: "翻译 谢谢")
-
-        #expect(items.first?.title == "Thank you")
-        #expect(items.first?.pluginID == TranslatorPlugin.id)
-    }
-
-    @Test("无关查询与空查询不返回结果")
-    func unrelatedQueryYieldsNothing() async {
-        let plugin = TranslatorPlugin()
+    @Test("无关查询不返回结果")
+    func unrelatedQueryYieldsNothing() async throws {
+        let plugin = try makePlugin()
         #expect(await plugin.searchItems(query: "definitely-unrelated").isEmpty)
         #expect(await plugin.searchItems(query: "").isEmpty)
     }
 
-    @Test("只打触发词不返回结果")
-    func bareTriggerYieldsNothing() async {
-        let plugin = TranslatorPlugin()
-        #expect(await plugin.searchItems(query: "tr").isEmpty)
-        #expect(await plugin.searchItems(query: "translation").isEmpty)
+    @Test("查词命中系统词典时返回词典条目")
+    func dictionaryLookupReturnsItem() async throws {
+        let plugin = try makePlugin()
+        let items = await plugin.searchItems(query: "dict apple")
+        // 系统词典在绝大多数机器上都有；命中时校验结构，没有也不强求
+        if let item = items.first {
+            #expect(item.pluginID == TranslatorPlugin.id)
+            #expect(item.id == "translator.dict")
+            #expect(!item.title.isEmpty)
+        }
     }
 }

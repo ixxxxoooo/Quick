@@ -19,6 +19,19 @@ public final class Base64CodecPlugin: QuickPlugin {
     public static let description = "普通文本与 Base64 互相转换，支持标准 RFC 4648 与 URL-Safe 编码格式。"
     public static let triggerWords = ["Base64 编解码", "base64", "编码", "解码"]
 
+    public static var functionCommands: [CommandDescriptor] {
+        [
+            CommandDescriptor(
+                id: "base64-codec.encode", pluginID: id, pluginName: name, title: "Base64 编码",
+                subtitle: "把文本编码为 Base64", keywords: ["base64", "base64编码", "b64"],
+                icon: "lock.doc"),
+            CommandDescriptor(
+                id: "base64-codec.decode", pluginID: id, pluginName: name, title: "Base64 解码",
+                subtitle: "把 Base64 还原为文本", keywords: ["base64解码", "unbase64"],
+                icon: "lock.open.doc")
+        ]
+    }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(Base64CodecPlugin.id)
@@ -44,7 +57,7 @@ public final class Base64CodecPlugin: QuickPlugin {
     private let buffer = TextBuffer()
 
     public func makeView() -> AnyView {
-        AnyView(Base64CodecView(buffer: buffer))
+        AnyView(Base64CodecView(buffer: buffer).prefillFromPluginContext(buffer))
     }
 
     public func activate() {

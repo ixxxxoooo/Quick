@@ -10,7 +10,7 @@ import SwiftUI
 /// 每个功能插件的设置页只有三块，且互不重复：
 /// 1. 概览：启用开关 + 一句话简介
 /// 2. 专属配置项
-/// 3. 唤醒与命令：关键字（只出现一次）与额外命令
+/// 3. 触发关键字：按功能拆开，每个功能展示自己的关键字
 struct FeatureSettingsPane: View {
 
     let tab: SettingsTab
@@ -90,64 +90,54 @@ struct FeatureSettingsPane: View {
         .settingsEnabled(isEnabled)
     }
 
-    // MARK: - 唤醒与命令
+    // MARK: - 触发关键字
 
-    /// 唤醒关键字与额外命令
+    /// 触发关键字：按功能拆开，每个功能一行 + 它自己的关键字胶囊
     ///
-    /// 关键字只在这里出现一次。插件默认的「打开本插件」命令只是同一批关键字的另一种说法，
-    /// 因此不再单列 —— 只有真正额外的命令才列出来。
+    /// 插件默认的「打开本插件」命令不单列 —— 它的关键字就是插件的唤醒词，和下面的
+    /// 功能关键字重复，单列只是噪音。没有声明任何功能（命令）的插件，这一节整体不显示。
     @ViewBuilder
     private var wakeSection: some View {
-        let words = pluginInfo?.triggerWords ?? []
-        let commands = extraCommands
-        if !words.isEmpty || !commands.isEmpty {
+        let commands = extraCommands.filter { !displayKeywords($0.keywords).isEmpty }
+        if !commands.isEmpty {
             Section {
-                if !words.isEmpty {
-                    SettingsRow(
-                        title: "关键字",
-                        subtitle: "在主面板输入任一关键字即可打开此插件。",
-                        trailingPlacement: .below,
-                        icon: { SettingsRowIcon(systemImage: "text.magnifyingglass") }
-                    ) {
-                        triggerChips(words)
-                    }
-                }
-
                 ForEach(commands) { command in
                     SettingsRow(
                         title: command.title,
-                        subtitle: commandSubtitle(command),
+                        subtitle: command.subtitle,
+                        trailingPlacement: .below,
                         icon: {
                             SettingsRowIcon(
                                 systemImage: command.icon,
                                 isEnabled: command.isInvocationEnabled)
                         }
-                    )
+                    ) {
+                        triggerChips(displayKeywords(command.keywords))
+                    }
                 }
             } header: {
-                Text("唤醒与命令")
+                Text("触发关键字")
             } footer: {
-                Text("要给某条命令绑快捷键，到「快捷键」页添加。")
+                Text("在主面板输入某个功能的关键字即可直接触发它；要给某条命令绑快捷键，到「快捷键」页添加。")
             }
         }
     }
 
     /// 除默认「打开本插件」之外的命令
-    ///
-    /// 默认命令的关键字就是上面那批唤醒词，列出来只会和关键字行重复。
     private var extraCommands: [SettingsCommandBinding] {
         guard let pluginID = tab.pluginID else { return [] }
         let openCommandID = CommandID.openPlugin(pluginID)
         return dataSource.pluginCommands(pluginID).filter { $0.id != openCommandID }
     }
 
-    /// 额外命令的说明：关键字 + 是否可用
-    private func commandSubtitle(_ command: SettingsCommandBinding) -> String {
-        let words = command.keywords.isEmpty ? command.title : command.keywords.joined(separator: "、")
-        if command.isInvocationEnabled {
-            return "关键字：\(words)。"
+    /// 展示用的关键字：命令关键字不带空格，带空格的直接不显示；并去重
+    private func displayKeywords(_ keywords: [String]) -> [String] {
+        var seen = Set<String>()
+        return keywords.filter { word in
+            !word.isEmpty
+                && !word.contains(where: { $0.isWhitespace })
+                && seen.insert(word.lowercased()).inserted
         }
-        return "关键字：\(words)。已关闭，主搜索和快捷键都不会生效。"
     }
 
     /// 关键字标签：一行放不下就换行，标签内部不换行
@@ -495,36 +485,44 @@ private struct CalendarFeatureSection: View {
 
 private struct TranslatorFeatureSection: View {
     @AppStorage(PluginSettingKey.Translator.targetLang) private var targetLang = "zh-Hans"
-    @AppStorage(PluginSettingKey.Translator.autoDetect) private var autoDetect = true
+
+    /// 与插件里的 `TranslationLanguages.all` 保持一致（QuickUI 不认识插件，只能并列一份）
+    private static let languages: [(code: String, label: String)] = [
+        ("zh-Hans", "简体中文"),
+        ("zh-Hant", "繁体中文"),
+        ("en", "英语"),
+        ("ja", "日语"),
+        ("ko", "韩语"),
+        ("fr", "法语"),
+        ("de", "德语"),
+        ("es", "西班牙语"),
+        ("ru", "俄语"),
+        ("it", "意大利语"),
+        ("pt", "葡萄牙语"),
+        ("ar", "阿拉伯语"),
+        ("th", "泰语"),
+        ("vi", "越南语")
+    ]
 
     var body: some View {
         Section {
             Picker(selection: $targetLang) {
-                Text("简体中文").tag("zh-Hans")
-                Text("繁体中文").tag("zh-Hant")
-                Text("英语").tag("en")
-                Text("日语").tag("ja")
-                Text("韩语").tag("ko")
-                Text("法语").tag("fr")
-                Text("德语").tag("de")
+                ForEach(Self.languages, id: \.code) { language in
+                    Text(language.label).tag(language.code)
+                }
             } label: {
                 SettingsRow(
                     title: "默认目标语言",
-                    subtitle: "翻译结果默认输出的语言。",
+                    subtitle: "翻译结果默认输出的语言。源语言在插件面板里切换，默认自动识别。",
                     icon: { SettingsRowIcon(systemImage: "globe") }
-                )
-            }
-
-            Toggle(isOn: $autoDetect) {
-                SettingsRow(
-                    title: "自动检测源语言",
-                    subtitle: "自动识别输入文本的语言，无需手动选择。"
                 )
             }
         } header: {
             Text("语言偏好")
         } footer: {
-            Text("使用「翻译 <文本>」或「translate <文本>」触发翻译。")
+            Text(
+                "在面板里输入「翻译 <文本>」或「translate <文本>」翻译；输入「词典 <单词>」或「dict <单词>」查词。翻译在端上完成，不联网。"
+            )
         }
     }
 }

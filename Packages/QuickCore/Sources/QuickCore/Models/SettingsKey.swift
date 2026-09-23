@@ -75,6 +75,26 @@ public enum SettingsKey {
     /// 首次引导已经完成
     public static let onboardingCompleted = "quick.onboarding.completed"
 
+    // MARK: - AI 基座
+
+    /// 宿主级 AI 配置。其他插件通过 `AIService` 读这份配置访问 AI，不各自维护一份。
+    public enum AI {
+        /// 是否启用 AI 能力
+        public static let enabled = "quick.ai.enabled"
+        /// 服务商（`AIProviderKind.rawValue`）
+        public static let provider = "quick.ai.provider"
+        /// API Key
+        public static let apiKey = "quick.ai.apiKey"
+        /// 自定义 Base URL（空 = 用服务商默认）
+        public static let baseURL = "quick.ai.baseURL"
+        /// 模型名（空 = 用服务商默认）
+        public static let model = "quick.ai.model"
+        /// 单次最大生成 token 数
+        public static let maxTokens = "quick.ai.maxTokens"
+        /// 采样温度
+        public static let temperature = "quick.ai.temperature"
+    }
+
     // MARK: - 插件开关前缀
 
     /// 生成插件启用状态的设置键

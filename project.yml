@@ -71,8 +71,6 @@ packages:
     path: Packages/PluginColorCompare
   PluginMarkdownPreview:
     path: Packages/PluginMarkdownPreview
-  PluginSuperPanel:
-    path: Packages/PluginSuperPanel
 
 targets:
   Quick:
@@ -137,4 +135,3 @@ targets:
       - package: PluginTextDiff
       - package: PluginColorCompare
       - package: PluginMarkdownPreview
-      - package: PluginSuperPanel

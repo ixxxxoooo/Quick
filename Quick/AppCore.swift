@@ -58,8 +58,6 @@ import PluginURLCodec
 
 import PluginUUIDGenerator
 
-import PluginSuperPanel
-
 import Carbon.HIToolbox
 import Foundation
 import QuickCore
@@ -91,6 +89,12 @@ final class AppCore {
 
     /// 面板协调器
     let paletteCoordinator = PaletteCoordinator()
+
+    /// 超级面板（宿主级浮层，不是插件）
+    let superPanelController = SuperPanelController()
+
+    /// 鼠标唤出监听（右键长按 / 中键单击）
+    let mouseTriggerMonitor = MouseTriggerMonitor()
 
     /// 权限服务
     let permissionService = PermissionService()
@@ -178,6 +182,12 @@ final class AppCore {
     /// 外观设置变化的观察者（必须强引用）
     private var appearanceSettingObserver: NSObjectProtocol?
 
+    /// 超级面板鼠标偏好变化的观察者（必须强引用）
+    private var superPanelDefaultsObserver: NSObjectProtocol?
+
+    /// 最近使用（与协调器共用同一份，设置页清空时也动它）
+    private var usageHistory: UsageHistory?
+
     /// 实际生效外观的观察者（必须强引用）
     private var effectiveAppearanceObserver: NSKeyValueObservation?
 
@@ -207,7 +217,9 @@ final class AppCore {
 
         // 3. 将插件注入到面板协调器，并接上「最近使用」与键盘布局
         paletteCoordinator.setPlugins(plugins)
-        paletteCoordinator.usageHistory = UsageHistory(database: database)
+        let history = UsageHistory(database: database)
+        usageHistory = history
+        paletteCoordinator.usageHistory = history
         paletteCoordinator.onPanelWillShow = { [weak self] in
             self?.applyForcedKeyboardLayout()
         }
@@ -229,6 +241,7 @@ final class AppCore {
             self?.invoke(commandID: commandID)
         }
         hotKeyService.start()
+        wireSuperPanel()
 
         paletteCoordinator.invokeCommand = { [weak self] commandID in
             self?.invoke(commandID: commandID)
@@ -284,6 +297,41 @@ final class AppCore {
             settingsWindowController.show()
         }
 
+        // 11. 开发启动参数：立即显示超级面板（验收用）
+        if ProcessInfo.processInfo.arguments.contains("-showSuperPanel") {
+            log.notice("命中启动参数 -showSuperPanel，立即显示超级面板")
+            superPanelController.show()
+        }
+
+        // 12. 开发启动参数：打开设置窗口的指定分栏（验收用）
+        //
+        //   -showSettingsTab screenshot   → 打开「截图工具」设置页
+        //
+        // 分栏名就是 `SettingsTab` 的 raw value。
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-showSettingsTab"), index + 1 < arguments.count,
+            let tab = SettingsTab(rawValue: arguments[index + 1])
+        {
+            log.notice("命中启动参数 -showSettingsTab \(tab.rawValue, privacy: .public)")
+            paletteCoordinator.hide()
+            settingsWindowController.show(tab: tab)
+        }
+
+        // 13. 开发启动参数：打开翻译面板并携带一段文本（验收用）
+        //
+        // 走真实的导航事件 + 上下文通道（与超级面板跳转同一条路），这样验收的就是
+        // `.prefillFromPluginContext` 本身，而不是某条旁路。
+        if ProcessInfo.processInfo.arguments.contains("-showTranslator") {
+            log.notice("命中启动参数 -showTranslator，打开翻译面板并携带文本")
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.5))
+                EventBus.shared.post(
+                    NavigateEvent(
+                        pluginID: TranslatorPlugin.id,
+                        context: ["query": "Hello, how are you today?"]))
+            }
+        }
+
         log.notice("AppCore 启动完成")
     }
 
@@ -308,6 +356,7 @@ final class AppCore {
     func prepareForTermination() {
         log.notice("开始退出清理")
         hotKeyService.stop()
+        mouseTriggerMonitor.stop()
         statusItemController.remove()
         pluginPanelController.closeAll()
         for plugin in plugins {
@@ -390,7 +439,12 @@ final class AppCore {
     /// 而 `.system` 映射成 `nil` 之后，系统切换外观由 AppKit 自己跟进，不需要我们监听什么。
     private func applyAppearance() {
         let appearance = AppAppearance.stored()
-        NSApp.appearance = appearance.nsAppearance
+        // 相同外观不重复赋值：这个函数挂在 `UserDefaults.didChangeNotification` 上，
+        // 任何一处偏好改动都会触发它（包括设置页里拖动滑块时的连续写入）。
+        // 重复赋同一个 `NSAppearance` 会让所有窗口重排，足以打断正在进行的拖动手势。
+        let target = appearance.nsAppearance
+        guard NSApp.appearance !== target else { return }
+        NSApp.appearance = target
         log.debug("外观已应用：\(appearance.rawValue, privacy: .public)")
     }
 
@@ -488,7 +542,7 @@ final class AppCore {
             (FileSearchPlugin.self, { FileSearchPlugin() }),
             (SnippetsPlugin.self, { SnippetsPlugin(storage: self.storage(for: SnippetsPlugin.id)) }),
             (OCRPlugin.self, { OCRPlugin() }),
-            (TranslatorPlugin.self, { TranslatorPlugin() }),
+            (TranslatorPlugin.self, { TranslatorPlugin(storage: self.storage(for: TranslatorPlugin.id)) }),
 
             // Phase 3.5: 开发者工具插件（原先是一个 devtools 容器，现在每个工具都是独立插件）
             (JSONFormatterPlugin.self, { JSONFormatterPlugin() }),
@@ -509,10 +563,7 @@ final class AppCore {
             (SystemMonitorPlugin.self, { SystemMonitorPlugin() }),
             (KillProcessPlugin.self, { KillProcessPlugin() }),
             (NetworkToolsPlugin.self, { NetworkToolsPlugin() }),
-            (ScreenshotPlugin.self, { ScreenshotPlugin() }),
-
-            // Phase 5: 超级面板
-            (SuperPanelPlugin.self, { SuperPanelPlugin() })
+            (ScreenshotPlugin.self, { ScreenshotPlugin() })
         ]
     }
 
@@ -632,6 +683,102 @@ final class AppCore {
         )
     }
 
+    // MARK: - 超级面板
+
+    /// 接线超级面板：系统能力注入 + 鼠标唤出 + 默认快捷键
+    ///
+    /// 超级面板不认识 `QuickPlatform`（依赖方向），所以抓选区、合成粘贴、解析最近使用
+    /// 都由这里注入进去。鼠标监听也归宿主：它是一项系统能力，不该跟着某个插件生死。
+    private func wireSuperPanel() {
+        let controller = superPanelController
+        controller.captureSelection = { SelectionCapture.captureText() }
+        controller.canPaste = { [weak self] in self?.pasteService.canSynthesize ?? false }
+        controller.paste = { [weak self] in _ = self?.pasteService.paste() }
+        controller.recentItems = { [weak self] in self?.resolveRecentItems() ?? [] }
+        controller.openSettings = { [weak self] in
+            self?.settingsWindowController.show(tab: .superPanel)
+        }
+
+        mouseTriggerMonitor.onTrigger = { [weak self] kind in
+            Task { @MainActor in
+                QuickLog.app.notice(
+                    "鼠标触发超级面板：\(String(describing: kind), privacy: .public)")
+                self?.paletteCoordinator.hide(restoreFocus: false)
+                self?.superPanelController.toggle()
+            }
+        }
+        syncMouseTriggerConfiguration()
+
+        if superPanelDefaultsObserver == nil {
+            superPanelDefaultsObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification,
+                object: UserDefaults.standard,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.syncMouseTriggerConfiguration()
+                }
+            }
+        }
+
+        // 默认 ⌥C（对齐 Fasty）。用户清空后不再自动补回。
+        if hotKeyService.binding(for: CommandID.superPanel) == nil {
+            let shortcut = KeyShortcut(carbonKeyCode: kVK_ANSI_C, carbonModifiers: optionKey)
+            _ = hotKeyService.setBinding(shortcut, for: CommandID.superPanel, registerNow: true)
+        }
+        controller.prewarm()
+        log.notice("超级面板已接线")
+    }
+
+    /// 把鼠标偏好同步到监听器
+    private func syncMouseTriggerConfiguration() {
+        let config = SuperPanelPreferences.mouseConfiguration()
+        mouseTriggerMonitor.apply(
+            MouseTriggerMonitor.Configuration(
+                rightLongPressEnabled: config.rightLongPressEnabled,
+                middleClickEnabled: config.middleClickEnabled,
+                thresholdMilliseconds: UInt64(config.thresholdMilliseconds)
+            )
+        )
+    }
+
+    /// 把「最近使用」的条目 id 解析成可展示的行（最多 4 条，对齐 Fasty）
+    private func resolveRecentItems() -> [SuperPanelRecentItem] {
+        guard let ids = usageHistory?.recentItemIDs(limit: 12) else { return [] }
+        var items: [SuperPanelRecentItem] = []
+        for id in ids {
+            if let item = resolveRecentItem(id) {
+                items.append(item)
+            }
+            if items.count >= 4 { break }
+        }
+        return items
+    }
+
+    /// 单个 id 的解析：应用、插件入口、插件命令
+    private func resolveRecentItem(_ id: String) -> SuperPanelRecentItem? {
+        if id.hasPrefix(CommandID.launchAppPrefix) {
+            let bundleID = String(id.dropFirst(CommandID.launchAppPrefix.count))
+            guard let app = appIndex.apps.first(where: { $0.bundleID == bundleID }) else { return nil }
+            return SuperPanelRecentItem(
+                id: id, title: app.name, subtitle: app.path, icon: "app",
+                kind: .app, launchPath: app.path)
+        }
+        if let pluginID = CommandID.openedPluginID(in: id),
+            let plugin = plugins.first(where: { type(of: $0).id == pluginID })
+        {
+            return SuperPanelRecentItem(
+                id: id, title: type(of: plugin).name, icon: type(of: plugin).icon,
+                kind: .plugin, pluginID: pluginID)
+        }
+        if let plugin = plugins.first(where: { type(of: $0).commands.contains { $0.id == id } }) {
+            return SuperPanelRecentItem(
+                id: id, title: type(of: plugin).name, icon: type(of: plugin).icon,
+                kind: .plugin, pluginID: type(of: plugin).id)
+        }
+        return nil
+    }
+
     // MARK: - 粘贴回上一个应用
 
     /// 交还焦点后多久再合成 ⌘V
@@ -680,6 +827,12 @@ final class AppCore {
     /// 执行一条命令。热键和搜索共用这一条路径
     private func invoke(commandID: String) {
         log.notice("执行命令 \(commandID, privacy: .public)")
+        // 超级面板不是插件命令，也不在命令目录里，单独认领
+        if commandID == CommandID.superPanel {
+            paletteCoordinator.hide(restoreFocus: false)
+            superPanelController.toggle()
+            return
+        }
         if commandID != CommandID.togglePalette, !settingsStore.isCommandEnabled(commandID) {
             log.notice("命令已关闭，拒绝调用 \(commandID, privacy: .public)")
             return
@@ -733,7 +886,9 @@ final class AppCore {
         }
         paletteCoordinator.staticCommands = indexed
         hotKeyService.syncRegistrations { [settingsStore] commandID in
-            commandID == CommandID.togglePalette || settingsStore.isCommandEnabled(commandID)
+            commandID == CommandID.togglePalette
+                || commandID == CommandID.superPanel
+                || settingsStore.isCommandEnabled(commandID)
         }
         log.notice("命令目录已更新，静态命令 \(indexed.count, privacy: .public) 条")
     }
@@ -771,6 +926,8 @@ extension AppCore: SettingsDataSource {
     func boundCommandBindings() -> [SettingsCommandBinding] {
         hotKeyService.boundCommandIDs().compactMap { commandID in
             guard commandID != CommandID.togglePalette else { return nil }
+            // 超级面板的快捷键在它自己的设置页里改，不在快捷键页重复出现
+            guard commandID != CommandID.superPanel else { return nil }
             guard hotKeyService.binding(for: commandID) != nil else { return nil }
             return describe(commandID: commandID)
         }
@@ -890,7 +1047,10 @@ extension AppCore: SettingsDataSource {
 
     func setCommandShortcut(keyCode: Int, carbonModifiers: Int, for commandID: String) -> Bool {
         let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        let registerNow = commandID == CommandID.togglePalette || settingsStore.isCommandEnabled(commandID)
+        let registerNow =
+            commandID == CommandID.togglePalette
+            || commandID == CommandID.superPanel
+            || settingsStore.isCommandEnabled(commandID)
         let outcome = hotKeyService.setBinding(shortcut, for: commandID, registerNow: registerNow)
         if case .conflict = outcome { return false }
         return true
@@ -906,7 +1066,7 @@ extension AppCore: SettingsDataSource {
     }
 
     func isCommandEnabled(_ commandID: String) -> Bool {
-        if commandID == CommandID.togglePalette { return true }
+        if commandID == CommandID.togglePalette || commandID == CommandID.superPanel { return true }
         return settingsStore.isCommandEnabled(commandID)
     }
 
@@ -937,6 +1097,7 @@ extension AppCore: SettingsDataSource {
         SettingsCommandBinding(
             id: command.id,
             title: command.title,
+            subtitle: command.subtitle,
             pluginName: command.pluginName,
             icon: command.icon,
             isInvocationEnabled: settingsStore.isCommandEnabled(command.id),
@@ -1159,6 +1320,51 @@ extension AppCore: SettingsDataSource {
             return nil
         }
         return plugin.makeSettingsView()
+    }
+
+    // MARK: - 超级面板
+
+    func makeSuperPanelSettingsView() -> AnyView {
+        AnyView(SuperPanelSettingsView(dataSource: self))
+    }
+
+    var superPanelShortcutKeycaps: [String]? {
+        hotKeyService.binding(for: CommandID.superPanel)?.keycaps
+    }
+
+    func setSuperPanelShortcut(keyCode: Int, carbonModifiers: Int) -> Bool {
+        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
+        let outcome = hotKeyService.setBinding(shortcut, for: CommandID.superPanel, registerNow: true)
+        if case .conflict = outcome { return false }
+        return true
+    }
+
+    func clearSuperPanelShortcut() {
+        hotKeyService.setBinding(nil, for: CommandID.superPanel, registerNow: false)
+    }
+
+    func clearRecentUsage() {
+        usageHistory?.removeAll()
+        log.notice("最近使用记录已清空")
+    }
+
+    // MARK: - AI 基座
+
+    func makeAISettingsView() -> AnyView {
+        AnyView(AISettingsPane(dataSource: self))
+    }
+
+    func testAIConnection() async -> SettingsAITestResult {
+        do {
+            let reply = try await AIService.testConnection()
+            let snippet = reply.isEmpty ? "OK" : String(reply.prefix(40))
+            log.notice("AI 连接测试成功")
+            return SettingsAITestResult(isSuccess: true, message: "连接成功：\(snippet)")
+        } catch {
+            log.warning("AI 连接测试失败：\(error.localizedDescription, privacy: .public)")
+            return SettingsAITestResult(
+                isSuccess: false, message: error.localizedDescription)
+        }
     }
 
     // MARK: - 权限
