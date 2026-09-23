@@ -41,6 +41,25 @@ public final class AIPlugin: QuickPlugin {
 
     public init() {}
 
+    // MARK: - 关键词
+
+    /// 触发词闸门与打分共用的关键词并集：内置关键词 + 用户自定义触发词
+    ///
+    /// 自定义词必须进闸门 —— 否则 `accepts` 放不下对应查询，下面的打分再准
+    /// 也没有机会跑。实时读偏好：设置页改完立即生效，不用重启插件。
+    static var searchKeywords: [String] {
+        AIProviderRegistry.allKeywords
+            + AIProviderRegistry.all.flatMap { customKeywords(for: $0.id) }
+    }
+
+    /// 用户在设置页为某个 Provider 配置的自定义触发词
+    static func customKeywords(for providerID: String) -> [String] {
+        AIProviderRegistry.parseCustomKeywords(
+            UserDefaults.standard.string(
+                forKey: PluginSettingKey.AIPortal.providerKeywords(providerID)
+            ) ?? "")
+    }
+
     // MARK: - 搜索
 
     public static var functionCommands: [CommandDescriptor] {
@@ -63,7 +82,7 @@ public final class AIPlugin: QuickPlugin {
     }
 
     public func accepts(query: String) -> Bool {
-        query.matchesAnyTriggerIncludingPrefix(AIProviderRegistry.allKeywords)
+        query.matchesAnyTriggerIncludingPrefix(Self.searchKeywords)
     }
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
@@ -76,7 +95,7 @@ public final class AIPlugin: QuickPlugin {
         // DeepSeek、打 `chatgp` 得能出 ChatGPT。整词规则做不到这件事（它保护的是
         // `ai` / `memo` 这类短触发词），所以这里用带长度下限的前缀变体，
         // 而下面那段模糊打分早就为此准备好了。
-        guard query.matchesAnyTriggerIncludingPrefix(AIProviderRegistry.allKeywords) else {
+        guard query.matchesAnyTriggerIncludingPrefix(Self.searchKeywords) else {
             return []
         }
 
@@ -105,8 +124,10 @@ public final class AIPlugin: QuickPlugin {
             // 设置页关掉的 Provider 不进搜索结果
             guard AIWebViewWindowManager.isProviderEnabled(provider.id) else { continue }
 
+            // 打分用合并后的关键词：自定义词与内置词一视同仁
+            let keywords = provider.keywords + Self.customKeywords(for: provider.id)
             let matchScore =
-                provider.keywords.compactMap { word -> Double? in
+                keywords.compactMap { word -> Double? in
                     let score = word.fuzzyScore(keyword)
                     return score > 0 ? score : nil
                 }.max() ?? 0

@@ -859,8 +859,12 @@
 - **胶囊是窗口里唯一常驻的控件，且只属于 AI 窗口。** 内容是一整块第三方网页，
   不能依赖页面 DOM（随时会变），所以控制只能浮在上面；分离窗口有自己的标题栏，
   控制长在标题栏里，不用胶囊（见 `docs/architecture.md`）。
-- **Provider 关键词表是匹配的唯一事实来源。** `AIProviderRegistry.all` 里每个 Provider 的
-  `keywords` 同时用于触发词闸门与打分，不要在别处再抄一份。
+- **Provider 关键词表是匹配的唯一事实来源。** 匹配用的是合并结果：`AIProviderRegistry.all`
+  里每个 Provider 的内置 `keywords`，加上用户在设置页配置的自定义触发词
+  （`PluginSettingKey.AIPortal.providerKeywords(_:)`，由 `AIProviderRegistry.parseCustomKeywords(_:)`
+  统一解析为小写、去空、去重）。合并后的并集（`AIPlugin.searchKeywords`）同时喂给触发词
+  闸门与打分，自定义词与内置词同权 —— 闸门里少了它，`accepts` 放不下对应查询，
+  打分再准也没有机会跑。不要在别处再抄一份。
 - **「这个 Provider 能不能用」只有一个判定，而且必须画出来。** 判定是
   `AIWebViewWindowManager.isProviderEnabled(_:)` —— 门户卡片、搜索结果、`openOrFocus`
   三处都问它。**设置页停用的 Provider，在面板上要显示成「已停用」加一个不可点的按钮**，

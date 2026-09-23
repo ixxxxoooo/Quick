@@ -90,6 +90,16 @@ struct AIProviderRegistryTests {
         #expect(AIProviderRegistry.provider(for: "") == nil)
     }
 
+    /// 自定义触发词存的是一整段原文，解析负责统一形态：切开、小写、去空、去重
+    @Test("解析自定义触发词：多分隔符、大小写、去空去重")
+    func parseCustomKeywords() {
+        #expect(AIProviderRegistry.parseCustomKeywords("") == [])
+        #expect(AIProviderRegistry.parseCustomKeywords("  ，； ") == [])
+        #expect(
+            AIProviderRegistry.parseCustomKeywords("MyAI, wenxin；MYAI 、 我 的AI")
+                == ["myai", "wenxin", "我", "的ai"])
+    }
+
     /// 搜索闸门用的是并集：28 个 Provider 关键词 + 7 个通用词
     @Test("allKeywords 是 Provider 关键词并集加通用词")
     func allKeywordsUnion() {

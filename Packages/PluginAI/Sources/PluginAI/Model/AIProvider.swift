@@ -114,4 +114,22 @@ enum AIProviderRegistry {
     static var allKeywords: [String] {
         all.flatMap(\.keywords) + ["ai", "AI", "聊天", "对话", "chat", "ai portal", "ai聚合"]
     }
+
+    /// 解析用户为某个 Provider 配置的自定义触发词
+    ///
+    /// 设置页存的是一整段原文（逗号 / 顿号 / 分号 / 空白分隔），这里统一切开、
+    /// 小写、去空、去重，与内置关键词的存储约定一致（全小写、无空串，
+    /// 见 `AIProviderRegistryTests.keywordsAreWellFormed`）。放在注册表而不是插件层：
+    /// 解析规则就是关键词规范本身，改要跟着内置关键词的约定一起改。
+    static func parseCustomKeywords(_ raw: String) -> [String] {
+        let separators = CharacterSet(charactersIn: ",，、;； \t\n\r")
+        var seen = Set<String>()
+        var keywords: [String] = []
+        for token in raw.components(separatedBy: separators) {
+            let keyword = token.trimmingCharacters(in: .whitespaces).lowercased()
+            guard !keyword.isEmpty, seen.insert(keyword).inserted else { continue }
+            keywords.append(keyword)
+        }
+        return keywords
+    }
 }

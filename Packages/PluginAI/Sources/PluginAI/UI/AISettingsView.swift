@@ -34,7 +34,10 @@ struct AISettingsView: View {
             } header: {
                 Text("AI 服务")
             } footer: {
-                Text("每个 AI 服务在独立窗口中运行，关闭窗口后登录态保持。")
+                Text(
+                    "每个 AI 服务在独立窗口中运行，关闭窗口后登录态保持。"
+                    + "在「自定义触发词」里填唤醒词（逗号或空格分隔），搜索输入它即可直达对应服务。"
+                )
             }
         }
         .formStyle(.grouped)
@@ -45,29 +48,38 @@ struct AISettingsView: View {
 private struct AIProviderSettingsRow: View {
     let provider: AIProvider
     @AppStorage private var isEnabled: Bool
+    @AppStorage private var customKeywords: String
 
     init(provider: AIProvider) {
         self.provider = provider
         self._isEnabled = AppStorage(
             wrappedValue: true, PluginSettingKey.AIPortal.providerEnabled(provider.id))
+        self._customKeywords = AppStorage(
+            wrappedValue: "", PluginSettingKey.AIPortal.providerKeywords(provider.id))
     }
 
     var body: some View {
-        Toggle(isOn: $isEnabled) {
-            HStack(spacing: DesignTokens.Spacing.md) {
-                Image(systemName: provider.icon)
-                    .font(DesignTokens.Typography.iconGlyph)
-                    .foregroundStyle(Color(hex: provider.accent) ?? Color.accentColor)
-                    .frame(width: 24)
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+            Toggle(isOn: $isEnabled) {
+                HStack(spacing: DesignTokens.Spacing.md) {
+                    Image(systemName: provider.icon)
+                        .font(DesignTokens.Typography.iconGlyph)
+                        .foregroundStyle(Color(hex: provider.accent) ?? Color.accentColor)
+                        .frame(width: DesignTokens.Size.rowIcon)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(provider.name)
-                        .font(DesignTokens.Typography.rowTitle)
-                    Text(provider.url.replacingOccurrences(of: "https://", with: ""))
-                        .font(DesignTokens.Typography.compactKeyCap)
-                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(provider.name)
+                            .font(DesignTokens.Typography.rowTitle)
+                        Text(provider.url.replacingOccurrences(of: "https://", with: ""))
+                            .font(DesignTokens.Typography.compactKeyCap)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    }
                 }
             }
+
+            TextField("自定义触发词（逗号或空格分隔）", text: $customKeywords)
+                .textFieldStyle(.plain)
+                .font(DesignTokens.Typography.rowTrailing)
         }
     }
 }
