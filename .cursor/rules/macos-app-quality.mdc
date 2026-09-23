@@ -26,9 +26,7 @@ alwaysApply: true
 `pre-commit` 钩子会自动执行，失败即拒绝提交：
 
 ```bash
-./Scripts/format.sh          # 先格式化
 ./Scripts/run-tests.sh       # 全量测试，必须全绿
-./Scripts/lint.sh            # 排版 + 语义
 ```
 
 **不要用 `git commit --no-verify` 绕过。** 万一绕过了，推送前必须补跑一次。

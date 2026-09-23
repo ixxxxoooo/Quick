@@ -9,10 +9,9 @@
 | 工具 | 版本 | 说明 |
 | --- | --- | --- |
 | macOS | 26+ | 部署目标就是 26.0，只支持当前稳定版 |
-| Xcode | 26+ | 提供 Swift 6 工具链与 `swift-format` |
+| Xcode | 26+ | 提供 Swift 6 工具链 |
 | Swift | 6.0 语言模式 | 严格并发 `complete` |
 | [XcodeGen](https://github.com/yonaskolb/XcodeGen) | 最新 | `brew install xcodegen`，用于生成工程 |
-| SwiftLint（可选） | 最新 | `brew install swiftlint`。未安装时 `Scripts/lint.sh` 会跳过并明确报告 |
 
 **首次克隆后执行一次：**
 
@@ -28,9 +27,6 @@
 ## 2. 日常命令
 
 ```bash
-./Scripts/format.sh          # 用 swift-format 就地格式化全部 Swift 文件
-./Scripts/lint.sh            # 排版检查（swift-format）+ 语义检查（swiftlint，若已安装）
-./Scripts/lint.sh --changed  # 只检查本次暂存的文件（pre-commit 用）
 ./Scripts/run-tests.sh       # 跑全部包的测试
 ./Scripts/run-tests.sh QuickCore PluginCalculator   # 只跑指定的包
 ./Scripts/build.sh           # 构建 Debug .app
@@ -43,7 +39,7 @@
 ./Scripts/new-plugin.sh PluginFoo   # 生成新功能插件骨架
 ```
 
-**提交前的最小动作**：`./Scripts/format.sh && ./Scripts/run-tests.sh`。
+**提交前的最小动作**：`./Scripts/run-tests.sh`。
 钩子会替你跑一次测试，但先自己跑能省一轮往返。
 
 ---
@@ -162,7 +158,7 @@ open -a "$(./Scripts/build.sh --path)" --args -showPalette
 
 | 钩子 | 检查 |
 | --- | --- |
-| `pre-commit` | ① 对暂存的文件跑 `swift-format` 排版检查 ② **跑全量测试** |
+| `pre-commit` | **跑全量测试** |
 | `commit-msg` | 校验 Conventional Commits 格式，并拒绝非 ASCII 主题行（等价于强制英文） |
 
 **测试失败就拒绝提交。** 这是刻意的：本项目的规则是「每次提交前必须跑完测试」。

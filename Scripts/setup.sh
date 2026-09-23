@@ -45,14 +45,7 @@ check() {
 }
 
 check xcodegen "brew install xcodegen（生成 Quick.xcodeproj 必需）"
-check swiftlint "brew install swiftlint（语义检查；缺失时 lint.sh 会跳过）"
 check jq "brew install jq（日志脚本用到）"
-
-if xcrun --find swift-format >/dev/null 2>&1; then
-    echo "    ✓ swift-format（随 Xcode 提供）"
-else
-    echo "    ✗ swift-format 不可用 — 需要 Xcode 26+ 工具链" >&2
-fi
 
 # ---------------------------------------------------------------------------
 # 3. 工程文件

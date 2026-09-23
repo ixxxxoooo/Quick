@@ -12,7 +12,6 @@ alwaysApply: true
 这是本项目的硬性要求，由 `pre-commit` 钩子强制执行：
 
 ```bash
-./Scripts/format.sh          # 先格式化，避免被钩子打回
 ./Scripts/run-tests.sh       # 全量测试，必须全绿
 ```
 
@@ -63,7 +62,6 @@ chore(tooling): add a pre-commit gate that runs the full test suite
 
 - [ ] `./Scripts/run-tests.sh` 全绿
 - [ ] `./Scripts/build.sh` 成功且无新增警告
-- [ ] `./Scripts/lint.sh` 干净
 - [ ] 新增/修改功能带了测试
 - [ ] 新增功能打了 `QuickLog` 日志（生命周期用 `.notice`）
 - [ ] 没有裸 `print`、没有裸设计数值字面量

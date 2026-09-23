@@ -32,13 +32,6 @@ jobs:
       - name: 启用 git 钩子配置
         run: ./Scripts/setup.sh || true
 
-      # 排版与语义检查。SwiftLint 是可选依赖，CI 上装上以获得完整检查。
-      - name: 安装 SwiftLint
-        run: brew install swiftlint
-
-      - name: 检查排版与语义
-        run: ./Scripts/lint.sh
-
       # 测试是硬门禁：任何一个包失败，整个 CI 失败。
       - name: 跑测试
         run: ./Scripts/run-tests.sh

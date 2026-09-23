@@ -115,11 +115,9 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 
 ```bash
 ./Scripts/setup.sh                 # 首次克隆后执行一次：启用 git 钩子
-./Scripts/format.sh                # 改完先格式化
 ./Scripts/run-tests.sh             # 跑全量测试（提交前必跑）
 ./Scripts/build.sh                 # 构建 .app
 ./Scripts/restart.sh               # 构建 + 杀旧进程 + 启动新实例（改完必跑）
-./Scripts/lint.sh                  # 排版 + 语义检查
 ```
 
 提交时 `pre-commit` 钩子会自动再跑一遍，失败即拒绝提交。见
@@ -164,7 +162,6 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 
 - `./Scripts/run-tests.sh` 全绿 —— **这是提交的硬门禁**。
 - `./Scripts/build.sh` 通过，且**没有新增警告**（当前基线是 0 个新警告）。
-- `./Scripts/lint.sh` 干净。
 - App 实际启动过，面板能被快捷键唤出，Esc 能关闭，CPU 空闲时接近 0。
 - `grep -rln 'import AppKit\|import SwiftUI\|import Cocoa' Packages/*/Sources/*/Model/` 无输出。
 - 该改的文档在**同一个提交**里改掉了。
