@@ -43,47 +43,14 @@ struct SettingsSidebarView: View {
         .background(focusShortcut)
     }
 
-    /// 分区列表：宿主页面在上，「插件」是分类，每个插件一项，关于在最后
-    private var browse: some View {
-        List(selection: selectionBinding) {
-            Section {
-                ForEach(SettingsSection.host.tabs) { tab in
-                    sidebarRow(title: tab.title, systemImage: tab.systemImage)
-                        .tag(tab)
-                }
-            }
-            Section("插件") {
-                ForEach(pluginRows, id: \.plugin.id) { row in
-                    sidebarRow(title: row.plugin.name, systemImage: row.plugin.icon)
-                        .tag(row.tab)
-                }
-            }
-            Section {
-                sidebarRow(title: SettingsTab.about.title, systemImage: SettingsTab.about.systemImage)
-                    .tag(SettingsTab.about)
-            }
-        }
-        .listStyle(.sidebar)
-    }
-
-    /// 已注册插件里，能对上设置页的那些。顺序跟插件名单一致
-    private var pluginRows: [(plugin: SettingsPlugin, tab: SettingsTab)] {
-        dataSource.pluginEntries.compactMap { plugin in
-            guard let tab = SettingsTab.tab(forPluginID: plugin.id) else { return nil }
-            return (plugin, tab)
-        }
-    }
-
-    private func sidebarRow(title: String, systemImage: String) -> some View {
+    private func sidebarRow(title: String, systemImage: String, tintName: String) -> some View {
         Label {
             Text(title)
         } icon: {
-            Image(systemName: systemImage)
-                .font(DesignTokens.Typography.sidebarIcon)
-                .frame(
-                    width: DesignTokens.Size.sidebarIconSlot,
-                    height: DesignTokens.Size.sidebarIconSlot,
-                    alignment: .center)
+            SettingsTileIcon(
+                systemImage: systemImage,
+                tint: .named(tintName)
+            )
         }
     }
 
@@ -99,6 +66,49 @@ struct SettingsSidebarView: View {
                 }
             }
         )
+    }
+
+    /// 分区列表：宿主页面在上，「插件」是分类，每个插件一项，关于在最后
+    private var browse: some View {
+        List(selection: selectionBinding) {
+            Section {
+                ForEach(SettingsSection.host.tabs) { tab in
+                    sidebarRow(
+                        title: tab.title,
+                        systemImage: tab.systemImage,
+                        tintName: tab.iconTintName
+                    )
+                    .tag(tab)
+                }
+            }
+            Section("插件") {
+                ForEach(pluginRows, id: \.plugin.id) { row in
+                    sidebarRow(
+                        title: row.plugin.name,
+                        systemImage: row.tab.systemImage,
+                        tintName: row.tab.iconTintName
+                    )
+                    .tag(row.tab)
+                }
+            }
+            Section {
+                sidebarRow(
+                    title: SettingsTab.about.title,
+                    systemImage: SettingsTab.about.systemImage,
+                    tintName: SettingsTab.about.iconTintName
+                )
+                .tag(SettingsTab.about)
+            }
+        }
+        .listStyle(.sidebar)
+    }
+
+    /// 已注册插件里，能对上设置页的那些。顺序跟插件名单一致
+    private var pluginRows: [(plugin: SettingsPlugin, tab: SettingsTab)] {
+        dataSource.pluginEntries.compactMap { plugin in
+            guard let tab = SettingsTab.tab(forPluginID: plugin.id) else { return nil }
+            return (plugin, tab)
+        }
     }
 
     /// 搜索结果
@@ -123,12 +133,10 @@ struct SettingsSidebarView: View {
                                 }
                             }
                         } icon: {
-                            Image(systemName: entry.tab.systemImage)
-                                .font(DesignTokens.Typography.sidebarIcon)
-                                .frame(
-                                    width: DesignTokens.Size.sidebarIconSlot,
-                                    height: DesignTokens.Size.sidebarIconSlot,
-                                    alignment: .center)
+                            SettingsTileIcon(
+                                systemImage: entry.tab.systemImage,
+                                tint: .named(entry.tab.iconTintName)
+                            )
                         }
                         .tag(entry.id)
                     }

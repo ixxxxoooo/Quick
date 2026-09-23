@@ -15,7 +15,7 @@ public final class OCRPlugin: QuickPlugin {
 
     public static let id = "ocr"
     public static let name = "文字识别"
-    public static let icon = "text.viewfinder"
+    public static let icon = "doc.text.viewfinder"
     public static let description = "基于 Apple Vision 原生离线光学字符识别，选取屏幕区域即可快速提取文字并自动复制到剪贴板。"
     public static let triggerWords = OCRQuery.triggers
 

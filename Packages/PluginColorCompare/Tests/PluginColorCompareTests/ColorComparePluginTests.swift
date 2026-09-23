@@ -178,7 +178,7 @@ struct ColorComparePluginTests {
     @Test("名称、图标、触发词齐备")
     func metadataIsComplete() {
         #expect(ColorComparePlugin.name == "颜色工具")
-        #expect(ColorComparePlugin.icon == "paintpalette")
+        #expect(ColorComparePlugin.icon == "paintpalette.fill")
         #expect(!ColorComparePlugin.triggerWords.isEmpty)
         #expect(ColorComparePlugin.triggerWords.allSatisfy { !$0.isEmpty })
     }

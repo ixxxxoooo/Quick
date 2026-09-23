@@ -15,7 +15,7 @@ public final class FileSearchPlugin: QuickPlugin {
 
     public static let id = "filesearch"
     public static let name = "文件搜索"
-    public static let icon = "doc.text.magnifyingglass"
+    public static let icon = "folder.fill.badge.magnifyingglass"
     public static let description = "基于 macOS Spotlight 原生索引的高性能文件搜索，支持全盘文件名匹配与内容深度检索。"
     public static let triggerWords = ["f", "file", "文件"]
 

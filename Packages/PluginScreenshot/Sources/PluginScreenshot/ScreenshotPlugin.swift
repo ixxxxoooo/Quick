@@ -17,7 +17,7 @@ public final class ScreenshotPlugin: QuickPlugin {
 
     public static let id = "screenshot"
     public static let name = "截图工具"
-    public static let icon = "camera"
+    public static let icon = "camera.fill"
     public static let description = "自绘遮罩截图，支持原地框选与标注（矩形、箭头、画笔、文字、马赛克、序号），可保存、复制或钉在桌面。"
     public static let areaKeywords = ["截图工具", "截图", "截屏", "screenshot", "区域截图", "框选"]
     public static let fullKeywords = ["全屏截图"]

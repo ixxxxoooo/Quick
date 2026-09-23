@@ -15,7 +15,7 @@ public final class HashCalculatorPlugin: QuickPlugin {
 
     public static let id = "hash-calculator"
     public static let name = "Hash 计算器"
-    public static let icon = "number.square"
+    public static let icon = "number.square.fill"
     public static let description = "实时计算文本数据的 MD5、SHA-1、SHA-256 与 SHA-512 校验散列值，支持大写切换与自动复制。"
     public static let triggerWords = ["Hash 计算器", "hash", "哈希", "md5", "sha"]
 

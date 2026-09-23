@@ -4,17 +4,36 @@
 
 import AppKit
 import Foundation
+import QuickCore
 
-/// 进程扫描器
+/// 系统监控采样器
 ///
-/// 获取正在运行的进程列表和系统信息。
-/// 解析与格式化都在 `Model/` 里（`ProcessListing` / `SystemMetrics`），
-/// 这里只负责起命令、读环境事实。
+/// 聚合进程列表、CPU / 内存 / 磁盘 / 电源 / 网络与硬件信息。
+/// 解析与格式化都在 `Model/`，这里只负责起命令、读 Mach / ifaddrs。
 @MainActor
 @Observable
 final class ProcessScanner {
 
-    /// 系统信息
+    private(set) var processes: [ProcessEntry] = []
+    private(set) var topCPUProcesses: [ProcessEntry] = []
+    private(set) var topMemoryProcesses: [ProcessEntry] = []
+
+    private(set) var cpuUsagePercent: Double?
+    private(set) var perCoreUsage: [CoreUsage] = []
+    private(set) var loadAverage: [String] = []
+
+    private(set) var memory: MemorySnapshot?
+    private(set) var disks: [DiskVolume] = []
+    private(set) var rootVolume: RootVolumeDetails?
+    private(set) var power: PowerSnapshot?
+    private(set) var networkInterfaces: [NetworkInterfaceInfo] = []
+    private(set) var networkThroughput: NetworkThroughput?
+    private(set) var temperature: TemperatureSnapshot?
+
+    private(set) var hardware: HardwareInfo?
+    private(set) var software: SoftwareInfo?
+
+    /// 兼容旧「系统信息」页的扁平结构
     struct SystemInfo: Sendable {
         let hostname: String
         let osVersion: String
@@ -23,81 +42,260 @@ final class ProcessScanner {
         let memoryTotal: String
     }
 
-    private(set) var processes: [ProcessEntry] = []
     private(set) var systemInfo: SystemInfo?
 
-    /// 偏好存储。注入是为了让采样间隔能被测试固定住 —— 默认就是标准偏好
     private let defaults: UserDefaults
+    private let log = QuickLog.plugin(SystemMonitorPlugin.id)
+
+    private var previousCPUTicks: CpuTickSample?
+    private var previousCoreTicks: [CpuTickSample]?
+    private var previousNetworkCounters: [NetworkCounterSample]?
+    private var didLoadHardware = false
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
     /// 当前的采样间隔（秒）
-    ///
-    /// 采样循环每轮都问它一次，所以设置页改了下一轮就生效。
-    /// internal 而不是 private：循环体默认要起 `ps`，测试里不允许起进程，间隔因此在这里被断言。
     var samplingInterval: Int {
         SystemMonitorSampling.configuredInterval(defaults: defaults)
     }
 
     /// 按设置里的采样间隔连续刷新，直到任务被取消
-    ///
-    /// 由视图的 `.task` 驱动：面板关掉（任务取消）采样就停，不会在后台空转。
-    ///
-    /// - Parameter tick: 每一轮的动作。默认刷新进程列表与系统信息；
-    ///   测试传入计数闭包，采样节奏就能在不起 `ps` 的前提下被观察。
     func startSampling(tick: (@MainActor () async -> Void)? = nil) async {
         while !Task.isCancelled {
             if let tick {
                 await tick()
             } else {
-                await refreshProcesses()
-                refreshSystemInfo()
+                await refreshAll()
             }
-
-            // 每轮重新读一次间隔：中途改设置，下一轮就是新的节奏
             try? await Task.sleep(for: .seconds(samplingInterval))
         }
     }
 
-    /// 刷新进程列表
+    /// 刷新全部可变指标
+    func refreshAll() async {
+        async let cpuTask: Void = refreshCPU()
+        async let memoryTask: Void = refreshMemory()
+        async let processTask: Void = refreshProcesses()
+        async let diskTask: Void = refreshDisks()
+        async let powerTask: Void = refreshPower()
+        async let networkTask: Void = refreshNetwork()
+        async let temperatureTask: Void = refreshTemperature()
+
+        await cpuTask
+        await memoryTask
+        await processTask
+        await diskTask
+        await powerTask
+        await networkTask
+        await temperatureTask
+
+        refreshSoftware()
+        if !didLoadHardware {
+            await refreshHardware()
+        }
+    }
+
+    /// 刷新进程列表（CPU 排序完整表 + 两类 Top 5）
     func refreshProcesses() async {
-        processes = await Task.detached(priority: .userInitiated) {
-            ProcessScanner.scan()
+        let cpuSorted = await Task.detached(priority: .userInitiated) {
+            ProcessScanner.scan(sort: .cpu)
+        }.value
+        let memorySorted = await Task.detached(priority: .userInitiated) {
+            ProcessScanner.scan(sort: .memory, limit: ProcessListing.topPreviewCount)
+        }.value
+
+        processes = cpuSorted
+        topCPUProcesses = Array(cpuSorted.prefix(ProcessListing.topPreviewCount))
+        topMemoryProcesses = memorySorted
+    }
+
+    /// 获取基础系统信息（兼容旧路径）
+    func refreshSystemInfo() {
+        refreshSoftware()
+    }
+
+    // MARK: - CPU
+
+    private func refreshCPU() async {
+        let sample = await Task.detached(priority: .utility) {
+            (CpuHostSampler.overallTicks(), CpuHostSampler.perCoreTicks())
+        }.value
+
+        if let current = sample.0 {
+            if let previous = previousCPUTicks {
+                cpuUsagePercent = CpuLoad.usagePercent(previous: previous, current: current)
+            }
+            previousCPUTicks = current
+        }
+
+        if let currentCores = sample.1 {
+            if let previous = previousCoreTicks,
+                let usage = CpuLoad.perCoreUsage(previous: previous, current: currentCores)
+            {
+                perCoreUsage = usage
+            }
+            previousCoreTicks = currentCores
+        }
+
+        var loads = [Double](repeating: 0, count: 3)
+        _ = loads.withUnsafeMutableBufferPointer { buffer in
+            getloadavg(buffer.baseAddress, 3)
+        }
+        loadAverage = CpuLoad.formatLoadAverage(loads)
+    }
+
+    // MARK: - Memory
+
+    private func refreshMemory() async {
+        memory = await Task.detached(priority: .utility) {
+            ProcessScanner.collectMemory()
         }.value
     }
 
-    /// 获取系统信息
-    func refreshSystemInfo() {
-        let sysInfo = Foundation.ProcessInfo.processInfo
+    // MARK: - Disk
+
+    private func refreshDisks() async {
+        let result = await Task.detached(priority: .utility) {
+            let df = LocalCommand.run(path: "/bin/df", arguments: ["-kP"])
+            let volumes = DiskStatsParsing.parseStorage(df)
+            let info = LocalCommand.run(path: "/usr/sbin/diskutil", arguments: ["info", "/"])
+            let root = info.isEmpty ? nil : DiskStatsParsing.parseRootVolume(info)
+            return (volumes, root)
+        }.value
+        disks = result.0
+        rootVolume = result.1
+    }
+
+    // MARK: - Power
+
+    private func refreshPower() async {
+        power = await Task.detached(priority: .utility) {
+            ProcessScanner.collectPower()
+        }.value
+    }
+
+    // MARK: - Network
+
+    private func refreshNetwork() async {
+        let now = Date()
+        let result = await Task.detached(priority: .utility) {
+            (NetworkInterfaceSampler.interfaces(), NetworkInterfaceSampler.counters(now: now))
+        }.value
+        networkInterfaces = result.0
+        let counters = result.1
+        if let previous = previousNetworkCounters {
+            networkThroughput = NetworkStatsParsing.throughput(previous: previous, current: counters)
+        }
+        previousNetworkCounters = counters
+    }
+
+    // MARK: - Temperature
+
+    private func refreshTemperature() async {
+        let state = Foundation.ProcessInfo.processInfo.thermalState
+        temperature = await Task.detached(priority: .utility) {
+            TemperatureSampler.sample(thermalState: state)
+        }.value
+    }
+
+    // MARK: - Software / Hardware
+
+    private func refreshSoftware() {
+        let info = Foundation.ProcessInfo.processInfo
+        software = SoftwareInfo(
+            osName: "macOS",
+            osVersion: info.operatingSystemVersionString,
+            hostname: info.hostName,
+            uptime: SystemMetrics.uptime(info.systemUptime)
+        )
         systemInfo = SystemInfo(
-            hostname: sysInfo.hostName,
-            osVersion: sysInfo.operatingSystemVersionString,
-            uptime: SystemMetrics.uptime(sysInfo.systemUptime),
-            cpuCount: sysInfo.processorCount,
-            memoryTotal: SystemMetrics.bytes(Int64(sysInfo.physicalMemory))
+            hostname: info.hostName,
+            osVersion: info.operatingSystemVersionString,
+            uptime: SystemMetrics.uptime(info.systemUptime),
+            cpuCount: info.processorCount,
+            memoryTotal: SystemMetrics.bytes(Int64(info.physicalMemory))
         )
     }
 
-    /// 起 `ps` 并把输出解析成进程条目
-    ///
-    /// `nonisolated` 是必需的：`ProcessScanner` 是 `@MainActor`，静态成员默认也继承主 actor 隔离，
-    /// 不加这个标注的话 `Task.detached` 里调用它仍会跳回主线程。起进程 + 阻塞读管道是 IO，
-    /// 留在主线程会卡住面板 —— 这也是它以前跑在 `DispatchQueue.global` 上的原因，行为不变。
-    nonisolated private static func scan() -> [ProcessEntry] {
-        let task = Process()
-        task.launchPath = ProcessListing.commandPath
-        task.arguments = ProcessListing.commandArguments
+    private func refreshHardware() async {
+        let info = await Task.detached(priority: .utility) {
+            let hardware = LocalCommand.run(
+                path: "/usr/sbin/system_profiler", arguments: ["SPHardwareDataType"])
+            let display = LocalCommand.run(
+                path: "/usr/sbin/system_profiler", arguments: ["SPDisplaysDataType"])
+            guard !hardware.isEmpty else { return nil as HardwareInfo? }
+            return HardwareInfoParsing.parseHardware(hardware, displayOutput: display)
+        }.value
+        if let info {
+            hardware = info
+            didLoadHardware = true
+            log.notice("硬件信息已缓存：\(info.modelIdentifier, privacy: .public)")
+        } else {
+            log.error("读取 system_profiler 硬件信息失败")
+        }
+    }
 
-        let pipe = Pipe()
-        task.standardOutput = pipe
+    // MARK: - 后台采集
 
-        try? task.run()
-        task.waitUntilExit()
+    nonisolated private static func scan(
+        sort: ProcessSortMode,
+        limit: Int = ProcessListing.maximumCount
+    ) -> [ProcessEntry] {
+        let output = LocalCommand.run(
+            path: ProcessListing.commandPath,
+            arguments: ProcessListing.commandArguments(sort: sort)
+        )
+        return ProcessListing.parse(output, limit: limit)
+    }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
-        return ProcessListing.parse(output)
+    nonisolated private static func collectMemory() -> MemorySnapshot? {
+        let pageSize =
+            Int(
+                LocalCommand.run(path: "/usr/sbin/sysctl", arguments: ["-n", "hw.pagesize"])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let memSize =
+            UInt64(
+                LocalCommand.run(path: "/usr/sbin/sysctl", arguments: ["-n", "hw.memsize"])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let pageable =
+            Int(
+                LocalCommand.run(
+                    path: "/usr/sbin/sysctl", arguments: ["-n", "vm.page_pageable_internal_count"]
+                ).trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let purgeable =
+            Int(
+                LocalCommand.run(path: "/usr/sbin/sysctl", arguments: ["-n", "vm.page_purgeable_count"])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let vmStat = LocalCommand.run(path: "/usr/bin/vm_stat", arguments: [])
+        let swap = LocalCommand.run(path: "/usr/sbin/sysctl", arguments: ["-n", "vm.swapusage"])
+        let pressure = LocalCommand.run(
+            path: "/usr/sbin/sysctl", arguments: ["-n", "kern.memorystatus_vm_pressure_level"])
+
+        guard pageSize > 0, memSize > 0 else { return nil }
+        return MemoryStatsParsing.snapshot(
+            pageSize: pageSize,
+            memSizeBytes: memSize,
+            pageableInternal: pageable,
+            purgeable: purgeable,
+            vmStatOutput: vmStat,
+            swapOutput: swap,
+            pressureRaw: pressure
+        )
+    }
+
+    nonisolated private static func collectPower() -> PowerSnapshot {
+        let pmset = LocalCommand.run(path: "/usr/bin/pmset", arguments: ["-g", "batt"])
+        let parsed = PowerStatsParsing.parsePmset(pmset)
+        return PowerSnapshot(
+            hasBattery: parsed.hasBattery,
+            batteryPercent: parsed.percent,
+            isCharging: parsed.isCharging,
+            isOnACPower: parsed.isOnAC,
+            condition: parsed.hasBattery ? "正常" : "N/A",
+            cycleCount: parsed.hasBattery ? "—" : "N/A",
+            timeRemainingMinutes: nil
+        )
     }
 }

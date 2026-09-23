@@ -139,7 +139,7 @@ struct ScreenshotPluginContractTests {
     @Test("名称、图标、触发词齐备")
     func metadataIsComplete() {
         #expect(ScreenshotPlugin.name == "截图工具")
-        #expect(ScreenshotPlugin.icon == "camera")
+        #expect(ScreenshotPlugin.icon == "camera.fill")
         #expect(
             ScreenshotPlugin.triggerWords == [
                 "截图工具", "截图", "截屏", "screenshot", "区域截图", "框选",

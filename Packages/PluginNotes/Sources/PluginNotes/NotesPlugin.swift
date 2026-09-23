@@ -16,7 +16,7 @@ public final class NotesPlugin: QuickPlugin {
 
     public static let id = "notes"
     public static let name = "笔记"
-    public static let icon = "text.page"
+    public static let icon = "note.text"
     public static let description = "轻量级便签与待办备忘录，支持极简富文本与 Markdown 记录，编辑即时自动保存且本地安全存储。"
     public static let triggerWords = ["备忘录", "memo", "note", "笔记", "便签"]
 

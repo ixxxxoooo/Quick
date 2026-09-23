@@ -71,7 +71,7 @@ struct MarkdownPreviewPluginTests {
     @Test("名称、图标、触发词齐备")
     func metadataIsComplete() {
         #expect(MarkdownPreviewPlugin.name == "Markdown 预览")
-        #expect(MarkdownPreviewPlugin.icon == "text.badge.checkmark")
+        #expect(MarkdownPreviewPlugin.icon == "text.alignleft")
         #expect(
             MarkdownPreviewPlugin.triggerWords == ["Markdown 预览", "markdown", "md", "预览"]
         )

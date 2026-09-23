@@ -67,6 +67,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case markdownPreview
     case colorCompare
     case systemMonitor
+    case killProcess
     case networkTools
     case ocr
     case screenshot
@@ -110,6 +111,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .markdownPreview: "Markdown 预览"
         case .colorCompare: "颜色工具"
         case .systemMonitor: "系统监控"
+        case .killProcess: "结束进程"
         case .networkTools: "网络工具"
         case .ocr: "文字识别"
         case .screenshot: "截图工具"
@@ -119,45 +121,89 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// 侧边栏图标（SF Symbol 名）
+    /// 侧边栏图标（精选 SF Symbol，优先 fill 变体以便落在彩色色块上可读）
     public var systemImage: String {
         switch self {
-        case .general: "switch.2"
-        case .appearance: "paintbrush"
-        case .shortcuts: "command"
-        case .plugins: "square.grid.2x2"
-        case .permissions: "lock.shield"
+        case .general: "gearshape.2.fill"
+        case .appearance: "paintbrush.fill"
+        case .shortcuts: "keyboard.fill"
+        case .plugins: "puzzlepiece.extension.fill"
+        case .permissions: "lock.shield.fill"
         case .search: "magnifyingglass"
 
-        case .applications: "app.badge"
-        case .systemActions: "bolt"
-        case .commands: "terminal"
+        case .applications: "square.grid.2x2.fill"
+        case .systemActions: "power.circle.fill"
+        case .commands: "terminal.fill"
 
-        case .clipboard: "doc.on.clipboard"
+        case .clipboard: "doc.on.clipboard.fill"
         case .calculator: "plus.forwardslash.minus"
-        case .fileSearch: "doc.text.magnifyingglass"
-        case .snippets: "curlybraces"
-        case .notes: "text.page"
+        case .fileSearch: "folder.fill.badge.magnifyingglass"
+        case .snippets: "text.quote"
+        case .notes: "note.text"
         case .calendar: "calendar"
         case .ai: "sparkles"
-        case .translator: "character.book.closed"
+        case .translator: "character.bubble.fill"
         case .jsonFormatter: "curlybraces"
-        case .sqlFormatter: "cylinder"
-        case .base64Codec: "lock.rectangle"
-        case .urlCodec: "link"
-        case .uuidGenerator: "number"
-        case .hashCalculator: "number.square"
-        case .timestampConverter: "clock"
-        case .textDiff: "doc.on.doc"
-        case .markdownPreview: "text.badge.checkmark"
-        case .colorCompare: "paintpalette"
-        case .systemMonitor: "cpu"
-        case .networkTools: "network"
-        case .ocr: "text.viewfinder"
-        case .screenshot: "camera"
-        case .superPanel: "bolt.square"
+        case .sqlFormatter: "cylinder.fill"
+        case .base64Codec: "lock.doc.fill"
+        case .urlCodec: "link.circle.fill"
+        case .uuidGenerator: "number.circle.fill"
+        case .hashCalculator: "number.square.fill"
+        case .timestampConverter: "clock.fill"
+        case .textDiff: "arrow.left.arrow.right"
+        case .markdownPreview: "text.alignleft"
+        case .colorCompare: "paintpalette.fill"
+        case .systemMonitor: "gauge.with.dots.needle.67percent"
+        case .killProcess: "xmark.octagon.fill"
+        case .networkTools: "wifi"
+        case .ocr: "doc.text.viewfinder"
+        case .screenshot: "camera.fill"
+        case .superPanel: "rectangle.3.group.fill"
 
-        case .about: "info.circle"
+        case .about: "info.circle.fill"
+        }
+    }
+
+    /// 侧栏色块着色（与 `SettingsTileIcon.Tint` 一一对应，用字符串避免跨模块可见性问题）
+    public var iconTintName: String {
+        switch self {
+        case .general: "gray"
+        case .appearance: "pink"
+        case .shortcuts: "orange"
+        case .plugins: "indigo"
+        case .permissions: "red"
+        case .search: "blue"
+
+        case .applications: "blue"
+        case .systemActions: "orange"
+        case .commands: "brown"
+
+        case .clipboard: "mint"
+        case .calculator: "orange"
+        case .fileSearch: "yellow"
+        case .snippets: "purple"
+        case .notes: "yellow"
+        case .calendar: "red"
+        case .ai: "purple"
+        case .translator: "teal"
+        case .jsonFormatter: "green"
+        case .sqlFormatter: "blue"
+        case .base64Codec: "indigo"
+        case .urlCodec: "cyan"
+        case .uuidGenerator: "gray"
+        case .hashCalculator: "brown"
+        case .timestampConverter: "orange"
+        case .textDiff: "pink"
+        case .markdownPreview: "blue"
+        case .colorCompare: "pink"
+        case .systemMonitor: "green"
+        case .killProcess: "red"
+        case .networkTools: "cyan"
+        case .ocr: "teal"
+        case .screenshot: "purple"
+        case .superPanel: "indigo"
+
+        case .about: "gray"
         }
     }
 
@@ -185,6 +231,7 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .markdownPreview: "markdown-preview"
         case .colorCompare: "color-compare"
         case .systemMonitor: "sysmonitor"
+        case .killProcess: "killprocess"
         case .networkTools: "networktools"
         case .ocr: "ocr"
         case .screenshot: "screenshot"
@@ -196,5 +243,26 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     /// 按插件 id 找到它的设置页
     public static func tab(forPluginID pluginID: String) -> SettingsTab? {
         allCases.first { $0.pluginID == pluginID }
+    }
+}
+
+extension SettingsTileIcon.Tint {
+    /// 从 `SettingsTab.iconTintName` 还原色块色
+    static func named(_ name: String) -> SettingsTileIcon.Tint {
+        switch name {
+        case "indigo": .indigo
+        case "purple": .purple
+        case "pink": .pink
+        case "red": .red
+        case "orange": .orange
+        case "yellow": .yellow
+        case "green": .green
+        case "mint": .mint
+        case "teal": .teal
+        case "cyan": .cyan
+        case "gray": .gray
+        case "brown": .brown
+        default: .blue
+        }
     }
 }

@@ -109,88 +109,95 @@ struct ProcessListingTests {
     @Test("命令契约固定")
     func commandContract() {
         #expect(ProcessListing.commandPath == "/bin/ps")
-        #expect(ProcessListing.commandArguments == ["-eo", "pid,pcpu,pmem,comm", "-r"])
+        #expect(ProcessListing.commandArguments == ["-axo", "pid=,pcpu=,pmem=,rss=,comm=", "-r"])
+        #expect(
+            ProcessListing.commandArguments(sort: .memory) == ["-axo", "pid=,pcpu=,pmem=,rss=,comm=", "-m"])
         #expect(ProcessListing.maximumCount == 50)
+        #expect(ProcessListing.topPreviewCount == 5)
     }
 
-    @Test("表头被丢掉，其余行按 pid/占用/名字解析")
+    @Test("表头被丢掉，其余行按 pid/占用/RSS/名字解析")
     func parsesRowsAndDropsHeader() {
         let output = """
-              PID  %CPU %MEM COMM
-                1   0.0  0.1 /sbin/launchd
-              532   1.5  2.3 /System/Library/CoreServices/Finder.app/Contents/MacOS/Finder
-              900  12.5  8.0 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+              PID  %CPU %MEM   RSS COMM
+                1   0.0  0.1  1234 /sbin/launchd
+              532   1.5  2.3  2048 /System/Library/CoreServices/Finder.app/Contents/MacOS/Finder
+              900  12.5  8.0  4096 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
             """
 
         #expect(
             ProcessListing.parse(output) == [
-                ProcessEntry(id: 1, name: "launchd", cpuUsage: "0.0%", memoryUsage: "0.1%"),
-                ProcessEntry(id: 532, name: "Finder", cpuUsage: "1.5%", memoryUsage: "2.3%"),
                 ProcessEntry(
-                    id: 900, name: "Google Chrome", cpuUsage: "12.5%", memoryUsage: "8.0%")
+                    id: 1, name: "launchd", cpuUsage: "0.0%", memoryUsage: "0.1%", memoryRss: "1 MB"),
+                ProcessEntry(
+                    id: 532, name: "Finder", cpuUsage: "1.5%", memoryUsage: "2.3%", memoryRss: "2 MB"),
+                ProcessEntry(
+                    id: 900, name: "Google Chrome", cpuUsage: "12.5%", memoryUsage: "8.0%",
+                    memoryRss: "4 MB")
             ])
     }
 
     @Test("空输出只剩表头时结果为空")
     func emptyOutput() {
         #expect(ProcessListing.parse("").isEmpty)
-        #expect(ProcessListing.parse("  PID %CPU %MEM COMM").isEmpty)
-        #expect(ProcessListing.parse("  PID %CPU %MEM COMM\n").isEmpty)
+        #expect(ProcessListing.parse("  PID %CPU %MEM RSS COMM").isEmpty)
+        #expect(ProcessListing.parse("  PID %CPU %MEM RSS COMM\n").isEmpty)
     }
 
-    @Test("不足四列的行被丢弃")
+    @Test("不足五列的行被丢弃")
     func shortRowsAreDropped() {
-        // 后半段的空格会被 filter 掉，所以「看起来够长」但只有 3 个字段的行同样无效
         let output = """
-              PID %CPU %MEM COMM
+              PID %CPU %MEM RSS COMM
               42  1.0  /bin/sh
-              43  1.0  2.0
+              43  1.0  2.0  100
               44
-              45  1.0  2.0  /bin/zsh
+              45  1.0  2.0  100 /bin/zsh
             """
 
         #expect(
             ProcessListing.parse(output) == [
-                ProcessEntry(id: 45, name: "zsh", cpuUsage: "1.0%", memoryUsage: "2.0%")
+                ProcessEntry(
+                    id: 45, name: "zsh", cpuUsage: "1.0%", memoryUsage: "2.0%", memoryRss: "100 KB")
             ])
     }
 
     @Test("pid 不是整数的行被丢弃，超范围也丢弃")
     func nonNumericPIDIsDropped() {
         let output = """
-              PID %CPU %MEM COMM
-              abc 1.0  2.0  /bin/sh
-            99999999999 1.0 2.0 /bin/overflow
-               1.5 1.0  2.0  /bin/float
-              100  1.0  2.0  /bin/ok
+              PID %CPU %MEM RSS COMM
+              abc 1.0  2.0  100 /bin/sh
+            99999999999 1.0 2.0 100 /bin/overflow
+               1.5 1.0  2.0  100 /bin/float
+              100  1.0  2.0  100 /bin/ok
             """
 
         #expect(
             ProcessListing.parse(output) == [
-                ProcessEntry(id: 100, name: "ok", cpuUsage: "1.0%", memoryUsage: "2.0%")
+                ProcessEntry(
+                    id: 100, name: "ok", cpuUsage: "1.0%", memoryUsage: "2.0%", memoryRss: "100 KB")
             ])
     }
 
-    @Test("CPU 与内存字段不做数值校验，原样带百分号")
+    @Test("CPU 与内存百分比字段不做数值校验，原样带百分号")
     func usageFieldsAreNotValidated() {
         let output = """
-              PID %CPU %MEM COMM
-               77  abc  xyz  /bin/odd
+              PID %CPU %MEM RSS COMM
+               77  abc  xyz  100 /bin/odd
             """
 
         #expect(
             ProcessListing.parse(output) == [
-                ProcessEntry(id: 77, name: "odd", cpuUsage: "abc%", memoryUsage: "xyz%")
+                ProcessEntry(
+                    id: 77, name: "odd", cpuUsage: "abc%", memoryUsage: "xyz%", memoryRss: "100 KB")
             ])
     }
 
     @Test("只保留前 50 行，丢弃非法行发生在截断之后")
     func maximumCountAppliesBeforeFiltering() {
-        var lines = ["  PID %CPU %MEM COMM"]
-        lines.append(contentsOf: (1...49).map { "\($0) 1.0 2.0 /bin/p\($0)" })
-        // 第 50 行是非法行：它占掉一个名额，所以最终只有 49 条
+        var lines = ["  PID %CPU %MEM RSS COMM"]
+        lines.append(contentsOf: (1...49).map { "\($0) 1.0 2.0 100 /bin/p\($0)" })
         lines.append("bad row")
-        lines.append(contentsOf: (100...110).map { "\($0) 1.0 2.0 /bin/p\($0)" })
+        lines.append(contentsOf: (100...110).map { "\($0) 1.0 2.0 100 /bin/p\($0)" })
 
         let entries = ProcessListing.parse(lines.joined(separator: "\n"))
 
@@ -201,8 +208,8 @@ struct ProcessListingTests {
 
     @Test("超过 50 条时只保留前 50 条，顺序不变")
     func truncatesToFiftyPreservingOrder() {
-        var lines = ["  PID %CPU %MEM COMM"]
-        lines.append(contentsOf: (1...60).map { "\($0) 1.0 2.0 /bin/p\($0)" })
+        var lines = ["  PID %CPU %MEM RSS COMM"]
+        lines.append(contentsOf: (1...60).map { "\($0) 1.0 2.0 100 /bin/p\($0)" })
 
         let entries = ProcessListing.parse(lines.joined(separator: "\n"))
 
@@ -212,26 +219,37 @@ struct ProcessListingTests {
 
     @Test("空行与纯空白行被跳过")
     func blankLinesAreSkipped() {
-        let output = "  PID %CPU %MEM COMM\n\n   \n  7 1.0 2.0 /bin/a\n"
+        let output = "  PID %CPU %MEM RSS COMM\n\n   \n  7 1.0 2.0 100 /bin/a\n"
 
         #expect(
             ProcessListing.parse(output) == [
-                ProcessEntry(id: 7, name: "a", cpuUsage: "1.0%", memoryUsage: "2.0%")
+                ProcessEntry(
+                    id: 7, name: "a", cpuUsage: "1.0%", memoryUsage: "2.0%", memoryRss: "100 KB")
             ])
     }
 
     @Test("带空格的可执行路径只取文件名，负 pid 不拦截")
     func nameIsLastPathComponentAndPIDMayBeNegative() {
         let output = """
-              PID %CPU %MEM COMM
-               -5 0.0 0.1 /usr/libexec/some helper agent
+              PID %CPU %MEM RSS COMM
+               -5 0.0 0.1 100 /usr/libexec/some helper agent
             """
 
-        // `Int32("-5")` 合法，代码没有非负校验；名字里的空格先拼回再取最后一段路径
         #expect(
             ProcessListing.parse(output) == [
                 ProcessEntry(
-                    id: -5, name: "some helper agent", cpuUsage: "0.0%", memoryUsage: "0.1%")
+                    id: -5, name: "some helper agent", cpuUsage: "0.0%", memoryUsage: "0.1%",
+                    memoryRss: "100 KB")
+            ])
+    }
+
+    @Test("无表头的 pid= 格式也能解析")
+    func parsesHeadlessOutput() {
+        let output = "  42  1.5  2.0  2048 /bin/zsh\n"
+        #expect(
+            ProcessListing.parse(output) == [
+                ProcessEntry(
+                    id: 42, name: "zsh", cpuUsage: "1.5%", memoryUsage: "2.0%", memoryRss: "2 MB")
             ])
     }
 }
@@ -253,12 +271,12 @@ struct SystemMonitorPluginTests {
     @Test("名称、图标、触发词齐备")
     func metadataIsComplete() {
         #expect(SystemMonitorPlugin.name == "系统监控")
-        #expect(SystemMonitorPlugin.icon == "cpu")
+        #expect(SystemMonitorPlugin.icon == "gauge.with.dots.needle.67percent")
         #expect(
             SystemMonitorPlugin.triggerWords
                 == [
                     "系统信息", "系统监控", "系统", "system", "信息", "硬件", "进程", "进程管理", "process", "monitor", "端口",
-                    "port", "cpu", "内存"
+                    "port", "cpu", "内存", "磁盘", "网络", "电池", "电源"
                 ])
         #expect(SystemMonitorPlugin.triggerWords.allSatisfy { !$0.isEmpty })
     }

@@ -15,7 +15,7 @@ public final class TextDiffPlugin: QuickPlugin {
 
     public static let id = "text-diff"
     public static let name = "文本对比"
-    public static let icon = "doc.on.doc"
+    public static let icon = "arrow.left.arrow.right"
     public static let description = "双栏文本内容直观比对，高亮新增、删除与变动字符，支持忽略空白字符与大小写差异。"
     public static let triggerWords = ["文本对比", "diff", "对比", "比较", "差异"]
 

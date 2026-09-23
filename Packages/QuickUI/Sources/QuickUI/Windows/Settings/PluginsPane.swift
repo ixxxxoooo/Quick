@@ -60,8 +60,10 @@ struct PluginsPane: View {
                                     title: plugin.name,
                                     subtitle: "plugin.\(plugin.id)",
                                     icon: {
+                                        let tab = SettingsTab.tab(forPluginID: plugin.id)
                                         SettingsRowIcon(
-                                            systemImage: plugin.icon,
+                                            systemImage: tab?.systemImage ?? plugin.icon,
+                                            tint: tab.map { .named($0.iconTintName) },
                                             isEnabled: enabledPlugins[plugin.id] ?? true
                                         )
                                     }

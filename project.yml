@@ -45,6 +45,8 @@ packages:
     path: Packages/PluginAI
   PluginSystemMonitor:
     path: Packages/PluginSystemMonitor
+  PluginKillProcess:
+    path: Packages/PluginKillProcess
   PluginNetworkTools:
     path: Packages/PluginNetworkTools
   PluginScreenshot:
@@ -122,6 +124,7 @@ targets:
       - package: PluginNotes
       - package: PluginAI
       - package: PluginSystemMonitor
+      - package: PluginKillProcess
       - package: PluginNetworkTools
       - package: PluginScreenshot
       - package: PluginJSONFormatter

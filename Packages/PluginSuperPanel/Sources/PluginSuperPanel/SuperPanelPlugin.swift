@@ -21,7 +21,7 @@ public final class SuperPanelPlugin: QuickPlugin {
 
     public static let id = "superPanel"
     public static let name = "超级面板"
-    public static let icon = "bolt.square"
+    public static let icon = "rectangle.3.group.fill"
     public static let description =
         "上下文感知面板：识别剪贴板内容给出即时动作，空白时提供常用工具工作台，并支持 IDE 项目快捷操作。"
     public static let triggerWords = ["sp", "super", "超级", "超级面板"]

@@ -60,7 +60,8 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 | `PluginLauncher` | 使用频率与收藏的持久化往返 | 有覆盖 |
 | `PluginClipboard` | 去重/排序/剪枝、条数与图片预算、坏行降级 | 有覆盖 |
 | `PluginNotes` · `PluginSnippets` | 表读写往返、排序 | 有覆盖 |
-| `PluginSystemMonitor` | 时长/字节格式化的边界、`ps` 输出解析 | 有覆盖 |
+| `PluginSystemMonitor` | 时长/字节/`ps` 解析、内存/磁盘/电源/CPU tick、温度聚合、偏好映射 | 有覆盖 |
+| `PluginKillProcess` | `ps` 解析与过滤、偏好回落、触发词入口 | 有覆盖 |
 | `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式 | 有覆盖 |
 | `PluginTranslator` | 词典方向、触发词前缀、语言判定 | 有覆盖 |
 | `PluginOCR` · `PluginFileSearch` | 触发词匹配、文本拼接、查询前缀解析、图标映射 | 有覆盖 |

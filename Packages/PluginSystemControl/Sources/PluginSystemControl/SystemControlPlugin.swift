@@ -15,7 +15,7 @@ public final class SystemControlPlugin: QuickPlugin {
 
     public static let id = "systemcontrol"
     public static let name = "系统控制"
-    public static let icon = "bolt"
+    public static let icon = "power.circle.fill"
     public static let description = "macOS 系统级快捷指令聚合，支持锁定屏幕、睡眠、重启、关机、清空废纸篓与外观切换等操作。"
     public static let triggerWords = [
         "系统控制", "system control", "系统命令",

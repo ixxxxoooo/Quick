@@ -15,7 +15,7 @@ public final class TimestampConverterPlugin: QuickPlugin {
 
     public static let id = "timestamp-converter"
     public static let name = "时间戳转换"
-    public static let icon = "clock"
+    public static let icon = "clock.fill"
     public static let description = "Unix 时间戳与人类可读标准日期时间互相转换，支持秒/毫秒级精度与跨时区换算。"
     public static let triggerWords = ["时间戳转换", "时间戳", "timestamp", "日期", "time"]
 

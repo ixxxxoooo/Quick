@@ -16,7 +16,7 @@ public final class LauncherPlugin: QuickPlugin {
 
     public static let id = "launcher"
     public static let name = "应用启动器"
-    public static let icon = "magnifyingglass"
+    public static let icon = "square.grid.2x2.fill"
     public static let description = "全系统已安装应用程序索引与启动器，支持中英文全拼、简拼搜索、自定义别名与使用频次智能排序。"
     public static let triggerWords = [
         "应用", "app", "打开", "open", "启动", "launch", "网页快开", "网页", "网站", "搜索", "web", "url", "google", "百度"

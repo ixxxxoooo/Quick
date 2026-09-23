@@ -15,7 +15,7 @@ public final class ColorComparePlugin: QuickPlugin {
 
     public static let id = "color-compare"
     public static let name = "颜色工具"
-    public static let icon = "paintpalette"
+    public static let icon = "paintpalette.fill"
     public static let description = "HEX、RGB、HSL 色彩格式解析互转与色板对比，支持色彩明暗微调与一键复制颜色代码。"
     public static let triggerWords = ["颜色对比", "颜色识别", "颜色", "色值", "对比度", "color"]
 

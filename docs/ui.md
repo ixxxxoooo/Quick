@@ -63,6 +63,7 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 | `Size.rowIcon` | 24 | 26 |
 | `Size.keyCap` / `compactKeyCap` | 18 / 15 | 20 / 17 |
 | `Size.edgeFadeHeight` | 22 | 24 |
+| `Size.monitorSidebar` | 220 | **242**（系统监控双栏左侧） |
 | `Radius.row` / `barControl` / `keyCap` | 10 / 8 / 6 | 11 / 9 / 7 |
 | `Typography.searchFieldSize` | 20 | 22 |
 
@@ -316,7 +317,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | 角色 | 令牌 | 用在哪 |
 | --- | --- | --- |
 | 行图标 | `Typography.iconGlyph`（16pt medium）+ `Size.rowIcon` 槽位 | 列表行的**前导**图标，与标题成列 |
-| 侧边栏图标 | `Typography.sidebarIcon`（13pt regular）+ `Size.sidebarIconSlot` | 设置窗口侧边栏；跟着侧边栏文字走，比行图标小一档 |
+| 侧边栏图标 | `SettingsTileIcon`（22pt 彩色色块 + 白色 SF Symbol） | 设置窗口侧栏；对齐系统设置 / Raycast 的瓷砖图标 |
 | 行内图标 | `Typography.inlineIcon`（13pt regular） | 与正文同排的图标：搜索框放大镜、清除按钮、警告三角、复制按钮、分离窗口标题栏的身份图标 |
 | 窗口控制图标 | `Typography.windowControlIcon`（12pt medium）+ `Size.windowControlButton` 槽位 | 分离窗口标题栏右上角的置顶 / 关闭；它跟着 22pt 的方形槽位走，不跟正文 |
 | 小控件图标 | `Typography.compactIcon`（11pt regular） | 别名框、快捷键录制器里的清除按钮 |
@@ -370,6 +371,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | `Scrolling/EdgeDissolve` | 滚动内容在浮动栏下方淡出的遮罩，`.edgeDissolve()` 挂载 |
 | `KeyCapChip` | 快捷键帽。`.filled`（底栏）/ `.outline`（列表行）两种样式 |
 | `BarButton` | 栏位按钮：悬停胶囊 + 图标/文字。`.titled`（底栏）/ `.icon`（窗口标题栏，此时 `title` 只作无障碍标签）两种样式，`.destructive` 色调给关闭用 |
+| `SettingsTileIcon` | 设置侧栏彩色色块图标（圆角色块 + 白色 SF Symbol），对齐系统设置 / Raycast |
 | `SectionHeader` | 列表分组标题（当前未使用：我们不做分组，见 §2） |
 | `ScreenPlacement` | 按指针位置挑屏幕（纯函数）。主面板与分离窗口共用，**不要各自去查 `NSScreen.main`** |
 

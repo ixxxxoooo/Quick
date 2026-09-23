@@ -19,53 +19,96 @@ struct ProcessEntry: Identifiable, Sendable, Equatable {
     /// CPU 占用，带百分号
     let cpuUsage: String
 
-    /// 内存占用，带百分号
+    /// 内存占用百分比，带百分号
     let memoryUsage: String
+
+    /// 物理内存 RSS 的人类可读形式（如 `664 MB`）
+    let memoryRss: String
 }
 
-/// `ps -eo pid,pcpu,pmem,comm -r` 输出的解析
+/// `ps` 排序方式
+enum ProcessSortMode: Sendable {
+    /// 按 CPU 降序（`-r`）
+    case cpu
+    /// 按内存降序（`-m`）
+    case memory
+
+    var flag: String {
+        switch self {
+        case .cpu: "-r"
+        case .memory: "-m"
+        }
+    }
+}
+
+/// `ps -axo pid=,pcpu=,pmem=,rss=,comm= …` 输出的解析
 ///
 /// 纯粹是字符串切分，不碰进程、管道和线程，所以能脱离系统独立断言。
 enum ProcessListing {
 
     /// 进程列表上限
     ///
-    /// 面板一屏就那么大，`ps -r` 已经按 CPU 排好序，排在后面的看也没用。
+    /// 面板一屏就那么大，`ps` 已经按目标指标排好序，排在后面的看也没用。
     static let maximumCount = 50
+
+    /// Top Processes 预览条数（对齐 Raycast）
+    static let topPreviewCount = 5
 
     /// 产出行数据的命令
     static let commandPath = "/bin/ps"
-    static let commandArguments = ["-eo", "pid,pcpu,pmem,comm", "-r"]
 
-    /// pid、pcpu、pmem 之外至少还要一个 comm 字段，不足 4 列的行直接丢弃
-    private static let minimumColumnCount = 4
+    /// 列契约：pid / pcpu / pmem / rss / comm
+    static let columnSpec = "pid=,pcpu=,pmem=,rss=,comm="
+
+    /// 历史兼容：默认按 CPU 排序的完整参数表
+    static let commandArguments = ["-axo", columnSpec, ProcessSortMode.cpu.flag]
+
+    static func commandArguments(sort: ProcessSortMode) -> [String] {
+        ["-axo", columnSpec, sort.flag]
+    }
+
+    /// pid、pcpu、pmem、rss 之外至少还要一个 comm 字段
+    private static let minimumColumnCount = 5
 
     /// 解析 `ps` 的标准输出
     ///
-    /// 第一行是表头，无条件丢掉 —— 不靠内容识别表头，因为列名会随系统版本变。
-    /// 截断（`maximumCount`）发生在丢弃非法行**之前**：先取前 50 行，
-    /// 再逐行过滤，所以表里混进非法行会让结果少于 50 条。
-    /// - Parameter output: `ps` 的标准输出
+    /// 新格式用 `pid=` 抑制表头，但仍兼容带表头的旧输出：第一行若 pid 不可解析就丢掉。
+    /// 截断（`maximumCount`）发生在丢弃非法行**之前**。
+    /// - Parameters:
+    ///   - output: `ps` 的标准输出
+    ///   - limit: 最多保留多少行（默认 `maximumCount`）
     /// - Returns: 进程条目，顺序与输入一致
-    static func parse(_ output: String) -> [ProcessEntry] {
-        let lines = output.components(separatedBy: "\n").dropFirst()
+    static func parse(_ output: String, limit: Int = maximumCount) -> [ProcessEntry] {
+        let lines = output.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
 
-        return lines.prefix(maximumCount).compactMap { line in
-            let parts = line.trimmingCharacters(in: .whitespaces)
-                .components(separatedBy: .whitespaces)
-                .filter { !$0.isEmpty }
-
-            guard parts.count >= minimumColumnCount else { return nil }
-            guard let pid = Int32(parts[0]) else { return nil }
-
-            // comm 本身可能带空格（`Google Chrome`），第 4 列起重新拼回一个字段
-            let name = parts[3...].joined(separator: " ")
-            return ProcessEntry(
-                id: pid,
-                name: (name as NSString).lastPathComponent,
-                cpuUsage: "\(parts[1])%",
-                memoryUsage: "\(parts[2])%"
-            )
+        let body: ArraySlice<String>
+        if let first = lines.first,
+            Int32(first.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? "") == nil
+        {
+            body = lines.dropFirst()
+        } else {
+            body = lines[...]
         }
+
+        return body.prefix(limit).compactMap(parseLine)
+    }
+
+    /// 解析单行
+    private static func parseLine(_ line: String) -> ProcessEntry? {
+        let parts = line.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        guard parts.count >= minimumColumnCount else { return nil }
+        guard let pid = Int32(parts[0]) else { return nil }
+        guard let rss = Int(parts[3]) else { return nil }
+
+        let name = parts[4...].joined(separator: " ")
+        return ProcessEntry(
+            id: pid,
+            name: (name as NSString).lastPathComponent,
+            cpuUsage: "\(parts[1])%",
+            memoryUsage: "\(parts[2])%",
+            memoryRss: SystemMetrics.rssKilobytes(rss)
+        )
     }
 }

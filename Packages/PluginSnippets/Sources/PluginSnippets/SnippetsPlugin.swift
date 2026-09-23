@@ -16,7 +16,7 @@ public final class SnippetsPlugin: QuickPlugin {
 
     public static let id = "snippets"
     public static let name = "文本片段"
-    public static let icon = "curlybraces"
+    public static let icon = "text.quote"
     public static let description = "常用代码片段与模板快捷管理器，支持预定义占位符、动态参数求值与全局快速粘贴插入。"
     public static let triggerWords = ["片段", "snippet", "模板", "template", "代码片段"]
 

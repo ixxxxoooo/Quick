@@ -51,7 +51,12 @@ struct FeatureSettingsPane: View {
                 SettingsRow(
                     title: "启用此插件",
                     subtitle: "开启后可在主面板搜索并使用。",
-                    icon: { SettingsRowIcon(systemImage: tab.systemImage) }
+                    icon: {
+                        SettingsRowIcon(
+                            systemImage: tab.systemImage,
+                            tint: .named(tab.iconTintName)
+                        )
+                    }
                 )
             }
             .onChange(of: isEnabled) { _, newValue in
@@ -189,6 +194,8 @@ struct FeatureSettingsPane: View {
             UUIDGeneratorFeatureSection()
         case .systemMonitor:
             SystemMonitorFeatureSection()
+        case .killProcess:
+            KillProcessFeatureSection()
         case .networkTools:
             NetworkToolsFeatureSection()
         case .ocr:
@@ -580,10 +587,72 @@ private struct UUIDGeneratorFeatureSection: View {
 
 private struct SystemMonitorFeatureSection: View {
     @AppStorage(PluginSettingKey.SystemMonitor.interval) private var interval = 2
+    @AppStorage(PluginSettingKey.SystemMonitor.defaultTab) private var defaultTab = "system-info"
+    @AppStorage(PluginSettingKey.SystemMonitor.displayModeCPU) private var cpuMode = "used"
+    @AppStorage(PluginSettingKey.SystemMonitor.displayModeMemory) private var memoryMode = "used"
+    @AppStorage(PluginSettingKey.SystemMonitor.displayModeDisk) private var diskMode = "free"
+    @AppStorage(PluginSettingKey.SystemMonitor.displayModeBattery) private var batteryMode = "free"
     @AppStorage(PluginSettingKey.SystemMonitor.showMenuBarStats) private var showMenuBar = false
 
     var body: some View {
         Section {
+            Picker(selection: $defaultTab) {
+                Text("系统信息").tag("system-info")
+                Text("CPU").tag("cpu")
+                Text("内存").tag("memory")
+                Text("磁盘").tag("disk")
+                Text("电源").tag("power")
+                Text("网络").tag("network")
+                Text("温度").tag("temperature")
+            } label: {
+                SettingsRow(
+                    title: "默认标签",
+                    subtitle: "打开系统监控时默认选中的视图。",
+                    icon: { SettingsRowIcon(systemImage: "rectangle.split.2x1") }
+                )
+            }
+
+            Picker(selection: $cpuMode) {
+                Text("显示已用").tag("used")
+                Text("显示空闲").tag("free")
+            } label: {
+                SettingsRow(
+                    title: "CPU 显示模式",
+                    subtitle: "侧栏与详情里的 CPU 百分比按已用或空闲展示。",
+                    icon: { SettingsRowIcon(systemImage: "cpu") }
+                )
+            }
+
+            Picker(selection: $memoryMode) {
+                Text("显示已用").tag("used")
+                Text("显示空闲").tag("free")
+            } label: {
+                SettingsRow(
+                    title: "内存显示模式",
+                    subtitle: "侧栏与详情里的内存百分比按已用或空闲展示。"
+                )
+            }
+
+            Picker(selection: $diskMode) {
+                Text("显示已用").tag("used")
+                Text("显示空闲").tag("free")
+            } label: {
+                SettingsRow(
+                    title: "磁盘显示模式",
+                    subtitle: "侧栏与详情里的磁盘百分比按已用或空闲展示。"
+                )
+            }
+
+            Picker(selection: $batteryMode) {
+                Text("显示已用").tag("used")
+                Text("显示空闲").tag("free")
+            } label: {
+                SettingsRow(
+                    title: "电池显示模式",
+                    subtitle: "有内置电池时，按剩余或已用展示电量。"
+                )
+            }
+
             Picker(selection: $interval) {
                 Text("1 秒").tag(1)
                 Text("2 秒").tag(2)
@@ -605,9 +674,69 @@ private struct SystemMonitorFeatureSection: View {
             }
             .disabled(true)
         } header: {
-            Text("监控设置")
+            Text("配置")
         } footer: {
-            PendingFeatureNote(detail: "「菜单栏显示 CPU/内存」还没有实现：插件面板里的采样是真的，菜单栏那块还没接。")
+            PendingFeatureNote(detail: "「菜单栏显示 CPU/内存」还没有实现：面板内采样已就绪，菜单栏文案尚未接线。")
+        }
+    }
+}
+
+private struct KillProcessFeatureSection: View {
+    @AppStorage(PluginSettingKey.KillProcess.sortMode) private var sortMode = "cpu"
+    @AppStorage(PluginSettingKey.KillProcess.refreshInterval) private var refreshInterval = 3
+    @AppStorage(PluginSettingKey.KillProcess.showPID) private var showPID = false
+    @AppStorage(PluginSettingKey.KillProcess.searchInPath) private var searchInPath = false
+    @AppStorage(PluginSettingKey.KillProcess.searchInPID) private var searchInPID = false
+
+    var body: some View {
+        Section {
+            Picker(selection: $sortMode) {
+                Text("CPU").tag("cpu")
+                Text("内存").tag("memory")
+            } label: {
+                SettingsRow(
+                    title: "默认排序",
+                    subtitle: "打开结束进程时按 CPU 或内存占用排序。",
+                    icon: { SettingsRowIcon(systemImage: "arrow.up.arrow.down") }
+                )
+            }
+
+            Picker(selection: $refreshInterval) {
+                Text("1 秒").tag(1)
+                Text("2 秒").tag(2)
+                Text("3 秒").tag(3)
+                Text("5 秒").tag(5)
+                Text("10 秒").tag(10)
+            } label: {
+                SettingsRow(
+                    title: "刷新周期",
+                    subtitle: "进程列表的自动刷新间隔。",
+                    icon: { SettingsRowIcon(systemImage: "timer") }
+                )
+            }
+
+            Toggle(isOn: $showPID) {
+                SettingsRow(
+                    title: "显示 PID",
+                    subtitle: "在进程名下方显示进程号。"
+                )
+            }
+
+            Toggle(isOn: $searchInPath) {
+                SettingsRow(
+                    title: "搜索可执行路径",
+                    subtitle: "标题栏搜索时同时匹配完整路径。"
+                )
+            }
+
+            Toggle(isOn: $searchInPID) {
+                SettingsRow(
+                    title: "搜索 PID",
+                    subtitle: "标题栏搜索时同时匹配进程号。"
+                )
+            }
+        } header: {
+            Text("配置")
         }
     }
 }

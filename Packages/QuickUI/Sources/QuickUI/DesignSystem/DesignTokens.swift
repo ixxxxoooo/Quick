@@ -74,6 +74,8 @@ public enum DesignTokens {
         public static let keyCap = scaled(6)
         /// 控件按钮圆角
         public static let barControl = scaled(8)
+        /// 设置侧栏彩色图标色块圆角
+        public static let settingsIconTile = scaled(6)
     }
 
     // MARK: - 尺寸
@@ -175,11 +177,17 @@ public enum DesignTokens {
         public static let settingsDetailMinimum: CGFloat = 420
         /// 设置搜索框高度
         public static let settingsSearchField: CGFloat = 28
+        /// 系统监控面板左侧导航宽度（对齐 Raycast System Monitor 双栏比例）
+        public static let monitorSidebar = scaled(220)
         /// 设置窗口侧边栏图标的槽位宽度
         ///
         /// 与 `Typography.sidebarIcon` 配套。槽位宽度统一是「这一页读起来整齐」的关键 ——
         /// 每行各自 `Image` 会让标题的起始位置逐行漂移。
         public static let sidebarIconSlot = scaled(18)
+        /// 设置侧栏彩色图标色块边长（对齐系统设置 / Raycast 的色块图标）
+        public static let settingsIconTile = scaled(22)
+        /// 色块内 SF Symbol 字号
+        public static let settingsIconGlyph = scaled(12)
 
         // MARK: 搜索结果行
 
@@ -484,6 +492,62 @@ public enum DesignTokens {
 
         /// 进度色
         public static let progress = Color.blue
+
+        /// 设置侧栏图标色块配色（对齐系统设置多彩瓷砖，深浅模式各一套）
+        public enum SettingsIcon {
+            public static let blue = adaptive(
+                dark: NSColor(srgbRed: 64 / 255, green: 156 / 255, blue: 255 / 255, alpha: 1),
+                light: NSColor(srgbRed: 0 / 255, green: 122 / 255, blue: 255 / 255, alpha: 1)
+            )
+            public static let indigo = adaptive(
+                dark: NSColor(srgbRed: 110 / 255, green: 130 / 255, blue: 255 / 255, alpha: 1),
+                light: NSColor(srgbRed: 88 / 255, green: 86 / 255, blue: 214 / 255, alpha: 1)
+            )
+            public static let purple = adaptive(
+                dark: NSColor(srgbRed: 191 / 255, green: 128 / 255, blue: 255 / 255, alpha: 1),
+                light: NSColor(srgbRed: 175 / 255, green: 82 / 255, blue: 222 / 255, alpha: 1)
+            )
+            public static let pink = adaptive(
+                dark: NSColor(srgbRed: 255 / 255, green: 110 / 255, blue: 170 / 255, alpha: 1),
+                light: NSColor(srgbRed: 255 / 255, green: 45 / 255, blue: 85 / 255, alpha: 1)
+            )
+            public static let red = adaptive(
+                dark: NSColor(srgbRed: 255 / 255, green: 105 / 255, blue: 97 / 255, alpha: 1),
+                light: NSColor(srgbRed: 255 / 255, green: 59 / 255, blue: 48 / 255, alpha: 1)
+            )
+            public static let orange = adaptive(
+                dark: NSColor(srgbRed: 255 / 255, green: 169 / 255, blue: 76 / 255, alpha: 1),
+                light: NSColor(srgbRed: 255 / 255, green: 149 / 255, blue: 0 / 255, alpha: 1)
+            )
+            public static let yellow = adaptive(
+                dark: NSColor(srgbRed: 255 / 255, green: 214 / 255, blue: 70 / 255, alpha: 1),
+                light: NSColor(srgbRed: 255 / 255, green: 204 / 255, blue: 0 / 255, alpha: 1)
+            )
+            public static let green = adaptive(
+                dark: NSColor(srgbRed: 70 / 255, green: 215 / 255, blue: 130 / 255, alpha: 1),
+                light: NSColor(srgbRed: 52 / 255, green: 199 / 255, blue: 89 / 255, alpha: 1)
+            )
+            public static let mint = adaptive(
+                dark: NSColor(srgbRed: 80 / 255, green: 230 / 255, blue: 200 / 255, alpha: 1),
+                light: NSColor(srgbRed: 0 / 255, green: 199 / 255, blue: 190 / 255, alpha: 1)
+            )
+            public static let teal = adaptive(
+                dark: NSColor(srgbRed: 80 / 255, green: 210 / 255, blue: 220 / 255, alpha: 1),
+                light: NSColor(srgbRed: 48 / 255, green: 176 / 255, blue: 199 / 255, alpha: 1)
+            )
+            public static let cyan = adaptive(
+                dark: NSColor(srgbRed: 90 / 255, green: 200 / 255, blue: 250 / 255, alpha: 1),
+                light: NSColor(srgbRed: 50 / 255, green: 173 / 255, blue: 230 / 255, alpha: 1)
+            )
+            public static let gray = adaptive(
+                dark: NSColor(srgbRed: 152 / 255, green: 162 / 255, blue: 179 / 255, alpha: 1),
+                light: NSColor(srgbRed: 142 / 255, green: 142 / 255, blue: 147 / 255, alpha: 1)
+            )
+            public static let brown = adaptive(
+                dark: NSColor(srgbRed: 196 / 255, green: 154 / 255, blue: 108 / 255, alpha: 1),
+                light: NSColor(srgbRed: 162 / 255, green: 132 / 255, blue: 94 / 255, alpha: 1)
+            )
+        }
 
         // MARK: 语法高亮
 

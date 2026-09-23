@@ -45,6 +45,8 @@ import PluginSystemControl
 import PluginSystemMonitor
 import PluginSystemMonitor
 
+import PluginKillProcess
+
 import PluginTextDiff
 
 import PluginTimestampConverter
@@ -505,6 +507,7 @@ final class AppCore {
             (NotesPlugin.self, { NotesPlugin(storage: self.storage(for: NotesPlugin.id)) }),
             (AIPlugin.self, { AIPlugin() }),
             (SystemMonitorPlugin.self, { SystemMonitorPlugin() }),
+            (KillProcessPlugin.self, { KillProcessPlugin() }),
             (NetworkToolsPlugin.self, { NetworkToolsPlugin() }),
             (ScreenshotPlugin.self, { ScreenshotPlugin() }),
 

@@ -85,19 +85,27 @@ extension SettingsRow where Icon == EmptyView, Trailing == EmptyView {
 
 /// 设置页里统一尺寸的图标槽位
 ///
-/// 单独抽出来是因为「图标槽位宽度一致」是这一页读起来整齐的关键：
-/// 每行各自 `Image` 会让标题的起始位置逐行漂移。
+/// 默认用彩色色块（`SettingsTileIcon`），与侧栏视觉一致；
+/// 未指定 tint 时回落为强调色单色符号，兼容旧调用点。
 struct SettingsRowIcon: View {
 
     let systemImage: String
+    var tint: SettingsTileIcon.Tint? = nil
     var isEnabled: Bool = true
 
     var body: some View {
-        Image(systemName: systemImage)
-            .font(DesignTokens.Typography.iconGlyph)
-            .foregroundStyle(isEnabled ? Color.accentColor : .secondary)
-            .frame(width: DesignTokens.Size.rowIcon, alignment: .center)
-            .accessibilityHidden(true)
+        Group {
+            if let tint {
+                SettingsTileIcon(systemImage: systemImage, tint: tint, isEnabled: isEnabled)
+            } else {
+                Image(systemName: systemImage)
+                    .font(DesignTokens.Typography.iconGlyph)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(isEnabled ? Color.accentColor : .secondary)
+                    .frame(width: DesignTokens.Size.rowIcon, alignment: .center)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 

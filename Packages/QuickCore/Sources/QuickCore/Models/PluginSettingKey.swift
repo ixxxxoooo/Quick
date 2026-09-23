@@ -97,6 +97,20 @@ public enum PluginSettingKey {
     public enum SystemMonitor {
         public static let interval = "sysmonitor.interval"
         public static let showMenuBarStats = "sysmonitor.showMenuBarStats"
+        public static let defaultTab = "sysmonitor.defaultTab"
+        public static let displayModeCPU = "sysmonitor.displayModeCPU"
+        public static let displayModeMemory = "sysmonitor.displayModeMemory"
+        public static let displayModeDisk = "sysmonitor.displayModeDisk"
+        public static let displayModeBattery = "sysmonitor.displayModeBattery"
+    }
+
+    /// 结束进程
+    public enum KillProcess {
+        public static let sortMode = "killprocess.sortMode"
+        public static let refreshInterval = "killprocess.refreshInterval"
+        public static let showPID = "killprocess.showPID"
+        public static let searchInPath = "killprocess.searchInPath"
+        public static let searchInPID = "killprocess.searchInPID"
     }
 
     /// 网络工具

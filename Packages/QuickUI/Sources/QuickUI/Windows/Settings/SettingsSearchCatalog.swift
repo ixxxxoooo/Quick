@@ -77,6 +77,9 @@ enum SettingsSearchCatalog {
             id: "features.sysmonitor", tab: .systemMonitor, title: "System Monitor / 系统监控",
             subtitle: "插件"),
         .init(
+            id: "features.killprocess", tab: .killProcess, title: "Kill Process / 结束进程",
+            subtitle: "插件"),
+        .init(
             id: "features.networktools", tab: .networkTools, title: "Network Tools / 网络诊断",
             subtitle: "插件"),
         .init(id: "features.ocr", tab: .ocr, title: "OCR / 文字识别", subtitle: "插件"),
