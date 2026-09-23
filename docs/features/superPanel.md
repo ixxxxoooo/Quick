@@ -1,7 +1,7 @@
 # 超级面板（Super Panel）
 
 对齐 Fasty 的双态超级面板：识别剪贴板内容给出即时动作；空白时提供工作台；
-并保留 IDE 前台项目检测。
+并保留 IDE 前台项目检测。支持与 Fasty 相同的**中键 / 右键长按**全局唤出。
 
 - 插件 id：`superPanel`
 - 触发词：`sp`、`super`、`超级`、`超级面板`
@@ -20,6 +20,20 @@
 5. **操作列表按项目路径缓存。** 上下文不变不重算。
 6. **插件之间只通过 `EventBus` 跳转。** 打开翻译 / JSON / 颜色等工具走
    `NavigateEvent`，不直接 `import` 其他插件。
+7. **鼠标唤出由 `MouseTriggerMonitor`（QuickPlatform）实现。** 插件只持有监听器并
+   在 `activate` / `deactivate` 与设置变更时启停；中键与右键长按可独立开关。
+8. **鼠标触发需要辅助功能权限。** 无权限时监听不启动，设置页提示授权。
+9. **中键触发会吞掉 down/up**，避免宿主取消划词选中；长按触发后吞掉
+   `rightMouseUp`，避免弹出系统右键菜单。触发前尝试 `SelectionCapture`（⌘C）
+   把选区写入剪贴板供上下文态使用。
+
+## 打开方式
+
+| 方式 | 说明 |
+| --- | --- |
+| 触发词 | ⌥Space → `sp` / `超级面板` → 回车 |
+| 中键单击 | 设置里开启「鼠标中键单击触发」（默认开） |
+| 右键长按 | 设置里开启「长按鼠标右键触发」（默认开），可调 50–1000ms |
 
 ## 智能预览类型（上下文）
 
@@ -64,3 +78,6 @@
 | `superPanel.preferredTerminal` | String | 首选终端应用 |
 | `superPanel.showClipboard` | Bool | 工作台显示剪贴板预览 |
 | `superPanel.showQuickTools` | Bool | 工作台显示常用工具 |
+| `superPanel.mouseLongPressEnabled` | Bool | 长按右键唤出（默认 true） |
+| `superPanel.mouseLongPressThresholdMs` | Int | 长按阈值 ms，50…1000（默认 450） |
+| `superPanel.middleClickEnabled` | Bool | 中键单击唤出（默认 true） |

@@ -6,8 +6,8 @@ import SwiftUI
 
 /// 设置侧栏 / 行首的彩色色块图标
 ///
-/// 对齐 macOS「系统设置」与 Raycast Preferences：小圆角色块 + 白色 SF Symbol。
-/// 本仓库禁止第三方图标库，视觉升级靠精选 SF Symbols + 色块渲染完成。
+/// 对齐 Raycast Preferences：约 18pt 圆角色块 + Medium 白色 SF Symbol，
+/// 顶部略亮的扁平渐变。本仓库禁止第三方图标库，视觉靠色块与精选符号完成。
 struct SettingsTileIcon: View {
 
     /// 色块语义色
@@ -39,7 +39,7 @@ struct SettingsTileIcon: View {
 
     var body: some View {
         Image(systemName: systemImage)
-            .font(.system(size: DesignTokens.Size.settingsIconGlyph, weight: .semibold))
+            .font(DesignTokens.Typography.settingsIconGlyphFont)
             .symbolRenderingMode(.monochrome)
             .foregroundStyle(.white)
             .frame(
@@ -53,8 +53,8 @@ struct SettingsTileIcon: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            tint.color,
-                            tint.color.opacity(0.78)
+                            tint.color.opacity(0.96),
+                            tint.color
                         ],
                         startPoint: .top,
                         endPoint: .bottom

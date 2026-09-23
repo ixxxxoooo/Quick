@@ -121,42 +121,42 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// 侧边栏图标（精选 SF Symbol，优先 fill 变体以便落在彩色色块上可读）
+    /// 侧边栏图标（精选简洁 SF Symbol，落在小色块上仍清晰）
     public var systemImage: String {
         switch self {
-        case .general: "gearshape.2.fill"
+        case .general: "gearshape.fill"
         case .appearance: "paintbrush.fill"
         case .shortcuts: "keyboard.fill"
         case .plugins: "puzzlepiece.extension.fill"
-        case .permissions: "lock.shield.fill"
+        case .permissions: "lock.fill"
         case .search: "magnifyingglass"
 
         case .applications: "square.grid.2x2.fill"
-        case .systemActions: "power.circle.fill"
+        case .systemActions: "power"
         case .commands: "terminal.fill"
 
         case .clipboard: "doc.on.clipboard.fill"
         case .calculator: "plus.forwardslash.minus"
-        case .fileSearch: "folder.fill.badge.magnifyingglass"
+        case .fileSearch: "folder.fill"
         case .snippets: "text.quote"
         case .notes: "note.text"
         case .calendar: "calendar"
         case .ai: "sparkles"
-        case .translator: "character.bubble.fill"
+        case .translator: "globe"
         case .jsonFormatter: "curlybraces"
         case .sqlFormatter: "cylinder.fill"
         case .base64Codec: "lock.doc.fill"
-        case .urlCodec: "link.circle.fill"
-        case .uuidGenerator: "number.circle.fill"
+        case .urlCodec: "link"
+        case .uuidGenerator: "number"
         case .hashCalculator: "number.square.fill"
         case .timestampConverter: "clock.fill"
         case .textDiff: "arrow.left.arrow.right"
         case .markdownPreview: "text.alignleft"
         case .colorCompare: "paintpalette.fill"
         case .systemMonitor: "gauge.with.dots.needle.67percent"
-        case .killProcess: "xmark.octagon.fill"
+        case .killProcess: "xmark.app.fill"
         case .networkTools: "wifi"
-        case .ocr: "doc.text.viewfinder"
+        case .ocr: "text.viewfinder"
         case .screenshot: "camera.fill"
         case .superPanel: "rectangle.3.group.fill"
 

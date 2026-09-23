@@ -74,8 +74,10 @@ public enum DesignTokens {
         public static let keyCap = scaled(6)
         /// 控件按钮圆角
         public static let barControl = scaled(8)
-        /// 设置侧栏彩色图标色块圆角
-        public static let settingsIconTile = scaled(6)
+        /// 设置侧栏彩色图标色块圆角（略紧，适配 18pt 色块）
+        ///
+        /// 设置窗口不跟 `panelScale`，与 `Size.settingsIconTile` 同为绝对点值。
+        public static let settingsIconTile: CGFloat = 5
     }
 
     // MARK: - 尺寸
@@ -184,10 +186,16 @@ public enum DesignTokens {
         /// 与 `Typography.sidebarIcon` 配套。槽位宽度统一是「这一页读起来整齐」的关键 ——
         /// 每行各自 `Image` 会让标题的起始位置逐行漂移。
         public static let sidebarIconSlot = scaled(18)
-        /// 设置侧栏彩色图标色块边长（对齐系统设置 / Raycast 的色块图标）
-        public static let settingsIconTile = scaled(22)
-        /// 色块内 SF Symbol 字号
-        public static let settingsIconGlyph = scaled(12)
+        /// 设置侧栏彩色图标色块边长（对齐 Raycast Preferences：约 18pt，不跟面板缩放）
+        public static let settingsIconTile: CGFloat = 18
+        /// 色块内 SF Symbol 字号（略小于色块，四周留白）
+        public static let settingsIconGlyph: CGFloat = 10
+        /// 色块与标题之间的水平间距（Raycast 侧栏约 10–12pt）
+        public static let settingsSidebarIconGap: CGFloat = 10
+        /// 侧栏行上下内边距（比系统默认略松，避免挤成一团）
+        public static let settingsSidebarRowVertical: CGFloat = 3
+        /// 侧栏行左右内边距
+        public static let settingsSidebarRowHorizontal: CGFloat = 8
 
         // MARK: 搜索结果行
 
@@ -334,6 +342,12 @@ public enum DesignTokens {
         ///
         /// 比 `iconGlyph` 小一档：侧边栏的文字是 `.body`，图标跟着文字走而不是跟着行图标走。
         public static let sidebarIcon = Font.system(size: scaled(13), weight: .regular)
+        /// 设置侧栏行标题（Regular 13pt，对齐 Raycast Preferences，不跟面板缩放）
+        public static let settingsSidebarLabel = Font.system(size: 13, weight: .regular)
+        /// 设置侧栏色块内字形（Medium，比 Semibold 更细，接近 Raycast 白符号）
+        public static let settingsIconGlyphFont = Font.system(
+            size: Size.settingsIconGlyph, weight: .medium
+        )
         /// 与正文同排的行内图标（搜索框的放大镜、清除按钮、警告三角）
         ///
         /// 这些图标属于**旁边那行文字**，不属于「行图标」那一列，所以跟着正文字号走。
@@ -442,6 +456,9 @@ public enum DesignTokens {
 
         /// 选中行背景
         public static let selection = ramp(dark: 0.10, light: 0.09)
+
+        /// 设置侧栏选中高亮（中性浅灰，对齐 Raycast；不用系统强调蓝）
+        public static let settingsSidebarSelection = ramp(dark: 0.16, light: 0.08)
 
         /// 悬停行背景
         public static let rowHover = ramp(dark: 0.05, light: 0.045)

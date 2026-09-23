@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import QuickCore
 import Testing
 
 @testable import PluginSuperPanel
@@ -260,6 +261,45 @@ struct ActionCategoryTests {
             #expect(!category.rawValue.isEmpty)
         }
         #expect(SuperPanelAction.Category.allCases.contains(.context))
+    }
+}
+
+@Suite("鼠标唤出偏好")
+struct SuperPanelMousePreferencesTests {
+
+    @Test("阈值夹紧并对齐 50ms 步进")
+    func thresholdClamping() {
+        #expect(SuperPanelMousePreferences.clampedThreshold(0) == 50)
+        #expect(SuperPanelMousePreferences.clampedThreshold(75) == 50)
+        #expect(SuperPanelMousePreferences.clampedThreshold(450) == 450)
+        #expect(SuperPanelMousePreferences.clampedThreshold(9999) == 1000)
+    }
+
+    @Test("从独立 suite 读取默认配置")
+    func readsDefaultsFromSuite() {
+        let name = "quick.test.superpanel.mouse.\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: name)!
+        defer { suite.removePersistentDomain(forName: name) }
+        let config = SuperPanelMousePreferences.configuration(from: suite)
+        #expect(config.rightLongPressEnabled == SuperPanelMousePreferences.defaultLongPressEnabled)
+        #expect(config.middleClickEnabled == SuperPanelMousePreferences.defaultMiddleClickEnabled)
+        #expect(config.thresholdMilliseconds == SuperPanelMousePreferences.defaultThresholdMs)
+        #expect(config.needsListening)
+    }
+
+    @Test("尊重写入的开关")
+    func respectsStoredToggles() {
+        let name = "quick.test.superpanel.mouse.\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: name)!
+        defer { suite.removePersistentDomain(forName: name) }
+        suite.set(false, forKey: PluginSettingKey.SuperPanel.mouseLongPressEnabled)
+        suite.set(false, forKey: PluginSettingKey.SuperPanel.middleClickEnabled)
+        suite.set(200, forKey: PluginSettingKey.SuperPanel.mouseLongPressThresholdMs)
+        let config = SuperPanelMousePreferences.configuration(from: suite)
+        #expect(!config.rightLongPressEnabled)
+        #expect(!config.middleClickEnabled)
+        #expect(config.thresholdMilliseconds == 200)
+        #expect(!config.needsListening)
     }
 }
 

@@ -212,5 +212,11 @@ public enum PluginSettingKey {
         public static let showClipboard = "superPanel.showClipboard"
         /// 工作台是否显示常用工具
         public static let showQuickTools = "superPanel.showQuickTools"
+        /// 长按右键唤出超级面板（对齐 Fasty）
+        public static let mouseLongPressEnabled = "superPanel.mouseLongPressEnabled"
+        /// 右键长按判定阈值（毫秒，50…1500）
+        public static let mouseLongPressThresholdMs = "superPanel.mouseLongPressThresholdMs"
+        /// 鼠标中键单击唤出超级面板（对齐 Fasty）
+        public static let middleClickEnabled = "superPanel.middleClickEnabled"
     }
 }

@@ -87,6 +87,10 @@ enum SettingsSearchCatalog {
         .init(
             id: "features.superpanel", tab: .superPanel, title: "Super Panel / 超级面板",
             subtitle: "插件"),
+        .init(
+            id: "features.superpanel.mouse", tab: .superPanel,
+            title: "Middle Click / Right Long Press / 中键 / 右键长按",
+            subtitle: "超级面板鼠标唤出"),
         .init(id: "about.version", tab: .about, title: "About / 关于 Quick", subtitle: "Advanced")
     ]
 

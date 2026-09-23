@@ -14,6 +14,7 @@ import SwiftUI
 /// - **上下文**：识别剪贴板中的网址 / 色值 / 时间戳 / 路径 / Base64 等，给出即时动作
 /// - **工作台**：常用工具快捷入口 + 剪贴板预览
 /// - **项目**：保留 IDE 前台项目检测（Git / 构建 / 导航）
+/// - **鼠标唤出**：中键单击 / 右键长按（需辅助功能权限）
 ///
 /// 不变量见 docs/features/superPanel.md
 @MainActor
@@ -23,7 +24,7 @@ public final class SuperPanelPlugin: QuickPlugin {
     public static let name = "超级面板"
     public static let icon = "rectangle.3.group.fill"
     public static let description =
-        "上下文感知面板：识别剪贴板内容给出即时动作，空白时提供常用工具工作台，并支持 IDE 项目快捷操作。"
+        "上下文感知面板：识别剪贴板内容给出即时动作，空白时提供常用工具工作台，并支持 IDE 项目快捷操作。支持中键与右键长按唤出。"
     public static let triggerWords = ["sp", "super", "超级", "超级面板"]
 
     private let log = QuickLog.plugin(SuperPanelPlugin.id)
@@ -32,13 +33,45 @@ public final class SuperPanelPlugin: QuickPlugin {
     let detector = ProjectDetector()
     let actionProvider = ActionProvider()
 
+    private let mouseMonitor = MouseTriggerMonitor()
+    private var defaultsObserver: NSObjectProtocol?
+
     public init() {}
 
     public func activate() {
+        mouseMonitor.onTrigger = { kind in
+            Task.detached(priority: .userInitiated) {
+                _ = SelectionCapture.captureText()
+                await MainActor.run {
+                    QuickLog.plugin(SuperPanelPlugin.id).notice(
+                        "鼠标唤出超级面板：\(String(describing: kind), privacy: .public)"
+                    )
+                    EventBus.shared.post(NavigateEvent(pluginID: SuperPanelPlugin.id))
+                }
+            }
+        }
+        syncMouseMonitor()
+        if defaultsObserver == nil {
+            defaultsObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification,
+                object: UserDefaults.standard,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.syncMouseMonitor()
+                }
+            }
+        }
         log.notice("超级面板插件已激活")
     }
 
     public func deactivate() {
+        if let defaultsObserver {
+            NotificationCenter.default.removeObserver(defaultsObserver)
+            self.defaultsObserver = nil
+        }
+        mouseMonitor.onTrigger = nil
+        mouseMonitor.stop()
         log.notice("超级面板插件已停用")
     }
 
@@ -139,6 +172,19 @@ public final class SuperPanelPlugin: QuickPlugin {
 
     public func makeSettingsView() -> AnyView? {
         AnyView(SuperPanelSettingsView())
+    }
+
+    // MARK: - 鼠标唤出
+
+    private func syncMouseMonitor() {
+        let config = SuperPanelMousePreferences.configuration()
+        mouseMonitor.apply(
+            MouseTriggerMonitor.Configuration(
+                rightLongPressEnabled: config.rightLongPressEnabled,
+                middleClickEnabled: config.middleClickEnabled,
+                thresholdMilliseconds: UInt64(config.thresholdMilliseconds)
+            )
+        )
     }
 
     private func matchScore(query: String, action: SuperPanelAction) -> Double {
