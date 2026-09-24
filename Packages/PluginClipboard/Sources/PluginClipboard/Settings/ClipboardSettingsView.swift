@@ -42,7 +42,7 @@ struct ClipboardSettingsView: View {
                 icon: { SettingsRowIcon(systemImage: "tray.full") }
             ) {
                 Stepper("\(maxEntries) 条", value: $maxEntries, in: 100...5000, step: 100)
-                    .frame(width: 120)
+                    .frame(width: DesignTokens.Size.settingsControl)
             }
 
             SettingsRow(
@@ -57,7 +57,7 @@ struct ClipboardSettingsView: View {
                     Text("512 MB").tag(512)
                 }
                 .labelsHidden()
-                .frame(width: 120)
+                .frame(width: DesignTokens.Size.settingsControl)
             }
 
             Toggle(isOn: $deduplication) {

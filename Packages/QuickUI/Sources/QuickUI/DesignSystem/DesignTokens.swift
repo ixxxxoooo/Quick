@@ -112,6 +112,11 @@ public enum DesignTokens {
         public static let compactKeyCap = scaled(15)
         /// 设置项别名框与快捷键录制框标准宽度（参考 Tinycast）
         public static let shortcutRecorder: CGFloat = 120
+        /// 设置行尾部输入控件（步进器、选择器）的标准宽度
+        ///
+        /// 尾部控件不定宽时，行与行之间会对不齐；太宽又会把标题挤掉。
+        /// **不随 `panelScale` 缩放**：设置窗口尺寸固定，缩放它只会让控件忽宽忽窄。
+        public static let settingsControl: CGFloat = 120
         /// 拖拽授权面板的初始宽度（吸附前 / 量不到系统设置窗口时的兜底）
         ///
         /// **吸附后不用它定宽**：宽度跟随系统设置右侧内容区（`PermissionSnapGeometry.width`），
