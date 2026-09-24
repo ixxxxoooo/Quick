@@ -86,7 +86,7 @@ public final class NotesPlugin: QuickPlugin, PluginViewProviding {
         query.matchesAnyTrigger(Self.triggerWords)
     }
 
-    public func dynamicSearch(query: String) async -> [SearchableItem] {
+    public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
 
         // 用整词匹配而不是 contains：否则 memory 会误命中 memo

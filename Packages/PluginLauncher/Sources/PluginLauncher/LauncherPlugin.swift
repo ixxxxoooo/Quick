@@ -100,7 +100,7 @@ public final class LauncherPlugin: QuickPlugin, PluginViewProviding {
     }
 
     /// 动态结果就是应用 / 终端命令搜索，并在长循环里响应取消
-    public func dynamicSearch(query: String) async -> [SearchableItem] {
+    public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
         return await makeSearchItems(query: query)
     }

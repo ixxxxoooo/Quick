@@ -75,7 +75,7 @@ public final class CalculatorPlugin: QuickPlugin, PluginViewProviding {
         engine.looksLikeExpression(query.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    public func dynamicSearch(query: String) async -> [SearchableItem] {
+    public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
 
         // 每次搜索都重新读设置：用户可能在面板开着的时候刚把小数位数改掉

@@ -54,7 +54,7 @@ public final class CalendarPlugin: QuickPlugin, PluginViewProviding {
         query.matchesAnyTrigger(Self.triggerWords)
     }
 
-    public func dynamicSearch(query: String) async -> [SearchableItem] {
+    public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
         guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 

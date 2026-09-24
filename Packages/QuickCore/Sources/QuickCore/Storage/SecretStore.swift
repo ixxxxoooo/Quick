@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import Synchronization
 
 /// 机密读写抽象（API Key 等）
 ///
@@ -14,27 +15,25 @@ public protocol SecretStoring: Sendable {
 }
 
 /// 进程内内存机密存储（仅测试）
-public final class InMemorySecretStore: SecretStoring, @unchecked Sendable {
-    private let lock = NSLock()
-    private var values: [String: String] = [:]
+///
+/// 用 `Mutex` 而不是 `NSLock` + `@unchecked Sendable`：`Mutex` 自身是 `Sendable`，
+/// 编译器因此能自己验证这个类型的安全，不需要任何断言。本项目只允许 Carbon
+/// C 回调跳板用 `@unchecked Sendable`。
+public final class InMemorySecretStore: SecretStoring {
+    private let values = Mutex<[String: String]>([:])
 
     public init() {}
 
     public func get(_ account: String) throws -> String? {
-        lock.lock()
-        defer { lock.unlock() }
-        return values[account]
+        values.withLock { $0[account] }
     }
 
     public func set(_ value: String, for account: String) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        values[account] = value
+        values.withLock { $0[account] = value }
     }
 
     public func delete(_ account: String) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        values.removeValue(forKey: account)
+        // `removeValue` 返回被删掉的值，这里不关心，但必须显式丢弃
+        _ = values.withLock { $0.removeValue(forKey: account) }
     }
 }

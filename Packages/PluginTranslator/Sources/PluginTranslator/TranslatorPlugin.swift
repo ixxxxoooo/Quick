@@ -60,7 +60,7 @@ public final class TranslatorPlugin: QuickPlugin, PluginViewProviding {
         TranslatorQuery.intent(in: query) != nil
     }
 
-    public func dynamicSearch(query: String) async -> [SearchableItem] {
+    public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
 
         guard let intent = TranslatorQuery.intent(in: query) else { return [] }

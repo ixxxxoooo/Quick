@@ -88,7 +88,7 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
         query.matchesAnyTriggerIncludingPrefix(Self.searchKeywords)
     }
 
-    public func dynamicSearch(query: String) async -> [SearchableItem] {
+    public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
 
         // 闸门要认前缀：Provider 名是「用户打一半就该收窄」的东西 —— 打 `deep` 得能出

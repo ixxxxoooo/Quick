@@ -111,7 +111,7 @@ public final class ClipboardPlugin: QuickPlugin, PluginViewProviding {
         query.matchesAnyTrigger(Self.triggerWords)
     }
 
-    public func dynamicSearch(query: String) async -> [SearchableItem] {
+    public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
 
         // 仅当搜索词与剪贴板相关时才返回入口

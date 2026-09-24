@@ -46,7 +46,7 @@ public final class FileSearchPlugin: QuickPlugin, PluginViewProviding {
         FileSearchQuery.keyword(in: query) != nil
     }
 
-    public func dynamicSearch(query: String) async -> [SearchableItem] {
+    public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
         // 闸门：必须以 "f " / "file " / "文件 " 开头且后面还有关键词，否则返回空、
         // 不去打扰 Spotlight。`accepts` 已经挡了一层，这里再挡一次是因为

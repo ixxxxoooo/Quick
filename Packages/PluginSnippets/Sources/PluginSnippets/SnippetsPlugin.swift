@@ -83,7 +83,7 @@ public final class SnippetsPlugin: QuickPlugin, PluginViewProviding {
         return store.acceptsQuery(trimmed)
     }
 
-    public func dynamicSearch(query: String) async -> [SearchableItem] {
+    public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
 
         // 触发提示是结果项的一部分，所以在构造结果项这一刻现读：
