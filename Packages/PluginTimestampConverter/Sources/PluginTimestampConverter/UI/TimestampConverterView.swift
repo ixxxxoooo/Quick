@@ -2,7 +2,6 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
-import Combine
 import QuickCore
 import QuickUI
 import SwiftUI
@@ -19,8 +18,6 @@ struct TimestampConverterView: View {
     @State private var inputType: TimestampConverterLogic.InputType = .empty
     @State private var now = Date()
     @State private var copiedKey: String?
-
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -136,8 +133,18 @@ struct TimestampConverterView: View {
             .padding(.vertical, DesignTokens.Spacing.sm)
         }
         .onChange(of: input) { _, newVal in convert(newVal) }
-        .onReceive(timer) { now = $0 }
+        .task {
+            // 底部「当前时间」每秒走一格。用 `Task` 而不是 `Timer.publish`：视图消失时
+            // 自动取消，不必再挂一个 onDisappear 去炸掉订阅
+            while !Task.isCancelled {
+                now = Date()
+                try? await Task.sleep(for: Self.clockInterval)
+            }
+        }
     }
+
+    /// 「当前时间」的走针间隔
+    private static let clockInterval = Duration.seconds(1)
 
     /// 转换逻辑整体在模型层，视图只把结果搬进 `@State`
     private func convert(_ text: String) {
