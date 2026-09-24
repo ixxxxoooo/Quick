@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import Carbon.HIToolbox
 import Testing
 
 @testable import PluginAI
@@ -54,5 +55,59 @@ struct AIWebViewWindowTests {
     func titleIsProviderName() throws {
         let panel = try makePanel()
         #expect(panel.title == "DeepSeek")
+    }
+
+    /// 主菜单刻意不放 ⌘W（留给主面板），所以这个普通窗口得自己接住它。
+    /// ⌘W 走 `performClose` → `close()` → 隐藏，与点红绿灯一致。
+    @Test("⌘W 被接住并触发关闭回调")
+    func commandWCloses() throws {
+        let panel = try makePanel()
+        var closed = 0
+        panel.onClose = { closed += 1 }
+
+        guard
+            let commandW = Self.keyDown(
+                keyCode: kVK_ANSI_W, modifiers: .command, characters: "w")
+        else {
+            Issue.record("无法构造合成按键事件")
+            return
+        }
+
+        #expect(panel.performKeyEquivalent(with: commandW))
+        #expect(closed == 1)
+    }
+
+    /// 其余按键必须放行，否则窗口会吃掉所有键盘输入
+    @Test("普通按键不被窗口消费")
+    func otherKeysFallThrough() throws {
+        let panel = try makePanel()
+        guard
+            let commandR = Self.keyDown(
+                keyCode: kVK_ANSI_R, modifiers: .command, characters: "r")
+        else {
+            Issue.record("无法构造合成按键事件")
+            return
+        }
+        #expect(panel.performKeyEquivalent(with: commandR) == false)
+    }
+
+    /// 合成一个按下事件（返回 nil 时由调用方记一条失败，而不是崩掉）
+    private static func keyDown(
+        keyCode: Int,
+        modifiers: NSEvent.ModifierFlags,
+        characters: String
+    ) -> NSEvent? {
+        NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: modifiers,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: UInt16(keyCode)
+        )
     }
 }

@@ -139,7 +139,7 @@ struct AIPluginTests {
 
         #expect(items.count == 9)
         #expect(
-            items.map(\.id) == ["ai.portal"] + AIProviderRegistry.all.map { "ai.\($0.id)" })
+            items.map(\.id) == ["plugin.open.ai"] + AIProviderRegistry.all.map { "ai.\($0.id)" })
         // 门户入口排在最前，且相关度固定 0.6；其余一律 0.5
         #expect(items.first?.relevance == 0.6)
         #expect(items.dropFirst().allSatisfy { $0.relevance == 0.5 })
@@ -153,7 +153,7 @@ struct AIPluginTests {
         let plugin = AIPlugin()
         let items = await plugin.dynamicSearch(query: "deepseek")
 
-        #expect(items.map(\.id) == ["ai.portal", "ai.deepseek"])
+        #expect(items.map(\.id) == ["plugin.open.ai", "ai.deepseek"])
         #expect(items.map(\.relevance) == [0.6, 0.8])
 
         let provider = AIProviderRegistry.provider(for: "deepseek")
@@ -168,7 +168,7 @@ struct AIPluginTests {
         let plugin = AIPlugin()
         let items = await plugin.dynamicSearch(query: "gpt")
 
-        #expect(items.map(\.id) == ["ai.portal", "ai.chatgpt"])
+        #expect(items.map(\.id) == ["plugin.open.ai", "ai.chatgpt"])
         #expect(items.map(\.relevance) == [0.6, 0.8])
     }
 
@@ -178,7 +178,7 @@ struct AIPluginTests {
         let plugin = AIPlugin()
         let items = await plugin.dynamicSearch(query: "通义")
 
-        #expect(items.map(\.id) == ["ai.portal", "ai.tongyi"])
+        #expect(items.map(\.id) == ["plugin.open.ai", "ai.tongyi"])
         #expect(items[1].title == "通义千问")
     }
 
@@ -200,11 +200,11 @@ struct AIPluginTests {
         let plugin = AIPlugin()
 
         let deep = await plugin.dynamicSearch(query: "deep")
-        #expect(deep.map(\.id) == ["ai.portal", "ai.deepseek"])
+        #expect(deep.map(\.id) == ["plugin.open.ai", "ai.deepseek"])
         #expect(deep[1].relevance == 0.9 * 0.8, "前缀命中按 0.9 折算")
 
         #expect(
-            await plugin.dynamicSearch(query: "chatgp").map(\.id) == ["ai.portal", "ai.chatgpt"])
+            await plugin.dynamicSearch(query: "chatgp").map(\.id) == ["plugin.open.ai", "ai.chatgpt"])
     }
 
     /// 前缀是「以触发词开头」：`seek` 是 deepseek 的中间片段，不该放行

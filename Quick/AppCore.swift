@@ -239,6 +239,10 @@ final class AppCore {
             ))
         log.notice("面板协调器依赖已注入")
 
+        // 3.5 预热面板：首次 ensurePanel 需 ~13 ms（NSPanel + SwiftUI 视图树），
+        // 提前到启动阶段吸收，避免首次按快捷键时被用户感知为延迟
+        paletteCoordinator.prewarm()
+
         // 4. 连接事件总线
         wireEventBus()
         log.notice("事件总线接线完成，订阅 \(self.subscriptions.count, privacy: .public) 条")
@@ -835,6 +839,7 @@ final class AppCore {
 
     /// 执行一条命令。热键和搜索共用这一条路径
     private func invoke(commandID: String) {
+        let invokeStart = ContinuousClock.now
         log.notice("执行命令 \(commandID, privacy: .public)")
         // 超级面板不是插件命令，也不在命令目录里，单独认领
         if commandID == CommandID.superPanel {
@@ -848,6 +853,8 @@ final class AppCore {
         }
         if commandID == CommandID.togglePalette {
             paletteCoordinator.toggle()
+            let ms = invokeStart.duration(to: .now).invokeMS
+            log.notice("invoke 完成（togglePalette）：\(ms, format: .fixed(precision: 1)) ms")
             return
         }
         if let pluginID = CommandID.openedPluginID(in: commandID) {
@@ -858,6 +865,8 @@ final class AppCore {
             } else {
                 paletteCoordinator.show(pluginID: pluginID)
             }
+            let ms = invokeStart.duration(to: .now).invokeMS
+            log.notice("invoke 完成（openPlugin \(pluginID, privacy: .public)）：\(ms, format: .fixed(precision: 1)) ms")
             return
         }
         guard let plugin = plugin(forCommand: commandID) else {
@@ -869,9 +878,13 @@ final class AppCore {
         let ownerPluginID = type(of: plugin).id
         if paletteCoordinator.isVisible, paletteCoordinator.activePluginID == ownerPluginID {
             paletteCoordinator.hide()
+            let ms = invokeStart.duration(to: .now).invokeMS
+            log.notice("invoke 完成（功能命令切换关闭 \(ownerPluginID, privacy: .public)）：\(ms, format: .fixed(precision: 1)) ms")
             return
         }
         plugin.perform(commandID: commandID)
+        let ms = invokeStart.duration(to: .now).invokeMS
+        log.notice("invoke 完成（perform \(commandID, privacy: .public)）：\(ms, format: .fixed(precision: 1)) ms")
     }
 
     /// 按插件 id 取实例
@@ -958,5 +971,13 @@ final class AppCore {
             命令目录已更新：静态命令 \(indexed.count, privacy: .public) 条，\
             登记归属 \(owners.count, privacy: .public) 条
             """)
+    }
+}
+
+extension Duration {
+    /// 转换为毫秒数（双精度），给 invoke 链路计时用
+    fileprivate var invokeMS: Double {
+        let (seconds, attoseconds) = components
+        return Double(seconds) * 1000 + Double(attoseconds) / 1_000_000_000_000_000
     }
 }

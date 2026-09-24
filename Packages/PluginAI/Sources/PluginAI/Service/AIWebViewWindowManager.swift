@@ -336,6 +336,23 @@ final class AIWebViewPanel: NSPanel {
         }
     }
 
+    /// ⌘W 关闭窗口
+    ///
+    /// 主菜单**刻意没有** ⌘W（留给主面板自己当「返回 / 关闭面板」，见 `MainMenu`），
+    /// 而这条路只在主面板是 key window 时成立。AI 窗口是普通窗口、主面板不在响应链上，
+    /// 所以 ⌘W 到别处就没人处理了 —— 表现是「这个窗口按 ⌘W 没反应」。
+    /// 这里单独接住它，`performClose(nil)` 的语义与点红绿灯一致（走 `close()` → 隐藏而非销毁）。
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command),
+            let chars = event.charactersIgnoringModifiers,
+            chars.lowercased() == "w"
+        {
+            performClose(nil)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     /// 非激活面板只需要能拿到键盘输入，不需要成为主窗口 ——
     /// 成为主窗口正是「应用一激活它就被带到前台」的原因。
     override var canBecomeKey: Bool { true }

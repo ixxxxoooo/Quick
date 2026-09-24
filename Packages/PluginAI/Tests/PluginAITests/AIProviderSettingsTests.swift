@@ -131,7 +131,7 @@ struct AIProviderSettingsTests {
 
             let items = await plugin.dynamicSearch(query: "myai")
             #expect(
-                items.map(\.id) == ["ai.portal", "ai.\(Self.providerID)"],
+                items.map(\.id) == ["plugin.open.ai", "ai.\(Self.providerID)"],
                 "输入自定义词应当直达配置的那个 Provider")
             #expect(items[1].relevance == 0.8, "自定义词精确命中与内置词同权")
         }
@@ -145,7 +145,7 @@ struct AIProviderSettingsTests {
 
             let items = await AIPlugin().dynamicSearch(query: "myai")
             #expect(
-                !items.contains { $0.id != "ai.portal" && $0.id != "ai.\(Self.providerID)" },
+                !items.contains { $0.id != "plugin.open.ai" && $0.id != "ai.\(Self.providerID)" },
                 "别的 Provider 不该被这个词带出来")
         }
     }

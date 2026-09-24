@@ -153,6 +153,15 @@ public final class PaletteCoordinator {
         self.plugins = plugins
     }
 
+    /// 启动时预热面板
+    ///
+    /// 首次 `ensurePanel` 需要创建 NSPanel + NSHostingView + SwiftUI 视图树，
+    /// 实测 13 ms。推到首次 show 会被用户感知为延迟，挪到启动阶段吸收掉。
+    public func prewarm() {
+        ensurePanel()
+        log.debug("面板预热完成")
+    }
+
     // MARK: - 面板控制
 
     /// 切换面板显隐
@@ -179,31 +188,51 @@ public final class PaletteCoordinator {
 
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
         let interval = signpost.beginInterval("palette.show")
-        let started = Date()
+        let started = ContinuousClock.now
 
         // 自动粘贴 / 自动清空只在主搜索模式下有意义；打开特定插件时跳过，
         // 避免剪贴板内容被填进搜索框后触发粘贴检测（JSON/SQL 跳转），
         // 把 activePluginID 篡改成 json-formatter/sql-formatter，导致
         // 再次按快捷键时切换（关闭）逻辑匹配不上。
         if pluginID == nil {
+            let t0 = ContinuousClock.now
             applyAutoBehavior()
+            let autoBehaviorMS = t0.duration(to: .now).ms
+            if autoBehaviorMS > 5 {
+                log.warning("show 子步骤慢：applyAutoBehavior \(autoBehaviorMS, format: .fixed(precision: 1)) ms")
+            }
         }
 
-        // 宿主行为（例如强制键盘布局）在面板真正出现之前生效
-        onPanelWillShow?()
-
         previousApp = NSWorkspace.shared.frontmostApplication
+
+        let t2 = ContinuousClock.now
         ensurePanel()
+        let ensurePanelMS = t2.duration(to: .now).ms
+        if ensurePanelMS > 5 {
+            log.warning("show 子步骤慢：ensurePanel \(ensurePanelMS, format: .fixed(precision: 1)) ms")
+        }
+
         applyPaletteMetrics()
         positionOnCursorScreen()
+
+        let t3 = ContinuousClock.now
         presentPanel()
+        let presentMS = t3.duration(to: .now).ms
+        if presentMS > 5 {
+            log.warning("show 子步骤慢：presentPanel \(presentMS, format: .fixed(precision: 1)) ms")
+        }
+
+        // 键盘布局切换（~10 ms）放在 presentPanel 之后：面板先出现，布局再切。
+        // 人类反应时间 > 200 ms，不可能在 10 ms 内开始打字，所以不影响体验。
+        // 放在 presentPanel 之前时，10 ms 的系统调用全部变成了面板出现的感知延迟。
+        onPanelWillShow?()
 
         signpost.endInterval("palette.show", interval)
-        let elapsedMS = Date().timeIntervalSince(started) * 1000
-        log.info(
+        let totalMS = started.duration(to: .now).ms
+        log.notice(
             """
             面板已显示：插件=\(self.activePluginID ?? "主搜索", privacy: .public)，\
-            耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
+            总耗时 \(totalMS, format: .fixed(precision: 1)) ms
             """)
 
         EventBus.shared.post(PaletteVisibilityChangedEvent(isVisible: true))
@@ -258,15 +287,30 @@ public final class PaletteCoordinator {
     /// 将面板真正推到前台
     private func presentPanel() {
         guard let panel else { return }
-        panel.makeKeyAndOrderFront(nil)
-        panel.orderFrontRegardless()
-        NSApp.activate(ignoringOtherApps: true)
 
-        // 确保搜索框获得焦点：遍历找到 NSTextField 并使其成为第一响应者
+        let t0 = ContinuousClock.now
+        panel.makeKeyAndOrderFront(nil)
+        let makeKeyMS = t0.duration(to: .now).ms
+
+        let t1 = ContinuousClock.now
+        panel.orderFrontRegardless()
+        let orderFrontMS = t1.duration(to: .now).ms
+
+        let t2 = ContinuousClock.now
+        NSApp.activate(ignoringOtherApps: true)
+        let activateMS = t2.duration(to: .now).ms
+
         focusSearchField(in: panel)
 
-        // 菜单栏点击后应用会失活，首次 makeKey 可能不生效；下一轮 runloop 补一次。
-        // 这正是 PalettePanel.hidesOnDeactivate = false 要配合的场景。
+        if makeKeyMS > 3 || orderFrontMS > 3 || activateMS > 3 {
+            log.warning(
+                """
+                presentPanel 子步骤：makeKey \(makeKeyMS, format: .fixed(precision: 1)), \
+                orderFront \(orderFrontMS, format: .fixed(precision: 1)), \
+                activate \(activateMS, format: .fixed(precision: 1)) ms
+                """)
+        }
+
         Task { @MainActor [weak self, weak panel] in
             guard let panel, panel.isVisible, !panel.isKeyWindow else { return }
             self?.log.debug("面板首次未取得 key window，补一次 makeKeyAndOrderFront")
@@ -299,18 +343,40 @@ public final class PaletteCoordinator {
     /// 隐藏面板
     /// - Parameter restoreFocus: 是否恢复之前应用的焦点
     public func hide(restoreFocus: Bool = true) {
+        let started = ContinuousClock.now
         let wasVisible = isVisible
-        panel?.orderOut(nil)
 
-        if restoreFocus, let app = previousApp, !app.isTerminated {
-            app.activate()
-        }
-        previousApp = nil
-        onPanelDidHide?()
+        // 视觉消失必须同步：用户按键后面板要立刻从屏幕上移走
+        panel?.orderOut(nil)
+        let orderOutMS = started.duration(to: .now).ms
 
         if wasVisible {
-            log.info("面板已隐藏，恢复焦点=\(restoreFocus, privacy: .public)")
+            // 焦点恢复和键盘布局还原不影响「面板消失」的视觉反馈，
+            // 推迟到下一轮 runloop 避免阻塞主线程（键盘布局切换实测 12~15 ms）
+            let app = restoreFocus ? previousApp : nil
+            let didHideCallback = onPanelDidHide
+            previousApp = nil
+
+            Task { @MainActor [weak self] in
+                let postStart = ContinuousClock.now
+                if let app, !app.isTerminated {
+                    app.activate()
+                }
+                didHideCallback?()
+                let postMS = postStart.duration(to: .now).ms
+                if postMS > 5 {
+                    self?.log.debug("hide 异步后处理：\(postMS, format: .fixed(precision: 1)) ms")
+                }
+            }
+
+            log.notice(
+                """
+                面板已隐藏（同步阶段）：orderOut \(orderOutMS, format: .fixed(precision: 1)) ms，\
+                恢复焦点=\(restoreFocus, privacy: .public)
+                """)
             EventBus.shared.post(PaletteVisibilityChangedEvent(isVisible: false))
+        } else {
+            previousApp = nil
         }
     }
 
@@ -659,5 +725,13 @@ extension NSSize {
     /// 两个尺寸是否近似相等（写进偏好再读回来会过一遍 Double，不敢用精确比较）
     fileprivate func isApproximately(_ other: NSSize) -> Bool {
         abs(width - other.width) < 0.5 && abs(height - other.height) < 0.5
+    }
+}
+
+extension Duration {
+    /// 转换为毫秒数（双精度），给计时日志用
+    fileprivate var ms: Double {
+        let (seconds, attoseconds) = components
+        return Double(seconds) * 1000 + Double(attoseconds) / 1_000_000_000_000_000
     }
 }

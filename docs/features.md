@@ -882,6 +882,12 @@
 - **命中之后按已有的模糊打分排。** 闸门只决定「要不要搜」，相关度仍由
   `word.fuzzyScore(keyword)` 给（前缀 0.9）再乘 0.8 —— 所以 `deep` 命中的 DeepSeek
   relevance 是 0.72，排在门户入口（0.6）之前。
+- **总入口只有一条，不会重复。** 门户入口的动态条目**复用「打开本插件」静态命令的 id**
+  （`CommandID.openPlugin("ai")`），聚合层按 id 去重，所以面板里只出现一条「AI 聚合」。
+  同时 `triggerWords` **只放通用唤醒词**（`ai` / `chat` / `AI 聚合` …），**不放 Provider 名**：
+  这条通用入口的关键字是 `triggerWords + [name]`，把 Provider 名塞进去，搜 `deepseek`
+  时它会以精确命中盖过真正的 DeepSeek 条目。Provider 名由 `AIProviderRegistry` 承载，
+  只喂动态闸门与打分。
 
 #### 内部结构
 

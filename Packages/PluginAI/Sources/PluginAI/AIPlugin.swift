@@ -19,15 +19,14 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
     public static let name = "AI 聚合"
     public static let icon = "sparkles"
     public static let description = "一站式直达主流大语言模型官网（DeepSeek、ChatGPT、Claude、Gemini 等），独立轻量窗口运行并保持登录态。"
+    /// 只收「唤醒整个插件」的通用词
+    ///
+    /// **Provider 名不放这里。** 这个列表是「打开本插件」这条命令的关键字，答案是
+    /// `triggerWords + [name]`；把 Provider 名塞进来，搜 `deepseek` 时这条通用入口会以
+    /// 精确命中（1.0）盖过真正的 DeepSeek 条目（0.8）。Provider 名由
+    /// `AIProviderRegistry.allKeywords` 承载，只喂动态搜索的闸门与打分，不走静态命令。
     public static let triggerWords = [
-        "AI 聚合", "AI Portal", "ai", "AI", "chat",
-        "deepseek", "DeepSeek", "ds",
-        "chatgpt", "ChatGPT", "gpt", "openai",
-        "gemini", "Gemini",
-        "claude", "Claude", "anthropic",
-        "豆包", "doubao", "kimi", "moonshot",
-        "glm", "GLM", "智谱",
-        "AI 官网", "AI 设置"
+        "AI 聚合", "AI Portal", "ai", "AI", "chat", "AI 官网", "AI 设置"
     ]
 
     public var isEnabled = true
@@ -65,25 +64,6 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
 
     // MARK: - 搜索
 
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "ai.portal",
-                pluginID: id,
-                pluginName: name,
-                title: "AI 聚合门户",
-                subtitle: "管理所有 AI 官网窗口",
-                keywords: triggerWords,
-                icon: icon
-            )
-        ]
-    }
-
-    public func perform(commandID: String) {
-        guard commandID == "ai.portal" || commandID == CommandID.openPlugin(Self.id) else { return }
-        EventBus.shared.post(NavigateEvent(pluginID: Self.id))
-    }
-
     public func accepts(query: String) -> Bool {
         query.matchesAnyTriggerIncludingPrefix(Self.searchKeywords)
     }
@@ -101,17 +81,20 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
 
         var results: [SearchableItem] = []
 
-        // 「AI 聚合」总入口
+        // 总入口。**id 与「打开本插件」这条静态命令相同**，所以它在真实搜索里会和静态
+        // 那一条按 id 去重 —— 面板只显示一条「AI 聚合」，不会出现「门户 + 聚合」两条。
+        // 这里仍然要放一条：闸门认的通用词（如「聊天」「ai聚合」）里，有些落不进
+        // `triggerWords`，静态命令匹配不到，得靠动态这条兜住。
         results.append(
             SearchableItem(
-                id: "ai.portal",
+                id: CommandID.openPlugin(Self.id),
                 pluginID: Self.id,
-                title: "AI 聚合门户",
-                subtitle: "管理所有 AI 官网窗口",
-                icon: "sparkles",
+                title: Self.name,
+                subtitle: Self.description,
+                icon: Self.icon,
                 relevance: 0.6,
                 action: {
-                    EventBus.shared.post(NavigateEvent(pluginID: "ai"))
+                    EventBus.shared.post(NavigateEvent(pluginID: Self.id))
                 }
             )
         )
