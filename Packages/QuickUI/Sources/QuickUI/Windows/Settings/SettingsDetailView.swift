@@ -14,6 +14,8 @@ import SwiftUI
 /// - 顶部由系统工具栏与窗口标题占据，内容区无需冗余标题与搜索框
 struct SettingsDetailView: View {
 
+    /// 详情的分发器：它要构造全部子页，所以用伞协议是**有意**的 ——
+    /// 这里是 `SettingsDataSource` 组合存在的理由，不是漏收窄。
     let dataSource: any SettingsDataSource
     let navigationState: SettingsNavigationState
 

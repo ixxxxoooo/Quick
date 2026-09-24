@@ -11,7 +11,7 @@ import SwiftUI
 /// 基于 NSMetadataQuery（Spotlight）的文件搜索。
 /// 支持按名称、内容搜索文件，并可快速打开或在 Finder 中显示。
 @MainActor
-public final class FileSearchPlugin: QuickPlugin {
+public final class FileSearchPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "filesearch"
     public static let name = "文件搜索"
@@ -48,25 +48,26 @@ public final class FileSearchPlugin: QuickPlugin {
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
-        return await searchItems(query: query)
-    }
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        // 触发词解析是纯逻辑，见 FileSearchQuery：必须以 "f " / "file " / "文件 " 开头，
-        // 且后面还要有关键词，否则这里就返回空、不去打扰 Spotlight
+        // 闸门：必须以 "f " / "file " / "文件 " 开头且后面还有关键词，否则返回空、
+        // 不去打扰 Spotlight。`accepts` 已经挡了一层，这里再挡一次是因为
+        // `dynamicSearch` 也能被直接调用（测试、未来的其它入口），而触发词解析是纯逻辑
+        // （见 FileSearchQuery），重复判断的代价可以忽略。
         guard let keyword = FileSearchQuery.keyword(in: query) else { return [] }
 
         // 会话已经在查询前读过一次设置：谓词按「搜索文件内容」开关构造，
-        // 结果按「忽略隐藏文件」过滤并按「最大结果数」截断
+        // 结果按「忽略隐藏文件」过滤并按「最大结果数」截断。
+        // NSMetadataQuery 必须跑在主 actor 上（要 runloop 派发通知），
+        // 所以这里显式跳回去 —— 这一次跳跃是有意的，不是遗漏。
         let files = await searchSession.search(query: keyword)
-        return items(for: files)
+        return Self.items(for: files)
     }
 
     /// 把搜索结果映射成面板条目
     ///
-    /// internal 而不是 private：接线测试要能在不跑 Spotlight 的前提下验证这里没有二次截断。
+    /// `nonisolated static`：纯映射，不碰实例状态，这样从无隔离的搜索路径调用
+    /// 不必再回主 actor。测试也靠它在不跑 Spotlight 的前提下验证没有二次截断 ——
     /// 以前这里写死 `prefix(10)`，设置页里的 20/50/100/200 全都被压成 10 条。
-    func items(for files: [FileSearchSession.FileResult]) -> [SearchableItem] {
+    nonisolated static func items(for files: [FileSearchSession.FileResult]) -> [SearchableItem] {
         files.map { file in
             SearchableItem(
                 id: "filesearch.\(file.path)",

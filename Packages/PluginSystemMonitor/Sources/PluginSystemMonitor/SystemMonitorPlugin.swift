@@ -10,15 +10,21 @@ import SwiftUI
 ///
 /// CPU / 内存 / 磁盘 / 电源 / 网络与硬件规格，布局对齐 Raycast System Monitor。
 @MainActor
-public final class SystemMonitorPlugin: QuickPlugin {
+public final class SystemMonitorPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "sysmonitor"
     public static let name = "系统监控"
     public static let icon = "gauge.with.dots.needle.67percent"
     public static let description = "查看 CPU、内存、磁盘、电源与网络占用，以及硬件规格与高负载进程。"
+    /// 触发词**必须全局唯一**（跨插件不重复）。
+    ///
+    /// `进程` / `process` / `网络` 归「结束进程」与「网络工具」—— 它们的功能更专一，
+    /// 而那三个词在这里只是仪表盘的一项。本插件仍可通过 `cpu` / `内存` / `磁盘` /
+    /// `系统信息` / `monitor` 等词命中，功能命令也各自带自己的关键词。
+    /// 这条约束由 `TriggerWordUniquenessTests` 守着。
     public static let triggerWords = [
-        "系统信息", "系统监控", "系统", "system", "信息", "硬件", "进程", "进程管理", "process", "monitor", "端口", "port",
-        "cpu", "内存", "磁盘", "网络", "电池", "电源"
+        "系统信息", "系统监控", "系统", "system", "信息", "硬件", "进程管理", "monitor", "端口", "port",
+        "cpu", "内存", "磁盘", "电池", "电源"
     ]
 
     public static var functionCommands: [CommandDescriptor] {
@@ -56,25 +62,6 @@ public final class SystemMonitorPlugin: QuickPlugin {
     private var visibilitySubscription: EventSubscription?
 
     public init() {}
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        // 用整词匹配而不是 contains：否则 export / support / report / import 都会误触发本插件
-        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
-
-        return [
-            SearchableItem(
-                id: "sysmonitor.overview",
-                pluginID: Self.id,
-                title: "系统监控",
-                subtitle: "CPU · 内存 · 磁盘 · 电源 · 网络",
-                icon: "cpu",
-                relevance: 0.6,
-                action: {
-                    EventBus.shared.post(NavigateEvent(pluginID: "sysmonitor"))
-                }
-            )
-        ]
-    }
 
     public func makeView() -> AnyView {
         AnyView(SystemMonitorView(scanner: scanner))

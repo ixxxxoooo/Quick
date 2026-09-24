@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty hash-calculator 布局：
 /// 输入区 → 结果列表（自动计算）→ 空状态提示
 @MainActor
-public final class HashCalculatorPlugin: QuickPlugin {
+public final class HashCalculatorPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "hash-calculator"
     public static let name = "Hash 计算器"
@@ -43,21 +43,6 @@ public final class HashCalculatorPlugin: QuickPlugin {
     private let log = QuickLog.plugin(HashCalculatorPlugin.id)
 
     public init() {}
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
-        return [
-            SearchableItem(
-                id: "hash-calculator.open",
-                pluginID: Self.id,
-                title: Self.name,
-                subtitle: "计算 MD5 / SHA1 / SHA256 / SHA512 哈希值",
-                icon: Self.icon,
-                relevance: 0.7,
-                action: { EventBus.shared.post(NavigateEvent(pluginID: Self.id)) }
-            )
-        ]
-    }
 
     /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
     private let buffer = TextBuffer()

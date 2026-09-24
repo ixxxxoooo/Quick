@@ -186,19 +186,25 @@ struct TimestampConverterPluginTests {
         #expect(!TimestampConverterPlugin.triggerWords.isEmpty)
     }
 
-    @Test("命中触发词时只返回一条结果")
-    func triggerReturnsExactlyOneItem() async {
-        let plugin = TimestampConverterPlugin()
-        let results = await plugin.searchItems(query: "时间戳")
+    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
+    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    @Test("时间戳转日期与当前时间戳各一条命令，且功能命令带插件前缀")
+    func commandsCoverBothDirections() {
+        let commands = TimestampConverterPlugin.commands
+        let ids = commands.map(\.id)
 
-        #expect(results.count == 1)
-        #expect(results.first?.pluginID == TimestampConverterPlugin.id)
-        #expect(results.first?.icon == TimestampConverterPlugin.icon)
+        #expect(ids.contains("timestamp-converter.toDate"))
+        #expect(ids.contains("timestamp-converter.now"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("timestamp-converter.") })
+        #expect(commands.allSatisfy { $0.pluginID == TimestampConverterPlugin.id })
     }
 
-    @Test("不命中触发词时返回空")
-    func unrelatedQueryReturnsNothing() async {
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = TimestampConverterPlugin()
-        #expect(await plugin.searchItems(query: "zzzz").isEmpty)
+
+        #expect(!plugin.accepts(query: "时间戳"))
+        #expect(await plugin.dynamicSearch(query: "zzzz").isEmpty)
     }
 }

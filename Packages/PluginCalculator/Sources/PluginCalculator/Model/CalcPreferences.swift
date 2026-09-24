@@ -28,7 +28,10 @@ struct CalcDisplayOptions: Sendable, Equatable {
 ///
 /// 读键的动作发生在**每次计算与每次回车**时，不是在插件 init 里读一次：
 /// 设置页可以在应用运行期间随时改，捕获一次的话用户就会看到「改了没反应」。
-enum CalcPreferences {
+///
+/// **`nonisolated`**：搜索闸门与求值都在无隔离路径上跑，而这里只读 `UserDefaults`
+/// （它本身线程安全），没有需要主 actor 保护的状态。
+nonisolated enum CalcPreferences {
 
     /// 设置页里可选的档位
     static let precisionChoices = [2, 4, 6, 10]

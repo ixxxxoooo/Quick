@@ -272,55 +272,73 @@ struct SystemMonitorPluginTests {
     func metadataIsComplete() {
         #expect(SystemMonitorPlugin.name == "系统监控")
         #expect(SystemMonitorPlugin.icon == "gauge.with.dots.needle.67percent")
-        #expect(
-            SystemMonitorPlugin.triggerWords
-                == [
-                    "系统信息", "系统监控", "系统", "system", "信息", "硬件", "进程", "进程管理", "process", "monitor", "端口",
-                    "port", "cpu", "内存", "磁盘", "网络", "电池", "电源"
-                ])
+        #expect(!SystemMonitorPlugin.triggerWords.isEmpty)
         #expect(SystemMonitorPlugin.triggerWords.allSatisfy { !$0.isEmpty })
     }
 
-    @Test("命中触发词时只返回一条入口结果")
-    func triggerWordYieldsSingleEntry() async throws {
-        let plugin = SystemMonitorPlugin()
-        let results = await plugin.searchItems(query: "进程")
+    /// 触发词必须全局唯一，跨插件不重复。
+    ///
+    /// `进程` / `process` / `网络` 归「结束进程」与「网络工具」—— 它们的功能更专一。
+    /// 这里锁住的是「本插件不再声明这三个词」，防止有人顺手加回来。
+    /// 全仓范围的检查由 `Scripts/check-trigger-words.py` 负责（已接入 run-tests.sh）。
+    @Test("已让出与其它插件冲突的触发词")
+    func relinquishedAmbiguousTriggers() {
+        let triggers = Set(SystemMonitorPlugin.triggerWords)
 
-        #expect(results.count == 1)
-        let item = try #require(results.first)
-        #expect(item.id == "sysmonitor.overview")
-        #expect(item.pluginID == SystemMonitorPlugin.id)
-        #expect(item.relevance == 0.6)
-        #expect(!item.title.isEmpty)
+        #expect(!triggers.contains("进程"))
+        #expect(!triggers.contains("process"))
+        #expect(!triggers.contains("网络"))
+        // 仍然保留自己的专属词
+        #expect(triggers.contains("系统信息"))
+        #expect(triggers.contains("cpu"))
     }
 
+    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems`／
+    /// `dynamicSearch` 的返回，那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    @Test("声明的命令覆盖各项监控，且功能命令带插件前缀")
+    func commandsCoverMonitors() {
+        let commands = SystemMonitorPlugin.commands
+        let ids = commands.map(\.id)
+
+        #expect(ids.contains("sysmonitor.cpu"))
+        #expect(ids.contains("sysmonitor.memory"))
+        #expect(ids.contains("sysmonitor.disk"))
+        #expect(ids.contains("sysmonitor.network"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("sysmonitor.") })
+        #expect(commands.allSatisfy { $0.pluginID == SystemMonitorPlugin.id })
+    }
+
+    /// 整词匹配是 `matchesAnyTrigger` 的契约，它仍在闸门与设置页里用。
+    /// 用 contains 的话 export / support 都会误命中 port —— 那会让本插件在
+    /// 每次输入这些词时被无谓唤醒。
     @Test("拉丁触发词按整词匹配：export / support 不命中 port")
-    func latinTriggersMatchWholeWordsOnly() async {
-        let plugin = SystemMonitorPlugin()
+    func latinTriggersMatchWholeWordsOnly() {
+        let triggers = SystemMonitorPlugin.triggerWords
 
-        // 用 contains 的话这三个都会误命中，注释里点名的就是这件事
-        #expect(await plugin.searchItems(query: "export").isEmpty)
-        #expect(await plugin.searchItems(query: "support").isEmpty)
-        #expect(await plugin.searchItems(query: "memory").isEmpty)
+        #expect(!"export".matchesAnyTrigger(triggers))
+        #expect(!"support".matchesAnyTrigger(triggers))
+        #expect(!"import".matchesAnyTrigger(triggers))
         // 整词仍然命中
-        #expect(await plugin.searchItems(query: "process").count == 1)
-        #expect(await plugin.searchItems(query: "monitor").count == 1)
+        #expect("system".matchesAnyTrigger(triggers))
+        #expect("monitor".matchesAnyTrigger(triggers))
     }
 
+    /// 中文按前缀匹配：打「系统信」也能命中「系统信息」
     @Test("中文触发词按前缀匹配")
-    func chineseTriggersMatchByPrefix() async {
-        let plugin = SystemMonitorPlugin()
+    func chineseTriggersMatchByPrefix() {
+        let triggers = SystemMonitorPlugin.triggerWords
 
-        #expect(await plugin.searchItems(query: "系统信息").count == 1)
-        #expect(await plugin.searchItems(query: "内存").count == 1)
+        #expect("系统信息".matchesAnyTrigger(triggers))
+        #expect("内存".matchesAnyTrigger(triggers))
     }
 
-    @Test("无关查询与空查询不返回结果")
-    func unrelatedQueryYieldsNothing() async {
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = SystemMonitorPlugin()
 
-        #expect(await plugin.searchItems(query: "").isEmpty)
-        #expect(await plugin.searchItems(query: "天气").isEmpty)
-        #expect(await plugin.searchItems(query: "screenshot").isEmpty)
+        #expect(!plugin.accepts(query: "系统信息"))
+        #expect(await plugin.dynamicSearch(query: "").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }

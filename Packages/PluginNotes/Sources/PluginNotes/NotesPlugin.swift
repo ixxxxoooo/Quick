@@ -12,7 +12,7 @@ import SwiftUI
 /// 轻量笔记 + 桌面便签 + 待办清单。
 /// 合并 Fasty 的 memo、sticky-notes、todo-list 功能。
 @MainActor
-public final class NotesPlugin: QuickPlugin {
+public final class NotesPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "notes"
     public static let name = "笔记"
@@ -88,14 +88,12 @@ public final class NotesPlugin: QuickPlugin {
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
-        return await searchItems(query: query)
-    }
 
-    public func searchItems(query: String) async -> [SearchableItem] {
         // 用整词匹配而不是 contains：否则 memory 会误命中 memo
         guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
-        // 拿剥离触发词后的词去搜；只剩触发词时为空串，表示列出全部笔记
+        // 拿剥离触发词后的词去搜；只剩触发词时为空串，表示列出全部笔记。
+        // 走的是 store 的搜索快照，不必回到主 actor。
         let keyword = query.removingTrigger(Self.triggerWords)
         let notes = store.search(keyword)
         return notes.prefix(5).map { note in

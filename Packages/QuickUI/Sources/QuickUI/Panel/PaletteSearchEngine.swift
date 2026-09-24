@@ -6,6 +6,41 @@ import Foundation
 import os
 import QuickCore
 
+/// 一次聚合搜索的结果
+///
+/// 把「超时」与「没搜到」分开，是这一版搜索最主要的修复：以前超时静默返回空数组，
+/// 用户看到的是「没找到」，而实际原因是「没搜完」。
+public struct PaletteSearchOutcome: Sendable {
+
+    /// 去重、排序、限流之后的条目
+    public let items: [SearchableItem]
+
+    /// 超时被放弃的插件 id；非空表示这次结果不完整
+    public let timedOutPluginIDs: [String]
+
+    /// 空结果
+    public static let empty = PaletteSearchOutcome(items: [], timedOutPluginIDs: [])
+}
+
+/// 单个插件的搜索产出
+private struct PluginSearchResult: Sendable {
+
+    let pluginID: String
+
+    /// `nil` 表示超时；空数组表示「查了但没有结果」
+    let items: [SearchableItem]?
+
+    let didTimeOut: Bool
+}
+
+/// 一轮动态搜索的汇总
+private struct DynamicSearchBatch: Sendable {
+
+    let items: [SearchableItem]
+
+    let timedOutPluginIDs: [String]
+}
+
 /// 主面板聚合搜索：静态命令索引 + 插件动态搜索
 ///
 /// 从 `PaletteCoordinator` 抽出的纯搜索逻辑，协调器只负责注入依赖与面板生命周期。
@@ -19,14 +54,14 @@ public enum PaletteSearchEngine {
 
     /// 单个插件的动态搜索超时
     ///
-    /// 插件的 `dynamicSearch` 跑在主 actor 上，一个慢查询会把整批结果卡住；
-    /// 超时之后放弃这个插件，而不是让整块面板陪它等。
+    /// 插件的 `dynamicSearch` 是 `nonisolated`，正常情况下不该阻塞主 actor；
+    /// 但网络、磁盘这类真实 IO 仍可能长时间不返回。超时之后放弃这个插件，
+    /// 而不是让整块面板陪它等 —— 超时的插件 id 会随结果一起返回给调用方。
     public static let pluginTimeout = Duration.seconds(2)
 
     /// 聚合搜索：静态命令索引 + 声明了动态结果的插件
     ///
-    /// 静态打分不碰插件对象，可以离开主线程。动态插件只有 `accepts` 为真才调用，
-    /// 并且超时会取消等待。
+    /// 静态打分不碰插件对象，可以离开主线程。动态插件只有 `accepts` 为真才调用。
     ///
     /// - Parameters:
     ///   - query: 搜索关键词
@@ -36,7 +71,7 @@ public enum PaletteSearchEngine {
     ///   - recentItemIDs: 空查询时用于首屏提权的最近使用 id（通常最多 12 条）
     ///   - invokeCommand: 命中静态命令时的执行入口
     ///   - log: 面板分类日志
-    /// - Returns: 去重、排序、限流之后的结果
+    /// - Returns: 去重、排序、限流之后的结果，附带超时的插件 id
     public static func search(
         query: String,
         staticCommands: [IndexedCommand],
@@ -45,7 +80,7 @@ public enum PaletteSearchEngine {
         recentItemIDs: [String],
         invokeCommand: @escaping @MainActor (String) -> Void,
         log: Logger
-    ) async -> [SearchableItem] {
+    ) async -> PaletteSearchOutcome {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
         let interval = signpost.beginInterval("palette.search")
@@ -57,7 +92,7 @@ public enum PaletteSearchEngine {
         }.value
         if Task.isCancelled {
             signpost.endInterval("palette.search", interval)
-            return []
+            return .empty
         }
 
         let staticItems = staticHits.map { hit in
@@ -76,34 +111,46 @@ public enum PaletteSearchEngine {
             )
         }
 
+        // `accepts` 现在是 nonisolated，闸门判定不再占用主 actor
         let dynamicPlugins = plugins.filter { plugin in
             let pluginID = type(of: plugin).id
             return plugin.isEnabled && isSearchSourceEnabled(pluginID) && plugin.accepts(query: trimmed)
         }
 
-        let dynamicItems = await withTaskGroup(of: [SearchableItem].self) { group in
+        let dynamicItems = await withTaskGroup(of: PluginSearchResult.self) { group in
             for plugin in dynamicPlugins {
                 let pluginName = type(of: plugin).name
                 let pluginID = type(of: plugin).id
                 group.addTask {
-                    let items = await searchDynamic(
+                    let outcome = await searchDynamic(
                         plugin: plugin, pluginID: pluginID, query: trimmed, log: log)
-                    return items.map { $0.pluginName == nil ? $0.withPluginName(pluginName) : $0 }
+                    guard let items = outcome.items else {
+                        return PluginSearchResult(pluginID: pluginID, items: nil, didTimeOut: true)
+                    }
+                    // 插件没自己填来源名时补上，结果行右侧的插件徽章靠它
+                    let named = items.map { item in
+                        item.pluginName == nil ? item.withPluginName(pluginName) : item
+                    }
+                    return PluginSearchResult(pluginID: pluginID, items: named, didTimeOut: false)
                 }
             }
             var results: [SearchableItem] = []
-            for await items in group {
-                results.append(contentsOf: items)
+            var timedOut: [String] = []
+            for await outcome in group {
+                if let items = outcome.items {
+                    results.append(contentsOf: items)
+                }
+                if outcome.didTimeOut { timedOut.append(outcome.pluginID) }
             }
-            return results
+            return DynamicSearchBatch(items: results, timedOutPluginIDs: timedOut)
         }
 
         if Task.isCancelled {
             signpost.endInterval("palette.search", interval)
-            return []
+            return .empty
         }
 
-        let collected = staticItems + dynamicItems
+        let collected = staticItems + dynamicItems.items
 
         // 去重：`SearchableItem` 的 `Hashable` 只看 id。重复 id 会让 `ForEach` 进入未定义行为。
         var seen = Set<String>()
@@ -118,6 +165,7 @@ public enum PaletteSearchEngine {
         }
 
         let limited = Array(sorted.prefix(resultLimit))
+        let timedOutIDs = dynamicItems.timedOutPluginIDs
 
         signpost.endInterval("palette.search", interval)
         let elapsedMS = Date().timeIntervalSince(started) * 1000
@@ -126,6 +174,7 @@ public enum PaletteSearchEngine {
                 """
                 聚合搜索超过 50ms：动态插件 \(dynamicPlugins.count, privacy: .public) 个，\
                 返回 \(limited.count, privacy: .public) 条，\
+                超时 \(timedOutIDs.count, privacy: .public) 个，\
                 耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
                 """
             )
@@ -140,18 +189,25 @@ public enum PaletteSearchEngine {
             )
         }
 
-        return limited
+        return PaletteSearchOutcome(items: limited, timedOutPluginIDs: timedOutIDs)
     }
 
-    /// 查询单个动态插件，超时即取消等待
+    /// 查询单个动态插件，超时即取消它的工作
+    ///
+    /// **这次取消是真的。** `dynamicSearch` 已经是 `nonisolated`，所以超时任务里的
+    /// `cancelAll()` 会真正把取消信号送到插件内部 —— 插件只要在循环里看
+    /// `Task.isCancelled`（协议要求）就能提前收尾。在这之前 `dynamicSearch` 跑在主 actor
+    /// 上，超时只能「放弃等待」，插件会继续跑完，主线程照样被占着。
+    ///
+    /// - Returns: 插件的条目；超时返回 nil（与「查了但没结果」区分开）
     private static func searchDynamic(
         plugin: any QuickPlugin,
         pluginID: String,
         query: String,
         log: Logger
-    ) async -> [SearchableItem] {
+    ) async -> PluginSearchResult {
         let started = Date()
-        return await withTaskGroup(of: [SearchableItem]?.self) { group in
+        let items = await withTaskGroup(of: [SearchableItem]?.self) { group in
             group.addTask {
                 await plugin.dynamicSearch(query: query)
             }
@@ -161,18 +217,21 @@ public enum PaletteSearchEngine {
             }
             let first = await group.next() ?? nil
             group.cancelAll()
-            if first == nil {
-                let elapsedMS = Date().timeIntervalSince(started) * 1000
-                log.warning(
-                    """
-                    插件 \(pluginID, privacy: .public) 搜索超时，已取消等待，\
-                    耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
-                    """
-                )
-                return []
-            }
-            return first ?? []
+            return first
         }
+
+        guard let items else {
+            let elapsedMS = Date().timeIntervalSince(started) * 1000
+            // 不静默：超时是「没搜完」，不是「没找到」，用户与排查者都要能分辨
+            log.warning(
+                """
+                插件 \(pluginID, privacy: .public) 搜索超时，已取消其工作，\
+                耗时 \(elapsedMS, format: .fixed(precision: 1)) ms
+                """
+            )
+            return PluginSearchResult(pluginID: pluginID, items: nil, didTimeOut: true)
+        }
+        return PluginSearchResult(pluginID: pluginID, items: items, didTimeOut: false)
     }
 
     /// 把最近使用过的条目提到前面，其余保持原顺序

@@ -135,7 +135,7 @@ struct AIPluginTests {
     @Test("只输入 ai 时返回门户入口 + 全部 8 个 Provider")
     func bareTriggerListsAllProviders() async {
         let plugin = AIPlugin()
-        let items = await plugin.searchItems(query: "ai")
+        let items = await plugin.dynamicSearch(query: "ai")
 
         #expect(items.count == 9)
         #expect(
@@ -151,7 +151,7 @@ struct AIPluginTests {
     @Test("Provider 名称查询：门户在前，命中的 Provider 紧随其后")
     func providerQuery() async {
         let plugin = AIPlugin()
-        let items = await plugin.searchItems(query: "deepseek")
+        let items = await plugin.dynamicSearch(query: "deepseek")
 
         #expect(items.map(\.id) == ["ai.portal", "ai.deepseek"])
         #expect(items.map(\.relevance) == [0.6, 0.8])
@@ -166,7 +166,7 @@ struct AIPluginTests {
     @Test("部分关键词（gpt）只命中 ChatGPT")
     func partialKeywordQuery() async {
         let plugin = AIPlugin()
-        let items = await plugin.searchItems(query: "gpt")
+        let items = await plugin.dynamicSearch(query: "gpt")
 
         #expect(items.map(\.id) == ["ai.portal", "ai.chatgpt"])
         #expect(items.map(\.relevance) == [0.6, 0.8])
@@ -176,7 +176,7 @@ struct AIPluginTests {
     @Test("中文关键词（通义）只命中通义千问")
     func chineseKeywordQuery() async {
         let plugin = AIPlugin()
-        let items = await plugin.searchItems(query: "通义")
+        let items = await plugin.dynamicSearch(query: "通义")
 
         #expect(items.map(\.id) == ["ai.portal", "ai.tongyi"])
         #expect(items[1].title == "通义千问")
@@ -187,9 +187,9 @@ struct AIPluginTests {
     @Test("未命中触发词时不返回任何结果")
     func unrelatedQueryReturnsNothing() async {
         let plugin = AIPlugin()
-        #expect(await plugin.searchItems(query: "clipboard").isEmpty)
-        #expect(await plugin.searchItems(query: "天气").isEmpty)
-        #expect(await plugin.searchItems(query: "").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "clipboard").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "").isEmpty)
     }
 
     // MARK: - 前缀查询
@@ -199,27 +199,27 @@ struct AIPluginTests {
     func prefixQueryFindsProvider() async {
         let plugin = AIPlugin()
 
-        let deep = await plugin.searchItems(query: "deep")
+        let deep = await plugin.dynamicSearch(query: "deep")
         #expect(deep.map(\.id) == ["ai.portal", "ai.deepseek"])
         #expect(deep[1].relevance == 0.9 * 0.8, "前缀命中按 0.9 折算")
 
         #expect(
-            await plugin.searchItems(query: "chatgp").map(\.id) == ["ai.portal", "ai.chatgpt"])
+            await plugin.dynamicSearch(query: "chatgp").map(\.id) == ["ai.portal", "ai.chatgpt"])
     }
 
     /// 前缀是「以触发词开头」：`seek` 是 deepseek 的中间片段，不该放行
     @Test("中间片段不算前缀")
     func infixQueryReturnsNothing() async {
         let plugin = AIPlugin()
-        #expect(await plugin.searchItems(query: "seek").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "seek").isEmpty)
     }
 
     /// 闸门有长度下限：一两个字母会把 `ai` / `gpt` 这类短触发词变成噪音源
     @Test("太短的前缀不放行")
     func tooShortPrefixReturnsNothing() async {
         let plugin = AIPlugin()
-        #expect(await plugin.searchItems(query: "de").isEmpty)
-        #expect(await plugin.searchItems(query: "d").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "de").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "d").isEmpty)
     }
 
     /// 命中的 Provider 必须能被窗口管理器认出来：id 就是注册表里的 id
@@ -227,7 +227,7 @@ struct AIPluginTests {
     func pluginIDStamped() async {
         let plugin = AIPlugin()
         for query in ["ai", "kimi", "glm", "豆包"] {
-            let items = await plugin.searchItems(query: query)
+            let items = await plugin.dynamicSearch(query: query)
             #expect(!items.isEmpty, "\(query) 应当有结果")
             #expect(items.allSatisfy { $0.pluginID == AIPlugin.id })
         }

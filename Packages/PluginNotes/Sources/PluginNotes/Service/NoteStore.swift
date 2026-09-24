@@ -4,6 +4,32 @@
 
 import Foundation
 import QuickCore
+import Synchronization
+
+/// 搜索用的笔记快照
+///
+/// 小写形态在刷新时算一次：搜索要脱离主 actor（见 `dynamicSearch` 的说明），
+/// 而每次按键都重新 `lowercased()` 几百条笔记是把开销放在了热路径上。
+struct NoteSearchSnapshot: Sendable {
+    let id: UUID
+    let title: String
+    let preview: String
+    private let loweredTitle: String
+    private let loweredContent: String
+
+    init(id: UUID, title: String, content: String, preview: String) {
+        self.id = id
+        self.title = title
+        self.preview = preview
+        self.loweredTitle = title.lowercased()
+        self.loweredContent = content.lowercased()
+    }
+
+    /// 标题或正文包含关键词
+    func matches(_ loweredQuery: String) -> Bool {
+        loweredTitle.contains(loweredQuery) || loweredContent.contains(loweredQuery)
+    }
+}
 
 /// 笔记存储
 ///
@@ -25,6 +51,13 @@ final class NoteStore {
     /// 存储句柄
     private let storage: PluginStorage
 
+    /// 搜索快照
+    ///
+    /// 主 actor 上每次 load/reload 后重建，`nonisolated` 的 `search` 直接读它 ——
+    /// 这样搜索不必回到主 actor 排队。用 `Mutex` 而不是假设「主 actor 写、
+    /// 后台读」天然安全：两者之间没有 happens-before 关系。
+    private let searchSnapshot = Mutex<[NoteSearchSnapshot]>([])
+
     /// 初始化并加载
     ///
     /// 同步加载：数据库就在本地，一次查询是微秒级，没有必要把它变成异步再让视图等一轮。
@@ -36,11 +69,12 @@ final class NoteStore {
 
     // MARK: - 查询
 
-    func search(_ query: String) -> [NoteItem] {
-        guard !query.isEmpty else { return notes }
-        let lower = query.lowercased()
-        return notes.filter {
-            $0.title.lowercased().contains(lower) || $0.content.lowercased().contains(lower)
+    /// 按关键词过滤笔记，可脱离主 actor 调用
+    nonisolated func search(_ query: String) -> [NoteSearchSnapshot] {
+        searchSnapshot.withLock { snapshot in
+            guard !query.isEmpty else { return snapshot }
+            let lowered = query.lowercased()
+            return snapshot.filter { $0.matches(lowered) }
         }
     }
 
@@ -139,6 +173,7 @@ final class NoteStore {
         do {
             notes = try Self.fetchNotes(from: storage.database)
             todos = try Self.fetchTodos(from: storage.database)
+            rebuildSearchSnapshot()
             log.info(
                 """
                 笔记已加载：\(self.notes.count, privacy: .public) 条笔记、\
@@ -149,6 +184,7 @@ final class NoteStore {
             log.error("笔记读取失败，已按空数据继续：\(error)")
             notes = []
             todos = []
+            rebuildSearchSnapshot()
         }
     }
 
@@ -167,6 +203,19 @@ final class NoteStore {
         } catch {
             log.error("笔记缓存刷新失败：\(error)")
         }
+        rebuildSearchSnapshot()
+    }
+
+    /// 重建搜索快照
+    ///
+    /// 唯一修改快照的地方。放在所有会改变 `notes` 的路径末尾，「搜索能读到刚写的
+    /// 笔记」才是可推理的，而不是依赖调用顺序。
+    private func rebuildSearchSnapshot() {
+        let snapshot = notes.map {
+            NoteSearchSnapshot(
+                id: $0.id, title: $0.title, content: $0.content, preview: $0.preview)
+        }
+        searchSnapshot.withLock { $0 = snapshot }
     }
 
     /// 按数据库里的真实内容重排待办缓存

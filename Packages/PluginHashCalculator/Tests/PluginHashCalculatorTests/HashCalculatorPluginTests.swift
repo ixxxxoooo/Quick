@@ -128,17 +128,27 @@ struct HashCalculatorPluginTests {
         #expect(!HashCalculatorPlugin.triggerWords.isEmpty)
     }
 
-    @Test("任一触发词都能唤醒插件，且只返回一个入口", arguments: ["hash", "md5", "sha", "哈希"])
-    func searchItemsMatchTrigger(_ trigger: String) async {
-        let items = await HashCalculatorPlugin().searchItems(query: trigger)
-        #expect(items.count == 1)
-        #expect(items.first?.id == "hash-calculator.open")
-        #expect(items.first?.pluginID == HashCalculatorPlugin.id)
+    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
+    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    @Test("四种散列各有一条命令，且功能命令带插件前缀")
+    func commandsCoverEveryHash() {
+        let commands = HashCalculatorPlugin.commands
+        let ids = commands.map(\.id)
+
+        #expect(ids.contains("hash-calculator.md5"))
+        #expect(ids.contains("hash-calculator.sha1"))
+        #expect(ids.contains("hash-calculator.sha256"))
+        #expect(ids.contains("hash-calculator.sha512"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("hash-calculator.") })
+        #expect(commands.allSatisfy { $0.pluginID == HashCalculatorPlugin.id })
     }
 
-    @Test("无关查询不返回结果")
-    func unrelatedQueryReturnsNothing() async {
-        let items = await HashCalculatorPlugin().searchItems(query: "天气")
-        #expect(items.isEmpty)
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
+        let plugin = HashCalculatorPlugin()
+
+        #expect(!plugin.accepts(query: "md5"))
+        #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }

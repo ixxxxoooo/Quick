@@ -7,7 +7,7 @@ import SwiftUI
 /// 主搜索搜哪些来源，以及应用索引目录
 struct SearchPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any PluginSettingsDataSource & LauncherSettingsDataSource
     @State private var enabled: [String: Bool] = [:]
 
     var body: some View {

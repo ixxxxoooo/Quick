@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty json-formatter 布局：
 /// 工具栏（格式化/压缩/复制/清空 + 缩进选择）→ 编辑区 → 状态栏
 @MainActor
-public final class JSONFormatterPlugin: QuickPlugin {
+public final class JSONFormatterPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "json-formatter"
     public static let name = "JSON 格式化"
@@ -44,21 +44,6 @@ public final class JSONFormatterPlugin: QuickPlugin {
     private let log = QuickLog.plugin(JSONFormatterPlugin.id)
 
     public init() {}
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
-        return [
-            SearchableItem(
-                id: "json-formatter.open",
-                pluginID: Self.id,
-                title: Self.name,
-                subtitle: "格式化/压缩 JSON，语法高亮",
-                icon: Self.icon,
-                relevance: 0.7,
-                action: { EventBus.shared.post(NavigateEvent(pluginID: Self.id)) }
-            )
-        ]
-    }
 
     /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
     private let buffer = TextBuffer()

@@ -64,7 +64,7 @@ struct SnippetsSettingWiringTests {
             defer { subscription.cancel() }
 
             UserDefaults.standard.set(true, forKey: PluginSettingKey.Snippets.autoExpand)
-            let expanding = try #require(await plugin.searchItems(query: "sig").first)
+            let expanding = try #require(await plugin.dynamicSearch(query: "sig").first)
             expanding.action()
             let expanded = try #require(copied.first)
             #expect(
@@ -72,7 +72,7 @@ struct SnippetsSettingWiringTests {
                 "开关开着时模板变量应当被替换，实际复制的是 \(expanded)")
 
             UserDefaults.standard.set(false, forKey: PluginSettingKey.Snippets.autoExpand)
-            let raw = try #require(await plugin.searchItems(query: "sig").first)
+            let raw = try #require(await plugin.dynamicSearch(query: "sig").first)
             raw.action()
             #expect(
                 copied.last == "你好 {date}",
@@ -87,11 +87,11 @@ struct SnippetsSettingWiringTests {
                 storing: Snippet(title: "签名", content: "内容", keyword: "sig"))
 
             UserDefaults.standard.set(true, forKey: PluginSettingKey.Snippets.showSnippetHint)
-            #expect(await plugin.searchItems(query: "sig").first?.shortcutHint == ":sig")
+            #expect(await plugin.dynamicSearch(query: "sig").first?.shortcutHint == ":sig")
 
             UserDefaults.standard.set(false, forKey: PluginSettingKey.Snippets.showSnippetHint)
             #expect(
-                await plugin.searchItems(query: "sig").first?.shortcutHint == nil,
+                await plugin.dynamicSearch(query: "sig").first?.shortcutHint == nil,
                 "开关关掉后结果项不该再带触发关键词")
         }
     }
@@ -111,7 +111,7 @@ struct SnippetsSettingWiringTests {
             }
             defer { subscription.cancel() }
 
-            let item = try #require(await plugin.searchItems(query: "sig").first)
+            let item = try #require(await plugin.dynamicSearch(query: "sig").first)
             #expect(item.shortcutHint == ":sig", "没设置过时提示应当按默认的开处理")
             item.action()
             #expect(

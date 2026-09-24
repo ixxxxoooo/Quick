@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty base64-codec 布局：
 /// 工具栏（模式切换 + 操作按钮）→ 编辑区 → 状态栏
 @MainActor
-public final class Base64CodecPlugin: QuickPlugin {
+public final class Base64CodecPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "base64-codec"
     public static let name = "Base64 编解码"
@@ -37,21 +37,6 @@ public final class Base64CodecPlugin: QuickPlugin {
     private let log = QuickLog.plugin(Base64CodecPlugin.id)
 
     public init() {}
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
-        return [
-            SearchableItem(
-                id: "base64-codec.open",
-                pluginID: Self.id,
-                title: Self.name,
-                subtitle: "Base64 编码和解码",
-                icon: Self.icon,
-                relevance: 0.7,
-                action: { EventBus.shared.post(NavigateEvent(pluginID: Self.id)) }
-            )
-        ]
-    }
 
     /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
     private let buffer = TextBuffer()

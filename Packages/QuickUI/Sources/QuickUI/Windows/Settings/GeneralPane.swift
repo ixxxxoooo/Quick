@@ -8,7 +8,7 @@ import SwiftUI
 /// 通用设置
 struct GeneralPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any HostSettingsDataSource & PluginSettingsDataSource
 
     @State private var launchAtLogin: Bool
     @AppStorage(SettingsKey.paletteAutoPasteSeconds)
@@ -16,7 +16,7 @@ struct GeneralPane: View {
     @AppStorage(SettingsKey.paletteAutoClearMinutes)
     private var autoClearMinutes = PaletteAutoBehavior.defaultClearIdle.rawValue
 
-    init(dataSource: any SettingsDataSource) {
+    init(dataSource: any HostSettingsDataSource & PluginSettingsDataSource) {
         self.dataSource = dataSource
         _launchAtLogin = State(initialValue: dataSource.isLaunchAtLoginEnabled)
     }

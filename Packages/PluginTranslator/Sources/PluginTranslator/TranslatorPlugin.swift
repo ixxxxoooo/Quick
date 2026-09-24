@@ -12,7 +12,7 @@ import SwiftUI
 /// （`AVSpeechSynthesizer`），全部离线、零第三方依赖。主面板里输入 `翻译 …` / `词典 …`
 /// 直接给结果，打开插件面板则是完整的输入 / 译文 / 词典三卡片工作台。
 @MainActor
-public final class TranslatorPlugin: QuickPlugin {
+public final class TranslatorPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "translator"
     public static let name = "翻译"
@@ -62,22 +62,34 @@ public final class TranslatorPlugin: QuickPlugin {
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
-        return await searchItems(query: query)
-    }
 
-    public func searchItems(query: String) async -> [SearchableItem] {
         guard let intent = TranslatorQuery.intent(in: query) else { return [] }
         switch intent {
         case .dictionary(let word):
-            return dictionaryItems(for: word)
+            // 词典走 DictionaryServices，它拿的是非 Sendable 的 CFRange 结果，
+            // 服务因此是主 actor 的；显式跳回去，这次跳转是有意的。
+            return await dictionaryItems(for: word)
         case .translate(let text):
             return await translationItems(for: text)
         }
     }
 
-    /// 单词：词典条目 + 译文各一条
-    private func dictionaryItems(for word: String) -> [SearchableItem] {
+    /// 单词：词典条目一条
+    ///
+    /// `@MainActor`：`DictionaryService` 包着非 Sendable 的系统 API，
+    /// 结果取回后立刻映射成 `Sendable` 的条目，后续处理不再需要主 actor。
+    private func dictionaryItems(for word: String) async -> [SearchableItem] {
         guard let entry = dictionary.lookup(word), !entry.isEmpty else { return [] }
+        return Self.dictionaryItem(for: entry, word: word)
+    }
+
+    /// 词典条目 → 搜索结果项
+    ///
+    /// `nonisolated static`：纯拼装，不碰实例状态。把这一步单独拿出来，
+    /// 「条目长什么样」才能在没有系统词典的测试里被固定住。
+    nonisolated static func dictionaryItem(
+        for entry: DictionaryEntry, word: String
+    ) -> [SearchableItem] {
         let brief = entry.briefMeaning ?? entry.word
         let subtitle = [entry.word, entry.phonetic].filter { !$0.isEmpty }.joined(separator: " · ")
         return [

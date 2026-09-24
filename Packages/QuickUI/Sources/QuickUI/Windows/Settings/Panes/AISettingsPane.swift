@@ -12,7 +12,7 @@ import SwiftUI
 /// 生成参数 / 连接测试」。
 public struct AISettingsPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any HostSettingsDataSource
 
     @AppStorage(SettingsKey.AI.enabled) private var enabled = false
     @AppStorage(SettingsKey.AI.provider) private var providerRaw = AIProviderKind.deepseek.rawValue
@@ -31,7 +31,7 @@ public struct AISettingsPane: View {
         AIProviderKind(rawValue: providerRaw) ?? .deepseek
     }
 
-    public init(dataSource: any SettingsDataSource) {
+    public init(dataSource: any HostSettingsDataSource) {
         self.dataSource = dataSource
     }
 

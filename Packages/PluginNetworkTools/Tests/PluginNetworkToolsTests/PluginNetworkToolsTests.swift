@@ -127,31 +127,39 @@ struct NetworkToolsPluginTests {
         #expect(!NetworkToolsPlugin.triggerWords.isEmpty)
     }
 
-    @Test("触发词能命中工具入口")
-    func triggerWordYieldsTheToolEntry() async {
-        let plugin = NetworkToolsPlugin()
-        let items: [SearchableItem] = await plugin.searchItems(query: "ip")
+    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
+    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    ///
+    /// 整词匹配（clipboard 里的 ip 不该唤醒本插件）现在由 `matchesAnyTrigger` 保证，
+    /// 它仍在闸门与命令关键词里用。
+    @Test("命令覆盖四项网络工具，且功能命令带插件前缀")
+    func commandsCoverTools() {
+        let commands = NetworkToolsPlugin.commands
+        let ids = commands.map(\.id)
 
-        #expect(items.count == 1, "触发词应只给一个入口，实际 \(items.count) 个")
-        #expect(items.first?.id == "networktools.tools")
-        #expect(items.first?.pluginID == NetworkToolsPlugin.id)
+        #expect(ids.contains("networktools.localIP"))
+        #expect(ids.contains("networktools.publicIP"))
+        #expect(ids.contains("networktools.dns"))
+        #expect(ids.contains("networktools.speed"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("networktools.") })
+        #expect(commands.allSatisfy { $0.pluginID == NetworkToolsPlugin.id })
     }
 
-    @Test("中文触发词同样可用")
-    func chineseTriggerAlsoWorks() async {
-        let plugin = NetworkToolsPlugin()
-        let items = await plugin.searchItems(query: "网络")
+    @Test("整词匹配：clipboard / description 里的 ip 不命中触发词")
+    func unrelatedWordContainingTriggerDoesNotMatch() {
+        let triggers = NetworkToolsPlugin.triggerWords
 
-        #expect(items.count == 1)
-        #expect(items.first?.pluginID == NetworkToolsPlugin.id)
+        #expect(!"clipboard".matchesAnyTrigger(triggers))
+        #expect(!"description".matchesAnyTrigger(triggers))
+        #expect("ip".matchesAnyTrigger(triggers))
     }
 
-    @Test("整词匹配：clipboard 里的 ip 不该唤醒网络工具")
-    func unrelatedWordContainingTriggerDoesNotMatch() async {
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = NetworkToolsPlugin()
-        #expect(await plugin.searchItems(query: "clipboard").isEmpty)
-        #expect(await plugin.searchItems(query: "description").isEmpty)
-        #expect(await plugin.searchItems(query: "definitely-unrelated").isEmpty)
-        #expect(await plugin.searchItems(query: "").isEmpty)
+
+        #expect(!plugin.accepts(query: "ip"))
+        #expect(await plugin.dynamicSearch(query: "definitely-unrelated").isEmpty)
     }
 }

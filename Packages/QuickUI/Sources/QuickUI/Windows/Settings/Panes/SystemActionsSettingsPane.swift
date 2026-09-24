@@ -13,7 +13,7 @@ import SwiftUI
 /// - 每项可配置别名，以及是否出现在主搜索里。快捷键在「快捷键」页绑定
 struct SystemActionsSettingsPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any LauncherSettingsDataSource & CommandSettingsDataSource & PluginSettingsDataSource
 
     var body: some View {
         let actions = dataSource.systemActions
@@ -42,12 +42,12 @@ struct SystemActionsSettingsPane: View {
 
 private struct SystemActionRow: View {
     let action: SettingsSystemActionItem
-    let dataSource: any SettingsDataSource
+    let dataSource: any LauncherSettingsDataSource & CommandSettingsDataSource & PluginSettingsDataSource
 
     @State private var alias: String
     @State private var isEnabled: Bool
 
-    init(action: SettingsSystemActionItem, dataSource: any SettingsDataSource) {
+    init(action: SettingsSystemActionItem, dataSource: any LauncherSettingsDataSource & CommandSettingsDataSource & PluginSettingsDataSource) {
         self.action = action
         self.dataSource = dataSource
         _alias = State(initialValue: action.alias ?? "")

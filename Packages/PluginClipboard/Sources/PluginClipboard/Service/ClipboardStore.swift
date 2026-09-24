@@ -4,6 +4,40 @@
 
 import Foundation
 import QuickCore
+import Synchronization
+
+/// 搜索用的剪贴板条目快照
+///
+/// 刻意**不含 `imageData`**：图片数据可能有几 MB，而搜索结果只用到类型与时间戳。
+/// 每个条目复制一份大 `Data` 会把「搜索」变成内存拷贝操作。
+struct ClipboardSearchSnapshot: Sendable {
+    let id: UUID
+    let text: String
+    let type: ClipboardEntry.ContentType
+    let preview: String
+    let timestamp: Date
+    private let loweredText: String
+    private let loweredPreview: String
+
+    init(entry: ClipboardEntry) {
+        self.id = entry.id
+        self.text = entry.text
+        self.type = entry.type
+        self.preview = entry.preview
+        self.timestamp = entry.timestamp
+        self.loweredText = entry.text.lowercased()
+        self.loweredPreview = entry.preview.lowercased()
+    }
+
+    /// 正文或预览包含关键词
+    func matches(_ loweredQuery: String) -> Bool {
+        loweredText.contains(loweredQuery) || loweredPreview.contains(loweredQuery)
+    }
+}
+
+/// 搜索用的剪贴板条目快照
+///
+/// 刻意**不含 `imageData`**：图片数据可能有几 MB，而搜索结果只用到类型与时间戳。
 
 /// 剪贴板历史存储
 ///
@@ -31,6 +65,13 @@ final class ClipboardStore {
 
     /// 存储句柄
     private let storage: PluginStorage
+
+    /// 搜索快照
+    ///
+    /// 主 actor 上每次改变 `entries` 后重建，`nonisolated` 的 `search` 直接读它 ——
+    /// 搜索因此不必回主 actor 排队。用 `Mutex` 而不是假设「主 actor 写、后台读」
+    /// 天然安全：两者之间没有 happens-before 关系。
+    private let searchSnapshot = Mutex<[ClipboardSearchSnapshot]>([])
 
     /// 初始化并加载历史
     ///
@@ -177,15 +218,14 @@ final class ClipboardStore {
         entries.filter { $0.type == .image }
     }
 
-    /// 搜索条目
-    /// - Parameter query: 搜索关键词
-    /// - Returns: 匹配的条目
-    func search(_ query: String) -> [ClipboardEntry] {
-        guard !query.isEmpty else { return entries }
-        let lower = query.lowercased()
-        return entries.filter {
-            $0.text.lowercased().contains(lower)
-                || $0.preview.lowercased().contains(lower)
+    /// 按关键词过滤条目，可脱离主 actor 调用
+    ///
+    /// 返回快照而不是 `ClipboardEntry`：图片数据不进快照（见 `ClipboardSearchSnapshot`）。
+    nonisolated func search(_ query: String) -> [ClipboardSearchSnapshot] {
+        searchSnapshot.withLock { snapshot in
+            guard !query.isEmpty else { return snapshot }
+            let lowered = query.lowercased()
+            return snapshot.filter { $0.matches(lowered) }
         }
     }
 
@@ -195,12 +235,14 @@ final class ClipboardStore {
     func load() {
         do {
             entries = try Self.fetchAll(from: storage.database)
+            rebuildSearchSnapshot()
             log.info("剪贴板历史已加载，\(self.entries.count, privacy: .public) 条")
         } catch {
             // 读不出来不能让插件起不来：记一条 error，按空历史继续
             log.error("剪贴板历史读取失败，已按空历史继续：\(error)")
             entries = []
         }
+        rebuildSearchSnapshot()
     }
 
     /// 把当前内存状态写回数据库
@@ -220,6 +262,17 @@ final class ClipboardStore {
         } catch {
             log.error("剪贴板缓存刷新失败：\(error)")
         }
+        rebuildSearchSnapshot()
+    }
+
+    /// 重建搜索快照
+    ///
+    /// 唯一修改快照的地方。所有会改变 `entries` 的路径（插入、删除、置顶、收藏、
+    /// 剪枝）最后都走 `reloadCacheFromDatabase`，所以放在这里能一次覆盖全部 ——
+    /// 「搜得到刚复制的内容」因此是可推理的，而不是依赖调用顺序。
+    private func rebuildSearchSnapshot() {
+        let snapshot = entries.map(ClipboardSearchSnapshot.init(entry:))
+        searchSnapshot.withLock { $0 = snapshot }
     }
 
     /// 按图片字节预算剪枝

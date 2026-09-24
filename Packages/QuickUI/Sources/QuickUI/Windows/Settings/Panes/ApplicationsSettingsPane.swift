@@ -15,7 +15,7 @@ import SwiftUI
 /// - 每行支持配置别名（Alias）以及独立全局快捷键（ShortcutRecorder）
 struct ApplicationsSettingsPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource
 
     @State private var query = ""
     @State private var showAll = false
@@ -121,12 +121,12 @@ struct ApplicationsSettingsPane: View {
 
 private struct AppItemRow: View {
     let app: SettingsAppItem
-    let dataSource: any SettingsDataSource
+    let dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource
 
     @State private var alias: String
     @State private var iconImage: NSImage?
 
-    init(app: SettingsAppItem, dataSource: any SettingsDataSource) {
+    init(app: SettingsAppItem, dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource) {
         self.app = app
         self.dataSource = dataSource
         _alias = State(initialValue: app.alias ?? "")

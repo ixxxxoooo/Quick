@@ -11,7 +11,7 @@ import SwiftUI
 /// 日志命令、面板几何。这三样在定位「日志里怎么找不到它」时都会用到。
 struct AboutPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any HostSettingsDataSource
 
     /// 复制反馈
     @State private var copiedField: String?

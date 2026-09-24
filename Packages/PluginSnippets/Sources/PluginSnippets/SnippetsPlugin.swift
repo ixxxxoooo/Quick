@@ -12,7 +12,7 @@ import SwiftUI
 /// 管理可复用的文本片段，支持关键词触发、变量替换和搜索。
 /// 用户可以快速插入常用文本、邮件签名、代码模板等。
 @MainActor
-public final class SnippetsPlugin: QuickPlugin {
+public final class SnippetsPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "snippets"
     public static let name = "文本片段"
@@ -40,7 +40,8 @@ public final class SnippetsPlugin: QuickPlugin {
     private let templateEngine = TemplateEngine()
 
     /// 空查询列出全部片段时的基础相关度，避免整屏结果都是 0 分
-    private static let defaultRelevance = 0.5
+    /// 空查询时片段的默认相关度
+    private nonisolated static let defaultRelevance = 0.5
 
     /// - Parameter storage: 由 AppCore 注入的存储句柄
     public init(storage: PluginStorage) {
@@ -79,19 +80,12 @@ public final class SnippetsPlugin: QuickPlugin {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return false }
         if trimmed.matchesAnyTrigger(Self.triggerWords) { return true }
-        let lower = trimmed.lowercased()
-        return store.snippets.contains { snippet in
-            if let keyword = snippet.keyword?.lowercased(), keyword.contains(lower) { return true }
-            return snippet.title.lowercased().contains(lower)
-        }
+        return store.acceptsQuery(trimmed)
     }
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
-        return await searchItems(query: query)
-    }
 
-    public func searchItems(query: String) async -> [SearchableItem] {
         // 触发提示是结果项的一部分，所以在构造结果项这一刻现读：
         // 设置页可以在面板开着的时候改这个开关，init 里读一次就再也跟不上
         let showsHint = PluginDefaults.isEnabled(

@@ -206,14 +206,14 @@ struct TranslatorPluginTests {
     @Test("无关查询不返回结果")
     func unrelatedQueryYieldsNothing() async throws {
         let plugin = try makePlugin()
-        #expect(await plugin.searchItems(query: "definitely-unrelated").isEmpty)
-        #expect(await plugin.searchItems(query: "").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "definitely-unrelated").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "").isEmpty)
     }
 
     @Test("查词命中系统词典时返回词典条目")
     func dictionaryLookupReturnsItem() async throws {
         let plugin = try makePlugin()
-        let items = await plugin.searchItems(query: "dict apple")
+        let items = await plugin.dynamicSearch(query: "dict apple")
         // 系统词典在绝大多数机器上都有；命中时校验结构，没有也不强求
         if let item = items.first {
             #expect(item.pluginID == TranslatorPlugin.id)

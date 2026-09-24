@@ -108,18 +108,25 @@ struct SQLFormatterPluginTests {
         #expect(!SQLFormatterPlugin.triggerWords.isEmpty)
     }
 
-    @Test("命中触发词时返回唯一入口")
-    func searchItemsReturnsSingleEntry() async {
-        let plugin = SQLFormatterPlugin()
-        let items = await plugin.searchItems(query: "sql")
-        #expect(items.count == 1)
-        #expect(items.first?.pluginID == SQLFormatterPlugin.id)
+    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
+    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    @Test("格式化与压缩各有一条命令，且功能命令带插件前缀")
+    func commandsCoverBothDirections() {
+        let commands = SQLFormatterPlugin.commands
+        let ids = commands.map(\.id)
+
+        #expect(ids.contains("sql-formatter.format"))
+        #expect(ids.contains("sql-formatter.minify"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("sql-formatter.") })
+        #expect(commands.allSatisfy { $0.pluginID == SQLFormatterPlugin.id })
     }
 
-    @Test("未命中触发词时不返回结果")
-    func searchItemsIgnoresUnrelatedQuery() async {
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = SQLFormatterPlugin()
-        let items = await plugin.searchItems(query: "天气")
-        #expect(items.isEmpty)
+
+        #expect(!plugin.accepts(query: "sql"))
+        #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }

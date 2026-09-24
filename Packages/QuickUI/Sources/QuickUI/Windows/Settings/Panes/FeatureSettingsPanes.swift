@@ -14,11 +14,11 @@ import SwiftUI
 struct FeatureSettingsPane: View {
 
     let tab: SettingsTab
-    let dataSource: any SettingsDataSource
+    let dataSource: any PluginSettingsDataSource & CommandSettingsDataSource
 
     @State private var isEnabled: Bool
 
-    init(tab: SettingsTab, dataSource: any SettingsDataSource) {
+    init(tab: SettingsTab, dataSource: any PluginSettingsDataSource & CommandSettingsDataSource) {
         self.tab = tab
         self.dataSource = dataSource
         let modID = tab.pluginID ?? ""

@@ -11,7 +11,7 @@ import SwiftUI
 /// 按 CPU / 内存排序列出进程，支持标题栏搜索筛选与结束 / 强制结束。
 /// 布局参考 Raycast Kill Process；搜索框走 `supportsPanelSearch` 落在面板标题栏。
 @MainActor
-public final class KillProcessPlugin: QuickPlugin {
+public final class KillProcessPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "killprocess"
     public static let name = "结束进程"
@@ -43,23 +43,6 @@ public final class KillProcessPlugin: QuickPlugin {
     private var visibilitySubscription: EventSubscription?
 
     public init() {}
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
-        return [
-            SearchableItem(
-                id: "killprocess.overview",
-                pluginID: Self.id,
-                title: "结束进程",
-                subtitle: "按 CPU / 内存排序并终止进程",
-                icon: "xmark.circle",
-                relevance: 0.6,
-                action: {
-                    EventBus.shared.post(NavigateEvent(pluginID: Self.id))
-                }
-            )
-        ]
-    }
 
     public func makeView() -> AnyView {
         AnyView(KillProcessView(service: service))

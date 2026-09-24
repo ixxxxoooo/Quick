@@ -12,7 +12,7 @@ import SwiftUI
 /// 下面是用户添加的命令绑定：左边录按键，右边选命令。没有添加过就空着，不把全部命令铺开。
 struct ShortcutsPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any CommandSettingsDataSource
 
     @State private var bindings: [SettingsCommandBinding] = []
     @State private var drafts: [DraftBinding] = []

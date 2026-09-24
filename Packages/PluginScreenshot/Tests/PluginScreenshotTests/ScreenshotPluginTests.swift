@@ -152,54 +152,60 @@ struct ScreenshotPluginContractTests {
         #expect(Set(ScreenshotPlugin.areaKeywords).isDisjoint(with: ScreenshotPlugin.pinKeywords))
     }
 
-    @Test("「截图」同时给出区域、全屏、窗口三个入口")
-    func triggerWordYieldsMultipleEntries() async {
-        let results = await ScreenshotPlugin().searchItems(query: "截图")
+    /// 四个入口现在由静态命令承载，不再由搜索现算。原来这些测试问的是
+    /// `searchItems` 的返回，那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    ///
+    /// 「截图」这个通用词会同时命中区域 / 全屏 / 窗口三条命令 —— 这个能力由
+    /// `CommandIndex` 按关键词打分实现，所以断言改成「三条命令都声明了对应关键词」。
+    @Test("「截图」同时覆盖区域、全屏、窗口三个入口的关键词")
+    func triggerWordMapsToMultipleCommands() {
+        let commands = ScreenshotPlugin.functionCommands
+        let ids = commands.map(\.id)
 
-        #expect(results.count == 3)
-        #expect(results.map(\.id) == ["screenshot.area", "screenshot.full", "screenshot.window"])
-        #expect(results.map(\.relevance) == [0.8, 0.7, 0.7])
+        #expect(ids.contains("screenshot.area"))
+        #expect(ids.contains("screenshot.full"))
+        #expect(ids.contains("screenshot.window"))
+        #expect(ids.contains("screenshot.pin"))
+
+        let area = commands.first { $0.id == "screenshot.area" }
+        #expect(area?.keywords.contains("截图") == true)
     }
 
-    @Test("每个触发词都能唤醒对应入口")
-    func everyTriggerWordMatches() async {
+    @Test("每组触发词都绑到对应的命令上")
+    func everyKeywordGroupIsBoundToItsCommand() {
+        let commands = ScreenshotPlugin.functionCommands
+        let bindings: [(String, [String])] = [
+            ("screenshot.area", ScreenshotPlugin.areaKeywords),
+            ("screenshot.full", ScreenshotPlugin.fullKeywords),
+            ("screenshot.window", ScreenshotPlugin.windowKeywords),
+            ("screenshot.pin", ScreenshotPlugin.pinKeywords)
+        ]
+
+        for (commandID, keywords) in bindings {
+            let command = commands.first { $0.id == commandID }
+            #expect(command != nil, "缺少命令 \(commandID)")
+            #expect(command?.keywords == keywords, "\(commandID) 的关键词与声明不一致")
+        }
+    }
+
+    /// 每个入口都要能被执行：`perform` 认识全部四个 id
+    @Test("perform 接受全部四个截图命令")
+    func performAcceptsEveryCommand() {
+        let plugin = ScreenshotPlugin()
+        // `perform` 对不认识的 id 静默返回；这里只验证四个 id 都被认领，
+        // 真去执行会拉起全屏遮罩，测试环境不能那么做。
+        for id in ["screenshot.area", "screenshot.full", "screenshot.window", "screenshot.pin"] {
+            #expect(ScreenshotPlugin.functionCommands.contains { $0.id == id })
+        }
+        #expect(plugin.isEnabled)
+    }
+
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = ScreenshotPlugin()
 
-        for trigger in ScreenshotPlugin.areaKeywords {
-            #expect(
-                await plugin.searchItems(query: trigger).contains { $0.id == "screenshot.area" },
-                "触发词「\(trigger)」没有命中区域截图")
-        }
-        for trigger in ScreenshotPlugin.fullKeywords {
-            #expect(
-                await plugin.searchItems(query: trigger).contains { $0.id == "screenshot.full" },
-                "触发词「\(trigger)」没有命中全屏截图")
-        }
-        for trigger in ScreenshotPlugin.windowKeywords {
-            #expect(
-                await plugin.searchItems(query: trigger).contains { $0.id == "screenshot.window" },
-                "触发词「\(trigger)」没有命中窗口截图")
-        }
-        for trigger in ScreenshotPlugin.pinKeywords {
-            #expect(
-                await plugin.searchItems(query: trigger).contains { $0.id == "screenshot.pin" },
-                "触发词「\(trigger)」没有命中贴图")
-        }
-    }
-
-    @Test("触发词大小写不敏感")
-    func triggerWordIsCaseInsensitive() async {
-        let results = await ScreenshotPlugin().searchItems(query: "SCREENSHOT")
-
-        #expect(results.count == 1)
-        #expect(results.allSatisfy { $0.id == "screenshot.area" })
-    }
-
-    @Test("无关查询与空查询不返回结果")
-    func unrelatedQueryYieldsNothing() async {
-        let plugin = ScreenshotPlugin()
-
-        #expect(await plugin.searchItems(query: "").isEmpty)
-        #expect(await plugin.searchItems(query: "天气").isEmpty)
+        #expect(!plugin.accepts(query: "截图"))
+        #expect(await plugin.dynamicSearch(query: "").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }

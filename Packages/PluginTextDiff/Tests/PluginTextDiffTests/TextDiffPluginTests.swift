@@ -185,19 +185,24 @@ struct TextDiffPluginTests {
         #expect(!TextDiffPlugin.triggerWords.isEmpty)
     }
 
-    @Test("命中触发词时只返回一条结果")
-    func triggerReturnsExactlyOneItem() async {
-        let plugin = TextDiffPlugin()
-        let results = await plugin.searchItems(query: "对比")
+    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
+    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    @Test("对比功能有一条命令，且带插件前缀")
+    func commandsCoverCompare() {
+        let commands = TextDiffPlugin.commands
+        let ids = commands.map(\.id)
 
-        #expect(results.count == 1)
-        #expect(results.first?.pluginID == TextDiffPlugin.id)
-        #expect(results.first?.icon == TextDiffPlugin.icon)
+        #expect(ids.contains("text-diff.compare"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("text-diff.") })
+        #expect(commands.allSatisfy { $0.pluginID == TextDiffPlugin.id })
     }
 
-    @Test("不命中触发词时返回空")
-    func unrelatedQueryReturnsNothing() async {
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = TextDiffPlugin()
-        #expect(await plugin.searchItems(query: "zzzz").isEmpty)
+
+        #expect(!plugin.accepts(query: "对比"))
+        #expect(await plugin.dynamicSearch(query: "zzzz").isEmpty)
     }
 }

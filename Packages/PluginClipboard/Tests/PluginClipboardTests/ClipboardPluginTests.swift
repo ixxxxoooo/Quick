@@ -423,7 +423,7 @@ struct ClipboardSettingWiringTests {
 
     /// 搜索结果里除「打开剪贴板管理器」之外的那几条
     private func entryItems(in database: SQLiteDatabase) async -> [SearchableItem] {
-        let items = await makePlugin(database: database).searchItems(query: "剪贴板")
+        let items = await makePlugin(database: database).dynamicSearch(query: "剪贴板")
         return items.filter { $0.id != "clipboard.open-panel" }
     }
 

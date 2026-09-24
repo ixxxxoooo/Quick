@@ -10,7 +10,7 @@ import SwiftUI
 /// 用户唯一能做的判断就是看那行灰字。
 struct PermissionsPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any HostSettingsDataSource
 
     /// 状态是每次进入这一页时现查的：权限可能在系统设置里被改过，
     /// 而应用收不到通知。缓存会让这一页显示过期状态。

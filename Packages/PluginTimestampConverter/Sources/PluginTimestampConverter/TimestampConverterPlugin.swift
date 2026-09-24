@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty timestamp-converter 布局：
 /// 输入区 + 自动检测 → 结果卡片列表 → 底部当前时间
 @MainActor
-public final class TimestampConverterPlugin: QuickPlugin {
+public final class TimestampConverterPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "timestamp-converter"
     public static let name = "时间戳转换"
@@ -37,21 +37,6 @@ public final class TimestampConverterPlugin: QuickPlugin {
     private let log = QuickLog.plugin(TimestampConverterPlugin.id)
 
     public init() {}
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
-        return [
-            SearchableItem(
-                id: "timestamp-converter.open",
-                pluginID: Self.id,
-                title: Self.name,
-                subtitle: "Unix 时间戳与日期互转",
-                icon: Self.icon,
-                relevance: 0.7,
-                action: { EventBus.shared.post(NavigateEvent(pluginID: Self.id)) }
-            )
-        ]
-    }
 
     /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
     private let buffer = TextBuffer()

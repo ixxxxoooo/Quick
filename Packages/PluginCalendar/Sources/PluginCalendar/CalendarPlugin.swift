@@ -12,7 +12,7 @@ import SwiftUI
 /// 使用 EventKit 读取系统日历事件，显示今日和近期日程。
 /// 支持农历显示。
 @MainActor
-public final class CalendarPlugin: QuickPlugin {
+public final class CalendarPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "calendar"
     public static let name = "日历"
@@ -56,10 +56,6 @@ public final class CalendarPlugin: QuickPlugin {
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
-        return await searchItems(query: query)
-    }
-
-    public func searchItems(query: String) async -> [SearchableItem] {
         guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
         let todayEvents = await calendarService.todayEvents()

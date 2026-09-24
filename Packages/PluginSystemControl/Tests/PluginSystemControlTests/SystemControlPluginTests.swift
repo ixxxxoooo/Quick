@@ -42,37 +42,49 @@ struct SystemControlPluginTests {
     @Test("空查询不返回结果")
     func emptyQueryYieldsNothing() async {
         let plugin = SystemControlPlugin()
-        #expect(await plugin.searchItems(query: "").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "").isEmpty)
     }
 
+    /// 关键词 → 操作的映射现在由静态命令承载（每条命令带 `SystemAction.keywords`），
+    /// 搜索不再现算。原来这条测试问的是 `searchItems` 的返回，那个遗留 API 已删除
+    /// （见 docs/refactor-plan.md Phase 0）。
     @Test("按关键词可以命中对应操作")
-    func searchMatchesByKeyword() async {
-        let plugin = SystemControlPlugin()
-        let results = await plugin.searchItems(query: "锁屏")
+    func commandsMatchByKeyword() {
+        let commands = SystemControlPlugin.functionCommands
+        let lock = commands.first { $0.id == "systemcontrol.lock" }
 
-        let ids = results.map(\.id)
-        #expect(ids.contains("systemcontrol.lock"), "「锁屏」应命中锁定屏幕操作，实际命中 \(ids)")
+        #expect(lock != nil, "缺少锁定屏幕命令")
+        #expect(
+            lock?.keywords.contains("锁屏") == true,
+            "「锁屏」应在锁定屏幕命令的关键词里，实际 \(lock?.keywords ?? [])")
     }
 
-    @Test("结果带插件前缀且互不重复")
-    func resultIdentifiersArePrefixedAndUnique() async {
-        let plugin = SystemControlPlugin()
-        let results = await plugin.searchItems(query: "关")
+    /// 每条系统操作都要有命令，否则它在设置页和热键里都不存在
+    @Test("每个 SystemAction 都有一条命令")
+    func everyActionHasACommand() {
+        let ids = Set(SystemControlPlugin.functionCommands.map(\.id))
+        for action in SystemAction.allCases {
+            #expect(ids.contains(CommandID.systemAction(action.rawValue)), "\(action.rawValue) 没有命令")
+        }
+    }
 
-        let ids = results.map(\.id)
-        #expect(Set(ids).count == ids.count, "同一插件内的 SearchableItem.id 必须唯一")
+    @Test("功能命令 id 带插件前缀且互不重复")
+    func resultIdentifiersArePrefixedAndUnique() {
+        let ids = SystemControlPlugin.functionCommands.map(\.id)
+
+        #expect(Set(ids).count == ids.count, "同一插件内的命令 id 必须唯一")
         #expect(ids.allSatisfy { $0.hasPrefix("systemcontrol.") })
-        #expect(results.allSatisfy { $0.pluginID == SystemControlPlugin.id })
+        #expect(
+            SystemControlPlugin.functionCommands.allSatisfy {
+                $0.pluginID == SystemControlPlugin.id
+            })
     }
 
-    @Test("相关度落在 0...1 区间")
-    func relevanceStaysInRange() async {
-        let plugin = SystemControlPlugin()
-        let results = await plugin.searchItems(query: "重启")
-
-        #expect(!results.isEmpty)
-        for item in results {
-            #expect(item.relevance >= 0 && item.relevance <= 1, "相关度越界: \(item.relevance)")
+    /// 别名解析靠 `CommandDescriptor.aliasKey`，设置页才能把用户改的名字绑到具体操作上
+    @Test("每条命令都有别名键")
+    func everyCommandCarriesAliasKey() {
+        for descriptor in SystemControlPlugin.functionCommands {
+            #expect(descriptor.aliasKey?.hasPrefix("system.") == true)
         }
     }
 

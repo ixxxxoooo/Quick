@@ -162,10 +162,10 @@ struct CalculatorPluginSettingsTests {
             let plugin = try Self.makePlugin()
 
             UserDefaults.standard.set(2, forKey: PluginSettingKey.Calculator.precision)
-            #expect(await plugin.searchItems(query: "2/3").first?.title == "0.67")
+            #expect(await plugin.dynamicSearch(query: "2/3").first?.title == "0.67")
 
             UserDefaults.standard.set(6, forKey: PluginSettingKey.Calculator.precision)
-            #expect(await plugin.searchItems(query: "2/3").first?.title == "0.666667")
+            #expect(await plugin.dynamicSearch(query: "2/3").first?.title == "0.666667")
         }
     }
 
@@ -175,7 +175,7 @@ struct CalculatorPluginSettingsTests {
             UserDefaults.standard.removeObject(forKey: PluginSettingKey.Calculator.precision)
 
             let plugin = try Self.makePlugin()
-            #expect(await plugin.searchItems(query: "2/3").first?.title == "0.6667")
+            #expect(await plugin.dynamicSearch(query: "2/3").first?.title == "0.6667")
         }
     }
 
@@ -186,11 +186,11 @@ struct CalculatorPluginSettingsTests {
             let separator = Locale.current.groupingSeparator ?? ","
 
             UserDefaults.standard.set(false, forKey: PluginSettingKey.Calculator.useGroupingSeparator)
-            #expect(await plugin.searchItems(query: "1000000*1").first?.title == "1000000")
+            #expect(await plugin.dynamicSearch(query: "1000000*1").first?.title == "1000000")
 
             UserDefaults.standard.set(true, forKey: PluginSettingKey.Calculator.useGroupingSeparator)
             #expect(
-                await plugin.searchItems(query: "1000000*1").first?.title
+                await plugin.dynamicSearch(query: "1000000*1").first?.title
                     == "1\(separator)000\(separator)000")
         }
     }
@@ -203,7 +203,7 @@ struct CalculatorPluginSettingsTests {
             defer { subscription.cancel() }
 
             UserDefaults.standard.set(true, forKey: PluginSettingKey.Calculator.autoCopy)
-            let items = await (try Self.makePlugin()).searchItems(query: "6*7")
+            let items = await (try Self.makePlugin()).dynamicSearch(query: "6*7")
             let copying = try #require(items.first)
             #expect(copying.shortcutHint == "⏎ 复制")
             copying.action()
@@ -211,7 +211,7 @@ struct CalculatorPluginSettingsTests {
 
             // 关掉之后同一个动作不能再往剪贴板里写东西
             UserDefaults.standard.set(false, forKey: PluginSettingKey.Calculator.autoCopy)
-            let silentItems = await (try Self.makePlugin()).searchItems(query: "6*7")
+            let silentItems = await (try Self.makePlugin()).dynamicSearch(query: "6*7")
             let silent = try #require(silentItems.first)
             #expect(silent.shortcutHint == "⏎ 完成")
             silent.action()

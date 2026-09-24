@@ -117,18 +117,30 @@ struct Base64CodecPluginTests {
         #expect(!Base64CodecPlugin.triggerWords.isEmpty)
     }
 
-    @Test("命中触发词时返回唯一入口")
-    func searchItemsReturnsSingleEntry() async {
-        let plugin = Base64CodecPlugin()
-        let items = await plugin.searchItems(query: "base64")
-        #expect(items.count == 1)
-        #expect(items.first?.pluginID == Base64CodecPlugin.id)
+    /// 入口由静态命令提供，不再由搜索现算 —— 这条测试因此问的是 `commands`。
+    /// 以前它问的是 `searchItems`，而那个遗留 API 已经删掉了（见 docs/refactor-plan.md Phase 0）。
+    ///
+    /// 注意 id 有两套前缀：默认的「打开本插件」用 `plugin.open.<id>`，
+    /// 功能命令用 `<id>.<功能>`。这不是笔误，是既有约定，见 docs/architecture.md。
+    @Test("声明的命令覆盖编解码两个功能，且 id 带插件前缀")
+    func commandsCoverBothDirections() {
+        let commands = Base64CodecPlugin.commands
+        let ids = commands.map(\.id)
+
+        #expect(ids.contains("base64-codec.encode"))
+        #expect(ids.contains("base64-codec.decode"))
+        #expect(ids.contains("plugin.open.base64-codec"))
+        // 功能命令必须带插件前缀：宿主按 "<pluginID>." 前缀回退找执行者
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("base64-codec.") })
+        #expect(commands.allSatisfy { $0.pluginID == Base64CodecPlugin.id })
     }
 
-    @Test("未命中触发词时不返回结果")
-    func searchItemsIgnoresUnrelatedQuery() async {
+    /// 插件不参与按查询现算：闸门恒为 false，聚合器因此不会在每次按键时叫醒它。
+    @Test("不参与动态搜索")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = Base64CodecPlugin()
-        let items = await plugin.searchItems(query: "天气")
-        #expect(items.isEmpty)
+        #expect(!plugin.accepts(query: "base64"))
+        #expect(await plugin.dynamicSearch(query: "base64").isEmpty)
     }
 }

@@ -55,7 +55,10 @@ struct PaletteRootView: View {
     var pluginSearch: PluginSearchQuery
 
     /// 执行搜索（由协调器注入）
-    var searchHandler: (String) async -> [SearchableItem]
+    ///
+    /// 返回 `PaletteSearchOutcome` 而不是裸数组：结果里带着「哪些插件超时了」，
+    /// 面板才能把「没搜完」与「没找到」区分开告诉用户。
+    var searchHandler: (String) async -> PaletteSearchOutcome
 
     /// 获取插件视图（由协调器注入）
     ///
@@ -76,6 +79,12 @@ struct PaletteRootView: View {
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
     @State private var appIndexSubscription: EventSubscription?
+
+    /// 上一次搜索里超时的插件数量
+    ///
+    /// 非零时结果列表下方会提示「部分插件未及时返回」—— 否则用户会把「没搜完」
+    /// 当成「没找到」，而这两件事该做的下一步完全不同。
+    @State private var timedOutPluginCount = 0
 
     private let log = QuickLog.palette
 
@@ -200,7 +209,15 @@ struct PaletteRootView: View {
     /// 搜索结果区域
     @ViewBuilder
     private var searchResultsArea: some View {
-        if results.isEmpty && !paletteQuery.text.isEmpty && !isSearching {
+        if results.isEmpty && !paletteQuery.text.isEmpty && timedOutPluginCount > 0 {
+            // 有插件超时且没有任何结果：这是「没搜完」，不是「没找到」。
+            // 两者该做的下一步不同 —— 前者重试就好，后者要换关键词。
+            emptyState(
+                icon: "clock.badge.exclamationmark",
+                message: "部分插件未及时返回",
+                detail: "\(timedOutPluginCount) 个插件搜索超时，换个关键词或稍后重试"
+            )
+        } else if results.isEmpty && !paletteQuery.text.isEmpty && !isSearching {
             emptyState(
                 icon: "questionmark.circle",
                 message: "没有找到结果",
@@ -218,13 +235,34 @@ struct PaletteRootView: View {
                 )
             }
         } else {
-            ResultListView(
-                items: results,
-                selectedIndex: selectionBinding,
-                selection: selection,
-                showsIcons: showResultIcons
-            )
+            VStack(spacing: 0) {
+                ResultListView(
+                    items: results,
+                    selectedIndex: selectionBinding,
+                    selection: selection,
+                    showsIcons: showResultIcons
+                )
+                if timedOutPluginCount > 0 {
+                    timedOutNotice
+                }
+            }
         }
+    }
+
+    /// 结果不完整时的底注
+    ///
+    /// 有结果时不能整块换成空状态 —— 已有的结果仍然可用，只需要说明它不完整。
+    private var timedOutNotice: some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            Image(systemName: "clock.badge.exclamationmark")
+                .font(DesignTokens.Typography.rowTrailing)
+            Text("\(timedOutPluginCount) 个插件未及时返回")
+                .font(DesignTokens.Typography.rowTrailing)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(DesignTokens.Colors.textTertiary)
+        .padding(.horizontal, DesignTokens.Spacing.xl)
+        .padding(.vertical, DesignTokens.Spacing.sm)
     }
 
     /// 结果列表的选中下标绑定
@@ -326,16 +364,17 @@ struct PaletteRootView: View {
             guard !Task.isCancelled else { return }
 
             isSearching = true
-            let items = await searchHandler(text)
+            let outcome = await searchHandler(text)
             guard !Task.isCancelled else { return }
 
-            results = items
+            results = outcome.items
+            timedOutPluginCount = outcome.timedOutPluginIDs.count
             isSearching = false
-            selection.update(count: items.count) { index in
-                guard items.indices.contains(index) else { return }
+            selection.update(count: outcome.items.count) { index in
+                guard outcome.items.indices.contains(index) else { return }
                 // 记在动作之前：动作可能切走插件、甚至关掉面板
-                onItemActivated?(items[index].id)
-                items[index].action()
+                onItemActivated?(outcome.items[index].id)
+                outcome.items[index].action()
             }
         }
     }

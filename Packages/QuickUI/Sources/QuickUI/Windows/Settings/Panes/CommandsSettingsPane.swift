@@ -13,7 +13,7 @@ import SwiftUI
 /// - 每条自定义命令支持配置别名与独立快捷键
 struct CommandsSettingsPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource
     var embedded = false
 
     @State private var runShellFallback: Bool
@@ -21,7 +21,7 @@ struct CommandsSettingsPane: View {
     @State private var editingCommand: SettingsCustomCommandItem?
     @AppStorage(PluginSettingKey.Shell.preferredTerminal) private var preferredTerminal = "com.apple.Terminal"
 
-    init(dataSource: any SettingsDataSource, embedded: Bool = false) {
+    init(dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource, embedded: Bool = false) {
         self.dataSource = dataSource
         self.embedded = embedded
         _runShellFallback = State(initialValue: dataSource.isRunShellFallbackEnabled)
@@ -107,7 +107,7 @@ struct CommandsSettingsPane: View {
 
 private struct CustomCommandRow: View {
     let command: SettingsCustomCommandItem
-    let dataSource: any SettingsDataSource
+    let dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource
     let onEdit: () -> Void
     let onDelete: () -> Void
 
@@ -115,7 +115,7 @@ private struct CustomCommandRow: View {
 
     init(
         command: SettingsCustomCommandItem,
-        dataSource: any SettingsDataSource,
+        dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource,
         onEdit: @escaping () -> Void,
         onDelete: @escaping () -> Void
     ) {
@@ -185,7 +185,7 @@ private struct CustomCommandRow: View {
 
 /// 自定义命令编辑弹窗
 private struct CommandEditorSheet: View {
-    let dataSource: any SettingsDataSource
+    let dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource
     let existingCommand: SettingsCustomCommandItem?
 
     @Environment(\.dismiss) private var dismiss

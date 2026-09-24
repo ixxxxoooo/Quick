@@ -75,14 +75,44 @@ public final class PaletteCoordinator {
     /// 剪贴板事件的订阅凭证
     private var clipboardSubscription: EventSubscription?
 
-    /// 面板即将显示 / 已经隐藏（由 AppCore 注入，用于强制键盘布局这类宿主行为）
-    public var onPanelWillShow: (() -> Void)?
-    public var onPanelDidHide: (() -> Void)?
+    /// 面板即将显示 / 已经隐藏（由宿主注入，用于强制键盘布局这类宿主行为）
+    ///
+    /// 只读：接线在 `AppCore.start()` 一次性完成，之后不再变更。见 `PaletteDependencies` 的说明。
+    public var onPanelWillShow: (() -> Void)? { dependencies?.onPanelWillShow }
+    public var onPanelDidHide: (() -> Void)? { dependencies?.onPanelDidHide }
 
-    /// 最近使用（由 AppCore 注入；没有存储时为空实现）
+    /// 最近使用（由宿主注入；没有存储时为空实现）
     ///
     /// 首屏顺序依赖它，所以它必须是宿主级的：应用、命令、工具条目都在同一张表里。
-    public var usageHistory: UsageHistory?
+    public var usageHistory: UsageHistory? { dependencies?.usageHistory }
+
+    /// 分离面板回调（协调器不直接持有 PluginPanelController）
+    public var onDetach: ((String) -> Void)? { dependencies?.onDetach }
+
+    /// 静态命令快照。搜索热路径只读它，不遍历插件对象
+    public var staticCommands: [IndexedCommand] = []
+
+    /// 某个插件是否参与主搜索
+    public var isSearchSourceEnabled: (String) -> Bool { dependencies?.isSearchSourceEnabled ?? { _ in true } }
+
+    /// 命中静态命令时的执行入口
+    ///
+    /// `@Sendable` 是必需的：它会被存进 `SearchableItem.action`，而那个结构是 `Sendable`。
+    public var invokeCommand: @MainActor @Sendable (String) -> Void {
+        dependencies?.invokeCommand ?? PaletteCoordinator.noOpInvoke
+    }
+
+    /// 未接线时的兜底：什么都不做
+    ///
+    /// 写成具名函数而不是 `{ _ in }`：闭包字面量在这里推不出 `Sendable`，
+    /// 而全局 actor 隔离的函数本身就是 `Sendable` 的，函数引用能直接转换。
+    @MainActor
+    private static func noOpInvoke(_ commandID: String) {}
+
+    /// 宿主注入的依赖
+    ///
+    /// `nil` 表示还没接线 —— 这在启动过程中是正常状态，但任何**查询**发生前必须已设好。
+    private var dependencies: PaletteDependencies?
 
     /// 面板外点击的监视器（发往其他应用的点击）
     ///
@@ -92,20 +122,21 @@ public final class PaletteCoordinator {
     /// 面板外点击的本地监视器（发往本应用其他窗口的点击）
     private var outsideClickLocalMonitor: Any?
 
-    /// 分离面板回调（由 AppCore 注入，协调器不直接持有 PluginPanelController）
-    public var onDetach: ((String) -> Void)?
-
-    /// 静态命令快照。搜索热路径只读它，不遍历插件对象
-    public var staticCommands: [IndexedCommand] = []
-
-    /// 某个插件是否参与主搜索。关闭后不调用它的动态搜索，静态命令也不会被放进快照
-    public var isSearchSourceEnabled: (String) -> Bool = { _ in true }
-
-    /// 命中静态命令时的执行入口
-    public var invokeCommand: @MainActor (String) -> Void = { _ in }
-
     public init() {
         observeClipboardChanges()
+    }
+
+    /// 注入宿主依赖
+    ///
+    /// **只调用一次**，由 `AppCore.start()` 在插件注册之后接线。重复调用会打
+    /// `.fault` —— 那意味着有人试图在运行期改依赖，而这正是本类型要消灭的模式。
+    /// - Parameter dependencies: 宿主的全部外部依赖
+    public func attach(_ dependencies: PaletteDependencies) {
+        guard self.dependencies == nil else {
+            log.fault("PaletteDependencies 被重复注入，后一次已忽略")
+            return
+        }
+        self.dependencies = dependencies
     }
 
     // MARK: - 插件注册
@@ -366,7 +397,7 @@ public final class PaletteCoordinator {
     // MARK: - 搜索
 
     /// 聚合搜索入口：依赖注入后委托给 `PaletteSearchEngine`
-    public func search(query: String) async -> [SearchableItem] {
+    public func search(query: String) async -> PaletteSearchOutcome {
         await PaletteSearchEngine.search(
             query: query,
             staticCommands: staticCommands,
@@ -390,7 +421,7 @@ public final class PaletteCoordinator {
             paletteMode: paletteMode,
             pluginSearch: pluginSearch,
             searchHandler: { [weak self] query in
-                guard let self else { return [] }
+                guard let self else { return .empty }
                 return await self.search(query: query)
             },
             pluginViewProvider: { [weak self] pluginID, context in
@@ -545,6 +576,9 @@ public final class PaletteCoordinator {
     /// 根据插件 ID 构建插件视图
     ///
     /// 通过闭包注入给 PaletteRootView，避免视图层直接依赖插件。
+    ///
+    /// 视图能力是运行时查询：插件没实现 `PluginViewProviding` 时面板会是空白，
+    /// 所以这条路径必须留一条能看出根因的日志。
     private func makePluginView(pluginID: String, context: [String: String]) -> AnyView? {
         guard let plugin = plugins.first(where: { type(of: $0).id == pluginID }),
             plugin.isEnabled
@@ -552,7 +586,11 @@ public final class PaletteCoordinator {
             log.warning("找不到插件 \(pluginID, privacy: .public) 或插件已禁用")
             return nil
         }
-        return plugin.makeView()
+        guard let provider = plugin as? PluginViewProviding else {
+            log.error("插件 \(pluginID, privacy: .public) 未实现 PluginViewProviding，面板无法显示")
+            return nil
+        }
+        return provider.makeView()
     }
 
     /// 将面板定位到光标所在屏幕的中上方

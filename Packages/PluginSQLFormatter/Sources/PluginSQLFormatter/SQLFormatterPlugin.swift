@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty sql-formatter 布局：
 /// 工具栏（格式化/压缩/复制/清空 + 方言/缩进选择）→ 编辑区 → 状态栏
 @MainActor
-public final class SQLFormatterPlugin: QuickPlugin {
+public final class SQLFormatterPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "sql-formatter"
     public static let name = "SQL 格式化"
@@ -37,21 +37,6 @@ public final class SQLFormatterPlugin: QuickPlugin {
     private let log = QuickLog.plugin(SQLFormatterPlugin.id)
 
     public init() {}
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
-        return [
-            SearchableItem(
-                id: "sql-formatter.open",
-                pluginID: Self.id,
-                title: Self.name,
-                subtitle: "格式化 SQL 查询语句",
-                icon: Self.icon,
-                relevance: 0.7,
-                action: { EventBus.shared.post(NavigateEvent(pluginID: Self.id)) }
-            )
-        ]
-    }
 
     /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
     private let buffer = TextBuffer()

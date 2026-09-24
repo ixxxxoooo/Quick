@@ -12,14 +12,19 @@ import SwiftUI
 /// 核心插件，提供主搜索入口。扫描系统已安装应用，
 /// 支持模糊搜索、拼音匹配、使用频率排序、收藏等功能。
 @MainActor
-public final class LauncherPlugin: QuickPlugin {
+public final class LauncherPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "launcher"
     public static let name = "应用启动器"
     public static let icon = "square.grid.2x2.fill"
     public static let description = "全系统已安装应用程序索引与启动器，支持中英文全拼、简拼搜索、自定义别名与使用频次智能排序。"
+    /// 触发词**必须全局唯一**（跨插件不重复）。
+    ///
+    /// `url` 归「URL 编解码」—— 那个插件是专门做编解码的，而这里的 `url` 想表达的是
+    /// 「打开一个网址」，由 `网页` / `网站` / `web` 已经覆盖。冲突词由
+    /// `TriggerWordUniquenessTests` 守着。
     public static let triggerWords = [
-        "应用", "app", "打开", "open", "启动", "launch", "网页快开", "网页", "网站", "搜索", "web", "url", "google", "百度"
+        "应用", "app", "打开", "open", "启动", "launch", "网页快开", "网页", "网站", "搜索", "web", "google", "百度"
     ]
 
     public var isEnabled = true
@@ -94,10 +99,10 @@ public final class LauncherPlugin: QuickPlugin {
         !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// 动态结果就是原来的应用 / 终端命令搜索，并在长循环里响应取消
+    /// 动态结果就是应用 / 终端命令搜索，并在长循环里响应取消
     public func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
-        return await searchItems(query: query)
+        return await makeSearchItems(query: query)
     }
 
     /// 热键启动应用或运行已保存的终端命令
@@ -121,37 +126,13 @@ public final class LauncherPlugin: QuickPlugin {
         }
     }
 
-    /// 空查询时不要返回全部应用，避免首屏加载过多图标
-    public func searchItems(query: String) async -> [SearchableItem] {
+    /// 应用 / 自定义命令 / Shell 兜底的现算结果
+    ///
+    /// **只处理非空查询。** `accepts` 已经把空查询挡在门外，所以走到这里的查询必然非空。
+    /// 首屏的应用列表靠静态 `showsWhenQueryEmpty` 入口 + 最近使用提权提供，
+    /// 不在这个函数里铺列表。
+    private func makeSearchItems(query: String) async -> [SearchableItem] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            // 空查询：展示应用列表（收藏置顶，其余应用按使用频率排序）
-            let favorites = Set(favoritesStore.favoriteIDs)
-            let favApps = appIndex.apps.filter { favorites.contains($0.bundleID) }
-            let otherApps = appIndex.apps.filter { !favorites.contains($0.bundleID) }
-            let sortedOther = otherApps.sorted {
-                rankingStore.score(for: $0.bundleID) > rankingStore.score(for: $1.bundleID)
-            }
-            let source = Array((favApps + sortedOther).prefix(50))
-            return source.map { entry in
-                SearchableItem(
-                    id: "launcher.\(entry.id)",
-                    pluginID: Self.id,
-                    title: entry.name,
-                    // 副标题只留**额外信息**（收藏标记）。「应用程序」这类说明与右侧的
-                    // 「应用启动器」徽章是同一件事，一行里写两遍只是噪音
-                    subtitle: favorites.contains(entry.bundleID) ? "★ 收藏应用" : nil,
-                    icon: "app",
-                    iconType: .appIcon(entry.path),
-                    relevance: favorites.contains(entry.bundleID) ? 1.0 : 0.5,
-                    action: { [weak self] in
-                        entry.launch()
-                        self?.rankingStore.recordUsage(entry.bundleID)
-                        EventBus.shared.post(HidePaletteEvent())
-                    }
-                )
-            }
-        }
 
         // 1. 如果以 '>' 开头，直接作为 Shell 命令执行
         if trimmed.hasPrefix(">") {
@@ -240,12 +221,19 @@ public final class LauncherPlugin: QuickPlugin {
             guard matchScore > 0 else { continue }
 
             let ranking = rankingStore.score(for: entry.bundleID)
-            let finalScore = matchScore * 0.7 + ranking * 0.3
+            // 收藏是用户显式排定的顺序，权重要压过使用频率
+            let isFavorite = favoritesStore.isFavorite(entry.bundleID)
+            let finalScore = isFavorite ? 1.0 : matchScore * 0.7 + ranking * 0.3
 
+            let hasAlias = !(alias ?? "").isEmpty
             let subtitle =
-                (alias != nil && !alias!.isEmpty)
-                ? "别名: \(alias!) · \(entry.path)"
-                : (entry.isSystemApp ? "系统应用" : "应用程序")
+                if isFavorite {
+                    hasAlias ? "★ 收藏 · 别名: \(alias ?? "")" : "★ 收藏应用"
+                } else if hasAlias {
+                    "别名: \(alias ?? "") · \(entry.path)"
+                } else {
+                    entry.isSystemApp ? "系统应用" : "应用程序"
+                }
 
             items.append(
                 SearchableItem(
@@ -296,9 +284,6 @@ public final class LauncherPlugin: QuickPlugin {
 
         return Array(results.prefix(20))
     }
-
-    /// 首屏不额外贡献条目：它提供的应用列表本身就是首屏主体
-    public func defaultItems() async -> [SearchableItem] { [] }
 
     public func makeView() -> AnyView {
         AnyView(LauncherView(plugin: self))

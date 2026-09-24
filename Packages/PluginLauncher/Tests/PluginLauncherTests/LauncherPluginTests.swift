@@ -36,14 +36,14 @@ struct LauncherPluginTests {
     func emptyQueryDoesNotDumpEveryApp() async throws {
         // 首屏不该把几百个应用一次性铺出来：空查询最多给 20 条。
         let plugin = LauncherPlugin(appIndex: AppIndex(), storage: try makeStorage())
-        let results = await plugin.searchItems(query: "   ")
+        let results = await plugin.dynamicSearch(query: "   ")
         #expect(results.count <= 20, "空查询（含纯空白）最多返回 20 条")
     }
 
     @Test("结果 id 带插件前缀且互不重复")
     func resultIdentifiersArePrefixedAndUnique() async throws {
         let plugin = LauncherPlugin(appIndex: AppIndex(), storage: try makeStorage())
-        let results = await plugin.searchItems(query: "x")
+        let results = await plugin.dynamicSearch(query: "x")
 
         let ids = results.map(\.id)
         #expect(Set(ids).count == ids.count, "同一插件内的 SearchableItem.id 必须唯一")
@@ -55,7 +55,7 @@ struct LauncherPluginTests {
     @Test("前缀 > 可直接识别并返回 Shell 命令搜索项")
     func directShellCommandPrefix() async throws {
         let plugin = LauncherPlugin(appIndex: AppIndex(), storage: try makeStorage())
-        let results = await plugin.searchItems(query: "> echo hello")
+        let results = await plugin.dynamicSearch(query: "> echo hello")
 
         #expect(results.count == 1)
         #expect(results.first?.id == "launcher.shell.direct")

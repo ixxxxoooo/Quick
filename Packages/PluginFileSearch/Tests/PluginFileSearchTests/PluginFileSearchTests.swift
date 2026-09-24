@@ -169,19 +169,19 @@ struct FileSearchPluginTests {
     @Test("无关查询不返回结果，也不触碰 Spotlight")
     func unrelatedQueryYieldsNothing() async {
         let plugin = FileSearchPlugin()
-        let items: [SearchableItem] = await plugin.searchItems(query: "definitely-unrelated")
+        let items: [SearchableItem] = await plugin.dynamicSearch(query: "definitely-unrelated")
 
         #expect(items.isEmpty)
-        #expect(await plugin.searchItems(query: "").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "").isEmpty)
     }
 
     @Test("只打触发词不返回结果")
     func bareTriggerYieldsNothing() async {
         let plugin = FileSearchPlugin()
-        #expect(await plugin.searchItems(query: "f").isEmpty)
-        #expect(await plugin.searchItems(query: "file").isEmpty)
-        #expect(await plugin.searchItems(query: "文件").isEmpty)
-        #expect(await plugin.searchItems(query: "f ").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "f").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "file").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "文件").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "f ").isEmpty)
     }
 
     // searchItems 的正向路径（触发词 + 关键词 → 结果项）要跑 NSMetadataQuery，

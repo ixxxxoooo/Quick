@@ -105,17 +105,27 @@ struct UUIDGeneratorPluginTests {
         #expect(!UUIDGeneratorPlugin.triggerWords.isEmpty)
     }
 
-    @Test("任一触发词都能唤醒插件，且只返回一个入口", arguments: ["uuid", "guid", "生成", "UUID 生成器"])
-    func searchItemsMatchTrigger(_ trigger: String) async {
-        let items = await UUIDGeneratorPlugin().searchItems(query: trigger)
-        #expect(items.count == 1)
-        #expect(items.first?.id == "uuid-generator.open")
-        #expect(items.first?.pluginID == UUIDGeneratorPlugin.id)
+    /// 入口由静态命令提供，不再由搜索现算 —— 这条测试因此问的是 `commands`。
+    ///
+    /// id 有两套前缀：默认的「打开本插件」是 `plugin.open.<id>`，功能命令是
+    /// `<id>.<功能>`。宿主按 `<pluginID>.` 前缀回退找执行者，所以功能命令必须带前缀。
+    @Test("声明的命令覆盖生成功能，且功能命令带插件前缀")
+    func commandsCoverGenerate() {
+        let commands = UUIDGeneratorPlugin.commands
+        let ids = commands.map(\.id)
+
+        #expect(ids.contains("uuid-generator.generate"))
+        #expect(ids.contains("plugin.open.uuid-generator"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("uuid-generator.") })
+        #expect(commands.allSatisfy { $0.pluginID == UUIDGeneratorPlugin.id })
     }
 
-    @Test("无关查询不返回结果")
-    func unrelatedQueryReturnsNothing() async {
-        let items = await UUIDGeneratorPlugin().searchItems(query: "天气")
-        #expect(items.isEmpty)
+    /// 插件不参与按查询现算：闸门恒为 false，聚合器因此不会在每次按键时叫醒它。
+    @Test("不参与动态搜索")
+    func doesNotTakePartInDynamicSearch() async {
+        let plugin = UUIDGeneratorPlugin()
+        #expect(!plugin.accepts(query: "uuid"))
+        #expect(await plugin.dynamicSearch(query: "uuid").isEmpty)
     }
 }

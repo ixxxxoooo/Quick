@@ -13,7 +13,7 @@ import SwiftUI
 /// 每个 Provider 在独立 WebView 窗口中运行，保持登录态。
 /// 搜索直达：输入 Provider 名称（如 "deepseek"）直接打开对应窗口。
 @MainActor
-public final class AIPlugin: QuickPlugin {
+public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "ai"
     public static let name = "AI 聚合"
@@ -47,13 +47,16 @@ public final class AIPlugin: QuickPlugin {
     ///
     /// 自定义词必须进闸门 —— 否则 `accepts` 放不下对应查询，下面的打分再准
     /// 也没有机会跑。实时读偏好：设置页改完立即生效，不用重启插件。
-    static var searchKeywords: [String] {
+    ///
+    /// `nonisolated`：闸门在无隔离的搜索路径上跑，而这里只读 `UserDefaults`
+    /// 与不可变的注册表，没有需要主 actor 保护的状态。
+    nonisolated static var searchKeywords: [String] {
         AIProviderRegistry.allKeywords
             + AIProviderRegistry.all.flatMap { customKeywords(for: $0.id) }
     }
 
     /// 用户在设置页为某个 Provider 配置的自定义触发词
-    static func customKeywords(for providerID: String) -> [String] {
+    nonisolated static func customKeywords(for providerID: String) -> [String] {
         AIProviderRegistry.parseCustomKeywords(
             UserDefaults.standard.string(
                 forKey: PluginSettingKey.AIPortal.providerKeywords(providerID)
@@ -87,10 +90,7 @@ public final class AIPlugin: QuickPlugin {
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
-        return await searchItems(query: query)
-    }
 
-    public func searchItems(query: String) async -> [SearchableItem] {
         // 闸门要认前缀：Provider 名是「用户打一半就该收窄」的东西 —— 打 `deep` 得能出
         // DeepSeek、打 `chatgp` 得能出 ChatGPT。整词规则做不到这件事（它保护的是
         // `ai` / `memo` 这类短触发词），所以这里用带长度下限的前缀变体，

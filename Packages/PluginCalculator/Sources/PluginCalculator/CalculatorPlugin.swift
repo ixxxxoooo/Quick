@@ -13,7 +13,7 @@ import SwiftUI
 ///
 /// 每次提交的算式都会落进「计算稿纸」（持久化历史），面板视图里可以看到逐条记录。
 @MainActor
-public final class CalculatorPlugin: QuickPlugin {
+public final class CalculatorPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "calculator"
     public static let name = "计算器"
@@ -34,8 +34,8 @@ public final class CalculatorPlugin: QuickPlugin {
 
     private let log = QuickLog.plugin(CalculatorPlugin.id)
 
-    /// 计算引擎
-    private let engine = CalcEngine()
+    /// 计算引擎（无状态且 Sendable，可从任意隔离域读）
+    private nonisolated let engine = CalcEngine()
 
     /// 计算历史（计算稿纸）
     private let store: CalcHistoryStore
@@ -77,10 +77,7 @@ public final class CalculatorPlugin: QuickPlugin {
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
-        return await searchItems(query: query)
-    }
 
-    public func searchItems(query: String) async -> [SearchableItem] {
         // 每次搜索都重新读设置：用户可能在面板开着的时候刚把小数位数改掉
         let options = CalcPreferences.displayOptions()
         guard let result = engine.evaluate(query, options: options) else { return [] }

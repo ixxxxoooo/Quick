@@ -11,7 +11,7 @@ import SwiftUI
 /// 使用 Vision 框架从截图中识别文字。
 /// 支持截取屏幕区域并自动 OCR，结果可复制或编辑。
 @MainActor
-public final class OCRPlugin: QuickPlugin {
+public final class OCRPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "ocr"
     public static let name = "文字识别"
@@ -48,25 +48,6 @@ public final class OCRPlugin: QuickPlugin {
     }
 
     // MARK: - QuickPlugin 协议
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        // 触发词匹配是纯逻辑，见 OCRQuery（中文按包含匹配，拉丁字母也因此会子串命中）
-        guard OCRQuery.isTriggered(by: query) else { return [] }
-
-        return [
-            SearchableItem(
-                id: "ocr.capture",
-                pluginID: Self.id,
-                title: "截图识别文字",
-                subtitle: "截取屏幕区域并识别文字",
-                icon: "text.viewfinder",
-                relevance: 0.8,
-                action: { [weak self] in
-                    Task { await self?.startCapture() }
-                }
-            )
-        ]
-    }
 
     public func makeView() -> AnyView {
         AnyView(OCRResultView(engine: engine))

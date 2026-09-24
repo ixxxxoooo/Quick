@@ -206,8 +206,8 @@ struct FileSearchPluginSettingsTests {
         let files = Self.fakeResults((1...100).map { "/Users/x/file\($0).txt" })
 
         // 以前这里写死 prefix(10)，设置页里的 20/50/100/200 全被压成 10 条
-        #expect(FileSearchPlugin().items(for: files).count == 100)
-        #expect(FileSearchPlugin().items(for: []).isEmpty)
+        #expect(FileSearchPlugin.items(for: files).count == 100)
+        #expect(FileSearchPlugin.items(for: []).isEmpty)
     }
 
     @Test("插件持有的会话读的是标准偏好里的设置")

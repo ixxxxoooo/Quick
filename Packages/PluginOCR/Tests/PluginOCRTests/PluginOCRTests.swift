@@ -108,21 +108,25 @@ struct OCRPluginTests {
         #expect(OCRPlugin.triggerWords == OCRQuery.triggers)
     }
 
-    @Test("触发词能命中截图识别入口")
-    func triggerWordYieldsTheCaptureEntry() async {
-        let plugin = OCRPlugin()
-        let items: [SearchableItem] = await plugin.searchItems(query: "ocr")
+    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
+    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    @Test("截图识别有一条命令，且带插件前缀")
+    func commandsCoverCapture() {
+        let commands = OCRPlugin.commands
+        let ids = commands.map(\.id)
 
-        #expect(items.count == 1, "输入触发词应只给出一个入口，实际 \(items.count) 个")
-        #expect(items.first?.id == "ocr.capture")
-        #expect(items.first?.pluginID == OCRPlugin.id)
+        #expect(ids.contains("ocr.capture"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("ocr.") })
+        #expect(commands.allSatisfy { $0.pluginID == OCRPlugin.id })
     }
 
-    @Test("无关查询不返回结果")
-    func unrelatedQueryYieldsNothing() async {
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = OCRPlugin()
-        #expect(await plugin.searchItems(query: "definitely-unrelated").isEmpty)
-        #expect(await plugin.searchItems(query: "").isEmpty)
+
+        #expect(!plugin.accepts(query: "ocr"))
+        #expect(await plugin.dynamicSearch(query: "definitely-unrelated").isEmpty)
     }
 
     @Test("生命周期方法可重复调用")

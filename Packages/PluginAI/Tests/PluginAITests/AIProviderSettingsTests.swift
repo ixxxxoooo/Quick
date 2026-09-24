@@ -47,7 +47,7 @@ struct AIProviderSettingsTests {
             UserDefaults.standard.removeObject(
                 forKey: PluginSettingKey.AIPortal.providerEnabled(Self.providerID))
 
-            let items = await AIPlugin().searchItems(query: Self.providerID)
+            let items = await AIPlugin().dynamicSearch(query: Self.providerID)
             #expect(
                 items.contains { $0.id == "ai.\(Self.providerID)" },
                 "默认应当是启用的，搜索结果里要有对应 Provider")
@@ -60,7 +60,7 @@ struct AIProviderSettingsTests {
             UserDefaults.standard.set(
                 false, forKey: PluginSettingKey.AIPortal.providerEnabled(Self.providerID))
 
-            let items = await AIPlugin().searchItems(query: Self.providerID)
+            let items = await AIPlugin().dynamicSearch(query: Self.providerID)
             #expect(
                 !items.contains { $0.id == "ai.\(Self.providerID)" },
                 "停用后搜索结果里不该再有这个 Provider")
@@ -129,7 +129,7 @@ struct AIProviderSettingsTests {
             let plugin = AIPlugin()
             #expect(plugin.accepts(query: "myai"), "自定义词要过得了触发词闸门")
 
-            let items = await plugin.searchItems(query: "myai")
+            let items = await plugin.dynamicSearch(query: "myai")
             #expect(
                 items.map(\.id) == ["ai.portal", "ai.\(Self.providerID)"],
                 "输入自定义词应当直达配置的那个 Provider")
@@ -143,7 +143,7 @@ struct AIProviderSettingsTests {
             UserDefaults.standard.set(
                 "myai", forKey: PluginSettingKey.AIPortal.providerKeywords(Self.providerID))
 
-            let items = await AIPlugin().searchItems(query: "myai")
+            let items = await AIPlugin().dynamicSearch(query: "myai")
             #expect(
                 !items.contains { $0.id != "ai.portal" && $0.id != "ai.\(Self.providerID)" },
                 "别的 Provider 不该被这个词带出来")
@@ -155,7 +155,7 @@ struct AIProviderSettingsTests {
         try await Self.withStandardDefaults {
             UserDefaults.standard.set("", forKey: PluginSettingKey.AIPortal.providerKeywords(Self.providerID))
 
-            let items = await AIPlugin().searchItems(query: Self.providerID)
+            let items = await AIPlugin().dynamicSearch(query: Self.providerID)
             #expect(
                 items.contains { $0.id == "ai.\(Self.providerID)" },
                 "内置关键词路径不应受空配置影响")

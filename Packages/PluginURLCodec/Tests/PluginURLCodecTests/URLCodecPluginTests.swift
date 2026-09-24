@@ -127,26 +127,32 @@ struct URLCodecPluginTests {
         #expect(!URLCodecPlugin.triggerWords.isEmpty)
     }
 
-    @Test(
-        "任一触发词都能唤醒插件，且只返回一个入口",
-        arguments: ["url", "url编码", "网址解码", "URL 编解码", "urlencode"])
-    func searchItemsMatchTrigger(_ trigger: String) async {
-        let items = await URLCodecPlugin().searchItems(query: trigger)
-        #expect(items.count == 1)
-        #expect(items.first?.id == "url-codec.open")
-        #expect(items.first?.pluginID == URLCodecPlugin.id)
+    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
+    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    @Test("编码与解码各有一条命令，且功能命令带插件前缀")
+    func commandsCoverBothDirections() {
+        let commands = URLCodecPlugin.commands
+        let ids = commands.map(\.id)
+
+        #expect(ids.contains("url-codec.encode"))
+        #expect(ids.contains("url-codec.decode"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("url-codec.") })
+        #expect(commands.allSatisfy { $0.pluginID == URLCodecPlugin.id })
     }
 
-    /// 通用词归 Base64 插件所有，URL 插件只能用带限定的触发词
-    @Test("通用词「编码 / 解码」不再命中", arguments: ["编码", "解码", "encode", "decode"])
-    func genericCodecWordsDoNotMatch(_ trigger: String) async {
-        let items = await URLCodecPlugin().searchItems(query: trigger)
-        #expect(items.isEmpty)
+    /// 通用词归 Base64 插件所有，URL 插件只能用带限定的触发词 ——
+    /// 否则两套编解码器会在同一条查询上撞车。这条约束现在体现在触发词上。
+    @Test("通用词「编码 / 解码」不在本插件的触发词里", arguments: ["编码", "解码", "encode", "decode"])
+    func genericCodecWordsAreNotTriggers(_ word: String) {
+        #expect(!word.matchesAnyTrigger(URLCodecPlugin.triggerWords))
     }
 
-    @Test("无关查询不返回结果")
-    func unrelatedQueryReturnsNothing() async {
-        let items = await URLCodecPlugin().searchItems(query: "天气")
-        #expect(items.isEmpty)
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
+        let plugin = URLCodecPlugin()
+
+        #expect(!plugin.accepts(query: "url编码"))
+        #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }

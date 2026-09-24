@@ -24,7 +24,7 @@ struct NotesPluginTests {
     @Test("命中触发词时返回匹配笔记")
     func searchItemsReturnsNotes() async throws {
         let plugin = try makePlugin(with: NoteItem(title: "会议记录", content: "要点"))
-        let items = await plugin.searchItems(query: "笔记")
+        let items = await plugin.dynamicSearch(query: "笔记")
 
         #expect(items.count == 1)
         #expect(items.first?.pluginID == NotesPlugin.id)
@@ -35,7 +35,7 @@ struct NotesPluginTests {
     func searchResultNavigatesWithNoteID() async throws {
         let note = NoteItem(title: "待打开", content: "正文")
         let plugin = try makePlugin(with: note)
-        let item = try #require(await plugin.searchItems(query: "memo").first)
+        let item = try #require(await plugin.dynamicSearch(query: "memo").first)
 
         var navigated: [NavigateEvent] = []
         let subscription = EventBus.shared.on(NavigateEvent.self) { navigated.append($0) }
@@ -50,6 +50,6 @@ struct NotesPluginTests {
     @Test("未命中触发词时不返回结果")
     func unrelatedQueryReturnsNothing() async throws {
         let plugin = try makePlugin(with: NoteItem(title: "x", content: "y"))
-        #expect(await plugin.searchItems(query: "天气").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }

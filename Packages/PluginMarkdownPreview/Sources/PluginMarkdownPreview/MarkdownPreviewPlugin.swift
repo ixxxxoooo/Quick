@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty markdown-preview 布局：
 /// 工具栏（复制/清空）→ 左右双栏（编辑 + 预览）
 @MainActor
-public final class MarkdownPreviewPlugin: QuickPlugin {
+public final class MarkdownPreviewPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "markdown-preview"
     public static let name = "Markdown 预览"
@@ -33,21 +33,6 @@ public final class MarkdownPreviewPlugin: QuickPlugin {
     private let log = QuickLog.plugin(MarkdownPreviewPlugin.id)
 
     public init() {}
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
-        return [
-            SearchableItem(
-                id: "markdown-preview.open",
-                pluginID: Self.id,
-                title: Self.name,
-                subtitle: "实时 Markdown 编辑与预览",
-                icon: Self.icon,
-                relevance: 0.7,
-                action: { EventBus.shared.post(NavigateEvent(pluginID: Self.id)) }
-            )
-        ]
-    }
 
     /// 面板工作状态：主面板与分离窗口共享同一实例，分离时内容不丢
     ///

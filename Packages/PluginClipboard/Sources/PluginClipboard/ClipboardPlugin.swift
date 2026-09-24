@@ -12,7 +12,7 @@ import SwiftUI
 /// 监听系统剪贴板变化，自动记录历史条目。
 /// 支持搜索、分类（文本/图片/文件）、收藏和快速粘贴。
 @MainActor
-public final class ClipboardPlugin: QuickPlugin {
+public final class ClipboardPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "clipboard"
     public static let name = "剪贴板历史"
@@ -113,17 +113,14 @@ public final class ClipboardPlugin: QuickPlugin {
 
     public func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
-        let items = await searchItems(query: query)
-        return items.filter { $0.id != "clipboard.open-panel" }
-    }
 
-    public func searchItems(query: String) async -> [SearchableItem] {
         // 仅当搜索词与剪贴板相关时才返回入口
         guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
 
-        // 剥离触发词后的词才是真正的筛选条件；为空表示列出最近几条
+        // 剥离触发词后的词才是真正的筛选条件；为空表示列出最近几条。
+        // 走 store 的搜索快照，不必回主 actor。
         let keyword = query.removingTrigger(Self.triggerWords)
-        let matches = keyword.isEmpty ? store.entries : store.search(keyword)
+        let matches = store.search(keyword)
 
         // 关掉「显示内容预览」后标题与副标题都不许出现剪贴板正文 ——
         // 这条设置就是「别在搜索结果里露出我复制过的东西」
@@ -131,22 +128,9 @@ public final class ClipboardPlugin: QuickPlugin {
 
         var results: [SearchableItem] = []
 
-        // 第一项：打开剪贴板管理器面板（导航到插件模式）
-        results.append(
-            SearchableItem(
-                id: "clipboard.open-panel",
-                pluginID: Self.id,
-                title: "打开剪贴板管理器",
-                subtitle: "查看全部 \(store.entries.count) 条剪贴板历史",
-                icon: Self.icon,
-                relevance: 0.9,
-                action: {
-                    EventBus.shared.post(
-                        NavigateEvent(pluginID: ClipboardPlugin.id))
-                }
-            ))
-
-        // 最近的几条文本记录，点击直接复制（图片需进入面板操作）
+        // 最近的几条文本记录，点击直接复制（图片需进入面板操作）。
+        // 「打开剪贴板管理器」不在这里给：`commands` 默认实现已经提供了本插件的入口命令，
+        // 再补一条同 id 语义的条目只会在结果里出现两行。
         let textMatches = matches.filter { $0.type != .image }
         results += textMatches.prefix(5).map { entry in
             let timestamp = entry.timestamp.formatted(date: .abbreviated, time: .shortened)
@@ -170,11 +154,6 @@ public final class ClipboardPlugin: QuickPlugin {
 
     public func makeView() -> AnyView {
         AnyView(ClipboardListView(store: store))
-    }
-
-    public func makeSettingsView() -> AnyView? {
-        // 配置项由 FeatureSettingsPane 的 ClipboardFeatureSection 统一管理
-        nil
     }
 
     public func activate() {

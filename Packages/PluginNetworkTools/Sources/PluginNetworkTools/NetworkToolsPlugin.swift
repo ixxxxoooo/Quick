@@ -11,7 +11,7 @@ import SwiftUI
 /// IP 查询 + DNS 信息 + 网络测速。
 /// 合并 Fasty 的 ip-query、dns-switch、speed-test。
 @MainActor
-public final class NetworkToolsPlugin: QuickPlugin {
+public final class NetworkToolsPlugin: QuickPlugin, PluginViewProviding {
 
     public static let id = "networktools"
     public static let name = "网络工具"
@@ -45,25 +45,6 @@ public final class NetworkToolsPlugin: QuickPlugin {
     private let service = NetworkService()
 
     public init() {}
-
-    public func searchItems(query: String) async -> [SearchableItem] {
-        // 用整词匹配而不是 contains：否则 clipboard / multiply / description 都会误触发本插件
-        guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
-
-        return [
-            SearchableItem(
-                id: "networktools.tools",
-                pluginID: Self.id,
-                title: "网络工具",
-                subtitle: "IP 查询 / DNS / 测速",
-                icon: "network",
-                relevance: 0.6,
-                action: {
-                    EventBus.shared.post(NavigateEvent(pluginID: "networktools"))
-                }
-            )
-        ]
-    }
 
     public func makeView() -> AnyView {
         AnyView(NetworkToolsView(service: service))

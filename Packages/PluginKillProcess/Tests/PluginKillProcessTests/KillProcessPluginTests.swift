@@ -182,10 +182,24 @@ struct KillProcessPluginContractTests {
         #expect(!KillProcessPlugin.triggerWords.isEmpty)
     }
 
-    @Test("触发词命中返回入口")
-    func trigger() async {
+    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
+    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    @Test("结束进程有一条命令，且带插件前缀")
+    func commandsCoverKill() {
+        let commands = KillProcessPlugin.commands
+        let ids = commands.map(\.id)
+
+        #expect(ids.contains("killprocess.kill"))
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("killprocess.") })
+        #expect(commands.allSatisfy { $0.pluginID == KillProcessPlugin.id })
+    }
+
+    @Test("插件不参与按查询现算")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = KillProcessPlugin()
-        #expect(await plugin.searchItems(query: "杀进程").count == 1)
-        #expect(await plugin.searchItems(query: "weather").isEmpty)
+
+        #expect(!plugin.accepts(query: "杀进程"))
+        #expect(await plugin.dynamicSearch(query: "weather").isEmpty)
     }
 }

@@ -10,14 +10,14 @@ import SwiftUI
 /// 长列表上方给一个搜索框，而不是让用户自己滚）。
 struct PluginsPane: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any PluginSettingsDataSource & CommandSettingsDataSource & LauncherSettingsDataSource
 
     @State private var enabledPlugins: [String: Bool]
     @State private var filter = ""
     @State private var selectedPluginID: String?
     @FocusState private var filterFocused: Bool
 
-    init(dataSource: any SettingsDataSource) {
+    init(dataSource: any PluginSettingsDataSource & CommandSettingsDataSource & LauncherSettingsDataSource) {
         self.dataSource = dataSource
         _enabledPlugins = State(
             initialValue: Dictionary(
@@ -132,7 +132,9 @@ struct PluginsPane: View {
 /// 某个插件自己的功能选项。快捷键不在这里
 private struct PluginOptionsPane: View {
     let plugin: SettingsPlugin
-    let dataSource: any SettingsDataSource
+    /// 转发给启动器 / 系统操作 / 插件设置页，所以需要这三片能力
+    let dataSource: any PluginSettingsDataSource & LauncherSettingsDataSource
+        & CommandSettingsDataSource
 
     var body: some View {
         if plugin.id == LauncherPluginID.launcher {

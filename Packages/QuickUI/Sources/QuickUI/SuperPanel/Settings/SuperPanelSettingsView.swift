@@ -12,9 +12,9 @@ import SwiftUI
 /// `SettingsDataSource` 走宿主的系统能力。
 public struct SuperPanelSettingsView: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any HostSettingsDataSource
 
-    public init(dataSource: any SettingsDataSource) {
+    public init(dataSource: any HostSettingsDataSource) {
         self.dataSource = dataSource
     }
 

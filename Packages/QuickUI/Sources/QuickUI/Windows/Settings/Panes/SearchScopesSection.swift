@@ -16,12 +16,12 @@ import UniformTypeIdentifiers
 /// - 支持「恢复默认」
 struct SearchScopesSection: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any LauncherSettingsDataSource
 
     @State private var scopes: [String]
     @State private var missingScopes: Set<String> = []
 
-    init(dataSource: any SettingsDataSource) {
+    init(dataSource: any LauncherSettingsDataSource) {
         self.dataSource = dataSource
         _scopes = State(initialValue: dataSource.searchScopes)
     }

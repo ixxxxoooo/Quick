@@ -183,34 +183,29 @@ struct ColorComparePluginTests {
         #expect(ColorComparePlugin.triggerWords.allSatisfy { !$0.isEmpty })
     }
 
-    @Test("触发词命中时只返回一条入口结果")
-    func triggerWordYieldsSingleEntry() async throws {
-        let plugin = ColorComparePlugin()
-        let results = await plugin.searchItems(query: "颜色")
+    /// 入口由静态命令提供，不再由搜索现算。原测试断言的是 `searchItems` 的返回，
+    /// 而那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
+    @Test("声明的命令覆盖识别与对比度，且 id 带插件前缀")
+    func commandsCoverFeatures() {
+        let commands = ColorComparePlugin.commands
+        let ids = commands.map(\.id)
 
-        #expect(results.count == 1)
-        let item = try #require(results.first)
-        #expect(item.pluginID == ColorComparePlugin.id)
-        #expect(item.id == "color-compare.open")
-        #expect(item.icon == ColorComparePlugin.icon)
-        #expect(item.relevance >= 0 && item.relevance <= 1)
+        #expect(ids.contains("color-compare.identify"))
+        #expect(ids.contains("color-compare.contrast"))
+        // 功能命令带插件前缀，宿主按它回退找执行者；「打开本插件」用 plugin.open. 前缀
+        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
+        #expect(functionIDs.allSatisfy { $0.hasPrefix("color-compare.") })
+        #expect(commands.allSatisfy { $0.pluginID == ColorComparePlugin.id })
+        #expect(commands.allSatisfy { !$0.title.isEmpty })
     }
 
-    @Test("每个触发词都能唤醒插件")
-    func everyTriggerWordMatches() async {
+    /// 插件不参与按查询现算：聚合器因此不会在每次按键时叫醒它。
+    @Test("不参与动态搜索")
+    func doesNotTakePartInDynamicSearch() async {
         let plugin = ColorComparePlugin()
 
-        for trigger in ColorComparePlugin.triggerWords {
-            let results = await plugin.searchItems(query: trigger)
-            #expect(results.count == 1, "触发词「\(trigger)」没有命中")
-        }
-    }
-
-    @Test("无关查询与空查询不返回结果")
-    func unrelatedQueryYieldsNothing() async {
-        let plugin = ColorComparePlugin()
-
-        #expect(await plugin.searchItems(query: "").isEmpty)
-        #expect(await plugin.searchItems(query: "天气").isEmpty)
+        #expect(!plugin.accepts(query: "颜色"))
+        #expect(await plugin.dynamicSearch(query: "").isEmpty)
+        #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }

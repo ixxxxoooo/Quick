@@ -16,7 +16,7 @@ import SwiftUI
 /// - 支持 ⌘F 聚焦搜索框
 struct SettingsSidebarView: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any PluginSettingsDataSource
     @Bindable var navigationState: SettingsNavigationState
 
     @State private var query = ""

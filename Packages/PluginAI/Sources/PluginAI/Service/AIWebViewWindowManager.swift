@@ -36,7 +36,9 @@ final class AIWebViewWindowManager {
     ///
     /// 门户卡片、搜索结果、打开动作问的是同一件事，判定只留这一份 —— 抄成两份，
     /// 就会出现「卡片能点、点了没反应」。
-    static func isProviderEnabled(_ providerId: String) -> Bool {
+    ///
+    /// `nonisolated`：搜索结果在无隔离的搜索路径上构造，这里只读 `UserDefaults`。
+    nonisolated static func isProviderEnabled(_ providerId: String) -> Bool {
         PluginDefaults.isEnabled(
             PluginSettingKey.AIPortal.providerEnabled(providerId), default: true)
     }

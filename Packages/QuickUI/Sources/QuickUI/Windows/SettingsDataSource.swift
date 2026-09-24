@@ -234,13 +234,24 @@ public struct SettingsAITestResult: Sendable {
 }
 
 /// 设置窗口的数据源与动作
+///
+/// **按职责拆成四个子协议再组合**：这个协议有约 50 个成员，而实际用得最多的视图
+/// 也只用 7 个（见 docs/refactor-plan.md Phase 4 的统计）。视图只声明它真正需要的
+/// 那一片，改动时的影响面才可推理。
+///
+/// `SettingsBridge` 一个类型实现全部四个 —— 组合优于继承，实现的还是一份。
 @MainActor
-public protocol SettingsDataSource: AnyObject {
+public protocol SettingsDataSource:
+    CommandSettingsDataSource,
+    LauncherSettingsDataSource,
+    PluginSettingsDataSource,
+    HostSettingsDataSource
+{
+}
 
-    // MARK: - 通用
-    var isLaunchAtLoginEnabled: Bool { get }
-    func setLaunchAtLogin(_ enabled: Bool)
-    var hotKeyDescription: String { get }
+/// 快捷键与命令
+@MainActor
+public protocol CommandSettingsDataSource: AnyObject {
 
     /// 唤出主面板当前的键帽。清空后是 ⌥Space
     var togglePaletteKeycaps: [String] { get }
@@ -259,12 +270,12 @@ public protocol SettingsDataSource: AnyObject {
     func clearCommandShortcut(for commandID: String)
     func isCommandEnabled(_ commandID: String) -> Bool
     func setCommandEnabled(_ commandID: String, enabled: Bool)
+}
 
-    // MARK: - 搜索来源
-    var searchSources: [SettingsSearchSource] { get }
-    func setSearchSourceEnabled(_ pluginID: String, enabled: Bool)
+/// 启动器：搜索范围、系统操作、自定义命令
+@MainActor
+public protocol LauncherSettingsDataSource: AnyObject {
 
-    // MARK: - 启动器：应用与搜索范围
     var searchScopes: [String] { get }
     func setSearchScopes(_ scopes: [String])
     func restoreDefaultSearchScopes()
@@ -272,11 +283,9 @@ public protocol SettingsDataSource: AnyObject {
     func appIcon(for path: String) -> NSImage?
     func setAppAlias(_ alias: String?, for bundleID: String)
 
-    // MARK: - 启动器：系统操作
     var systemActions: [SettingsSystemActionItem] { get }
     func setSystemActionAlias(_ alias: String?, for id: String)
 
-    // MARK: - 启动器：Shell 与自定义命令
     var isRunShellFallbackEnabled: Bool { get }
     func setRunShellFallbackEnabled(_ enabled: Bool)
     var customCommands: [SettingsCustomCommandItem] { get }
@@ -286,8 +295,19 @@ public protocol SettingsDataSource: AnyObject {
         id: UUID, name: String, command: String, isEnabled: Bool, alias: String?,
         workingDirectory: String?, loadsShellEnvironment: Bool)
     func deleteCustomCommand(id: UUID)
+}
 
-    // MARK: - 功能插件设置
+/// 插件：开关、搜索来源、专属设置页
+@MainActor
+public protocol PluginSettingsDataSource: AnyObject {
+
+    var searchSources: [SettingsSearchSource] { get }
+    func setSearchSourceEnabled(_ pluginID: String, enabled: Bool)
+
+    var pluginEntries: [SettingsPlugin] { get }
+    func isPluginEnabled(_ id: String) -> Bool
+    func setPluginEnabled(_ id: String, enabled: Bool)
+    func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView?
 
     /// 系统里可选的键盘布局
     ///
@@ -297,19 +317,22 @@ public protocol SettingsDataSource: AnyObject {
     /// 面板打开时强制切换到的布局 id（nil / 空 = 不切换）
     var forcedKeyboardLayoutID: String? { get }
     func setForcedKeyboardLayout(_ layoutID: String?)
+}
 
-    var pluginEntries: [SettingsPlugin] { get }
-    func isPluginEnabled(_ id: String) -> Bool
-    func setPluginEnabled(_ id: String, enabled: Bool)
-    func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView?
+/// 宿主级：通用、超级面板、AI、权限、关于
+@MainActor
+public protocol HostSettingsDataSource: AnyObject {
+
+    // MARK: - 通用
+    var isLaunchAtLoginEnabled: Bool { get }
+    func setLaunchAtLogin(_ enabled: Bool)
+    var hotKeyDescription: String { get }
 
     // MARK: - 超级面板（宿主级）
-
     /// 超级面板的设置页
     ///
     /// 超级面板不是插件，它的设置页由组装层直接提供，不走 `pluginEntries`。
     func makeSuperPanelSettingsView() -> AnyView
-
     /// 唤出超级面板的全局快捷键键帽
     var superPanelShortcutKeycaps: [String]? { get }
     /// 录制超级面板快捷键；冲突返回 false
@@ -319,7 +342,6 @@ public protocol SettingsDataSource: AnyObject {
     func clearRecentUsage()
 
     // MARK: - AI 基座
-
     /// 宿主级 AI 服务设置页
     func makeAISettingsView() -> AnyView
     /// 连接自检（发一条最短消息）

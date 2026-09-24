@@ -10,12 +10,12 @@ import SwiftUI
 /// 不设分组标题、开关标题里也不重复插件名 —— 窗口标题与侧边栏已经写着它了。
 struct PluginIntroSection: View {
 
-    let dataSource: any SettingsDataSource
+    let dataSource: any PluginSettingsDataSource
     let pluginID: String
 
     @State private var isEnabled: Bool
 
-    init(dataSource: any SettingsDataSource, pluginID: String) {
+    init(dataSource: any PluginSettingsDataSource, pluginID: String) {
         self.dataSource = dataSource
         self.pluginID = pluginID
         _isEnabled = State(initialValue: dataSource.isPluginEnabled(pluginID))
