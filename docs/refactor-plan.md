@@ -626,15 +626,20 @@ public struct PaletteDependencies {
 
 ### 5.1 测试覆盖断崖
 
-| 包 | 源码 | 测试 | 测试率 |
-|---|---|---|---|
-| `PluginScreenshot` | 2,390 | 205 | **8.6%** |
-| `PluginJSONFormatter` | 1,109 | 173 | **15.6%** |
-| `PluginCalculator` | 1,179 | 355 | 30% |
-| `QuickUI` | 15,447 | 2,233 | 14%（含 577 行 `PluginPanelControllerTests`） |
+**先把口径说清**：下表是「测试文件行数 ÷ 源码行数」，**不是代码覆盖率**。
+它只能说明「这个包的测试有多少行」，不能说明「多少分支被走过」——
+要真覆盖率得开 `--enable-code-coverage` 再跑一遍。
 
-优先补 `PluginScreenshot` 与 `PluginJSONFormatter` 的**纯逻辑层**测试
-（坐标换算、选区裁剪、JSON 格式化/压缩/转义），UI 层不强行测。
+| 包 | 源码 | 测试 | 行数比 | 用例数 |
+|---|---|---|---|---|
+| `PluginScreenshot` | 2,376 | 317 | 13.3% | 20 |
+| `PluginJSONFormatter` | 1,130 | 239 | 21.2% | 21 |
+| `PluginCalculator` | 1,239 | 355 | 28.7% | 19 |
+| `QuickUI` | 15,447 | 2,526 | 16.4% | 166 |
+
+`PluginScreenshot` 与 `PluginJSONFormatter` 的纯逻辑层已补：裁剪钳制、缩放取整、
+编码类型与扩展名一致性、节点文本转义、行路径唯一性。**UI 层不强行测** ——
+遮罩窗口与树视图的渲染要在真机上看，断言渲染结果只会得到脆弱的测试。
 
 ### 5.2 按键路由抽成纯函数
 
@@ -712,8 +717,8 @@ Phase 5 (并发与测试)            ⚠️ 测试迁移与新增完成；3 处�
 
 | 项 | 价值 | 风险 |
 | --- | --- | --- |
-| `PluginScreenshot` / `PluginJSONFormatter` 补逻辑层测试 | 中（9.0% / 16.5%） | 低 |
-| 首屏不依赖搜索（真正解决 50.8ms） | 中 | 中，涉及渲染时序 |
+| 真实分阶段测量搜索耗时（首屏渲染 vs 打分 vs 插件） | 高，50.8 ms 必须先测出是哪一段 | 低 |
+| `PalettePanel.sendEvent` 的按键路由抽成纯函数 | 中 | 低 |
 | `PaletteCoordinator` 拆三个类型 | 低 | 高，不建议做 |
 | `MouseTriggerMonitor` / `ShellCommandRunner` / `PermissionDrag` | **保留**，见 Phase 5 说明 | — |
 
