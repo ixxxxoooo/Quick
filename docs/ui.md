@@ -165,6 +165,11 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
   会让标题保持全黑，看起来像能点。
 - 设置搜索是**手写清单**（`SettingsSearchCatalog`），不自动扫描视图树 ——
   SwiftUI 的视图树扫不出来，而清单只有几十行。这是有意的取舍。
+- **插件专属设置页住在插件包里**（`Settings/<Name>SettingsView.swift`），由插件类的
+  `makeSettingsView()` 返回；`FeatureSettingsPane` 只负责概览、触发关键字与分发。
+  插件包用不了 `QuickUI` 的 internal 类型，所以行、图标槽、置灰修饰符都是 **public** 的 ——
+  这是「插件只管内容区」在设置页上的对应约束，不要为了让它们 internal 而把表单搬回宿主。
+- 设置行的尾部控件用 `DesignTokens.Size.settingsControl` 定宽，行与行才对得齐。
 
 ### 面板里的键盘导航（为什么不在 SwiftUI 层）
 
@@ -387,7 +392,10 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | `Scrolling/EdgeDissolve` | 滚动内容在浮动栏下方淡出的遮罩，`.edgeDissolve()` 挂载 |
 | `KeyCapChip` | 快捷键帽。`.filled`（底栏）/ `.outline`（列表行）两种样式 |
 | `BarButton` | 栏位按钮：悬停胶囊 + 图标/文字。`.titled`（底栏）/ `.icon`（窗口标题栏，此时 `title` 只作无障碍标签）两种样式，`.destructive` 色调给关闭用 |
-| `SettingsTileIcon` | 设置侧栏彩色色块图标（18pt 圆角色块 + Medium 白色 SF Symbol），对齐 Raycast Preferences |
+| `SettingsTileIcon` | 设置侧栏彩色色块图标（18pt 圆角色块 + Medium 白色 SF Symbol），对齐 Raycast Preferences。**public**：插件的设置页住在插件自己的包里，那里也要用同一套色块 |
+| `SettingsRow` | 设置页的一行：固定宽度图标槽 + 标题/副标题 + 尾部控件，尾部可同行（`.inline`）或换行（`.below`）。**public**，插件包里的设置页靠它拼出与宿主一致的行 |
+| `SettingsRowIcon` | 设置行左侧的图标槽位；给了 `tint` 就是彩色色块，否则是强调色单色符号 |
+| `View.settingsEnabled(_:)` | 置灰 + 禁用。只用 `.disabled` 标题仍是全黑，看起来像能点 |
 | `SectionHeader` | 列表分组标题（当前未使用：我们不做分组，见 §2） |
 | `ScreenPlacement` | 按指针位置挑屏幕（纯函数）。主面板与分离窗口共用，**不要各自去查 `NSScreen.main`** |
 
@@ -417,6 +425,8 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | `PluginPanelController` | 分离窗口管理：创建独立 NSWindow、单例策略、尺寸记忆、关闭。控制长在它自己的标题栏里（置顶 / 关闭 + ⌘R 刷新），标题栏带 `WindowDragArea` 负责拖拽；声明了 `supportsPanelSearch` 的插件在标题栏里直接放搜索框（标题栏加高一档），由 `DetachedPluginPanel` 把方向键 / 回车 / ⌘F 转给 `PluginSearchQuery` |
 | `FloatingCapsuleView` | 悬浮胶囊：**AI 网页窗口**的常驻控件（内容是一整块网页，没有自己的边框）。可拖、可折叠、位置按窗口持久化 |
 | `ActivationPolicyKeeper` | 应用激活策略的唯一记账处：设置窗口与 AI 窗口在场时 `.regular`，都走了回 `.accessory` |
+| `FeatureSettingsPane` | 设置窗口里「插件」分页的外壳：概览、触发关键字，加上插件自己那份设置视图（internal，只在 `QuickUI` 内组装）。表单本身住在各个 `Plugin*` 包里 |
+| `PendingFeatureNote` | 设置页里「这个插件暂无专属设置」的占位说明。**public**，插件包的设置页可以直接用它 |
 
 ---
 
