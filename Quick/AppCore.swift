@@ -851,7 +851,13 @@ final class AppCore {
             return
         }
         if let pluginID = CommandID.openedPluginID(in: commandID) {
-            paletteCoordinator.show(pluginID: pluginID)
+            // 与 togglePalette 同语义：面板正开着这个插件时再按一次就关掉，
+            // 否则（关着 / 停在别的插件 / 主搜索）打开或切过去
+            if paletteCoordinator.isVisible, paletteCoordinator.activePluginID == pluginID {
+                paletteCoordinator.hide()
+            } else {
+                paletteCoordinator.show(pluginID: pluginID)
+            }
             return
         }
         guard let plugin = plugin(forCommand: commandID) else {
