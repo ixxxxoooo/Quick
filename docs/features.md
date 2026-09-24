@@ -36,9 +36,10 @@
   首屏在聚合之后还会被 `PaletteSearchEngine.promotingRecents` 用跨插件的 `UsageHistory`
   重排一次，最近使用过的条目会被提到最前。收藏为空时退化为频率顺序，这是刻意的 ——
   没有收藏的新用户也该看到点东西，而不是一片空白。**排查首屏顺序时不要只看这个文件。**
-- **`defaultItems()` 必须返回空。** 首屏的主体就是这里给出的应用列表；
-  默认实现会额外贡献「触发词裸查询的第一条」，那会让首屏多出一条多余的应用条目
- （`LauncherPlugin` 因此覆盖它）。
+- **收藏通过提权影响搜索结果。** 收藏过的应用相关度直接置 1.0（压过使用频率），
+  副标题带 `★` 标记。收藏曾经只作用于「空查询列出全部应用」那条分支，而那条分支
+  在 `accepts` 挡掉空查询之后已经不可达 —— 收藏的出口因此挪到了搜索提权上。
+  改这里之前先确认收藏仍有可见效果。
 - **`SearchableItem.id` 必须带有 `launcher.` 前缀。**
   - 应用项：`launcher.<bundleID>`
   - 直接 Shell：`launcher.shell.direct`
@@ -220,7 +221,7 @@
 | --- | --- | --- | --- |
 | 启用剪贴板监听 | `clipboard.monitorEnabled` | 开 | `ClipboardPlugin.applyMonitorSetting()` |
 | 退出时清除历史 | `clipboard.clearOnQuit` | 关 | `ClipboardPlugin.deactivate()` |
-| 显示内容预览 | `clipboard.showPreview` | 开 | `ClipboardPlugin.searchItems(query:)` |
+| 显示内容预览 | `clipboard.showPreview` | 开 | `ClipboardPlugin.dynamicSearch(query:)` |
 | 自动去重 | `clipboard.deduplication` | 开 | `ClipboardStore.add(_:)` |
 
 「启用剪贴板监听」是唯一一个**必须即时生效**的：关掉之后还在记录剪贴板等于骗用户。
@@ -447,8 +448,9 @@
   一一对应；热键、`perform(commandID:)` 与搜索结果共用同一 id。
 - **用户在设置里关闭某条命令后必须拒绝执行**（`SettingsStore.isCommandEnabled`）；关闭时打
   `.notice` 日志，不静默忽略。
-- **空查询不产出 `searchItems` 结果**（避免首屏被系统命令淹没）；首屏若出现某条命令，来自
-  `defaultItems()` 对触发词的首条 `searchItems` 取样。
+- **空查询不产出搜索结果**（避免首屏被系统命令淹没）。插件的搜索入口已删除：
+  每条系统操作都是一条静态命令（`functionCommands`），由 `CommandIndex` 按关键词
+  与用户别名统一打分 —— 别名解析在 `rebuildCommandCatalog()` 里做，不在插件的搜索里。
 - **执行后关闭主面板**（`HidePaletteEvent`），与面板内点击一致。
 - **反馈必须如实**：走 AppleScript 的操作失败时 HUD 提示需「自动化」权限；成功且机器即将
   休眠/重启/注销时**不**伪造成功 HUD。锁屏走 `/usr/bin/pmset displaysleepnow`。
@@ -925,9 +927,10 @@
    `TranslationService` 用 `NLLanguageRecognizer` 探测后把结果交给它们取舍。
 5. **词典解析是纯逻辑。** `DictionaryParser` 把系统词典返回的带标记文本
    （`|` 分词头/音标/释义、`▸` 分例句、`①②` 分义项）解析成结构化词条。
-6. **内联结果与插件视图用一次性字段搭桥。** `TranslatorPlugin.pendingText`：
-   `searchItems` 写、`TranslatorView` 出现时取走并清空 —— 主面板搜索与插件视图之间
-   没有直接的上下文通道。
+6. **内联结果与插件视图靠导航上下文搭桥。** 搜索结果里的「打开」动作发
+   `NavigateEvent(pluginID:context: ["query": ...])`，插件视图用
+   `.prefillFromPluginContext(buffer)` 在出现时把 `query` 填进输入框 ——
+   主面板搜索与插件视图之间没有直接的引用通道。
 7. **历史是用户内容，存插件的键值存储（`PluginStorage`），不放 `UserDefaults`。**
    否则「重置设置」会连历史一起清掉。整体 JSON 存取，上限封顶，重复的「原文 + 语言对」去重。
 8. **朗读用 `AVSpeechSynthesizer`，按语言选系统语音。** 不需要联网、不依赖词典音频。

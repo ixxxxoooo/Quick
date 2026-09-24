@@ -1,25 +1,28 @@
 # Quick 架构重构方案
 
 > 本文是 2026-09 一次静态架构审计的结论与执行计划。
-> 审计方式：**只读代码**（约 9.6 万行 Swift、31 个 SPM 包），
-> 未编译、未运行。凡涉及「实际有多慢」的判断都在文中标注了 `[需实测]`。
-> 本文与 [`AGENTS.md`](../AGENTS.md) 的既有规则不冲突；若冲突以 `AGENTS.md` 为准。
+> 审计方式：**只读代码**（约 9.6 万行 Swift、31 个 SPM 包）。
+>
+> **执行状态（2026-09-24）**：Phase 0 / 1 / 2 已全部落地，Phase 3（依赖注入收敛）
+> 与 Phase 4（设置层拆分）的主要部分也已完成。各阶段末尾的「完成情况」小节记录了
+> 实际做了什么、验证数据是多少、以及哪些判断在执行中被修正。
+> 尚未做的：Phase 5 的 Timer 迁移（有意保留，理由见该节）。
 
 ## 结论摘要
 
 架构方向是对的，**问题在于契约比实现诚实**：文档描述的是一套现代体系，
-代码里有大量 legacy 残留、隐式字符串协议与主 actor 瓶颈在背离它。
+代码里有大量遗留残留、隐式字符串协议与主 actor 瓶颈在背离它。
 
 具体地：
 
 - **方向正确的部分**（重构中不碰）：`AppCore` 单一所有者、插件只在 `registerPlugins()`
   实例化、`CommandIndex` 的「建索引预处理 + 按键只打分」、`DesignTokens` 单一令牌源、
-  `QuickLog` 分级体系、插件自治 SQLite schema。
+  `QuickLog` 分级体系、插件自治 SQLite schema。这些在执行中**一条都没被破坏**。
 - **需要修的部分**：协议里的 SwiftUI 耦合、搜索管线的并发模型、退化成公开可变闭包的
   依赖注入、遗留 API 与死代码、设置页长在共享包里。
 
-**最大单项收益是 Phase 2（搜索管线）**，因为它同时解决「超时杀不掉」「2 秒卡住整批结果」
-「线性扫描命令归属」三个问题。
+**最大单项收益是 Phase 2（搜索管线）** —— 它同时解决了「超时杀不掉」「2 秒卡住整批结果」
+「线性扫描命令归属」「触发词冲突无人仲裁」四个问题。
 
 ---
 
@@ -84,6 +87,35 @@ grep -rn "func searchItems" Packages/*/Sources/ | grep -v "QuickCore/Sources"
 
 改用 `Mutex`（`Synchronization`，项目已在 `EventBus` 里用过）保护可变状态，
 或把可变状态移出该类型。验收：`grep -rn "@unchecked Sendable" Packages/PluginCalculator/` 无输出。
+
+### 额外发现：`InMemorySecretStore` 的 `@unchecked Sendable` 也没有依据
+
+同一轮核查还发现 `QuickCore/Storage/SecretStore.swift` 的测试用内存实现用
+`NSLock` + `@unchecked Sendable`。它不涉及任何 C 回调，所以不在允许范围内 ——
+改用 `Mutex` 后断言整个消失。**`@unchecked Sendable` 从 4 处降到 3 处**，
+剩下三处（`MouseTriggerMonitor` 的 CGEventTap、`ShellCommandRunner` 的两个进程句柄）
+都在系统 C API 边界上，有正当理由，已在代码注释里写明依据。
+
+`Mutex` 的 `withLock` 返回值有个细节：闭包返回 `Void` 时不能写 `_ =`（编译器会警告
+「冗余」），而闭包返回可选值时必须写（否则警告「未使用」）。两处因此写法不同。
+
+### 完成情况
+
+三项全部落地。**过程中修正了一处审计判断**：
+
+- 0.1 确认那三个目录**未被 git 跟踪**（只有 `.build/` 残留），所以是本地清理，
+  不是仓库问题 —— 这一点在审计时被我误判为「仓库里有空包」。
+- 0.2 实际删除的是 **16 个**插件的 `searchItems`，不是计划里列的 13 个。
+  另外 9 个插件的 `searchItems` 是 `dynamicSearch` 的唯一实现体，按计划**改名**而非删除
+  （`dynamicSearch` 的转发壳一并合并掉了）。
+- 0.4 的 `MathParser` 改成 `struct` 并给解析方法加 `mutating`，`@unchecked Sendable` 消失。
+
+**一处需要澄清的表述**：审计时我把 `searchItems` 称作「死代码」，这不准确。
+它在主搜索路径上确实不可达（`PaletteSearchEngine` 不调用它），但它是**协议要求**且
+测试在直接调用。准确的性质是「遗留公开 API」，删除它需要迁移测试 —— 二者工作量和
+风险不同。测试迁移已在 Phase 2 完成。
+
+验证：`./Scripts/run-tests.sh` 28 包全绿。
 
 ---
 
@@ -161,6 +193,33 @@ let view = (plugin as? PluginViewProviding)?.makeView()
 grep -rn "import SwiftUI\|import AppKit\|import Cocoa" Packages/QuickCore/Sources/
 # 期望：无输出（QuickCore 彻底不依赖 UI 框架）
 ```
+
+### 完成情况
+
+已完成，且比计划更彻底：
+
+- `SearchableItem` 的 `import SwiftUI` 是**完全未使用**的（文件里没有任何 SwiftUI 类型），
+  直接删除。
+- `PluginContext.swift` 里的 `EnvironmentValues.pluginContext` 是真 SwiftUI，
+  **移到 `QuickUI/Panel/PluginContext.swift`**，符合「环境键属于 UI 层」的定位。
+- `QuickCore` 里已无 `import SwiftUI` —— 上面那条验收命令现在无输出。
+- 24 个插件声明 `PluginViewProviding`，3 个有专属设置页的额外声明
+  `PluginSettingsProviding`。`ClipboardPlugin` 的 `makeSettingsView` 返回 nil，
+  与默认实现等价，**按「迁移绝不包装」直接删除**，而不是留一个空覆写当文档。
+
+宿主侧两处 `as?` 查询都带了日志：`PaletteCoordinator.makePluginView` 落空时 `.error`，
+`AppCore.detachPlugin` 落空时 `.error` 并退化成 `EmptyView`
+（`PluginPanelController` 的契约是非可选视图）。
+
+### 一处顺带发现的契约不一致
+
+`commands` 的 id 有**两套前缀**：默认的「打开本插件」是 `plugin.open.<插件id>`，
+功能命令是 `<插件id>.<功能>`。而 `AppCore.plugin(forCommand:)` 的前缀回退只认后者 ——
+`plugin.open.*` 走不到那条路（它由 `invoke()` 里的 `CommandID.openedPluginID` 单独处理）。
+
+这不影响正确性，但容易误导。已在 `docs/architecture.md` 记下，并把测试断言改成
+显式区分两套前缀（`commands.filter { !$0.id.hasPrefix("plugin.open.") }`），
+避免后来者按错的前缀写断言。
 
 ---
 
@@ -294,6 +353,74 @@ private var pluginsByID: [String: any QuickPlugin] = [:]
 - `elapsedMS > 50` 的 warning 占比 `[需实测]` 降到 1% 以下；
 - `grep -rn "func dynamicSearch" Packages/Plugin*/Sources/ | grep -v nonisolated` 无输出。
 
+### 完成情况
+
+**协议改造已完成**：`accepts` / `dynamicSearch` / `static` 元数据（`id`、`name`、`icon`、
+`description`、`triggerWords`、`commands`、`storageMigrations`）全部标 `nonisolated`。
+25 个插件全部通过。
+
+**关键发现：`nonisolated` 不能调用 `@MainActor` 方法**，即使该方法是 `async`。这是个
+编译错误而非警告。所以「只改签名、保留转发壳」的路径走不通 —— 这也推翻了审计时
+我对选项 B 的判断（当时以为可以在宿主侧自旋等待而插件不动，实际编译不过）。
+
+10 个搜索依赖 `@MainActor @Observable` store 的插件因此需要**不可变搜索快照**
+（`Mutex` 保护）。快照顺带把 `lowercased()` 从每次按键移到每次刷新，去掉了热路径上
+的重复规范化。两个值得记住的细节：
+
+- `ClipboardSearchSnapshot` **刻意不含 `imageData`**。剪贴板历史可能有 369 条含图片的条目，
+  每条复制一份 `Data` 会把搜索变成内存拷贝操作。
+- `SnippetStore.load()` 一开始漏了重建快照，**被测试当场抓住**（3 条失败）。
+  这说明快照的更新点必须覆盖所有改变源数据的路径，而不只是写入路径。
+
+**超时现在是真取消**：`searchDynamic` 返回 `PluginSearchResult`，`nil` 表示超时，
+与「查了但无结果」区分开。结果由 `PaletteSearchOutcome` 带回，面板在结果不完整时
+显示底注（有结果）或空状态（无结果）。以前超时静默返回空数组。
+
+**命令索引已建**：`rebuildCommandCatalog()` 顺带重建 `pluginsByID` 与 `commandOwners`
+两张表，替掉了 6 处线性扫描。
+
+**触发词冲突已仲裁**：新增 `Scripts/check-trigger-words.py`，接入 `run-tests.sh`。
+它解析三种触发词写法（字面量、跨文件常量引用、常量相加），**解析不出来就失败**而不是
+跳过 —— 否则守卫会有盲区。已用注入冲突做反向验证（退出码 1）。
+4 个冲突词按「语义更专一的一方保留」解决。
+
+#### 一处必须记住的 Swift 语义
+
+`nonisolated` 的**协议要求会让实现自动推断为 `nonisolated`** —— 不需要（也不会）
+在实现处看到标注。这个机制值得记住，因为它有两个后果：
+
+1. 好处：协议一旦要求 `nonisolated`，所有实现立刻脱离主 actor，不必逐个改。
+2. 陷阱：**实现处没有标注，只看实现不容易看出它跑在哪个隔离域。**
+   9 个插件的 `dynamicSearch` 因此都补上了显式 `nonisolated` —— 不改行为，
+   但把「这里必须能脱离主 actor」写在读代码的人会看到的地方，
+   防止将来有人改协议时把搜索悄悄放回主线程。
+
+反面教材也在同一轮验证里出现过：我一度以为 9 个插件漏标了 `nonisolated`、
+导致主 actor 瓶颈没解决，于是「修正」了一遍。**实际是编译器早已推断正确，
+我的修改不是修 bug。** 教训是：涉及隔离域的判断要写最小实验验证，
+不能从「源码里没看到关键字」推断「行为不对」。
+
+#### 实测数据
+
+启动日志（`./Scripts/logs.sh --dev`，`-showPalette`）：
+
+| 指标 | 实测 | 预算 | 结论 |
+| --- | --- | --- | --- |
+| 面板 `show()` → 可见 | **34.0 ms** | < 100 ms | ✅ |
+| 空闲 CPU（3 次采样） | 0.1–0.2 % | ≈ 0 % | ✅ |
+| 启动到托盘图标 | 日志时序正常 | < 400 ms | ✅ |
+| 插件注册 | 25 个 | — | ✅ |
+| 静态命令 / 归属登记 | 83 / 83 条 | 一致 | ✅ |
+
+**一处未达标项**：一次聚合搜索记录为 **64.6 ms，超过 50 ms 预算**，日志显示
+`动态插件 0 个` —— 说明瓶颈在 `CommandIndex` 对 83 条静态命令的打分，不在插件。
+83 条命令不该要 64ms，这里有优化空间（很可能是 `MatchQuery` 的拼音/模糊打分
+对每条命令的每个字段都重算）。**这是下一步该看的地方**，本次重构没有动它，
+因为改动打分算法会改变排序结果、需要独立的验证。
+
+`Task.isCancelled` 的中途检查仍保留在插件循环里（协议要求），
+`grep -rn "func dynamicSearch" Packages/Plugin*/Sources/ | grep -v nonisolated` 无输出。
+
 ---
 
 ## Phase 3：依赖注入替代公开可变闭包
@@ -357,6 +484,26 @@ public struct PaletteDependencies {
   导航、搜索路由的纯逻辑分支；
 - 面板显隐、上下键、回车、Esc 冒烟全部通过。
 
+### 完成情况
+
+**已完成第一步（不可变注入）**，第二步（拆成三个类型）**未做** —— 理由是
+`PaletteCoordinator` 现在 650 行但职责已经收敛，而拆分需要改动
+`PaletteView` 的全部注入路径，风险与收益不成比例。这一步留待有明确需求时再做。
+
+已完成的部分：
+
+- 新增 `PaletteDependencies`，8 个 `public var` 收敛为 `private var dependencies`
+  + 只读计算属性。缺项现在是**编译错误**。
+- `attach(_:)` 加 `.fault` 日志防重复注入 —— 那正是本类型要消灭的模式。
+- `AppCore.start()` 里六七行分散赋值合并成一次 `attach`。
+
+**一处实现细节**：`invokeCommand` 必须是 `@Sendable`，因为它会被存进
+`SearchableItem.action`（`Sendable` 结构）。而 `@MainActor` 的静态方法**不能**再标
+`@Sendable`（全局 actor 隔离的函数本身就是 Sendable），所以兜底写成具名函数
+`PaletteCoordinator.noOpInvoke` 而不是闭包字面量 —— 字面量在这里推不出 `Sendable`。
+
+实测确认接线正常：启动日志中有「面板协调器依赖已注入」，命令归属 83 条与静态命令一致。
+
 ---
 
 ## Phase 4：插件设置页下沉
@@ -405,6 +552,39 @@ public struct PaletteDependencies {
 - `grep -n "case \"" Packages/QuickUI/Sources/QuickUI/Windows/Settings/` 无插件 id 硬编码；
 - 每个设置页仍能打开、读写偏好、明暗两模式视觉无回归。
 
+### 完成情况
+
+**协议拆分已完成，设置页下沉未做。**
+
+先量了收益再动手：统计发现**用得最多的视图也只用到 7 个成员**，而协议暴露约 50 个。
+所以拆分的价值在于收窄视图的依赖面，而不只是把大协议切成小协议。
+
+拆成 4 个子协议，用组合协议保持 `SettingsBridge` 单一实现：
+
+| 协议 | 覆盖 |
+| --- | --- |
+| `CommandSettingsDataSource` | 快捷键、命令开关、别名 |
+| `LauncherSettingsDataSource` | 搜索范围、系统操作、自定义命令 |
+| `PluginSettingsDataSource` | 插件开关、搜索来源、专属设置页、键盘布局 |
+| `HostSettingsDataSource` | 通用、超级面板、AI、权限、关于 |
+
+视图按需声明，多数是 1–2 片的组合。`SettingsDetailView` / `SettingsView` /
+`SettingsWindowController` 保留伞协议 —— 它们是分发器，要构造全部子页，
+**这里用伞协议是有意的**，不是漏收窄（已在代码注释里写明，避免后来者「顺手收窄」而破坏）。
+
+**设置页下沉（让插件包自己实现设置视图）没有做**。当前 `FeatureSettingsPanes.swift`
+已经降到约 250 行、且不再硬编码插件 id 分支（走 `makeFeatureSettingsView` 能力查询），
+主要收益已经拿到。剩下的「插件 UI 移出共享包」是纯搬家，改动面覆盖十几个插件的 UI 文件，
+在没有明确需求时不做更稳妥。
+
+### 一处审计判断的修正
+
+计划里我说「给插件加设置项要去改共享 UI 包，依赖方向是反的」。执行时发现
+`FeatureSettingsPane` 早就是通过 `dataSource.makeFeatureSettingsView(for:)` 分发的，
+插件的专属设置页由**插件自己**构造（如 `AISettingsView`），只是文件放在
+`QuickUI/Windows/Settings/Panes/` 下。所以「依赖方向反了」这个说法不准确 ——
+真实问题是**文件位置**而非依赖方向。这降低了这一项的优先级。
+
 ---
 
 ## Phase 5：并发与测试补齐
@@ -446,24 +626,64 @@ public struct PaletteDependencies {
 **注意**：这一项要逐个实测 CPU 占用再决定，不要为了「符合规矩」而改动已经稳定的
 系统事件通路。`[需实测]`
 
+### 完成情况
+
+**测试覆盖：部分完成，有意保留。**
+
+测试迁移与新增是本轮改动量最大的部分之一 —— 26 个测试文件、125 处调用点从旧的
+`searchItems` 迁移到新契约。迁移不是机械改名：断言内容要换成验证**当前真实行为**
+（命令覆盖、闸门语义、不参与动态搜索），否则测试会测一个「恒返回空的默认实现」，
+失去保护力。这也是一处需要警惕的退化 —— `Launcher` 的「空查询不返回全部应用」
+测试在改名后就不再验证任何东西了。
+
+**Timer 迁移：未做，且我认为不应该盲目做。**
+
+计划里列了 6 处 `Timer` / `DispatchQueue`，但逐个看下来，结论与审计时不同：
+
+| 位置 | 结论 |
+| --- | --- |
+| `ClipboardMonitor`（0.5s 轮询） | **值得改**，但它是剪贴板记录的唯一入口，改动需要覆盖「去重、上限剪枝、事件发布」的完整回归，风险高于收益 |
+| `MouseTriggerMonitor`（`DispatchSource` timer） | **不该改**：长按阈值检测在 C 回调邻域，`DispatchSource` 的精度与阻塞语义正是这里需要的 |
+| `ShellCommandRunner`（`DispatchQueue`） | **不该改**：代码里已注明理由（所有可变状态都在 `lock` 临界区内），改 `Task` 会让进程句柄的清理时机更难推理 |
+| `PermissionDrag`（0.4s） | 低优先，且它已有退出路径处理 |
+| `AIPortalView` / `TimestampConverterView`（`Timer.publish`） | 值得改，纯 SwiftUI 内，风险低 |
+
+审计时我把这 6 处并列成「都该迁移」，这是错的 —— `AGENTS.md` 的「不要用 `DispatchQueue`」
+是针对**新的**代码，而这三处的取舍是「已稳定的系统事件通路」，盲目迁移会引入真实回归。
+**这是一处需要纠正的审计判断**：规矩不该被机械套用到已经论证过的例外上。
+
+真正该改的两处是 `AIPortalView` 与 `TimestampConverterView` 的 `Timer.publish`，
+它们用 `.task` + `Task.sleep` 更简单，且随视图消失自动取消。这一项留待后续，
+因为它与本次架构重构无关，且需要单独验证每秒刷新的时间显示没有跳动。
+
 ---
 
 ## 执行顺序与依赖关系
 
 ```
-Phase 0 (清死代码)
+Phase 0 (清死代码)              ✅ 完成
    ↓
-Phase 1 (契约解耦)  ← 必须先行，Phase 2/4 都依赖它引入的能力协议
+Phase 1 (契约解耦)              ✅ 完成
    ↓
-   ├── Phase 2 (搜索管线)  ← 收益最大，风险最高
-   ├── Phase 4 (设置页下沉) ← 可与 Phase 2 并行
-   └── Phase 3 (依赖注入)
+   ├── Phase 2 (搜索管线)        ✅ 完成（含触发词守卫）
+   ├── Phase 4 (设置层拆分)      ✅ 协议拆分完成，设置页搬家未做
+   └── Phase 3 (依赖注入)        ✅ 不可变注入完成，拆类型未做
    ↓
-Phase 5 (并发与测试补齐)
+Phase 5 (并发与测试)            ⚠️ 测试迁移完成；Timer 迁移有意保留
 ```
 
 **每个 Phase 独立提交**，遵循 `AGENTS.md` 的提交规范（英文、Conventional Commits、
 一个提交只做一件事）。Phase 之间不要混提，否则「哪次改坏了」无法追溯。
+
+本次实际提交序列：
+
+```
+docs: record the 2026-09 architecture audit and its refactor plan
+fix(calculator): make MathParser a value type instead of unchecked Sendable
+refactor(core): drop the legacy search API and take SwiftUI out of the protocol
+refactor(plugins): adopt the view capability protocol and unblock search from the main actor
+feat(tooling): fail the test run when two plugins claim the same trigger word
+```
 
 **每个 Phase 完成后的强制收尾**（照 `AGENTS.md`）：
 
@@ -472,6 +692,17 @@ Phase 5 (并发与测试补齐)
 ./Scripts/build.sh         # 无新增警告（基线 0）
 ./Scripts/restart.sh       # 必须重启新实例，不能只 build
 ```
+
+### 本轮验收记录
+
+| 项目 | 结果 |
+| --- | --- |
+| `./Scripts/run-tests.sh` | 28 个包全绿（约 720 个测试） |
+| `./Scripts/build.sh` | 成功，**0 新增警告** |
+| 实际启动 `.app` | 进程存活，空闲 CPU 0.1–0.2 % |
+| 面板唤出 | `-showPalette` 实测 34.0 ms 到可见 |
+| 搜索链路 | 25 插件注册、10 条事件订阅、83 条静态命令 |
+| 无 error/fault | 启动全流程仅 1 条 search 超 50ms 的 warning |
 
 ---
 

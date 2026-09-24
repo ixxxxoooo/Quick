@@ -103,10 +103,12 @@ EventKit、Vision、Spotlight、CoreLocation、Accessibility、`screencapture` �
 - `EventBus`：订阅/取消订阅/`removeAll` 的语义。
 
 **应测（契约层）**
-- 每个 `QuickPlugin`：`searchItems` 对空查询与正常查询的行为、
-  `id` 的唯一性、`deactivate()` 是否落盘。
+- 每个 `QuickPlugin`：`commands` 的 id 前缀与唯一性、`accepts` 闸门行为、
+  `dynamicSearch` 对空查询与正常查询的行为、`deactivate()` 是否落盘。
 - 关键不变量：`hidesOnDeactivate == false`、面板尺寸有效、
   `SearchableItem.id` 在同一插件内不重复。
+- **触发词唯一性由 `Scripts/check-trigger-words.py` 统一守**（已接入 `run-tests.sh`），
+  插件测试里不必重复实现跨插件扫描。
 
 **不测（除非另有理由）**
 - SwiftUI 视图的像素级外观 —— 那靠人工验收与 `docs/ui.md` 的规范约束。

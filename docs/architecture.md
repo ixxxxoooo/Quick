@@ -107,47 +107,53 @@
 ```swift
 @MainActor
 public protocol QuickPlugin: AnyObject, Sendable {
-    static var id: String { get }
-    static var name: String { get }
-    static var icon: String { get }
-    static var commands: [CommandDescriptor] { get } // 默认为「打开本插件」
+    // 元数据：nonisolated，因为搜索路径要脱离主 actor 读它们
+    nonisolated static var id: String { get }
+    nonisolated static var name: String { get }
+    nonisolated static var icon: String { get }
+    nonisolated static var commands: [CommandDescriptor] { get } // 默认为「打开本插件」
     var isEnabled: Bool { get set }
-    func searchItems(query: String) async -> [SearchableItem]
-    func accepts(query: String) -> Bool          // 动态搜索闸门，默认 false
-    func dynamicSearch(query: String) async -> [SearchableItem]
+    nonisolated func accepts(query: String) -> Bool          // 动态搜索闸门，默认 false
+    nonisolated func dynamicSearch(query: String) async -> [SearchableItem]
     func perform(commandID: String)              // 热键和搜索共用
-    func makeView() -> AnyView
-    func makeSettingsView() -> AnyView?
     func activate()
     func deactivate()
+    static var storageMigrations: [SQLiteMigration] { get }
 }
 ```
 
-协议提供了默认实现：`commands` 默认一条打开插件的命令、`accepts` 默认 false、
-`dynamicSearch` 默认空、`perform` 默认导航进插件面板、`isEnabled` 默认 `true`、
-`makeSettingsView` 默认 `nil`、`searchItems` 默认空、`activate`/`deactivate` 默认无操作、
-`defaultItems` 默认取「触发词裸查询的第一条」。**只实现你需要的那些**，
-不要写空实现占位。
+**视图不在这个协议里。** 插件的主视图与设置页由 `QuickUI` 声明的两个能力协议提供，
+宿主用 `as?` 运行时查询：
 
-### 主面板搜索：双轨
+```swift
+public protocol PluginViewProviding { func makeView() -> AnyView }
+public protocol PluginSettingsProviding { func makeSettingsView() -> AnyView? }
+```
+
+这样 `QuickCore` 不必认识 SwiftUI。代价是查询失败只会在运行期暴露 —— 所以宿主在
+`as?` 落空时必须打 `.error`，否则「忘了实现协议」会表现成面板一片空白而没有线索。
+
+协议提供了默认实现：`commands` 默认一条打开插件的命令、`accepts` 默认 false、
+`dynamicSearch` 默认空、`perform` 默认导航进插件面板、`makeSettingsView` 默认 `nil`、
+`activate`/`deactivate` 默认无操作。**只实现你需要的那些**，不要写空实现占位。
+
+### 主面板搜索
 
 [`PaletteSearchEngine`](../Packages/QuickUI/Sources/QuickUI/Panel/PaletteSearchEngine.swift)
 负责主面板聚合搜索；协调器只注入插件列表、静态命令快照与执行回调。
 
-**主路径（新插件必须走这条）**
-
-- 静态：`static var commands` → 启动时快照为 `CommandIndex`，按键时在后台线程打分。
-- 动态：实现 `accepts(query:)` 闸门 + `dynamicSearch(query:)`，只有闸门为真时才并发调用，
-  单插件超时 2 秒即放弃等待。
+- 静态：`nonisolated static var commands` → 启动时快照为 `CommandIndex`，按键时打分。
+- 动态：实现 `accepts(query:)` 闸门 + `dynamicSearch(query:)`，只有闸门为真时才并发调用。
 - 执行：命中静态命令走 `perform(commandID:)`（与快捷键同 id）。
 
-**Legacy 路径（逐步废弃，新插件不要实现）**
+**闸门与 `dynamicSearch` 都是 `nonisolated`。** 它们跑在脱离主 actor 的搜索路径上，
+所以实现里不许碰主 actor 隔离的状态。需要读实例数据（store、缓存）的插件要给搜索
+准备一份不可变快照 —— 参考 `NoteStore` / `ClipboardStore` 的 `searchSnapshot`。
+这不是可选优化：`nonisolated` 函数**不能**调用 `@MainActor` 方法，那是编译错误。
 
-- `searchItems(query:)` —— **主面板聚合搜索已不再调用**；仍留在协议里供旧插件与
-  `defaultItems` 默认实现内部使用。
-- `defaultItems()` —— **仅供首屏遗留用途**（空查询时每个插件至多贡献一条入口）；
-  新插件应靠 `commands` 里 `showsWhenQueryEmpty` 的静态命令出现在首屏，不要覆盖
-  `defaultItems` 去调 `searchItems`。
+搜索返回 `PaletteSearchOutcome` 而不是裸数组：它带着「哪些插件超时了」。超时会被
+真正取消（因为 `dynamicSearch` 不再占着主 actor），且面板会把「没搜完」和「没找到」
+分开显示 —— 以前超时静默返回空数组，用户看到的是「没找到」，而下一步该做什么完全不同。
 
 空查询还会在聚合排序后用 `UsageHistory` 做 `PaletteSearchEngine.promotingRecents`（最近 12 条）。
 命令 id 和插件 id 一样，发布后不能改。
@@ -170,13 +176,13 @@ public protocol QuickPlugin: AnyObject, Sendable {
 
 - **`static var id` 一旦发布就不能改。** 它是 `SettingsKey.pluginEnabled(id)` 的键，
   改了等于用户设置丢失。
-- **新插件不要实现 `searchItems` / `defaultItems` 作为主搜索路径。** 主搜索走
-  `commands` + `dynamicSearch`（见上文双轨）；遗留 API 长期将从协议移除。
-- **`searchItems`（Legacy）必须是纯查询。** 不要在里面激活插件、写盘、发网络请求、改
-  `isEnabled`。仅在被 `defaultItems` 等遗留路径调用时才会跑；要缓存就在 `activate()` 里预热。
-- **`defaultItems()`（Legacy）** 在首屏每条最多出一次；新插件用静态命令的
-  `showsWhenQueryEmpty` 代替。仍覆盖它的插件：默认实现会经 `searchItems` 取触发词第一条；
-  `LauncherPlugin` 覆盖返回空 —— 应用列表本身就是首屏主体。
+- **主搜索只走 `commands` + `dynamicSearch`。** 遗留的 `searchItems` / `defaultItems`
+  已从协议删除（见 [refactor-plan.md](refactor-plan.md) Phase 0）。
+- **触发词必须全局唯一。** `matchesAnyTrigger` 是子串匹配，两个插件声明同一个词会让
+  同一条查询同时唤醒它们。通用词放 `CommandDescriptor.keywords`（命令级关键词允许重复，
+  索引会统一打分排序）。`Scripts/check-trigger-words.py` 会在 `run-tests.sh` 里失败。
+- **`nonisolated` 的搜索不许碰主 actor 状态。** 需要读 store 的插件要准备不可变快照，
+  参考 `NoteStore` / `ClipboardStore` 的 `searchSnapshot`。
 - **`dynamicSearch` 必须尊重取消。** 调用方（`PaletteSearchEngine`）并发且带超时，
   插件内部若有昂贵准备，要检查 `Task.isCancelled`。
 - **`makeView()` 返回的视图不要持有 `AppCore`。** 需要能力就通过插件构造器注入。

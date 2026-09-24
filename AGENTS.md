@@ -88,9 +88,10 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
   **绝不**另起一个并行的单例。视图通过 `@Environment` 拿协调器，不直接拿 `AppCore`。
   除 `AppCore.shared`、`EventBus.shared` 外，仅允许有意的工具单例：`IconCache.shared`、
   `KeychainStore.shared`（宿主应通过 `AppCore.iconCache` 与注入的 `SecretStoring` 使用）。
-- **新插件主搜索只走 `commands` + `dynamicSearch`。** 禁止把 `searchItems` / `defaultItems`
-  当作主路径；二者为遗留 API，长期将从 `QuickPlugin` 移除（勿在协议要求上加 `@available` 废弃，
-  否则会全仓警告）。
+- **插件主搜索只走 `commands` + `dynamicSearch`。** 遗留的 `searchItems` / `defaultItems`
+  已从 `QuickPlugin` 删除 —— 不要再加回来，也不要为兼容而保留包装层。
+- **新插件视图走 `PluginViewProviding` / `PluginSettingsProviding`（`QuickUI` 声明）。**
+  核心协议不认识 SwiftUI，宿主用 `as?` 运行时查询并在此落空时打 `.error`。
 - **插件只在 `AppCore.registerPlugins()` 里实例化。** 这是全仓唯一 `plugins.append(...)` 的地方。
   插件**不自注册**，没有插件扫描，没有服务定位器。
 - **插件之间只通过 `EventBus` 通信。** 插件互不 `import`、互不持有引用、互不直接调用。
