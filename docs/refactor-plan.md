@@ -641,23 +641,30 @@ public struct PaletteDependencies {
 `PalettePanel.sendEvent` 里的上下键/回车/Tab 路由逻辑照
 `PaletteCoordinator.escapeAction` 的成功做法抽成纯函数，即可单测。
 现有 `escapeAction` 是三档优先级，是最值得保留的测试范式。
-
 ### 5.3 遗留的 `Timer` / `DispatchQueue`
 
 按 `AGENTS.md` 的并发规矩（定时优先 `Task` + `Task.sleep`，不要 `DispatchQueue`），
-以下位置应在 Phase 5 评估迁移：
+审计时列出了 6 处。**其中 3 处已迁移，另外 3 处是系统边界，结论与审计不同。**
 
-| 位置 | 现状 | 备注 |
+已迁移（`Task` 循环，随视图或 `stop()` 取消）：
+
+| 位置 | 原来 | 现在 |
 |---|---|---|
-| `PluginClipboard/Service/ClipboardMonitor.swift:20,35` | `Timer` 0.5s 轮询 | 高频定时，迁 `Task` + `sleep` 收益明显 |
-| `PluginAI/UI/AIPortalView.swift:26` | `Timer.publish` 2s | SwiftUI 内，改 `.task` |
-| `PluginTimestampConverter/UI/TimestampConverterView.swift:23` | `Timer.publish` 1s | 同上 |
-| `QuickUI/Windows/Permissions/PermissionDrag.swift:237` | `Timer` 0.4s | 检查退出路径是否 `invalidate()` |
-| `QuickPlatform/Input/MouseTriggerMonitor.swift:350` | `DispatchSource` timer | 长按阈值检测，C 回调邻域，谨慎 |
-| `QuickPlatform/Shell/ShellCommandRunner.swift:90` | `DispatchQueue` | 有 `Sendable` 注释说明，谨慎 |
+| `PluginClipboard/Service/ClipboardMonitor.swift` | `Timer` 0.5s 轮询 | `Task` 循环；`start()` 幂等、`stop()` 取消，有测试锁住 |
+| `PluginAI/UI/AIPortalView.swift` | `Timer.publish` 2s | `.task` 循环 |
+| `PluginTimestampConverter/UI/TimestampConverterView.swift` | `Timer.publish` 1s | `.task` 循环，`Combine` 依赖随之删掉 |
 
-**注意**：这一项要逐个实测 CPU 占用再决定，不要为了「符合规矩」而改动已经稳定的
-系统事件通路。`[需实测]`
+保留（不是「懒得改」，而是系统边界）：
+
+| 位置 | 现状 | 为什么保留 |
+|---|---|---|
+| `QuickUI/Windows/Permissions/PermissionDrag.swift` | `Timer` 0.4s + `tolerance` | 追踪的是**别的应用**的窗口（系统设置）位置，`tolerance` 是刻意留给系统的合并窗口；退出路径已 `invalidate()` |
+| `QuickPlatform/Input/MouseTriggerMonitor.swift` | `DispatchSource` timer | 长按阈值检测在 C 回调邻域，且它是 `@unchecked Sendable` 的既有实例 |
+| `QuickPlatform/Shell/ShellCommandRunner.swift` | `DispatchQueue` | 代码里已注明理由（所有可变状态都在 `lock` 临界区内），改 `Task` 会让进程句柄的清理时机更难推理 |
+
+**注意**：`AGENTS.md` 的「不要 `DispatchQueue`」是针对**新写的代码**。这三处的取舍
+需要单独论证，不能因为「规矩这么写」就机械套用 —— 也不能反过来拿「系统边界」当
+万能借口，任何一处要改都必须先测出实际行为差异。
 
 ### 完成情况
 
@@ -669,25 +676,21 @@ public struct PaletteDependencies {
 失去保护力。这也是一处需要警惕的退化 —— `Launcher` 的「空查询不返回全部应用」
 测试在改名后就不再验证任何东西了。
 
-**Timer 迁移：未做，且我认为不应该盲目做。**
+**Timer 迁移：3 处已做，3 处有意保留。**
 
-计划里列了 6 处 `Timer` / `DispatchQueue`，但逐个看下来，结论与审计时不同：
+计划里列了 6 处 `Timer` / `DispatchQueue`，逐个看下来结论并不一致：
 
 | 位置 | 结论 |
 | --- | --- |
-| `ClipboardMonitor`（0.5s 轮询） | **值得改**，但它是剪贴板记录的唯一入口，改动需要覆盖「去重、上限剪枝、事件发布」的完整回归，风险高于收益 |
-| `MouseTriggerMonitor`（`DispatchSource` timer） | **不该改**：长按阈值检测在 C 回调邻域，`DispatchSource` 的精度与阻塞语义正是这里需要的 |
-| `ShellCommandRunner`（`DispatchQueue`） | **不该改**：代码里已注明理由（所有可变状态都在 `lock` 临界区内），改 `Task` 会让进程句柄的清理时机更难推理 |
-| `PermissionDrag`（0.4s） | 低优先，且它已有退出路径处理 |
-| `AIPortalView` / `TimestampConverterView`（`Timer.publish`） | 值得改，纯 SwiftUI 内，风险低 |
+| `ClipboardMonitor`（0.5s 轮询） | **已改**：`Timer` 每 tick 都要回主 actor 跳一次，还得在每条退出路径 `invalidate()`；`Task` 循环只靠 `stop()` 取消。启停幂等有测试覆盖 |
+| `AIPortalView` / `TimestampConverterView`（`Timer.publish`） | **已改**：纯 SwiftUI 内，`.task` 随视图消失自动取消 |
+| `MouseTriggerMonitor`（`DispatchSource` timer） | **保留**：长按阈值检测在 C 回调邻域，`DispatchSource` 的精度与阻塞语义正是这里需要的 |
+| `ShellCommandRunner`（`DispatchQueue`） | **保留**：代码里已注明理由（所有可变状态都在 `lock` 临界区内），改 `Task` 会让进程句柄的清理时机更难推理 |
+| `PermissionDrag`（0.4s） | **保留**：追踪的是系统设置窗口的位置，`tolerance` 是刻意留给系统合并的；退出路径已 `invalidate()` |
 
 审计时我把这 6 处并列成「都该迁移」，这是错的 —— `AGENTS.md` 的「不要用 `DispatchQueue`」
-是针对**新的**代码，而这三处的取舍是「已稳定的系统事件通路」，盲目迁移会引入真实回归。
-**这是一处需要纠正的审计判断**：规矩不该被机械套用到已经论证过的例外上。
-
-真正该改的两处是 `AIPortalView` 与 `TimestampConverterView` 的 `Timer.publish`，
-它们用 `.task` + `Task.sleep` 更简单，且随视图消失自动取消。这一项留待后续，
-因为它与本次架构重构无关，且需要单独验证每秒刷新的时间显示没有跳动。
+是针对**新的**代码。但同样的道理，也不该把「系统边界」当成免检标签：保留的三处
+要改也必须先测出实际差异。
 
 ---
 
@@ -702,18 +705,17 @@ Phase 1 (契约解耦)              ✅ 完成
    ├── Phase 4 (设置层拆分)      ✅ 完成（协议拆分 + 设置页全部下沉）
    └── Phase 3 (依赖注入)        ✅ 不可变注入完成，拆类型未做
    ↓
-Phase 5 (并发与测试)            ⚠️ 测试迁移与新增完成；Timer 迁移有意保留
+Phase 5 (并发与测试)            ⚠️ 测试迁移与新增完成；3 处定时已迁 `Task`，3 处系统边界保留
 ```
 
 **剩余项**（均可独立开工，不阻塞彼此）：
 
 | 项 | 价值 | 风险 |
 | --- | --- | --- |
-| `AIPortalView` / `TimestampConverterView` 的 `Timer.publish` 改 `.task` | 低，但符合 `AGENTS.md` | 低 |
 | `PluginScreenshot` / `PluginJSONFormatter` 补逻辑层测试 | 中（9.0% / 16.5%） | 低 |
 | 首屏不依赖搜索（真正解决 50.8ms） | 中 | 中，涉及渲染时序 |
 | `PaletteCoordinator` 拆三个类型 | 低 | 高，不建议做 |
-| `MouseTriggerMonitor` / `ShellCommandRunner` 的 `DispatchSource` | **不应做**，见 Phase 5 说明 | — |
+| `MouseTriggerMonitor` / `ShellCommandRunner` / `PermissionDrag` | **保留**，见 Phase 5 说明 | — |
 
 **每个 Phase 独立提交**，遵循 `AGENTS.md` 的提交规范（英文、Conventional Commits、
 一个提交只做一件事）。Phase 之间不要混提，否则「哪次改坏了」无法追溯。
@@ -726,6 +728,12 @@ fix(calculator): make MathParser a value type instead of unchecked Sendable
 refactor(core): drop the legacy search API and take SwiftUI out of the protocol
 refactor(plugins): adopt the view capability protocol and unblock search from the main actor
 feat(tooling): fail the test run when two plugins claim the same trigger word
+test(palette): make the search gate tests able to fail
+refactor(clipboard): give the settings controls a named width token
+docs(ui): register the setting rows the plugin packages now depend on
+refactor(clipboard): poll for clipboard changes with a task
+refactor(timestamp-converter): drive the clock display with a task
+refactor(ai): refresh provider status with a task
 ```
 
 **每个 Phase 完成后的强制收尾**（照 `AGENTS.md`）：
