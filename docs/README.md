@@ -12,6 +12,7 @@
 | [ui.md](ui.md) | 设计令牌、面板几何、间距/颜色/字体/动画规范、组件清单与复用纪律、无障碍 |
 | [development.md](development.md) | 环境、命令、构建、调试、提交、加插件、数据位置、发布 |
 | [features.md](features.md) | 每个功能插件的不变量与内部约定；改某个插件前必读 |
+| [refactor-plan.md](refactor-plan.md) | 2026-09 架构审计的结论与五阶段重构计划；动架构前先读它，避免重复踩已知的坑 |
 
 ## features.md
 
