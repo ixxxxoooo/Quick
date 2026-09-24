@@ -143,6 +143,65 @@ struct JSONFormatterLogicTests {
     }
 }
 
+// MARK: - 节点文本
+
+@Suite("JSON 节点文本")
+struct JSONNodeTextTests {
+
+    /// 复制出去的必须是**合法 JSON**：键与字符串值里的引号、反斜杠、控制字符都要转义，
+    /// 否则用户粘到编辑器里就是一段语法错误的文本。
+    @Test("紧凑文本转义引号、反斜杠与控制字符")
+    func compactTextEscapes() {
+        let node = JSONNode.object([
+            JSONNode.Pair(key: "quote\"key", value: .string("line1\nline2\\end\ttab")),
+            JSONNode.Pair(key: "control", value: .string("\u{01}"))
+        ])
+
+        let text = node.compactText()
+        #expect(text.contains(#""quote\"key""#))
+        #expect(text.contains(#"\n"#))
+        #expect(text.contains(#"\\end"#))
+        #expect(text.contains(#"\t"#))
+        #expect(text.contains(#"\u0001"#))
+        // 转义之后仍要能被解析回来
+        #expect((try? JSONFormatterLogic.parseTree(text)) != nil)
+    }
+
+    /// 整数值不能输出成 `1.0` —— 用户拿它当 ID 用时会被下游当成浮点
+    @Test("整数按整数输出，小数保持原样")
+    func numberTextKeepsIntegersIntegral() {
+        #expect(JSONNode.numberText(1) == "1")
+        #expect(JSONNode.numberText(-42) == "-42")
+        #expect(JSONNode.numberText(1.5) == "1.5")
+        // 超出 Int64 精确范围的值不能再当成整数取整
+        #expect(JSONNode.numberText(1e20) != "100000000000000000000")
+    }
+
+    /// 路径是折叠状态的键，同一种结构必须每次得到同一个路径 —— 否则折叠会错位
+    @Test("同名键与嵌套数组的路径互不冲突")
+    func rowPathsAreDistinct() throws {
+        let root = try JSONFormatterLogic.parseTree(#"{"a":[{"a":1}],"b":[{"a":2}]}"#)
+        let rows = JSONTreeLayout.rows(
+            root: root, collapsed: JSONTreeLayout.defaultCollapsed(root), query: "1")
+
+        let ids = rows.map(\.id)
+        #expect(Set(ids).count == ids.count, "路径必须唯一，重复会让 ForEach 进入未定义行为")
+        #expect(ids.contains { $0.contains("[\"a\"]") })
+        #expect(ids.contains { $0.contains("[0]") })
+    }
+
+    @Test("搜索只命中叶子，不因容器子节点命中而重复标记")
+    func searchMarksOnlyMatchingLeaves() throws {
+        let root = try JSONFormatterLogic.parseTree(#"{"outer":{"inner":"findme"}}"#)
+        let rows = JSONTreeLayout.rows(
+            root: root, collapsed: JSONTreeLayout.defaultCollapsed(root), query: "findme")
+
+        let matched = rows.filter(\.matchesQuery)
+        #expect(matched.count == 1, "只有叶子自身命中，容器不该被一起标记")
+        #expect(matched.first?.key == "inner")
+    }
+}
+
 @MainActor
 @Suite("JSON 格式化插件契约")
 struct JSONFormatterPluginTests {
