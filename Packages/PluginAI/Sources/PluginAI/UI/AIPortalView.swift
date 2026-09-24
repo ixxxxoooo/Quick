@@ -22,9 +22,6 @@ struct AIPortalView: View {
     @State private var feedbackMessage: String?
     @State private var reloadingID: String?
 
-    /// 定时刷新活跃状态
-    private let pollTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
-
     var body: some View {
         ScrollView {
             VStack(spacing: DesignTokens.Spacing.lg) {
@@ -39,8 +36,14 @@ struct AIPortalView: View {
             }
             .padding(DesignTokens.Spacing.lg)
         }
-        .onAppear { refreshActive() }
-        .onReceive(pollTimer) { _ in refreshActive() }
+        .task {
+            // 窗口开了关、关了开都在主 actor 上，2 秒的轮询足够近；`Timer.publish` 换不掉
+            // 这一个，但 `Task` 好在视图消失时自动取消，不会留一个孤儿定时器
+            while !Task.isCancelled {
+                refreshActive()
+                try? await Task.sleep(for: Self.activeRefreshInterval)
+            }
+        }
         .overlay(alignment: .bottom) {
             // 操作反馈 Toast
             if let msg = feedbackMessage {
@@ -293,6 +296,11 @@ struct AIPortalView: View {
         .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
         .padding(.bottom, DesignTokens.Spacing.lg)
     }
+
+    /// 活跃状态的刷新间隔
+    ///
+    /// 窗口的开关都由本插件自己发起，2 秒足够贴近；再密只是白跑主 actor。
+    private static let activeRefreshInterval = Duration.seconds(2)
 
     // MARK: - 辅助
 
