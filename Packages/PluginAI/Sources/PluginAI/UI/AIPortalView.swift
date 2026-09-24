@@ -37,8 +37,8 @@ struct AIPortalView: View {
             .padding(DesignTokens.Spacing.lg)
         }
         .task {
-            // 窗口开了关、关了开都在主 actor 上，2 秒的轮询足够近；`Timer.publish` 换不掉
-            // 这一个，但 `Task` 好在视图消失时自动取消，不会留一个孤儿定时器
+            // 窗口开关都由本插件自己发起，2 秒的轮询足够贴近；`Task` 的好处是视图
+            // 消失时自动取消，不会留下一个孤儿定时器
             while !Task.isCancelled {
                 refreshActive()
                 try? await Task.sleep(for: Self.activeRefreshInterval)
