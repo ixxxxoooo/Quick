@@ -4,8 +4,10 @@
 
 import CoreGraphics
 import Foundation
+import ImageIO
 import QuickCore
 import Testing
+import UniformTypeIdentifiers
 
 @testable import PluginScreenshot
 
@@ -127,6 +129,110 @@ struct ScreenshotGeometryTests {
 
         let transformed = annotation.transformed(offset: .zero, scale: 2)
         #expect(transformed.kind == .text(origin: CGPoint(x: 10, y: 10), string: "hi", fontSize: 36))
+    }
+}
+
+// MARK: - 裁剪、缩放与编码
+
+@Suite("截图裁剪与编码")
+struct CaptureOutputTests {
+
+    /// 200×100 像素的假显示器：画布 100×50 point → scale = 2
+    private func makeSnapshot(width: Int = 200, height: Int = 100) throws -> DisplaySnapshot {
+        let image = try makeImage(width: width, height: height)
+        return DisplaySnapshot(
+            displayID: 1,
+            screenFrameInPoints: CGRect(x: 0, y: 0, width: CGFloat(width) / 2, height: CGFloat(height) / 2),
+            nominalScaleFactor: 2,
+            image: image)
+    }
+
+    @Test("整屏选区裁出来的就是整张图")
+    func cropWholeCanvasKeepsImageSize() throws {
+        let snapshot = try makeSnapshot()
+        let cropped = try #require(
+            CaptureOutput.crop(snapshot, toLocalRect: CGRect(x: 0, y: 0, width: 100, height: 50)))
+
+        #expect(cropped.width == 200)
+        #expect(cropped.height == 100)
+    }
+
+    /// 选区可以拖出屏幕外（用户把鼠标甩到另一块屏上），此时越界部分要被切掉。
+    ///
+    /// 这条断言单看有点弱 —— `CGImage.cropping(to:)` 自己就会裁到图像边界。
+    /// 留下它是因为**它同时锁住了背面**：`snapshot.pixelSize` 与底图尺寸必须一致，
+    /// 只改 `pixelSize` 而忘了同步底图时，这里会露出尺寸对不上的问题。
+    @Test("超出画布的选区被钳制到图像边界")
+    func cropClampsToImageBounds() throws {
+        let snapshot = try makeSnapshot()
+        let cropped = try #require(
+            CaptureOutput.crop(snapshot, toLocalRect: CGRect(x: 60, y: 0, width: 100, height: 50)))
+
+        #expect(cropped.width == 80, "右边界外的部分应当被切掉")
+        #expect(cropped.height == 100)
+        #expect(snapshot.pixelSize == CGSize(width: 200, height: 100))
+    }
+
+    @Test("与画布完全不相交的选区返回 nil")
+    func cropOutsideReturnsNil() throws {
+        let snapshot = try makeSnapshot()
+        #expect(CaptureOutput.crop(snapshot, toLocalRect: CGRect(x: 500, y: 500, width: 10, height: 10)) == nil)
+        // 零面积也不是有效选区
+        #expect(CaptureOutput.crop(snapshot, toLocalRect: .zero) == nil)
+    }
+
+    @Test("缩放按点尺度取整，且不为零")
+    func scaledRoundsToAtLeastOnePixel() throws {
+        let image = try makeImage(width: 200, height: 100)
+
+        let half = CaptureOutput.scaled(image, to: CGSize(width: 100, height: 50))
+        #expect(half.width == 100)
+        #expect(half.height == 50)
+
+        // 缩到不足一像素时仍要出一张 1×1，不能让 CGContext 拿到 0
+        let tiny = CaptureOutput.scaled(image, to: CGSize(width: 0.2, height: 0.2))
+        #expect(tiny.width == 1)
+        #expect(tiny.height == 1)
+    }
+
+    /// 格式与落地扩展名必须一致：文件叫 .jpg 内容却是 PNG，用户拿去上传会被拒
+    @Test("每种格式都产出可解码的数据")
+    func everyFormatEncodes() throws {
+        let image = try makeImage(width: 40, height: 30)
+
+        for format in CaptureFormat.allCases {
+            let data = try #require(CaptureOutput.data(image, format: format), "\(format) 编码失败")
+            #expect(!data.isEmpty)
+
+            let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+            let type = try #require(CGImageSourceGetType(source) as String?)
+            let expected = try #require(UTType(filenameExtension: format.fileExtension))
+            #expect(
+                UTType(type)?.conforms(to: expected) == true,
+                "\(format) 的扩展名是 \(format.fileExtension)，编码出来的却是 \(type)")
+        }
+    }
+
+    @Test("没有标注时烘焙直接返回底图")
+    func flattenWithoutAnnotationsReturnsBase() throws {
+        let image = try makeImage(width: 20, height: 10)
+        let flat = CaptureOutput.flatten(base: image, annotations: [])
+
+        #expect(flat.width == 20)
+        #expect(flat.height == 10)
+    }
+
+    /// 有标注时要走一遍重绘：输出尺寸不变，但已经不是同一个对象
+    @Test("有标注时烘焙保持尺寸并产出新图")
+    func flattenDrawsAnnotations() throws {
+        let image = try makeImage(width: 60, height: 40)
+        let annotation = Annotation(
+            kind: .rectangle(CGRect(x: 5, y: 5, width: 20, height: 20)), color: .red, lineWidth: 3)
+
+        let flat = CaptureOutput.flatten(base: image, annotations: [annotation])
+
+        #expect(flat.width == 60)
+        #expect(flat.height == 40)
     }
 }
 
