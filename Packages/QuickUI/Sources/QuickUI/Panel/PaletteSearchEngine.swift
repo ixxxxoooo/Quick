@@ -78,18 +78,27 @@ public enum PaletteSearchEngine {
         plugins: [any QuickPlugin],
         isSearchSourceEnabled: (String) -> Bool,
         recentItemIDs: [String],
-        invokeCommand: @escaping @MainActor (String) -> Void,
+        invokeCommand: @escaping @MainActor @Sendable (String) -> Void,
         log: Logger
     ) async -> PaletteSearchOutcome {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
         let interval = signpost.beginInterval("palette.search")
         let started = Date()
-        let commands = staticCommands
 
-        let staticHits = await Task.detached {
-            CommandIndex.matching(commands, query: trimmed)
-        }.value
+        // 空查询只做「每插件取一条入口」——83 条命令的遍历加去重，实测 0.05 ms 量级。
+        // 为它付一次 `Task.detached` 的线程跳转是负收益：主线程忙（首次渲染）时那次
+        // 跳转的等待能到 100 ms 级，而它换来的并行节省不到 0.1 ms。
+        // 这里曾经无条件 detach，日志里因此出现过「聚合搜索超过 50ms」的假警报。
+        let staticHits: [CommandHit]
+        if trimmed.isEmpty {
+            staticHits = CommandIndex.matching(staticCommands, query: trimmed)
+        } else {
+            let commands = staticCommands
+            staticHits = await Task.detached {
+                CommandIndex.matching(commands, query: trimmed)
+            }.value
+        }
         if Task.isCancelled {
             signpost.endInterval("palette.search", interval)
             return .empty
