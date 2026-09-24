@@ -739,6 +739,9 @@ docs(ui): register the setting rows the plugin packages now depend on
 refactor(clipboard): poll for clipboard changes with a task
 refactor(timestamp-converter): drive the clock display with a task
 refactor(ai): refresh provider status with a task
+docs: record which timer migrations landed and which are staying
+test(screenshot): cover cropping, scaling and encoding
+test(json-formatter): cover node text escaping and row paths
 ```
 
 **每个 Phase 完成后的强制收尾**（照 `AGENTS.md`）：
