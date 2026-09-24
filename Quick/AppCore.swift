@@ -149,6 +149,18 @@ final class AppCore {
     /// 所有已注册插件
     private(set) var plugins: [any QuickPlugin] = []
 
+    /// 插件 id → 实例
+    ///
+    /// 与 `plugins` 同时维护，由 `rebuildCommandCatalog()` 重建。视图工厂、导航、
+    /// 命令归属都问它，避免每次都遍历数组。
+    private(set) var pluginsByID: [String: any QuickPlugin] = [:]
+
+    /// 命令 id → 负责执行的插件 id
+    ///
+    /// 静态命令与动态命令的前缀回退是两条不同的路：这里只登记静态 `commands`，
+    /// 动态命令（`launcher.app.*`）仍走前缀回退。
+    private var commandOwners: [String: String] = [:]
+
     /// 事件订阅凭证（防止被释放）
     private var subscriptions: [EventSubscription] = []
 
@@ -194,40 +206,44 @@ final class AppCore {
         registerPlugins()
         log.notice("插件注册完成，共 \(self.plugins.count, privacy: .public) 个")
 
-        // 3. 将插件注入到面板协调器，并接上「最近使用」与键盘布局
+        // 3. 注入宿主的全部外部依赖，并把插件交给协调器
+        //
+        // 依赖一次性收进 `PaletteDependencies`：以前这里是六七行 `paletteCoordinator.xxx = ...`，
+        // 漏掉一行不报错，只表现为某个功能静默失效。
         paletteCoordinator.setPlugins(plugins)
         let history = UsageHistory(database: database)
         usageHistory = history
-        paletteCoordinator.usageHistory = history
-        paletteCoordinator.onPanelWillShow = { [weak self] in
-            self?.applyForcedKeyboardLayout()
-        }
-        paletteCoordinator.onPanelDidHide = { [weak self] in
-            self?.restoreKeyboardLayout()
-        }
+        paletteCoordinator.attach(
+            PaletteDependencies(
+                isSearchSourceEnabled: { [weak self] pluginID in
+                    self?.settingsStore.isSearchSourceEnabled(pluginID) ?? true
+                },
+                invokeCommand: { [weak self] commandID in
+                    self?.invoke(commandID: commandID)
+                },
+                onDetach: { [weak self] pluginID in
+                    self?.detachPlugin(pluginID)
+                },
+                onPanelWillShow: { [weak self] in
+                    self?.applyForcedKeyboardLayout()
+                },
+                onPanelDidHide: { [weak self] in
+                    self?.restoreKeyboardLayout()
+                },
+                usageHistory: history
+            ))
+        log.notice("面板协调器依赖已注入")
 
         // 4. 连接事件总线
         wireEventBus()
         log.notice("事件总线接线完成，订阅 \(self.subscriptions.count, privacy: .public) 条")
 
-        // 5. 设置协调器的分离回调
-        paletteCoordinator.onDetach = { [weak self] pluginID in
-            self?.detachPlugin(pluginID)
-        }
-
-        // 6. 启动基础设施服务
+        // 5. 启动基础设施服务
         hotKeyService.onCommand = { [weak self] commandID in
             self?.invoke(commandID: commandID)
         }
         hotKeyService.start()
         wireSuperPanel()
-
-        paletteCoordinator.invokeCommand = { [weak self] commandID in
-            self?.invoke(commandID: commandID)
-        }
-        paletteCoordinator.isSearchSourceEnabled = { [weak self] pluginID in
-            self?.settingsStore.isSearchSourceEnabled(pluginID) ?? true
-        }
 
         // 快捷键录制协调器：录制时暂停/恢复全局快捷键
         ShortcutRecorderCoordinator.shared.onPause = { [weak self] in
@@ -362,14 +378,23 @@ final class AppCore {
     ///
     /// 查找插件实例 → 获取视图 → 创建独立窗口 → 主面板返回搜索模式。
     private func detachPlugin(_ pluginID: String) {
-        guard let plugin = plugins.first(where: { type(of: $0).id == pluginID }),
+        guard let plugin = pluginsByID[pluginID],
             plugin.isEnabled
         else {
             log.warning("分离失败：找不到插件 \(pluginID, privacy: .public) 或插件已禁用")
             return
         }
 
-        let viewProvider = { plugin.makeView() }
+        // 视图能力是运行时查询。`PluginPanelController` 的契约是非可选视图，所以失败时
+        // 退化成空视图 —— 代价是窗口空白，所以这里必须留一条 error 说明根因。
+        let viewProvider = { () -> AnyView in
+            guard let provider = plugin as? PluginViewProviding else {
+                QuickLog.app.error(
+                    "插件 \(pluginID, privacy: .public) 未实现 PluginViewProviding，分离窗口无法显示")
+                return AnyView(EmptyView())
+            }
+            return provider.makeView()
+        }
         let name = type(of: plugin).name
         let icon = type(of: plugin).icon
         let supportsSearch = type(of: plugin).supportsPanelSearch
@@ -744,16 +769,17 @@ final class AppCore {
                 kind: .app, launchPath: app.path)
         }
         if let pluginID = CommandID.openedPluginID(in: id),
-            let plugin = plugins.first(where: { type(of: $0).id == pluginID })
+            let plugin = pluginsByID[pluginID]
         {
             return SuperPanelRecentItem(
                 id: id, title: type(of: plugin).name, icon: type(of: plugin).icon,
                 kind: .plugin, pluginID: pluginID)
         }
-        if let plugin = plugins.first(where: { type(of: $0).commands.contains { $0.id == id } }) {
+        // 功能命令：走命令归属表，与执行路径用的是同一份索引
+        if let ownerID = commandOwners[id], let plugin = pluginsByID[ownerID] {
             return SuperPanelRecentItem(
                 id: id, title: type(of: plugin).name, icon: type(of: plugin).icon,
-                kind: .plugin, pluginID: type(of: plugin).id)
+                kind: .plugin, pluginID: ownerID)
         }
         return nil
     }
@@ -831,21 +857,64 @@ final class AppCore {
         plugin.perform(commandID: commandID)
     }
 
+    /// 按插件 id 取实例
+    ///
+    /// 设置页与事件路由用它；`plugins` 数组仍保留给需要遍历的路径（注册、启停、退出）。
+    func plugin(withID pluginID: String) -> (any QuickPlugin)? {
+        pluginsByID[pluginID]
+    }
+
+    /// 某条命令归哪个插件
+    ///
+    /// 只查静态 `commands` 的登记表；动态命令（`launcher.app.*`）没有归属条目，
+    /// 调用方需要自己认前缀。
+    func pluginID(owningCommand commandID: String) -> String? {
+        commandOwners[commandID]
+    }
+
+    /// 取某条命令的声明
+    ///
+    /// 设置页要用它的标题、关键词与图标来渲染一行 —— 这些信息只在声明里，
+    /// 从执行路径拿不到。
+    func commandDescriptor(of commandID: String, in pluginID: String) -> CommandDescriptor? {
+        guard let plugin = pluginsByID[pluginID] else { return nil }
+        return type(of: plugin).commands.first { $0.id == commandID }
+    }
+
     /// 按命令 id 找到负责执行的插件
+    ///
+    /// 走 `commandOwners` 字典而不是遍历插件数组：设置页、热键、搜索结果都会问
+    /// 「这条命令归谁」，线性扫描会随插件数与命令数一起增长。
     private func plugin(forCommand commandID: String) -> (any QuickPlugin)? {
-        if let owner = plugins.first(where: { type(of: $0).commands.contains { $0.id == commandID } }) {
-            return owner
+        if let ownerID = commandOwners[commandID] {
+            return pluginsByID[ownerID]
         }
-        // 动态命令（如 launcher.app.*、launcher.shell.*）不在静态 `commands` 里，只能按插件 id 前缀回退。
+        // 动态命令（如 `launcher.app.*`、`launcher.shell.*`）不在静态 `commands` 里，
+        // 没有映射条目，只能按插件 id 前缀回退。前缀匹配天然只能遍历，但这类命令
+        // 只在执行时问一次，不在按键热路径上。
         return plugins.first { commandID.hasPrefix(type(of: $0).id + ".") }
     }
 
     /// 用当前插件声明和开关重建静态命令快照，并按开关注册热键
+    ///
+    /// 顺带重建两个查找表（`pluginsByID`、`commandOwners`）—— 它们和命令快照
+    /// 来自同一份数据，分开重建迟早会出现「快照里有的命令索引里没有」。
     func rebuildCommandCatalog() {
         var indexed: [IndexedCommand] = []
-        for plugin in plugins where plugin.isEnabled {
+        var owners: [String: String] = [:]
+        var byID: [String: any QuickPlugin] = [:]
+
+        for plugin in plugins {
             let meta = type(of: plugin)
-            guard settingsStore.isSearchSourceEnabled(meta.id) else { continue }
+            byID[meta.id] = plugin
+
+            // 命令归属与「是否启用」无关：禁用的插件也可能收到热键（用户先绑了键、
+            // 后关掉插件），那时要能找到它并打日志说明它为什么没执行。
+            for command in meta.commands {
+                owners[command.id] = meta.id
+            }
+
+            guard plugin.isEnabled, settingsStore.isSearchSourceEnabled(meta.id) else { continue }
             for command in meta.commands {
                 guard settingsStore.isCommandEnabled(command.id) else { continue }
                 var keywords = command.keywords
@@ -858,12 +927,19 @@ final class AppCore {
                 indexed.append(IndexedCommand(command.replacingKeywords(keywords)))
             }
         }
+
+        pluginsByID = byID
+        commandOwners = owners
         paletteCoordinator.staticCommands = indexed
         hotKeyService.syncRegistrations { [settingsStore] commandID in
             commandID == CommandID.togglePalette
                 || commandID == CommandID.superPanel
                 || settingsStore.isCommandEnabled(commandID)
         }
-        log.notice("命令目录已更新，静态命令 \(indexed.count, privacy: .public) 条")
+        log.notice(
+            """
+            命令目录已更新：静态命令 \(indexed.count, privacy: .public) 条，\
+            登记归属 \(owners.count, privacy: .public) 条
+            """)
     }
 }

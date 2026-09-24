@@ -2,6 +2,7 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
+import QuickCore
 import SwiftUI
 
 /// 插件导航上下文的 Environment 键

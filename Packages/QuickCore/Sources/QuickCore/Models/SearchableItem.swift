@@ -2,7 +2,7 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
-import SwiftUI
+import Foundation
 
 /// 搜索结果的统一模型
 ///

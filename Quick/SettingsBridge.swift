@@ -121,15 +121,15 @@ final class SettingsBridge: SettingsDataSource {
         if pluginID == LauncherPlugin.id {
             return core.loadCustomCommands().map { describe(commandID: CommandID.shell($0.id.uuidString)) }
         }
-        guard let plugin = core.plugins.first(where: { type(of: $0).id == pluginID }) else { return [] }
+        guard let plugin = core.pluginsByID[pluginID] else { return [] }
         return type(of: plugin).commands.map { bindingRow(for: $0) }
     }
 
     /// 把命令 id 解析成设置行。应用和终端命令不在静态声明里，要单独认前缀
     private func describe(commandID: String) -> SettingsCommandBinding {
-        if let command = core.plugins.lazy.compactMap({ plugin in
-            type(of: plugin).commands.first { $0.id == commandID }
-        }).first {
+        if let ownerID = core.pluginID(owningCommand: commandID),
+            let command = core.commandDescriptor(of: commandID, in: ownerID)
+        {
             return bindingRow(for: command)
         }
         if commandID.hasPrefix(CommandID.launchAppPrefix) {
@@ -424,7 +424,7 @@ final class SettingsBridge: SettingsDataSource {
     func setPluginEnabled(_ id: String, enabled: Bool) {
         core.settingsStore.setPluginEnabled(id, enabled: enabled)
 
-        guard let plugin = core.plugins.first(where: { type(of: $0).id == id }) else {
+        guard let plugin = core.pluginsByID[id] else {
             log.warning("找不到插件 \(id, privacy: .public)，设置已保存但未同步实例")
             return
         }
@@ -442,11 +442,13 @@ final class SettingsBridge: SettingsDataSource {
 
     func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView? {
         guard let pluginID = tab.pluginID,
-            let plugin = core.plugins.first(where: { type(of: $0).id == pluginID })
+            let plugin = core.pluginsByID[pluginID]
         else {
             return nil
         }
-        return plugin.makeSettingsView()
+        // 设置页能力同样是运行时查询：没实现就回落到 FeatureSettingsPane 的默认三段式布局，
+        // 这不是错误路径，所以不打日志。
+        return (plugin as? PluginSettingsProviding)?.makeSettingsView()
     }
 
     // MARK: - 超级面板

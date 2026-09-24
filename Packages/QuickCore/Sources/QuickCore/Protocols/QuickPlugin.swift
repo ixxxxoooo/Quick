@@ -2,34 +2,37 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
-import SwiftUI
+import Foundation
 
 /// Feature Plugin 的统一协议
 ///
 /// 所有功能插件（Launcher、Clipboard、DevTools 等）都实现此协议。
 /// AppCore 通过此协议发现、管理、路由插件。
 /// 插件之间不直接依赖，仅通过 EventBus 通信。
+///
+/// **本协议不认识 SwiftUI。** 插件的主视图与设置视图由 `QuickUI` 的
+/// `PluginViewProviding` / `PluginSettingsProviding` 声明 —— 这样核心层能脱离
+/// UI 框架独立编译，`Model/` 的编译期边界检查才名副其实。
 @MainActor
 public protocol QuickPlugin: AnyObject, Sendable {
 
     /// 插件唯一标识（全局唯一，用于事件路由和设置存储）
-    static var id: String { get }
+    nonisolated static var id: String { get }
 
     /// 插件显示名称（出现在搜索结果和设置页面中）
-    static var name: String { get }
+    nonisolated static var name: String { get }
 
     /// 插件图标（SF Symbol 名称）
-    static var icon: String { get }
+    nonisolated static var icon: String { get }
 
     /// 插件功能说明与使用指南
-    static var description: String { get }
+    nonisolated static var description: String { get }
 
     /// 插件的触发词列表（中英双语）
     ///
     /// 用户在搜索框中输入这些词时会唤醒该插件。
     /// 一条命令可以有多个关键字；不同关键字可以打开同一个插件里的不同功能。
-    /// 精确匹配到两条时不执行，避免猜错。
-    static var triggerWords: [String] { get }
+    nonisolated static var triggerWords: [String] { get }
 
     /// 插件是否已启用
     ///
@@ -43,60 +46,40 @@ public protocol QuickPlugin: AnyObject, Sendable {
     /// 声明为 true 的插件（剪贴板、JSON 格式化等）会得到搜索框，文本经
     /// `PluginSearchQuery` 环境对象传进来，由插件自己决定怎么过滤。
     /// **默认不聚焦**，按 ⌘F 才把焦点放进去。
-    static var supportsPanelSearch: Bool { get }
+    nonisolated static var supportsPanelSearch: Bool { get }
 
-    /// **Legacy：** 旧版逐插件搜索入口
+    /// 插件自己声明的功能命令（不含「打开本插件」）
     ///
-    /// 主面板聚合搜索（`PaletteSearchEngine`）**不再调用**此方法。
-    /// 新插件应走 `commands` + `accepts`/`dynamicSearch`；仅保留供尚未迁移的插件与
-    /// `defaultItems` 默认实现内部使用。
-    /// - Parameter query: 用户在搜索框中输入的文本
-    /// - Returns: 匹配的搜索结果项
-    func searchItems(query: String) async -> [SearchableItem]
+    /// **必须是协议要求，不能只在扩展里给默认实现** —— 否则默认的 `commands`
+    /// 会静态派发到这个空默认，而不是各插件自己的实现，功能命令会被悄悄丢掉。
+    nonisolated static var functionCommands: [CommandDescriptor] { get }
 
-    /// 构建插件的主视图（显示在面板中）
-    func makeView() -> AnyView
+    /// 这个插件声明的静态命令
+    ///
+    /// 默认是一条「打开本插件」+ `functionCommands`。结果会随输入变化的插件改走
+    /// `dynamicSearch`，并把这里留空或只放不会重复的入口。命令 id 一旦发布就不能改。
+    nonisolated static var commands: [CommandDescriptor] { get }
 
-    /// 构建插件的设置视图（显示在设置窗口中，无设置则返回 nil）
-    func makeSettingsView() -> AnyView?
+    /// 这次查询要不要走动态搜索
+    ///
+    /// 返回 false 时聚合器不会调用 `dynamicSearch`。闸门必须便宜：它在每次按键、
+    /// 每个已启用插件上都会跑，而且**不许碰主 actor 状态** —— 见 `dynamicSearch` 的说明。
+    nonisolated func accepts(query: String) -> Bool
+
+    /// 按查询现算的结果
+    ///
+    /// 只在 `accepts` 为真时调用。循环里要看 `Task.isCancelled`，新的一次按键会取消上一次。
+    ///
+    /// **`nonisolated`**：搜索期间主 actor 同时要处理按键与渲染，插件在这里做的
+    /// CPU 密集或阻塞工作会直接变成输入延迟。需要读实例状态的实现应把状态做成
+    /// `let` + `Sendable` 的快照，或把计算放进 `nonisolated` 函数里。
+    nonisolated func dynamicSearch(query: String) async -> [SearchableItem]
 
     /// 插件激活（应用启动或插件被启用时调用）
     func activate()
 
     /// 插件停用（应用退出或插件被禁用时调用）
     func deactivate()
-
-    /// **Legacy：** 首屏（空查询）时想展示的条目
-    ///
-    /// 主搜索首屏优先靠 `commands` 里 `showsWhenQueryEmpty` 的静态命令。
-    /// 此方法仅供尚未迁移的插件；新插件不要覆盖它。
-    ///
-    /// 默认实现取「触发词裸查询经 `searchItems` 的第一条」—— 只取一条是有意的，
-    /// 避免首屏变成插件自己的列表页。
-    func defaultItems() async -> [SearchableItem]
-
-    /// 插件自己声明的功能命令（不含「打开本插件」）
-    ///
-    /// **必须是协议要求，不能只在扩展里给默认实现** —— 否则默认的 `commands`
-    /// 会静态派发到这个空默认，而不是各插件自己的实现，功能命令会被悄悄丢掉。
-    static var functionCommands: [CommandDescriptor] { get }
-
-    /// 这个插件声明的静态命令
-    ///
-    /// 默认是一条「打开本插件」+ `functionCommands`。结果会随输入变化的插件改走
-    /// `dynamicSearch`，并把这里留空或只放不会重复的入口。命令 id 一旦发布就不能改。
-    static var commands: [CommandDescriptor] { get }
-
-    /// 这次查询要不要走动态搜索
-    ///
-    /// 返回 false 时聚合器不会调用 `dynamicSearch`。闸门必须便宜：
-    /// 它在每次按键、每个已启用插件上都会跑。
-    func accepts(query: String) -> Bool
-
-    /// 按查询现算的结果
-    ///
-    /// 只在 `accepts` 为真时调用。循环里要看 `Task.isCancelled`，新的一次按键会取消上一次。
-    func dynamicSearch(query: String) async -> [SearchableItem]
 
     /// 执行一条命令
     ///
@@ -121,35 +104,29 @@ public protocol QuickPlugin: AnyObject, Sendable {
 public extension QuickPlugin {
 
     /// 默认无触发词
-    static var triggerWords: [String] { [] }
+    nonisolated static var triggerWords: [String] { [] }
 
     /// 默认不在面板里提供插件内搜索
-    static var supportsPanelSearch: Bool { false }
+    nonisolated static var supportsPanelSearch: Bool { false }
 
     /// 默认无功能说明
-    static var description: String { "" }
-
-    /// 默认无设置视图
-    func makeSettingsView() -> AnyView? { nil }
-
-    /// Legacy：默认空搜索结果（主面板不再聚合调用）
-    func searchItems(query: String) async -> [SearchableItem] { [] }
+    nonisolated static var description: String { "" }
 
     /// 默认无操作
     func activate() {}
     func deactivate() {}
 
     /// 默认不建表：只有用真表的插件才声明 schema
-    static var storageMigrations: [SQLiteMigration] { [] }
+    nonisolated static var storageMigrations: [SQLiteMigration] { [] }
 
     /// 插件自己声明的功能命令（不含「打开本插件」）
     ///
     /// 每个功能一条命令、各自带关键字。设置页的「触发关键字」按它逐条展示；
     /// 主面板里输入某个功能的关键字也能直接命中那一条。默认没有。
-    static var functionCommands: [CommandDescriptor] { [] }
+    nonisolated static var functionCommands: [CommandDescriptor] { [] }
 
     /// 默认一条「打开本插件」+ 插件声明的功能命令
-    static var commands: [CommandDescriptor] {
+    nonisolated static var commands: [CommandDescriptor] {
         [
             CommandDescriptor.openPlugin(
                 id: id,
@@ -162,10 +139,10 @@ public extension QuickPlugin {
     }
 
     /// 默认不参与动态搜索，避免每次按键把所有插件都叫醒
-    func accepts(query: String) -> Bool { false }
+    nonisolated func accepts(query: String) -> Bool { false }
 
     /// 默认没有随查询变化的结果
-    func dynamicSearch(query: String) async -> [SearchableItem] { [] }
+    nonisolated func dynamicSearch(query: String) async -> [SearchableItem] { [] }
 
     /// 默认把本插件的命令导航进插件面板
     ///
@@ -175,11 +152,5 @@ public extension QuickPlugin {
         guard commandID == CommandID.openPlugin(Self.id) || commandID.hasPrefix("\(Self.id).")
         else { return }
         EventBus.shared.post(NavigateEvent(pluginID: Self.id))
-    }
-
-    /// Legacy：默认取触发词经 `searchItems` 的第一条（新插件应用静态 `showsWhenQueryEmpty` 命令）
-    func defaultItems() async -> [SearchableItem] {
-        guard let trigger = Self.triggerWords.first else { return [] }
-        return Array(await searchItems(query: trigger).prefix(1))
     }
 }
