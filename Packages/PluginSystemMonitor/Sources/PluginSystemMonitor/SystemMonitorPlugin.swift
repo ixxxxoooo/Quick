@@ -10,7 +10,7 @@ import SwiftUI
 ///
 /// CPU / 内存 / 磁盘 / 电源 / 网络与硬件规格，布局对齐 Raycast System Monitor。
 @MainActor
-public final class SystemMonitorPlugin: QuickPlugin, PluginViewProviding {
+public final class SystemMonitorPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "sysmonitor"
     public static let name = "系统监控"
@@ -65,6 +65,10 @@ public final class SystemMonitorPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(SystemMonitorView(scanner: scanner))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(SystemMonitorSettingsView())
     }
 
     public func activate() {

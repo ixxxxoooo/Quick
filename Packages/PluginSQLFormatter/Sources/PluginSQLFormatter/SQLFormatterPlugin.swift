@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty sql-formatter 布局：
 /// 工具栏（格式化/压缩/复制/清空 + 方言/缩进选择）→ 编辑区 → 状态栏
 @MainActor
-public final class SQLFormatterPlugin: QuickPlugin, PluginViewProviding {
+public final class SQLFormatterPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "sql-formatter"
     public static let name = "SQL 格式化"
@@ -43,6 +43,10 @@ public final class SQLFormatterPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(SQLFormatterView(buffer: buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(SQLFormatterSettingsView())
     }
 
     public func activate() {

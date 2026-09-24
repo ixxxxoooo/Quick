@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty uuid-generator 布局：
 /// 工具栏（数量/大写/去连字符 + 生成按钮）→ 结果列表 → 状态栏
 @MainActor
-public final class UUIDGeneratorPlugin: QuickPlugin, PluginViewProviding {
+public final class UUIDGeneratorPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "uuid-generator"
     public static let name = "UUID 生成器"
@@ -36,6 +36,10 @@ public final class UUIDGeneratorPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(UUIDGeneratorView())
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(UUIDGeneratorSettingsView())
     }
 
     public func activate() {

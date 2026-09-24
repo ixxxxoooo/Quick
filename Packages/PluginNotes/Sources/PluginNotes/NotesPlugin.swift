@@ -12,7 +12,7 @@ import SwiftUI
 /// 轻量笔记 + 桌面便签 + 待办清单。
 /// 合并 Fasty 的 memo、sticky-notes、todo-list 功能。
 @MainActor
-public final class NotesPlugin: QuickPlugin, PluginViewProviding {
+public final class NotesPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "notes"
     public static let name = "笔记"
@@ -114,6 +114,10 @@ public final class NotesPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(NotesView(store: store))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(NotesSettingsView())
     }
 
     public func activate() {

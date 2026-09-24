@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty text-diff 布局：
 /// 工具栏（互换/复制/清空 + 差异统计）→ 左右双栏编辑区 → 差异结果
 @MainActor
-public final class TextDiffPlugin: QuickPlugin, PluginViewProviding {
+public final class TextDiffPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "text-diff"
     public static let name = "文本对比"
@@ -42,6 +42,10 @@ public final class TextDiffPlugin: QuickPlugin, PluginViewProviding {
         AnyView(
             TextDiffView(bufferA: bufferA, bufferB: bufferB)
                 .prefillFromPluginContext(bufferA))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(TextDiffSettingsView())
     }
 
     public func activate() {

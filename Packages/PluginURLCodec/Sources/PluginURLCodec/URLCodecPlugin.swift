@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty url-codec 布局：
 /// 工具栏（模式切换 + 操作按钮）→ 编辑区 → 状态栏
 @MainActor
-public final class URLCodecPlugin: QuickPlugin, PluginViewProviding {
+public final class URLCodecPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "url-codec"
     public static let name = "URL 编解码"
@@ -46,6 +46,10 @@ public final class URLCodecPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(URLCodecView(buffer: buffer).prefillFromPluginContext(buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(URLCodecSettingsView())
     }
 
     public func activate() {

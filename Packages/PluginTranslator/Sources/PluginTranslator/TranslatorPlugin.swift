@@ -12,7 +12,7 @@ import SwiftUI
 /// （`AVSpeechSynthesizer`），全部离线、零第三方依赖。主面板里输入 `翻译 …` / `词典 …`
 /// 直接给结果，打开插件面板则是完整的输入 / 译文 / 词典三卡片工作台。
 @MainActor
-public final class TranslatorPlugin: QuickPlugin, PluginViewProviding {
+public final class TranslatorPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "translator"
     public static let name = "翻译"
@@ -142,6 +142,10 @@ public final class TranslatorPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(TranslatorView(plugin: self, buffer: buffer).prefillFromPluginContext(buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(TranslatorSettingsView())
     }
 
     public func activate() {

@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty base64-codec 布局：
 /// 工具栏（模式切换 + 操作按钮）→ 编辑区 → 状态栏
 @MainActor
-public final class Base64CodecPlugin: QuickPlugin, PluginViewProviding {
+public final class Base64CodecPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "base64-codec"
     public static let name = "Base64 编解码"
@@ -43,6 +43,10 @@ public final class Base64CodecPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(Base64CodecView(buffer: buffer).prefillFromPluginContext(buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(Base64CodecSettingsView())
     }
 
     public func activate() {

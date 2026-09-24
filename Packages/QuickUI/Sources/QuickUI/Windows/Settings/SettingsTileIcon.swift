@@ -8,10 +8,10 @@ import SwiftUI
 ///
 /// 对齐 Raycast Preferences：约 18pt 圆角色块 + Medium 白色 SF Symbol，
 /// 顶部略亮的扁平渐变。本仓库禁止第三方图标库，视觉靠色块与精选符号完成。
-struct SettingsTileIcon: View {
+public struct SettingsTileIcon: View {
 
     /// 色块语义色
-    enum Tint: Sendable {
+    public enum Tint: Sendable {
         case blue, indigo, purple, pink, red, orange, yellow, green, mint, teal, cyan, gray, brown
 
         var color: Color {
@@ -37,7 +37,18 @@ struct SettingsTileIcon: View {
     var tint: Tint = .blue
     var isEnabled: Bool = true
 
-    var body: some View {
+    /// 构造一个彩色方块图标
+    /// - Parameters:
+    ///   - systemImage: SF Symbol 名称
+    ///   - tint: 色块档位
+    ///   - isEnabled: 关掉时降不透明度
+    public init(systemImage: String, tint: Tint = .blue, isEnabled: Bool = true) {
+        self.systemImage = systemImage
+        self.tint = tint
+        self.isEnabled = isEnabled
+    }
+
+    public var body: some View {
         Image(systemName: systemImage)
             .font(DesignTokens.Typography.settingsIconGlyphFont)
             .symbolRenderingMode(.monochrome)

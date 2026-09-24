@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty color-compare 布局：
 /// 输入区 → 颜色卡片网格（HEX/RGB/HSL）→ 亮度排序和对比度矩阵
 @MainActor
-public final class ColorComparePlugin: QuickPlugin, PluginViewProviding {
+public final class ColorComparePlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "color-compare"
     public static let name = "颜色工具"
@@ -43,6 +43,10 @@ public final class ColorComparePlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(ColorCompareView(buffer: buffer).prefillFromPluginContext(buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(ColorCompareSettingsView())
     }
 
     public func activate() {

@@ -13,7 +13,7 @@ import SwiftUI
 ///
 /// 每次提交的算式都会落进「计算稿纸」（持久化历史），面板视图里可以看到逐条记录。
 @MainActor
-public final class CalculatorPlugin: QuickPlugin, PluginViewProviding {
+public final class CalculatorPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "calculator"
     public static let name = "计算器"
@@ -123,6 +123,10 @@ public final class CalculatorPlugin: QuickPlugin, PluginViewProviding {
         AnyView(
             CalculatorView(engine: engine, store: store, buffer: buffer)
                 .prefillFromPluginContext(buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(CalculatorSettingsView())
     }
 
     public func activate() {

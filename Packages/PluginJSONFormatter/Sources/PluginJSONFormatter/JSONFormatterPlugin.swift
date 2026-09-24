@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty json-formatter 布局：
 /// 工具栏（格式化/压缩/复制/清空 + 缩进选择）→ 编辑区 → 状态栏
 @MainActor
-public final class JSONFormatterPlugin: QuickPlugin, PluginViewProviding {
+public final class JSONFormatterPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "json-formatter"
     public static let name = "JSON 格式化"
@@ -50,6 +50,10 @@ public final class JSONFormatterPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(JSONFormatterView(buffer: buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(JSONFormatterSettingsView())
     }
 
     public func activate() {

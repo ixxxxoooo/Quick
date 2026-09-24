@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty markdown-preview 布局：
 /// 工具栏（复制/清空）→ 左右双栏（编辑 + 预览）
 @MainActor
-public final class MarkdownPreviewPlugin: QuickPlugin, PluginViewProviding {
+public final class MarkdownPreviewPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "markdown-preview"
     public static let name = "Markdown 预览"
@@ -57,6 +57,10 @@ public final class MarkdownPreviewPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(MarkdownPreviewView(buffer: buffer).prefillFromPluginContext(buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(MarkdownPreviewSettingsView())
     }
 
     public func activate() {

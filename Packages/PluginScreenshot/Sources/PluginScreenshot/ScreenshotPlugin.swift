@@ -13,7 +13,7 @@ import SwiftUI
 /// 抓屏走 ScreenCaptureKit（不再用系统 `screencapture`），因为原地标注需要拿到
 /// 冻结的那一帧画面。
 @MainActor
-public final class ScreenshotPlugin: QuickPlugin, PluginViewProviding {
+public final class ScreenshotPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public nonisolated static let id = "screenshot"
     public nonisolated static let name = "截图工具"
@@ -113,6 +113,10 @@ public final class ScreenshotPlugin: QuickPlugin, PluginViewProviding {
                 onPin: { [weak self] in self?.overlay.pinExistingImage() }
             )
         )
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(ScreenshotSettingsView())
     }
 
     public func activate() {

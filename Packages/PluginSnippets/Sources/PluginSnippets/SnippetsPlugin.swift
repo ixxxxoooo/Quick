@@ -12,7 +12,7 @@ import SwiftUI
 /// 管理可复用的文本片段，支持关键词触发、变量替换和搜索。
 /// 用户可以快速插入常用文本、邮件签名、代码模板等。
 @MainActor
-public final class SnippetsPlugin: QuickPlugin, PluginViewProviding {
+public final class SnippetsPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "snippets"
     public static let name = "文本片段"
@@ -118,6 +118,10 @@ public final class SnippetsPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(SnippetsView(store: store))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(SnippetsSettingsView())
     }
 
     public func activate() {

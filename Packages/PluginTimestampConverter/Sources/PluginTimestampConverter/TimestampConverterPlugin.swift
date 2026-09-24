@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty timestamp-converter 布局：
 /// 输入区 + 自动检测 → 结果卡片列表 → 底部当前时间
 @MainActor
-public final class TimestampConverterPlugin: QuickPlugin, PluginViewProviding {
+public final class TimestampConverterPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "timestamp-converter"
     public static let name = "时间戳转换"
@@ -43,6 +43,10 @@ public final class TimestampConverterPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(TimestampConverterView(buffer: buffer).prefillFromPluginContext(buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(TimestampConverterSettingsView())
     }
 
     public func activate() {

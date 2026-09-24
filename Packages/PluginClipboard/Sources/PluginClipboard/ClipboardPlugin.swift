@@ -12,7 +12,7 @@ import SwiftUI
 /// 监听系统剪贴板变化，自动记录历史条目。
 /// 支持搜索、分类（文本/图片/文件）、收藏和快速粘贴。
 @MainActor
-public final class ClipboardPlugin: QuickPlugin, PluginViewProviding {
+public final class ClipboardPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "clipboard"
     public static let name = "剪贴板历史"
@@ -154,6 +154,10 @@ public final class ClipboardPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(ClipboardListView(store: store))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(ClipboardSettingsView())
     }
 
     public func activate() {

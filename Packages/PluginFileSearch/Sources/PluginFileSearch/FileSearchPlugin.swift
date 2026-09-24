@@ -11,7 +11,7 @@ import SwiftUI
 /// 基于 NSMetadataQuery（Spotlight）的文件搜索。
 /// 支持按名称、内容搜索文件，并可快速打开或在 Finder 中显示。
 @MainActor
-public final class FileSearchPlugin: QuickPlugin, PluginViewProviding {
+public final class FileSearchPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "filesearch"
     public static let name = "文件搜索"
@@ -89,6 +89,10 @@ public final class FileSearchPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(FileSearchView(session: searchSession, buffer: buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(FileSearchSettingsView())
     }
 
     public func activate() {

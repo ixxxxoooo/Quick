@@ -11,7 +11,7 @@ import SwiftUI
 /// 参考 Fasty hash-calculator 布局：
 /// 输入区 → 结果列表（自动计算）→ 空状态提示
 @MainActor
-public final class HashCalculatorPlugin: QuickPlugin, PluginViewProviding {
+public final class HashCalculatorPlugin: QuickPlugin, PluginViewProviding, PluginSettingsProviding {
 
     public static let id = "hash-calculator"
     public static let name = "Hash 计算器"
@@ -49,6 +49,10 @@ public final class HashCalculatorPlugin: QuickPlugin, PluginViewProviding {
 
     public func makeView() -> AnyView {
         AnyView(HashCalculatorView(buffer: buffer).prefillFromPluginContext(buffer))
+    }
+
+    public func makeSettingsView() -> AnyView? {
+        AnyView(HashCalculatorSettingsView())
     }
 
     public func activate() {
