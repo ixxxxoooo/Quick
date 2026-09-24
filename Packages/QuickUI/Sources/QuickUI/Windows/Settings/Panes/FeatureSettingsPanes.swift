@@ -79,13 +79,9 @@ struct FeatureSettingsPane: View {
 
     /// 插件自己的设置项；插件关闭时整体置灰
     ///
-    /// **只问能力，不做分发。** 以前这里是一个按 `SettingsTab` 硬编码 22 个分支的
-    /// switch，把每个插件的表单都留在 `QuickUI` 里 —— 结果是共享 UI 包认识每个插件
-    /// 的专属配置（`QuickUI` 因此成了「所有插件设置页的宿主」，而不是外壳）。
-    /// 现在插件的表单住在插件自己的包里，由 `PluginSettingsProviding` 提供。
-    ///
-    /// 没实现该协议的插件（或返回 nil 的）不额外显示内容 —— 概览与触发关键字
-    /// 两节已经把它们能配置的东西说完了，再补一块空白只是噪音。
+    /// **只问能力，不做分发。** 表单住在插件自己的包里，由 `PluginSettingsProviding`
+    /// 在运行时提供；这里认识的是协议，不是任何一个插件。没实现该协议（或返回 nil）
+    /// 的插件不额外显示内容 —— 概览与触发关键字两节已经说完了它能配置的东西。
     @ViewBuilder
     private var featureSection: some View {
         if let customView = dataSource.makeFeatureSettingsView(for: tab) {

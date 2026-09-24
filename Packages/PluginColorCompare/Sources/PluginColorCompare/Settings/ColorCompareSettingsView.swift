@@ -9,8 +9,7 @@ import SwiftUI
 /// 颜色工具的专属设置页
 ///
 /// **住在插件自己的包里**：设置项的键属于 `PluginSettingKey.ColorCompare`，
-/// 读它们的人就该和它们在一起。`QuickUI` 不认识这个视图，只提供 `SettingsRow`
-/// 这类外壳组件，由 `PluginSettingsProviding` 在运行时查询。
+/// 读写它们的人就该和它们在一起。
 struct ColorCompareSettingsView: View {
 
     @AppStorage(PluginSettingKey.ColorCompare.defaultFormat) private var defaultFormat = "hex"
