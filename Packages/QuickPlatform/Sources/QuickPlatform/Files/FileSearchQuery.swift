@@ -7,8 +7,8 @@ import Foundation
 /// 文件搜索的触发词解析
 ///
 /// 纯逻辑：把「用户输入 → 真正要搜的关键词」这一步单独拿出来，才能在不启动
-/// Spotlight 的前提下固定触发词的行为（真正的查询由 FileSearchSession 交给
-/// NSMetadataQuery）。
+/// Spotlight 的前提下固定触发词的行为（真正的查询由 `FileSearchService` 交给
+/// `NSMetadataQuery`）。
 public enum FileSearchQuery {
 
     /// 触发前缀
@@ -31,11 +31,11 @@ public enum FileSearchQuery {
 
     /// Spotlight 谓词的描述：格式串 + 参数
     ///
-    /// 只描述「搜什么」，由会话交给 `NSPredicate`。抽成纯数据是为了让「搜索文件内容」
+    /// 只描述「搜什么」，由服务交给 `NSPredicate`。抽成纯数据是为了让「搜索文件内容」
     /// 这个开关的效果能被断言 —— 真正跑查询需要 Spotlight 与整机索引，测试里不允许。
-    struct Predicate: Equatable, Sendable {
-        let format: String
-        let arguments: [String]
+    public struct Predicate: Equatable, Sendable {
+        public let format: String
+        public let arguments: [String]
     }
 
     /// 构造搜索谓词
@@ -44,7 +44,7 @@ public enum FileSearchQuery {
     ///   - keyword: 关键词
     ///   - includeContents: 为 true 时连文件内的文本内容一起匹配（`kMDItemTextContent` 是 Spotlight 的内容索引）
     /// - Returns: 谓词描述
-    static func predicate(for keyword: String, includeContents: Bool) -> Predicate {
+    public static func predicate(for keyword: String, includeContents: Bool) -> Predicate {
         guard includeContents else {
             return Predicate(
                 format: "kMDItemDisplayName CONTAINS[cd] %@",

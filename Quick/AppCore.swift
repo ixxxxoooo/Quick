@@ -8,7 +8,6 @@ import PluginCalculator
 import PluginCalendar
 import PluginClipboard
 import PluginColorCompare
-import PluginFileSearch
 import PluginHashCalculator
 import PluginJSONFormatter
 import PluginKillProcess
@@ -120,12 +119,17 @@ final class AppCore {
     /// 第一次启动的引导
     private let onboardingController = OnboardingWindowController()
 
+    /// 文件搜索来源
+    ///
+    /// **不是插件**：它由宿主直接持有并注入给面板协调器，因此不进 `registerPlugins()`、
+    /// 不出现在插件列表、也不能被单独禁用。
+    private let fileSearchSource = FileSearchSource()
+
     /// 打开数据库
     ///
     /// 打不开文件时退到内存库继续运行：剪贴板、笔记这些功能不该因为存储问题整个用不了，
     /// 代价是本次运行不落盘 —— 所以这条日志是 error 级，不静默。
-    private static func openDatabase() -> SQLiteDatabase {
-        do {
+    private static func openDatabase() -> SQLiteDatabase {        do {
             return try SQLiteDatabase(path: AppPaths.database())
         } catch {
             QuickLog.app.error("数据库打不开，本次运行改用内存库，数据不会保存：\(error)")
@@ -230,7 +234,8 @@ final class AppCore {
                 onPanelDidHide: { [weak self] in
                     self?.restoreKeyboardLayout()
                 },
-                usageHistory: history
+                usageHistory: history,
+                hostSearchSource: fileSearchSource
             ))
         log.notice("面板协调器依赖已注入")
 
@@ -554,7 +559,6 @@ final class AppCore {
             (SystemControlPlugin.self, { SystemControlPlugin(settingsStore: self.settingsStore) }),
 
             // Phase 3: 效率与工具插件
-            (FileSearchPlugin.self, { FileSearchPlugin() }),
             (SnippetsPlugin.self, { SnippetsPlugin(storage: self.storage(for: SnippetsPlugin.id)) }),
             (OCRPlugin.self, { OCRPlugin() }),
             (TranslatorPlugin.self, { TranslatorPlugin(storage: self.storage(for: TranslatorPlugin.id)) }),

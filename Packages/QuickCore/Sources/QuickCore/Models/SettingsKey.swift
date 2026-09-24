@@ -40,6 +40,17 @@ public enum SettingsKey {
         "quick.alias.\(key)"
     }
 
+    // MARK: - 文件搜索（宿主能力，不属于任何插件）
+
+    /// 单次文件搜索最多返回条数
+    public static let fileSearchMaxResults = "fileSearch.maxResults"
+
+    /// 是否过滤隐藏文件与隐藏目录下的文件
+    public static let fileSearchIgnoreHidden = "fileSearch.ignoreHidden"
+
+    /// 是否连文件正文一起匹配（Spotlight 内容索引）
+    public static let fileSearchIncludeContents = "fileSearch.includeContents"
+
     // MARK: - 面板行为
 
     /// 面板打开时自动把剪贴板内容填进搜索框的时间窗（秒；0 = 关闭）

@@ -29,8 +29,6 @@ packages:
     path: Packages/PluginCalculator
   PluginSystemControl:
     path: Packages/PluginSystemControl
-  PluginFileSearch:
-    path: Packages/PluginFileSearch
   PluginSnippets:
     path: Packages/PluginSnippets
   PluginOCR:
@@ -114,7 +112,6 @@ targets:
       - package: PluginClipboard
       - package: PluginCalculator
       - package: PluginSystemControl
-      - package: PluginFileSearch
       - package: PluginSnippets
       - package: PluginOCR
       - package: PluginTranslator

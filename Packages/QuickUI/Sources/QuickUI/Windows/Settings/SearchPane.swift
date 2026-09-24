@@ -37,6 +37,7 @@ struct SearchPane: View {
             }
 
             SearchScopesSection(dataSource: dataSource)
+            FileSearchSection()
         }
         .formStyle(.grouped)
         .onAppear {

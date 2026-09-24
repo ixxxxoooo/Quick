@@ -8,38 +8,38 @@
 
 /* Begin PBXBuildFile section */
 		03D030042B8C230428E13BF8 /* QuickPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = EB1FAFFF92FB2D709E88377F /* QuickPlatform */; };
-		0CD8D28B58AEE042E22B17AC /* PluginTimestampConverter in Frameworks */ = {isa = PBXBuildFile; productRef = 48089A1880F9BC5977EFE119 /* PluginTimestampConverter */; };
+		0CD8D28B58AEE042E22B17AC /* PluginTextDiff in Frameworks */ = {isa = PBXBuildFile; productRef = D67A514737047D5B9925EA48 /* PluginTextDiff */; };
 		277B92A1F7D8BA105B19055E /* PluginCalculator in Frameworks */ = {isa = PBXBuildFile; productRef = 892814393E695508914504C9 /* PluginCalculator */; };
 		3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7873A36EB616CB4FE27F295 /* AppCore.swift */; };
-		386A524CDDBEBC88969870AE /* PluginColorCompare in Frameworks */ = {isa = PBXBuildFile; productRef = 0051A1A787E875EA7BE5A614 /* PluginColorCompare */; };
-		39BF304AD2D01B87D3F7834C /* PluginFileSearch in Frameworks */ = {isa = PBXBuildFile; productRef = 1B94608C8CFE671C17CCDBC7 /* PluginFileSearch */; };
-		417799EEF90D61AF8F7AF754 /* PluginKillProcess in Frameworks */ = {isa = PBXBuildFile; productRef = 6265A8A2D1FC70626C2DACA6 /* PluginKillProcess */; };
-		43E6D248378B141C8E7591D4 /* PluginNetworkTools in Frameworks */ = {isa = PBXBuildFile; productRef = 7E26B93AF39A58B145948CCE /* PluginNetworkTools */; };
-		49EB2F798FEA1E3DE5047D99 /* PluginMarkdownPreview in Frameworks */ = {isa = PBXBuildFile; productRef = 6CD2506177A0FE1A48FB4D96 /* PluginMarkdownPreview */; };
+		386A524CDDBEBC88969870AE /* PluginMarkdownPreview in Frameworks */ = {isa = PBXBuildFile; productRef = 6CD2506177A0FE1A48FB4D96 /* PluginMarkdownPreview */; };
+		39BF304AD2D01B87D3F7834C /* PluginSnippets in Frameworks */ = {isa = PBXBuildFile; productRef = E01449FAF7BA101578F06AF4 /* PluginSnippets */; };
+		3F28736FE058C441506AB7F0 /* FileSearchSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8883DA61F27C8CB9CBC70E58 /* FileSearchSource.swift */; };
+		417799EEF90D61AF8F7AF754 /* PluginNetworkTools in Frameworks */ = {isa = PBXBuildFile; productRef = 7E26B93AF39A58B145948CCE /* PluginNetworkTools */; };
+		43E6D248378B141C8E7591D4 /* PluginScreenshot in Frameworks */ = {isa = PBXBuildFile; productRef = 94AAA82063614DB0D0F9D16A /* PluginScreenshot */; };
 		4B431AEF9D4BE531431145DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4AD2A44C727483F56A0A316D /* Assets.xcassets */; };
 		4FB5C899DD337B31D55F59DE /* PluginClipboard in Frameworks */ = {isa = PBXBuildFile; productRef = 967C96E3F4CC521690436415 /* PluginClipboard */; };
 		52363DE2F513149A6038375A /* QuickUI in Frameworks */ = {isa = PBXBuildFile; productRef = 783AEBF3F1FAE829DCAFC004 /* QuickUI */; };
 		524D1EC52B497EBF1E980A28 /* SettingsBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */; };
 		53A985DAB5B69501293E3EC9 /* PluginLauncher in Frameworks */ = {isa = PBXBuildFile; productRef = 101707495A6AF30BDD48497F /* PluginLauncher */; };
-		5BD9CB4EF1094389D50EC0AB /* PluginURLCodec in Frameworks */ = {isa = PBXBuildFile; productRef = F60EBFA34FFC8FDDF0CB8678 /* PluginURLCodec */; };
-		76B868B658D790B18C10FC2C /* PluginSQLFormatter in Frameworks */ = {isa = PBXBuildFile; productRef = 1FFF450730B0758258EE887F /* PluginSQLFormatter */; };
-		86A89A47B2880D49A08EBBBC /* PluginTranslator in Frameworks */ = {isa = PBXBuildFile; productRef = CA41B567971AB8CE0445F5C7 /* PluginTranslator */; };
-		89E1DEDD952C64C3242D5385 /* PluginHashCalculator in Frameworks */ = {isa = PBXBuildFile; productRef = 0F74B10CDA2C6AF373813DB4 /* PluginHashCalculator */; };
+		5BD9CB4EF1094389D50EC0AB /* PluginUUIDGenerator in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF1D69FA23DA7FFF37FAA7E /* PluginUUIDGenerator */; };
+		76B868B658D790B18C10FC2C /* PluginBase64Codec in Frameworks */ = {isa = PBXBuildFile; productRef = 8EBC8865C1DE63B00ECE5D14 /* PluginBase64Codec */; };
+		86A89A47B2880D49A08EBBBC /* PluginCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 14C604C793BB19FA72FF5B6D /* PluginCalendar */; };
+		89E1DEDD952C64C3242D5385 /* PluginTimestampConverter in Frameworks */ = {isa = PBXBuildFile; productRef = 48089A1880F9BC5977EFE119 /* PluginTimestampConverter */; };
 		947ED1B4A3109AF5B63E3E83 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5894ED469482915CE3F1ED6A /* AppIcon.icon */; };
-		95C2CAFCA62640B6BB7D9474 /* PluginAI in Frameworks */ = {isa = PBXBuildFile; productRef = A55EC642F7A5A977D30FB60D /* PluginAI */; };
-		976D65BF3CF0BC30CD60BF64 /* PluginUUIDGenerator in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF1D69FA23DA7FFF37FAA7E /* PluginUUIDGenerator */; };
+		95C2CAFCA62640B6BB7D9474 /* PluginSystemMonitor in Frameworks */ = {isa = PBXBuildFile; productRef = 730276E735A178193257030B /* PluginSystemMonitor */; };
+		976D65BF3CF0BC30CD60BF64 /* PluginHashCalculator in Frameworks */ = {isa = PBXBuildFile; productRef = 0F74B10CDA2C6AF373813DB4 /* PluginHashCalculator */; };
 		99C17420548B0EF4F181ECCA /* QuickCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */; };
 		9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1701F76E22B29388E212E6DA /* QuickApp.swift */; };
-		A3F5185C4E5024554087DADF /* PluginOCR in Frameworks */ = {isa = PBXBuildFile; productRef = 8F56EC8E050625C22BC8D67D /* PluginOCR */; };
+		A3F5185C4E5024554087DADF /* PluginTranslator in Frameworks */ = {isa = PBXBuildFile; productRef = CA41B567971AB8CE0445F5C7 /* PluginTranslator */; };
 		A5F5BA05FBA565DA840A590D /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */; };
-		BA5058D145F68F4B1230A9D6 /* PluginScreenshot in Frameworks */ = {isa = PBXBuildFile; productRef = 94AAA82063614DB0D0F9D16A /* PluginScreenshot */; };
-		C168ED1A3E5CA36E9E363842 /* PluginJSONFormatter in Frameworks */ = {isa = PBXBuildFile; productRef = 2E35DDAF3712336ED4C40854 /* PluginJSONFormatter */; };
-		C38D384C5CD7A8F76F831F71 /* PluginBase64Codec in Frameworks */ = {isa = PBXBuildFile; productRef = 8EBC8865C1DE63B00ECE5D14 /* PluginBase64Codec */; };
-		CDCBFE06CE05C92920350DC7 /* PluginNotes in Frameworks */ = {isa = PBXBuildFile; productRef = 0158B63D69632B31FBFE46A0 /* PluginNotes */; };
-		D94821D4837449038E038DB6 /* PluginSystemMonitor in Frameworks */ = {isa = PBXBuildFile; productRef = 730276E735A178193257030B /* PluginSystemMonitor */; };
-		DB8A9B8692F4BE8F23B18966 /* PluginSnippets in Frameworks */ = {isa = PBXBuildFile; productRef = E01449FAF7BA101578F06AF4 /* PluginSnippets */; };
-		DE7F122FCEC7A48CA773BCBD /* PluginCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 14C604C793BB19FA72FF5B6D /* PluginCalendar */; };
-		EF95AA346256E7B62E83D0E6 /* PluginTextDiff in Frameworks */ = {isa = PBXBuildFile; productRef = D67A514737047D5B9925EA48 /* PluginTextDiff */; };
+		BA5058D145F68F4B1230A9D6 /* PluginJSONFormatter in Frameworks */ = {isa = PBXBuildFile; productRef = 2E35DDAF3712336ED4C40854 /* PluginJSONFormatter */; };
+		C168ED1A3E5CA36E9E363842 /* PluginSQLFormatter in Frameworks */ = {isa = PBXBuildFile; productRef = 1FFF450730B0758258EE887F /* PluginSQLFormatter */; };
+		C38D384C5CD7A8F76F831F71 /* PluginURLCodec in Frameworks */ = {isa = PBXBuildFile; productRef = F60EBFA34FFC8FDDF0CB8678 /* PluginURLCodec */; };
+		CDCBFE06CE05C92920350DC7 /* PluginAI in Frameworks */ = {isa = PBXBuildFile; productRef = A55EC642F7A5A977D30FB60D /* PluginAI */; };
+		D94821D4837449038E038DB6 /* PluginKillProcess in Frameworks */ = {isa = PBXBuildFile; productRef = 6265A8A2D1FC70626C2DACA6 /* PluginKillProcess */; };
+		DB8A9B8692F4BE8F23B18966 /* PluginOCR in Frameworks */ = {isa = PBXBuildFile; productRef = 8F56EC8E050625C22BC8D67D /* PluginOCR */; };
+		DE7F122FCEC7A48CA773BCBD /* PluginNotes in Frameworks */ = {isa = PBXBuildFile; productRef = 0158B63D69632B31FBFE46A0 /* PluginNotes */; };
+		EF95AA346256E7B62E83D0E6 /* PluginColorCompare in Frameworks */ = {isa = PBXBuildFile; productRef = 0051A1A787E875EA7BE5A614 /* PluginColorCompare */; };
 		F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6253BE55917823E5C48BF0A6 /* AppDelegate.swift */; };
 		F1453649AD3331E4B9612090 /* PluginSystemControl in Frameworks */ = {isa = PBXBuildFile; productRef = F6EF76EEC6647C0CF9D9325A /* PluginSystemControl */; };
 /* End PBXBuildFile section */
@@ -70,6 +70,7 @@
 		84C6DDB5084BAABFA569E71D /* Quick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Quick.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		859C9D9B672D640CC22809EF /* QuickPlatform */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickPlatform; path = Packages/QuickPlatform; sourceTree = SOURCE_ROOT; };
 		885C95C97CFC23FD83D482C7 /* PluginClipboard */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginClipboard; path = Packages/PluginClipboard; sourceTree = SOURCE_ROOT; };
+		8883DA61F27C8CB9CBC70E58 /* FileSearchSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSearchSource.swift; sourceTree = "<group>"; };
 		A11F20BEC5F97F5EC79606AC /* PluginUUIDGenerator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginUUIDGenerator; path = Packages/PluginUUIDGenerator; sourceTree = SOURCE_ROOT; };
 		A336738EEED8ECCEAF064C6D /* PluginHashCalculator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginHashCalculator; path = Packages/PluginHashCalculator; sourceTree = SOURCE_ROOT; };
 		A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsBridge.swift; sourceTree = "<group>"; };
@@ -80,7 +81,6 @@
 		DAE083F8C32E921D91600BCF /* PluginNetworkTools */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginNetworkTools; path = Packages/PluginNetworkTools; sourceTree = SOURCE_ROOT; };
 		E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
 		ECC0C21D103D53478067559C /* PluginNotes */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginNotes; path = Packages/PluginNotes; sourceTree = SOURCE_ROOT; };
-		F597EC369E2F2D2F52684F76 /* PluginFileSearch */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginFileSearch; path = Packages/PluginFileSearch; sourceTree = SOURCE_ROOT; };
 		FA9D9302DC1D059B78C0F406 /* PluginSQLFormatter */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginSQLFormatter; path = Packages/PluginSQLFormatter; sourceTree = SOURCE_ROOT; };
 		FE2289C2B74C6E51D568A553 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -97,27 +97,26 @@
 				4FB5C899DD337B31D55F59DE /* PluginClipboard in Frameworks */,
 				277B92A1F7D8BA105B19055E /* PluginCalculator in Frameworks */,
 				F1453649AD3331E4B9612090 /* PluginSystemControl in Frameworks */,
-				39BF304AD2D01B87D3F7834C /* PluginFileSearch in Frameworks */,
-				DB8A9B8692F4BE8F23B18966 /* PluginSnippets in Frameworks */,
-				A3F5185C4E5024554087DADF /* PluginOCR in Frameworks */,
-				86A89A47B2880D49A08EBBBC /* PluginTranslator in Frameworks */,
-				DE7F122FCEC7A48CA773BCBD /* PluginCalendar in Frameworks */,
-				CDCBFE06CE05C92920350DC7 /* PluginNotes in Frameworks */,
-				95C2CAFCA62640B6BB7D9474 /* PluginAI in Frameworks */,
-				D94821D4837449038E038DB6 /* PluginSystemMonitor in Frameworks */,
-				417799EEF90D61AF8F7AF754 /* PluginKillProcess in Frameworks */,
-				43E6D248378B141C8E7591D4 /* PluginNetworkTools in Frameworks */,
-				BA5058D145F68F4B1230A9D6 /* PluginScreenshot in Frameworks */,
-				C168ED1A3E5CA36E9E363842 /* PluginJSONFormatter in Frameworks */,
-				76B868B658D790B18C10FC2C /* PluginSQLFormatter in Frameworks */,
-				C38D384C5CD7A8F76F831F71 /* PluginBase64Codec in Frameworks */,
-				5BD9CB4EF1094389D50EC0AB /* PluginURLCodec in Frameworks */,
-				976D65BF3CF0BC30CD60BF64 /* PluginUUIDGenerator in Frameworks */,
-				89E1DEDD952C64C3242D5385 /* PluginHashCalculator in Frameworks */,
-				0CD8D28B58AEE042E22B17AC /* PluginTimestampConverter in Frameworks */,
-				EF95AA346256E7B62E83D0E6 /* PluginTextDiff in Frameworks */,
-				386A524CDDBEBC88969870AE /* PluginColorCompare in Frameworks */,
-				49EB2F798FEA1E3DE5047D99 /* PluginMarkdownPreview in Frameworks */,
+				39BF304AD2D01B87D3F7834C /* PluginSnippets in Frameworks */,
+				DB8A9B8692F4BE8F23B18966 /* PluginOCR in Frameworks */,
+				A3F5185C4E5024554087DADF /* PluginTranslator in Frameworks */,
+				86A89A47B2880D49A08EBBBC /* PluginCalendar in Frameworks */,
+				DE7F122FCEC7A48CA773BCBD /* PluginNotes in Frameworks */,
+				CDCBFE06CE05C92920350DC7 /* PluginAI in Frameworks */,
+				95C2CAFCA62640B6BB7D9474 /* PluginSystemMonitor in Frameworks */,
+				D94821D4837449038E038DB6 /* PluginKillProcess in Frameworks */,
+				417799EEF90D61AF8F7AF754 /* PluginNetworkTools in Frameworks */,
+				43E6D248378B141C8E7591D4 /* PluginScreenshot in Frameworks */,
+				BA5058D145F68F4B1230A9D6 /* PluginJSONFormatter in Frameworks */,
+				C168ED1A3E5CA36E9E363842 /* PluginSQLFormatter in Frameworks */,
+				76B868B658D790B18C10FC2C /* PluginBase64Codec in Frameworks */,
+				C38D384C5CD7A8F76F831F71 /* PluginURLCodec in Frameworks */,
+				5BD9CB4EF1094389D50EC0AB /* PluginUUIDGenerator in Frameworks */,
+				976D65BF3CF0BC30CD60BF64 /* PluginHashCalculator in Frameworks */,
+				89E1DEDD952C64C3242D5385 /* PluginTimestampConverter in Frameworks */,
+				0CD8D28B58AEE042E22B17AC /* PluginTextDiff in Frameworks */,
+				EF95AA346256E7B62E83D0E6 /* PluginColorCompare in Frameworks */,
+				386A524CDDBEBC88969870AE /* PluginMarkdownPreview in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,6 +139,7 @@
 				6253BE55917823E5C48BF0A6 /* AppDelegate.swift */,
 				5894ED469482915CE3F1ED6A /* AppIcon.icon */,
 				4AD2A44C727483F56A0A316D /* Assets.xcassets */,
+				8883DA61F27C8CB9CBC70E58 /* FileSearchSource.swift */,
 				29D3223EB25304FC1C719BA9 /* Quick.entitlements */,
 				1701F76E22B29388E212E6DA /* QuickApp.swift */,
 				A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */,
@@ -158,7 +158,6 @@
 				55801C1D7B74B8E7FC29368A /* PluginCalendar */,
 				885C95C97CFC23FD83D482C7 /* PluginClipboard */,
 				4D3CC3B2ADFA1A143C8B30B1 /* PluginColorCompare */,
-				F597EC369E2F2D2F52684F76 /* PluginFileSearch */,
 				A336738EEED8ECCEAF064C6D /* PluginHashCalculator */,
 				3A0528521CC2D2EE454DB2B2 /* PluginJSONFormatter */,
 				676A3B0A6598E5EE41B88946 /* PluginKillProcess */,
@@ -224,7 +223,6 @@
 				967C96E3F4CC521690436415 /* PluginClipboard */,
 				892814393E695508914504C9 /* PluginCalculator */,
 				F6EF76EEC6647C0CF9D9325A /* PluginSystemControl */,
-				1B94608C8CFE671C17CCDBC7 /* PluginFileSearch */,
 				E01449FAF7BA101578F06AF4 /* PluginSnippets */,
 				8F56EC8E050625C22BC8D67D /* PluginOCR */,
 				CA41B567971AB8CE0445F5C7 /* PluginTranslator */,
@@ -281,7 +279,6 @@
 				9C06C1F1E120954ECC50CFE8 /* XCLocalSwiftPackageReference "Packages/PluginCalendar" */,
 				802CCF29C3403E755DE8A55E /* XCLocalSwiftPackageReference "Packages/PluginClipboard" */,
 				FB6A266D9B8E48339AD35B3F /* XCLocalSwiftPackageReference "Packages/PluginColorCompare" */,
-				9AA7FBDED908A6CF4EAF317B /* XCLocalSwiftPackageReference "Packages/PluginFileSearch" */,
 				17382907570F01BCCC1E0A9A /* XCLocalSwiftPackageReference "Packages/PluginHashCalculator" */,
 				AF2C6E4FE25265075B5E78F0 /* XCLocalSwiftPackageReference "Packages/PluginJSONFormatter" */,
 				C63FF3099BD8A9E65C95A8CA /* XCLocalSwiftPackageReference "Packages/PluginKillProcess" */,
@@ -333,6 +330,7 @@
 			files = (
 				3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */,
 				F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */,
+				3F28736FE058C441506AB7F0 /* FileSearchSource.swift in Sources */,
 				9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */,
 				524D1EC52B497EBF1E980A28 /* SettingsBridge.swift in Sources */,
 				A5F5BA05FBA565DA840A590D /* StatusItemController.swift in Sources */,
@@ -591,10 +589,6 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/PluginSQLFormatter;
 		};
-		9AA7FBDED908A6CF4EAF317B /* XCLocalSwiftPackageReference "Packages/PluginFileSearch" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/PluginFileSearch;
-		};
 		9C06C1F1E120954ECC50CFE8 /* XCLocalSwiftPackageReference "Packages/PluginCalendar" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/PluginCalendar;
@@ -665,10 +659,6 @@
 		14C604C793BB19FA72FF5B6D /* PluginCalendar */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PluginCalendar;
-		};
-		1B94608C8CFE671C17CCDBC7 /* PluginFileSearch */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = PluginFileSearch;
 		};
 		1FFF450730B0758258EE887F /* PluginSQLFormatter */ = {
 			isa = XCSwiftPackageProductDependency;

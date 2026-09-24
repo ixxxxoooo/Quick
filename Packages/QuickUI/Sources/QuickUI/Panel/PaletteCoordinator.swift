@@ -95,6 +95,12 @@ public final class PaletteCoordinator {
     /// 某个插件是否参与主搜索
     public var isSearchSourceEnabled: (String) -> Bool { dependencies?.isSearchSourceEnabled ?? { _ in true } }
 
+    /// 宿主自己的搜索来源（文件搜索）
+    ///
+    /// 它不是插件，所以不走 `plugins` 那一条；但结果与插件结果在同一个任务组里汇总，
+    /// 排序、去重、限流、超时规则完全一致。
+    public var hostSearchSource: (any PaletteHostSearchSource)? { dependencies?.hostSearchSource }
+
     /// 命中静态命令时的执行入口
     ///
     /// `@Sendable` 是必需的：它会被存进 `SearchableItem.action`，而那个结构是 `Sendable`。
@@ -405,7 +411,8 @@ public final class PaletteCoordinator {
             isSearchSourceEnabled: isSearchSourceEnabled,
             recentItemIDs: usageHistory?.recentItemIDs(limit: 12) ?? [],
             invokeCommand: invokeCommand,
-            log: log
+            log: log,
+            hostSource: hostSearchSource
         )
     }
 

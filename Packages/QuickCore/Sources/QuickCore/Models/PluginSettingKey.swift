@@ -52,13 +52,6 @@ public enum PluginSettingKey {
         public static let autoCopy = "calculator.autoCopy"
     }
 
-    /// 文件搜索
-    public enum FileSearch {
-        public static let ignoreHidden = "fileSearch.ignoreHidden"
-        public static let includeContents = "fileSearch.includeContents"
-        public static let maxResults = "fileSearch.maxResults"
-    }
-
     /// 文本片段
     public enum Snippets {
         public static let autoExpand = "snippets.autoExpand"

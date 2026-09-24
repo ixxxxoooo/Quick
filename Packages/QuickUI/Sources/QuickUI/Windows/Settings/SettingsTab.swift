@@ -52,7 +52,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     // MARK: - 功能插件
     case clipboard
     case calculator
-    case fileSearch
     case snippets
     case notes
     case calendar
@@ -97,7 +96,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 
         case .clipboard: "剪贴板历史"
         case .calculator: "计算器"
-        case .fileSearch: "文件搜索"
         case .snippets: "文本片段"
         case .notes: "笔记"
         case .calendar: "日历"
@@ -141,7 +139,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 
         case .clipboard: "doc.on.clipboard.fill"
         case .calculator: "plus.forwardslash.minus"
-        case .fileSearch: "folder.fill"
         case .snippets: "text.quote"
         case .notes: "note.text"
         case .calendar: "calendar"
@@ -185,7 +182,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 
         case .clipboard: "mint"
         case .calculator: "orange"
-        case .fileSearch: "yellow"
         case .snippets: "purple"
         case .notes: "yellow"
         case .calendar: "red"
@@ -219,7 +215,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .systemActions: "systemcontrol"
         case .clipboard: "clipboard"
         case .calculator: "calculator"
-        case .fileSearch: "filesearch"
         case .snippets: "snippets"
         case .notes: "notes"
         case .calendar: "calendar"

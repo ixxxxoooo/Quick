@@ -32,7 +32,7 @@ struct SettingsSidebarIconTests {
 
     @Test("常用插件符号保持简洁（无 badge / 双齿轮）")
     func pluginSymbolsStaySimple() {
-        #expect(!SettingsTab.fileSearch.systemImage.contains("badge"))
+        #expect(!SettingsTab.calculator.systemImage.contains("badge"))
         #expect(SettingsTab.general.systemImage == "gearshape.fill")
         #expect(SettingsTab.ocr.systemImage == "text.viewfinder")
         #expect(SettingsTab.killProcess.systemImage == "xmark.app.fill")

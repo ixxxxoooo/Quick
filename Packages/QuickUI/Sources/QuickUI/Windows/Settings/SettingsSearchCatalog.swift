@@ -37,7 +37,7 @@ enum SettingsSearchCatalog {
         .init(id: "plugins.launcher", tab: .applications, title: "应用启动器", subtitle: "插件"),
         .init(id: "plugins.system", tab: .systemActions, title: "系统控制", subtitle: "插件"),
         .init(id: "features.calculator", tab: .calculator, title: "Calculator / 计算器", subtitle: "插件"),
-        .init(id: "features.filesearch", tab: .fileSearch, title: "File Search / 文件搜索", subtitle: "插件"),
+        .init(id: "features.filesearch", tab: .search, title: "File Search / 文件搜索", subtitle: "搜索来源"),
         .init(id: "features.snippets", tab: .snippets, title: "Snippets / 代码片段", subtitle: "插件"),
         .init(id: "features.notes", tab: .notes, title: "Notes / 便签备忘", subtitle: "插件"),
         .init(id: "features.calendar", tab: .calendar, title: "Calendar / 日历日程", subtitle: "插件"),

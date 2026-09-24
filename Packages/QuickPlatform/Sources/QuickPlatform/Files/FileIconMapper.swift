@@ -7,8 +7,7 @@ import Foundation
 /// 文件扩展名 → SF Symbol 图标
 ///
 /// 纯逻辑：只按名字里的扩展名查表，不碰文件系统也不碰 AppKit 图标。
-/// 放在模型层（而不是 FileSearchSession 里），是因为它是搜索结果的展示规则，
-/// 应当能脱离 Spotlight 单独验证。
+/// 搜索结果里的文件图标靠它，因此它必须能脱离 Spotlight 单独验证。
 public enum FileIconMapper {
 
     /// 按文件名给出图标

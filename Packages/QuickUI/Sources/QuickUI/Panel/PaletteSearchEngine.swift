@@ -59,7 +59,7 @@ public enum PaletteSearchEngine {
     /// 而不是让整块面板陪它等 —— 超时的插件 id 会随结果一起返回给调用方。
     public static let pluginTimeout = Duration.seconds(2)
 
-    /// 聚合搜索：静态命令索引 + 声明了动态结果的插件
+    /// 聚合搜索：静态命令索引 + 宿主来源 + 声明了动态结果的插件
     ///
     /// 静态打分不碰插件对象，可以离开主线程。动态插件只有 `accepts` 为真才调用。
     ///
@@ -72,6 +72,8 @@ public enum PaletteSearchEngine {
     ///   - invokeCommand: 命中静态命令时的执行入口
     ///   - log: 面板分类日志
     ///   - pluginTimeout: 单个插件的超时；测试会传一个很短的值
+    ///   - hostSource: 宿主自己的搜索来源（文件搜索）。它不是插件，
+    ///     所以既不出现在插件列表里、也不能被单独禁用
     /// - Returns: 去重、排序、限流之后的结果，附带超时的插件 id
     public static func search(
         query: String,
@@ -81,7 +83,8 @@ public enum PaletteSearchEngine {
         recentItemIDs: [String],
         invokeCommand: @escaping @MainActor @Sendable (String) -> Void,
         log: Logger,
-        pluginTimeout: Duration = PaletteSearchEngine.pluginTimeout
+        pluginTimeout: Duration = PaletteSearchEngine.pluginTimeout,
+        hostSource: (any PaletteHostSearchSource)? = nil
     ) async -> PaletteSearchOutcome {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
@@ -129,6 +132,19 @@ public enum PaletteSearchEngine {
         }
 
         let dynamicItems = await withTaskGroup(of: PluginSearchResult.self) { group in
+            // 宿主来源与插件走同一个任务组：超时、取消、结果汇总都是同一套规则，
+            // 不给它开第二条路径。标识在任务外取好 —— 它们是主 actor 上的属性。
+            if let hostSource, hostSource.accepts(query: trimmed) {
+                let sourceID = hostSource.sourceID
+                let displayName = hostSource.displayName
+                group.addTask {
+                    let items = await hostSource.search(query: trimmed)
+                    let named = items.map { item in
+                        item.pluginName == nil ? item.withPluginName(displayName) : item
+                    }
+                    return PluginSearchResult(pluginID: sourceID, items: named, didTimeOut: false)
+                }
+            }
             for plugin in dynamicPlugins {
                 let pluginName = type(of: plugin).name
                 let pluginID = type(of: plugin).id
