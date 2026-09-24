@@ -71,6 +71,7 @@ public enum PaletteSearchEngine {
     ///   - recentItemIDs: 空查询时用于首屏提权的最近使用 id（通常最多 12 条）
     ///   - invokeCommand: 命中静态命令时的执行入口
     ///   - log: 面板分类日志
+    ///   - pluginTimeout: 单个插件的超时；测试会传一个很短的值
     /// - Returns: 去重、排序、限流之后的结果，附带超时的插件 id
     public static func search(
         query: String,
@@ -79,7 +80,8 @@ public enum PaletteSearchEngine {
         isSearchSourceEnabled: (String) -> Bool,
         recentItemIDs: [String],
         invokeCommand: @escaping @MainActor @Sendable (String) -> Void,
-        log: Logger
+        log: Logger,
+        pluginTimeout: Duration = PaletteSearchEngine.pluginTimeout
     ) async -> PaletteSearchOutcome {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
@@ -132,7 +134,8 @@ public enum PaletteSearchEngine {
                 let pluginID = type(of: plugin).id
                 group.addTask {
                     let outcome = await searchDynamic(
-                        plugin: plugin, pluginID: pluginID, query: trimmed, log: log)
+                        plugin: plugin, pluginID: pluginID, query: trimmed, log: log,
+                        timeout: pluginTimeout)
                     guard let items = outcome.items else {
                         return PluginSearchResult(pluginID: pluginID, items: nil, didTimeOut: true)
                     }
@@ -203,17 +206,17 @@ public enum PaletteSearchEngine {
 
     /// 查询单个动态插件，超时即取消它的工作
     ///
-    /// **这次取消是真的。** `dynamicSearch` 已经是 `nonisolated`，所以超时任务里的
-    /// `cancelAll()` 会真正把取消信号送到插件内部 —— 插件只要在循环里看
-    /// `Task.isCancelled`（协议要求）就能提前收尾。在这之前 `dynamicSearch` 跑在主 actor
-    /// 上，超时只能「放弃等待」，插件会继续跑完，主线程照样被占着。
+    /// **取消是合作式的，不是强制的。** `dynamicSearch` 是 `nonisolated`，`cancelAll()`
+    /// 只把取消标志送到插件内部，插件要在 `await` 点或循环里看 `Task.isCancelled`
+    /// 才会真的收尾。这不改变「超时后不等它」这一行为：整块面板仍然按超时返回。
     ///
     /// - Returns: 插件的条目；超时返回 nil（与「查了但没结果」区分开）
     private static func searchDynamic(
         plugin: any QuickPlugin,
         pluginID: String,
         query: String,
-        log: Logger
+        log: Logger,
+        timeout: Duration
     ) async -> PluginSearchResult {
         let started = Date()
         let items = await withTaskGroup(of: [SearchableItem]?.self) { group in
@@ -221,7 +224,7 @@ public enum PaletteSearchEngine {
                 await plugin.dynamicSearch(query: query)
             }
             group.addTask {
-                try? await Task.sleep(for: pluginTimeout)
+                try? await Task.sleep(for: timeout)
                 return nil
             }
             let first = await group.next() ?? nil
