@@ -864,6 +864,13 @@ final class AppCore {
             log.warning("没有插件认领命令 \(commandID, privacy: .public)")
             return
         }
+        // 功能命令也做切换：面板正在显示该插件时再按同一个插件的快捷键就关掉。
+        // plugin.open.* 已在上面处理，这里兜住 clipboard.clear 这类功能命令热键。
+        let ownerPluginID = type(of: plugin).id
+        if paletteCoordinator.isVisible, paletteCoordinator.activePluginID == ownerPluginID {
+            paletteCoordinator.hide()
+            return
+        }
         plugin.perform(commandID: commandID)
     }
 

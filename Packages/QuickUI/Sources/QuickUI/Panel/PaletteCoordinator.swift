@@ -181,8 +181,13 @@ public final class PaletteCoordinator {
         let interval = signpost.beginInterval("palette.show")
         let started = Date()
 
-        // 面板打开前的自动行为：先按时间窗决定搜索框内容，再显示
-        applyAutoBehavior()
+        // 自动粘贴 / 自动清空只在主搜索模式下有意义；打开特定插件时跳过，
+        // 避免剪贴板内容被填进搜索框后触发粘贴检测（JSON/SQL 跳转），
+        // 把 activePluginID 篡改成 json-formatter/sql-formatter，导致
+        // 再次按快捷键时切换（关闭）逻辑匹配不上。
+        if pluginID == nil {
+            applyAutoBehavior()
+        }
 
         // 宿主行为（例如强制键盘布局）在面板真正出现之前生效
         onPanelWillShow?()

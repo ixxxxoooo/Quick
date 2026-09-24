@@ -125,6 +125,11 @@ struct PaletteRootView: View {
             }
         }
         .onChange(of: paletteQuery.text) { oldValue, newValue in
+            // 插件模式下不做粘贴检测和搜索：插件有自己的内容视图，
+            // 在这里触发 NavigateEvent 会把 activePluginID 篡改成
+            // json-formatter/sql-formatter，导致快捷键切换逻辑失效。
+            guard !paletteMode.isPluginMode else { return }
+
             // 粘贴检测：一次性增量超过阈值时检测内容类型
             let delta = newValue.count - oldValue.count
             if delta >= PasteContentDetector.pasteThreshold {
