@@ -2,7 +2,6 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
-import SwiftUI
 import Testing
 
 @testable import QuickCore
@@ -29,7 +28,6 @@ struct PluginCommandsTests {
                     keywords: ["do"], icon: "star")
             ]
         }
-        func makeView() -> AnyView { AnyView(EmptyView()) }
     }
 
     @Test("默认 commands = 打开本插件 + functionCommands")
@@ -47,7 +45,6 @@ struct PluginCommandsTests {
             static let name = "Plain"
             static let icon = "circle"
             var isEnabled = true
-            func makeView() -> AnyView { AnyView(EmptyView()) }
         }
         #expect(PlainPlugin.commands.map(\.id) == [CommandID.openPlugin("plain")])
     }
