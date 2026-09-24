@@ -8,8 +8,11 @@ import Foundation
 ///
 /// 解析并计算数学表达式。使用 NSExpression 作为后端，
 /// 支持四则运算、括号、幂运算等。
-@MainActor
-final class CalcEngine {
+///
+/// **无状态且 `Sendable`，所以是 `nonisolated`。** 搜索闸门（`accepts`）与求值
+/// 都在面板按键的热路径上，留在主 actor 上会让计算和渲染互相排队。引擎不持有
+/// 任何可变状态，令牌化与解析各自新建局部对象，因此脱离主 actor 是安全的。
+nonisolated final class CalcEngine: Sendable {
 
     /// 计算结果
     struct CalcResult: Sendable {
@@ -80,7 +83,8 @@ final class CalcEngine {
     /// 使用纯 Swift 解析并计算数学表达式（杜绝 NSExpression 引发的未捕获异常崩溃）
     private func tryMathExpression(_ expr: String, options: CalcDisplayOptions) -> CalcResult? {
         guard let tokens = MathTokenizer(input: expr).tokenize() else { return nil }
-        guard let value = MathParser(tokens: tokens).parse() else { return nil }
+        var parser = MathParser(tokens: tokens)
+        guard let value = parser.parse() else { return nil }
         return CalcResult(value: value, formatted: CalcFormatting.string(from: value, options: options))
     }
 
@@ -305,7 +309,13 @@ struct MathTokenizer: Sendable {
     }
 }
 
-final class MathParser: @unchecked Sendable {
+/// 数学表达式解析器
+///
+/// **值类型。** 它持有游标 `pos`，而同一个实例被两个线程共享就会真的竞争 ——
+/// 之前用 `@unchecked Sendable` 把这件事压了下去，本项目只允许 Carbon 回调跳板
+/// 用那个（见 docs/standards.md）。改成 `struct` 后每个调用点各自持有一份游标，
+/// 编译器能自己证明安全，不需要任何断言。
+struct MathParser: Sendable {
     private let tokens: [MathToken]
     private var pos: Int = 0
 
@@ -317,14 +327,14 @@ final class MathParser: @unchecked Sendable {
         pos < tokens.count ? tokens[pos] : nil
     }
 
-    private func advance() -> MathToken? {
+    mutating func advance() -> MathToken? {
         guard pos < tokens.count else { return nil }
         let tok = tokens[pos]
         pos += 1
         return tok
     }
 
-    func parse() -> Double? {
+    mutating func parse() -> Double? {
         guard !tokens.isEmpty else { return nil }
         guard let result = parseExpression() else { return nil }
         guard pos == tokens.count, result.isFinite else { return nil }
@@ -332,7 +342,7 @@ final class MathParser: @unchecked Sendable {
     }
 
     // expression = term (('+' | '-') term)*
-    private func parseExpression() -> Double? {
+    private mutating func parseExpression() -> Double? {
         guard var value = parseTerm() else { return nil }
         while let tok = current {
             if tok == .plus {
@@ -351,7 +361,7 @@ final class MathParser: @unchecked Sendable {
     }
 
     // term = power (('*' | '/' | '%') power)*
-    private func parseTerm() -> Double? {
+    private mutating func parseTerm() -> Double? {
         guard var value = parsePower() else { return nil }
         while let tok = current {
             if tok == .multiply {
@@ -374,7 +384,7 @@ final class MathParser: @unchecked Sendable {
     }
 
     // power = unary ('^' power)?
-    private func parsePower() -> Double? {
+    private mutating func parsePower() -> Double? {
         guard let base = parseUnary() else { return nil }
         if current == .power {
             _ = advance()
@@ -387,7 +397,7 @@ final class MathParser: @unchecked Sendable {
     }
 
     // unary = ('+' | '-') unary | primary
-    private func parseUnary() -> Double? {
+    private mutating func parseUnary() -> Double? {
         if current == .plus {
             _ = advance()
             return parseUnary()
@@ -400,7 +410,7 @@ final class MathParser: @unchecked Sendable {
     }
 
     // primary = number | identifier | '(' expression ')'
-    private func parsePrimary() -> Double? {
+    private mutating func parsePrimary() -> Double? {
         guard let tok = advance() else { return nil }
         switch tok {
         case .number(let val):
@@ -428,7 +438,7 @@ final class MathParser: @unchecked Sendable {
         }
     }
 
-    private func evaluateFunction(_ name: String, arg: Double) -> Double? {
+    private mutating func evaluateFunction(_ name: String, arg: Double) -> Double? {
         switch name {
         case "sqrt":
             guard arg >= 0 else { return nil }
