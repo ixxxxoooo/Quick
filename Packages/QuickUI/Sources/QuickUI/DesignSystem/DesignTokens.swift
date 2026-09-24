@@ -117,6 +117,16 @@ public enum DesignTokens {
         /// 尾部控件不定宽时，行与行之间会对不齐；太宽又会把标题挤掉。
         /// **不随 `panelScale` 缩放**：设置窗口尺寸固定，缩放它只会让控件忽宽忽窄。
         public static let settingsControl: CGFloat = 120
+        /// 设置行尾部较宽的控件（多位数步进器、长文案选择器）
+        ///
+        /// 与 `settingsControl` 同一族，只为「120 装不下」的准备。不要为单个页面现造宽度。
+        public static let settingsControlWide: CGFloat = 140
+        /// 设置行尾部数字读数的宽度（滑块右侧的 `36` / `44` 那类）
+        public static let settingsReadout: CGFloat = 36
+        /// 编辑器 / 输入区的标准最小宽度（插件工作面板里的文本框）
+        public static let editorMinWidth: CGFloat = 200
+        /// 分段控件（`pickerStyle(.segmented)`）的标准宽度
+        public static let segmentedControl: CGFloat = 140
         /// 拖拽授权面板的初始宽度（吸附前 / 量不到系统设置窗口时的兜底）
         ///
         /// **吸附后不用它定宽**：宽度跟随系统设置右侧内容区（`PermissionSnapGeometry.width`），

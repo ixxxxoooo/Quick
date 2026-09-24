@@ -213,7 +213,7 @@ struct JSONFormatterView: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 120)
+            .frame(width: DesignTokens.Size.settingsControl)
 
             // 分段控件自带标签时会被挤成竖排的窄条（曾经的样式缺陷），
             // 所以标签自己写，控件只负责选择
@@ -227,7 +227,7 @@ struct JSONFormatterView: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 130)
+            .frame(width: DesignTokens.Size.settingsControlWide)
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .padding(.vertical, DesignTokens.Spacing.sm)

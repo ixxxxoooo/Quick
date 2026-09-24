@@ -102,7 +102,7 @@ public struct SuperPanelSettingsView: View {
                                 }
                             }
                         )
-                        .frame(width: 140)
+                        .frame(width: DesignTokens.Size.settingsControlWide)
                         Text("\(Int(thresholdValue)) ms")
                             .font(DesignTokens.Typography.rowTrailing)
                             .foregroundStyle(.secondary)
@@ -166,11 +166,11 @@ public struct SuperPanelSettingsView: View {
                             }
                         }
                     )
-                    .frame(width: 140)
+                    .frame(width: DesignTokens.Size.settingsControlWide)
                     Text("\(Int((opacityValue * 100).rounded()))%")
                         .font(DesignTokens.Typography.rowTrailing)
                         .foregroundStyle(.secondary)
-                        .frame(width: 44, alignment: .trailing)
+                        .frame(width: DesignTokens.Size.settingsReadout, alignment: .trailing)
                 }
             }
 

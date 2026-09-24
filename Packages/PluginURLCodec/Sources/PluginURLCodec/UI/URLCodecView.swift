@@ -44,7 +44,7 @@ struct URLCodecView: View {
                     ForEach(Mode.allCases, id: \.self) { m in
                         Text(m.rawValue).tag(m)
                     }
-                }.pickerStyle(.segmented).frame(width: 140)
+                }.pickerStyle(.segmented).frame(width: DesignTokens.Size.segmentedControl)
 
                 Button {
                     transform()
@@ -92,7 +92,7 @@ struct URLCodecView: View {
                         .font(DesignTokens.Typography.code)
                         .scrollContentBackground(.hidden)
                 }
-                .frame(minWidth: 200)
+                .frame(minWidth: DesignTokens.Size.editorMinWidth)
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text(mode == .encode ? "已编码" : "原文")
@@ -105,7 +105,7 @@ struct URLCodecView: View {
                         .font(DesignTokens.Typography.code)
                         .scrollContentBackground(.hidden)
                 }
-                .frame(minWidth: 200)
+                .frame(minWidth: DesignTokens.Size.editorMinWidth)
             }
 
             Divider().opacity(0.3)

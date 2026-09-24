@@ -143,12 +143,12 @@ struct AppearancePane: View {
                         in: -50...50,
                         step: 5
                     )
-                    .frame(width: 120)
+                    .frame(width: DesignTokens.Size.settingsControl)
 
                     Text("\(panelTransparency > 0 ? "+\(panelTransparency)" : "\(panelTransparency)")%")
                         .font(DesignTokens.Typography.keyCap)
                         .foregroundStyle(.secondary)
-                        .frame(width: 36, alignment: .trailing)
+                        .frame(width: DesignTokens.Size.settingsReadout, alignment: .trailing)
                 }
             }
         } header: {

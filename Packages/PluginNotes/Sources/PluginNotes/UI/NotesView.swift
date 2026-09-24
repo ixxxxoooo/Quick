@@ -77,7 +77,7 @@ struct NotesView: View {
                     .padding(.horizontal, DesignTokens.Spacing.md)
                 }
             }
-            .frame(width: 200)
+            .frame(width: DesignTokens.Size.editorMinWidth)
 
             Divider().opacity(0.3)
 

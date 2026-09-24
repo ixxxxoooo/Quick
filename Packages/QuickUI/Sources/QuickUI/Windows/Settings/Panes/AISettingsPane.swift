@@ -198,7 +198,7 @@ public struct AISettingsPane: View {
                     in: AIConfig.minMaxTokens...AIConfig.maxMaxTokens,
                     step: 256
                 )
-                .frame(width: 140)
+                .frame(width: DesignTokens.Size.settingsControlWide)
             }
 
             SettingsRow(
@@ -212,7 +212,7 @@ public struct AISettingsPane: View {
                     Text(String(format: "%.1f", temperature))
                         .font(DesignTokens.Typography.rowTrailing)
                         .foregroundStyle(.secondary)
-                        .frame(width: 36, alignment: .trailing)
+                        .frame(width: DesignTokens.Size.settingsReadout, alignment: .trailing)
                 }
             }
         } header: {

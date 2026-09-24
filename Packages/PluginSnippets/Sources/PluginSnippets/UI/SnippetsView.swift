@@ -53,7 +53,7 @@ struct SnippetsView: View {
                     .padding(.horizontal, DesignTokens.Spacing.md)
                 }
             }
-            .frame(width: 250)
+            .frame(width: DesignTokens.Size.editorMinWidth)
 
             Divider().opacity(0.3)
 
