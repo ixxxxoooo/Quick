@@ -16,8 +16,8 @@ final class ClipboardMonitor {
     /// 新内容回调
     var onNewContent: ((ClipboardEntry) -> Void)?
 
-    /// 轮询定时器
-    private var timer: Timer?
+    /// 轮询任务
+    private var pollingTask: Task<Void, Never>?
 
     /// 上次检测到的变更计数
     private var lastChangeCount: Int = 0
@@ -25,16 +25,24 @@ final class ClipboardMonitor {
     /// 是否正在监听
     private(set) var isRunning = false
 
+    /// 轮询间隔
+    ///
+    /// macOS 没有剪贴板变化通知，只能轮询。0.5 秒是「按了 ⌘C 再唤面板就能看到」
+    /// 与「白跑主线程」之间的折中。
+    private static let pollInterval = Duration.milliseconds(500)
+
     /// 开始监听
     ///
     /// 幂等：设置页每写一次偏好都会让插件重新按开关起停一次，不幂等的话每次都会新建
-    /// 一个定时器并重置变更计数，等于反复丢掉「刚才那半秒里复制的东西」。
+    /// 一个轮询任务并重置变更计数，等于反复丢掉「刚才那半秒里复制的东西」。
     func start() {
         guard !isRunning else { return }
         lastChangeCount = NSPasteboard.general.changeCount
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.checkForChanges()
+        pollingTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.pollInterval)
+                guard let self, !Task.isCancelled else { return }
+                self.checkForChanges()
             }
         }
         isRunning = true
@@ -42,8 +50,8 @@ final class ClipboardMonitor {
 
     /// 停止监听
     func stop() {
-        timer?.invalidate()
-        timer = nil
+        pollingTask?.cancel()
+        pollingTask = nil
         isRunning = false
     }
 

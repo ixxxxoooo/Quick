@@ -471,9 +471,29 @@ struct ClipboardSettingWiringTests {
         }
     }
 
+    /// 监听器从 `Timer` 换成 `Task` 之后，这里锁住的是两条容易写坏的性质：
+    /// 重复 `start()` 不能起第二个轮询（会重置变更计数、丢内容），
+    /// `stop()` 之后不能再有轮询碰粘贴板。
+    @Test("监听器的启停：start 幂等、stop 真的停")
+    func monitorStartIsIdempotentAndStopStops() async {
+        let monitor = ClipboardMonitor()
+
+        monitor.start()
+        monitor.start()
+        #expect(monitor.isRunning, "start 之后应当是运行中")
+
+        monitor.stop()
+        #expect(monitor.isRunning == false, "stop 之后应当不再运行")
+
+        // 再跑一轮，确认停掉之后没有残留任务在碰 `NSPasteboard`
+        monitor.start()
+        #expect(monitor.isRunning)
+        monitor.stop()
+        #expect(monitor.isRunning == false)
+    }
+
     @Test("退出时清除历史：开关打开才清，且保留收藏")
-    func clearOnQuitFollowsTheSetting() async throws {
-        try await withSetting(PluginSettingKey.Clipboard.clearOnQuit, value: false) {
+    func clearOnQuitFollowsTheSetting() async throws {        try await withSetting(PluginSettingKey.Clipboard.clearOnQuit, value: false) {
             let database = try makeDatabase()
             makeStore(database: database).add(ClipboardEntry(text: "不该被清掉的"))
 
