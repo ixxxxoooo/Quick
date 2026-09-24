@@ -454,7 +454,9 @@
 - **执行后关闭主面板**（`HidePaletteEvent`），与面板内点击一致。
 - **反馈必须如实**：走 AppleScript 的操作失败时 HUD 提示需「自动化」权限；成功且机器即将
   休眠/重启/注销时**不**伪造成功 HUD。锁屏走 `/usr/bin/pmset displaysleepnow`。
-- **`toggleDoNotDisturb` 尚未实现**，执行时只发 info HUD「勿扰模式切换暂未实现」。
+- **不提供没有实现的操作。** 勿扰 / 专注模式在 macOS 上没有公开的切换 API，
+  `toggleDoNotDisturb` 因此已被删除 —— 一条能搜到、点了只弹「暂未实现」的命令
+  比没有这条命令更糟。
 - **`Model/SystemAction.swift` 禁止 AppKit / SwiftUI**；AppleScript、`pmset`、`NSWorkspace`
   只出现在 `Service/SystemActionRunner.swift`。
 
@@ -478,7 +480,7 @@
 
 - 大量操作依赖「系统设置 → 隐私与安全性 → 自动化」；Dev 构建签名变化后权限可能失效。
 - 「锁屏」实为立即关闭显示器睡眠，是否需密码取决于系统「锁屏」设置。
-- 勿扰模式切换为占位。
+- 不支持勿扰 / 专注模式切换：macOS 没有公开 API。
 
 ### 文件搜索（filesearch）
 

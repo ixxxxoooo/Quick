@@ -56,8 +56,6 @@ final class SystemActionRunner {
             ejectAll()
         case .toggleDarkMode:
             toggleDarkMode()
-        case .toggleDoNotDisturb:
-            EventBus.shared.post(ShowHUDEvent(message: "勿扰模式切换暂未实现", tone: .info))
         }
     }
 

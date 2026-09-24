@@ -17,7 +17,6 @@ public enum SystemAction: String, CaseIterable, Sendable {
     case emptyTrash = "emptytrash"
     case ejectAll = "ejectall"
     case toggleDarkMode = "darkmode"
-    case toggleDoNotDisturb = "dnd"
 
     /// 显示标题
     public var title: String {
@@ -31,7 +30,6 @@ public enum SystemAction: String, CaseIterable, Sendable {
         case .emptyTrash: "清空废纸篓"
         case .ejectAll: "推出所有磁盘"
         case .toggleDarkMode: "切换深色模式"
-        case .toggleDoNotDisturb: "切换勿扰模式"
         }
     }
 
@@ -47,7 +45,6 @@ public enum SystemAction: String, CaseIterable, Sendable {
         case .emptyTrash: "永久删除废纸篓中的所有项目"
         case .ejectAll: "安全推出所有可移除磁盘"
         case .toggleDarkMode: "在深色和浅色模式之间切换"
-        case .toggleDoNotDisturb: "切换系统勿扰模式"
         }
     }
 
@@ -63,7 +60,6 @@ public enum SystemAction: String, CaseIterable, Sendable {
         case .emptyTrash: "trash"
         case .ejectAll: "eject"
         case .toggleDarkMode: "circle.lefthalf.filled"
-        case .toggleDoNotDisturb: "bell.slash"
         }
     }
 
@@ -79,7 +75,6 @@ public enum SystemAction: String, CaseIterable, Sendable {
         case .emptyTrash: ["清空废纸篓", "废纸篓", "trash", "empty trash"]
         case .ejectAll: ["全部弹出", "弹出全部", "推出磁盘", "eject", "eject all"]
         case .toggleDarkMode: ["深色模式", "暗色", "浅色", "dark mode", "light", "theme", "主题", "切换"]
-        case .toggleDoNotDisturb: ["勿扰", "免打扰", "do not disturb", "dnd"]
         }
     }
 }

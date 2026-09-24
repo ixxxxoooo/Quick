@@ -110,6 +110,14 @@ struct SystemActionMetadataTests {
         }
     }
 
+    /// 回归测试：勿扰模式在 macOS 上没有公开的切换 API，曾经留了一个能搜到、
+    /// 点了只弹「暂未实现」的命令 —— 那种占位比没有更糟，用户会以为功能坏了
+    @Test("不提供没有实现的占位操作")
+    func noUnimplementedPlaceholderActions() {
+        #expect(SystemAction(rawValue: "dnd") == nil)
+        #expect(!SystemAction.allCases.contains { $0.title.contains("暂未实现") })
+    }
+
     @Test("英文关键词能命中对应操作")
     func englishKeywordsMapToActions() {
         let samples: [(String, SystemAction)] = [
@@ -121,8 +129,7 @@ struct SystemActionMetadataTests {
             ("screen saver", .screenSaver),
             ("empty trash", .emptyTrash),
             ("eject all", .ejectAll),
-            ("dark mode", .toggleDarkMode),
-            ("do not disturb", .toggleDoNotDisturb)
+            ("dark mode", .toggleDarkMode)
         ]
         for (keyword, expected) in samples {
             #expect(
@@ -142,8 +149,7 @@ struct SystemActionMetadataTests {
             ("屏保", .screenSaver),
             ("废纸篓", .emptyTrash),
             ("推出磁盘", .ejectAll),
-            ("深色模式", .toggleDarkMode),
-            ("勿扰", .toggleDoNotDisturb)
+            ("深色模式", .toggleDarkMode)
         ]
         for (keyword, expected) in samples {
             #expect(
