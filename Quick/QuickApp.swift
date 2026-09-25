@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import QuickPlatform
 
 /// 应用入口（纯 AppKit）
 ///
@@ -12,6 +13,11 @@ import AppKit
 @main
 enum QuickMain {
     static func main() {
+        // 单实例检查：若已有实例运行，唤起主实例并退出当前进程
+        guard SingleInstanceGuard.shared.ensureSingleInstance() else {
+            return
+        }
+
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate

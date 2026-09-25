@@ -3,6 +3,7 @@
 // @author ygw
 
 import AppKit
+import QuickPlatform
 import QuickUI
 
 /// AppKit 生命周期代理
@@ -13,6 +14,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 应用完成启动
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 捕获系统终止信号（SIGTERM / SIGINT），确保 pkill 或系统关机时优雅移除托盘图标
+        SingleInstanceGuard.shared.installSignalHandlers {
+            AppCore.shared.prepareForTermination()
+        }
+
         // 主菜单要在任何窗口出现之前装好：⌘A / ⌘C / ⌘V 这些靠它的菜单项派发，
         // 没有菜单就完全没人处理（见 MainMenu 的说明）
         MainMenu.install()
@@ -25,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 应用即将退出
     func applicationWillTerminate(_ notification: Notification) {
         AppCore.shared.prepareForTermination()
+        SingleInstanceGuard.shared.releaseLock()
     }
 
     /// Dock 图标被点击（accessory 模式下不触发，保留以防切换）

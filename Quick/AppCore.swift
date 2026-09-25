@@ -168,6 +168,9 @@ final class AppCore {
     /// 事件订阅凭证（防止被释放）
     private var subscriptions: [EventSubscription] = []
 
+    /// 单实例唤醒通知观察者（必须强引用）
+    private var wakeUpObserver: NSObjectProtocol?
+
     /// 调试唤醒通知观察者（必须强引用，否则立即失效）
     private var debugWakeObserver: NSObjectProtocol?
 
@@ -349,11 +352,24 @@ final class AppCore {
         }
     }
 
-    /// 监听开发调试唤醒信号（分布式通知）
-    ///
-    /// 应用内用 `DistributedNotificationCenter` 发
-    /// `com.ixxxxoooo.quick.togglePalette` 即可切换面板（不要用 `notifyutil -p`）。
+    /// 监听开发调试唤醒信号（分布式通知）与单实例重复启动协同
     private func observeDebugWakeSignals() {
+        // 1. 监听单实例重复启动唤醒
+        wakeUpObserver = DistributedNotificationCenter.default().addObserver(
+            forName: SingleInstanceGuard.wakeUpNotificationName,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let args = notification.userInfo?["arguments"] as? [String]
+            Task { @MainActor in
+                if let args {
+                    self?.applyLaunchArguments(args)
+                }
+                self?.paletteCoordinator.show()
+            }
+        }
+
+        // 2. 兼容原有的 com.ixxxxoooo.quick.togglePalette
         debugWakeObserver = DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("com.ixxxxoooo.quick.togglePalette"),
             object: nil,
@@ -374,6 +390,14 @@ final class AppCore {
         mouseTriggerMonitor.stop()
         statusItemController.remove()
         pluginPanelController.closeAll()
+        if let obs = wakeUpObserver {
+            DistributedNotificationCenter.default().removeObserver(obs)
+            wakeUpObserver = nil
+        }
+        if let obs = debugWakeObserver {
+            DistributedNotificationCenter.default().removeObserver(obs)
+            debugWakeObserver = nil
+        }
         for plugin in plugins {
             plugin.deactivate()
         }
