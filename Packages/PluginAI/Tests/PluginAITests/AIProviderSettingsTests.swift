@@ -114,4 +114,32 @@ struct AIProviderSettingsTests {
                 PluginDefaults.isEnabled(PluginSettingKey.AIPortal.defaultAlwaysOnTop, default: false))
         }
     }
+
+    /// 停用的 Provider 不该留在命令表里：快捷键页还能把它的关键字解出来、
+    /// 主面板也还搜得到，可按下去什么都不会发生 —— 那种「看起来能用」比没有更糟
+    @Test("停用的 Provider 不进命令表，也解不出关键字")
+    func disabledProviderLeavesCommandTable() async throws {
+        try await Self.withStandardDefaults {
+            let commandID = AIPlugin.providerCommandID(Self.providerID)
+
+            UserDefaults.standard.removeObject(
+                forKey: PluginSettingKey.AIPortal.providerEnabled(Self.providerID))
+            #expect(
+                AIPlugin.functionCommands.contains { $0.id == commandID },
+                "启用时命令表里要有它，否则快捷键解不出关键字")
+            #expect(
+                KeywordResolver.match(query: Self.providerID, commands: AIPlugin.commands)?.id
+                    == commandID,
+                "启用时按服务名要能解到这条命令")
+
+            UserDefaults.standard.set(
+                false, forKey: PluginSettingKey.AIPortal.providerEnabled(Self.providerID))
+            #expect(
+                !AIPlugin.functionCommands.contains { $0.id == commandID },
+                "停用后命令表里不该还有它")
+            #expect(
+                KeywordResolver.match(query: Self.providerID, commands: AIPlugin.commands) == nil,
+                "停用的服务不该还能解出关键字")
+        }
+    }
 }

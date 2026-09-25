@@ -36,7 +36,8 @@ struct AISettingsView: View {
             } footer: {
                 Text(
                     "每个 AI 服务在独立窗口中运行，关闭窗口后登录态保持。"
-                    + "触发词就是服务自己的名称（下面列出的别名同样可用），搜索输入它即可直达。"
+                    + "触发词就是服务自己的名称（下面列出的别名同样可用），"
+                    + "在主面板搜索或到「快捷键」页输入它即可直达。"
                 )
             }
         }
@@ -79,6 +80,11 @@ private struct AIProviderSettingsRow: View {
             Text("触发词：\(provider.triggerWords.joined(separator: "、"))")
                 .font(DesignTokens.Typography.compactKeyCap)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
+        }
+        // 命令表要跟着开关走：停用的 Provider 不该还能在「快捷键」页解出关键字、
+        // 也不该在主面板搜到 —— 那时按下去什么都不会发生。宿主收到事件后重建命令快照。
+        .onChange(of: isEnabled) { _, _ in
+            EventBus.shared.post(CommandCatalogChangedEvent())
         }
     }
 }

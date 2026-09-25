@@ -891,14 +891,25 @@
   （`CommandID.openPlugin("ai")`），聚合层按 id 去重，所以面板里只出现一条「AI 聚合」。
   同时 `triggerWords` **只放通用唤醒词**（`ai` / `chat` / `AI 聚合` …），**不放 Provider 名**：
   这条通用入口的关键字是 `triggerWords + [name]`，把 Provider 名塞进去，搜 `deepseek`
-  时它会以精确命中盖过真正的 DeepSeek 条目。Provider 名由 `AIProviderRegistry` 承载，
-  只喂动态闸门与打分。
+  时它会以精确命中盖过真正的 DeepSeek 条目。
+- **每个启用的 Provider 还是一条静态命令（`AIPlugin.functionCommands`），id 是
+  `ai.<providerId>`。** 这条命令的用途**只有快捷键**：快捷键页把用户写的关键字解到
+  具体一条命令，`KeywordResolver` 只认命令声明 —— 只做动态搜索结果的话，
+  「⌥D + deepseek」永远是「没有唯一对上的关键字」。搜索结果仍然由 `dynamicSearch`
+  现算（它能跟着 Provider 开关实时变），两边的 id 必须一致（`providerCommandID(_:)`）：
+  聚合搜索按 id 去重，id 一对不上，面板里就会出现两行 DeepSeek。
+  **停用的 Provider 不进命令表**，设置页的开关会发 `CommandCatalogChangedEvent`
+  让宿主重建命令快照 —— 留一条解得出关键字、按下去什么都不做的命令，就是「看起来能用」。
+  `triggerWords` 那条禁止仍然成立：Provider 名**不放进插件级的 `triggerWords`**，
+  它们只出现在各自的命令里。这不只是排序问题 —— `KeywordResolver` 要求关键字**唯一**
+  命中一条命令，门户入口的名字一旦也等于 `deepseek`，「⌥D + deepseek」就会因为
+  「命中两条」而失败。
 
 #### 内部结构
 
 | 类型 | 职责 |
 | --- | --- |
-| `AIPlugin` | 插件入口：搜索结果（门户入口 + 命中的 Provider）与 `makeView()` |
+| `AIPlugin` | 插件入口：搜索结果（门户入口 + 命中的 Provider）、Provider 命令（快捷键用）、`perform` 与 `makeView()` |
 | `AIProvider` / `AIProviderRegistry` | Provider 元数据与注册表（名称、URL、图标、强调色、触发词） |
 | `AIWebViewWindowManager` | 每个 Provider 一个 WebView 窗口，生命周期与 Dock 身份，以及「能不能用」的判定 |
 | `AIWebViewPanel` | 自定义 NSPanel：点红绿灯只隐藏不销毁 |

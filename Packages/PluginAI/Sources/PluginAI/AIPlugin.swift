@@ -40,6 +40,51 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
 
     public init() {}
 
+    // MARK: - 命令
+
+    /// 每个启用的 Provider 一条命令
+    ///
+    /// 它存在的理由**不是搜索**（搜索结果由 `dynamicSearch` 现算，能跟着开关实时变），
+    /// 而是**快捷键**：快捷键页把用户写的关键字解到具体一条命令，`KeywordResolver`
+    /// 只认命令声明，动态结果不在候选里 —— 不声明成命令，「⌥D + deepseek」就解不出来。
+    ///
+    /// 命令 id 与动态条目共用 `providerCommandID(_:)`，两条路撞在同一个 id 上，
+    /// 聚合搜索按 id 去重后只留一条，不会出现两行同名的 DeepSeek。
+    ///
+    /// 停用的 Provider 不进命令表：留一条解得出关键字、按下去却什么都不做的命令，
+    /// 就是「看起来能用」的假象。开关一变，设置页会发 `CommandCatalogChangedEvent`
+    /// 让宿主重建快照。
+    public nonisolated static var functionCommands: [CommandDescriptor] {
+        AIProviderRegistry.all
+            .filter { AIWebViewWindowManager.isProviderEnabled($0.id) }
+            .map { provider in
+                CommandDescriptor(
+                    id: providerCommandID(provider.id),
+                    pluginID: id,
+                    pluginName: name,
+                    title: provider.name,
+                    subtitle: provider.description,
+                    keywords: provider.triggerWords,
+                    icon: provider.icon
+                )
+            }
+    }
+
+    /// Provider 命令的 id：`ai.<providerId>`
+    ///
+    /// 静态命令与动态搜索结果都用它 —— 两处各写一遍字符串，去重就会悄悄失效。
+    nonisolated static func providerCommandID(_ providerID: String) -> String {
+        "\(id).\(providerID)"
+    }
+
+    /// 从命令 id 反解 Provider id；不是 Provider 命令时返回 nil
+    nonisolated static func providerID(fromCommandID commandID: String) -> String? {
+        let prefix = "\(id)."
+        guard commandID.hasPrefix(prefix) else { return nil }
+        let providerID = String(commandID.dropFirst(prefix.count))
+        return AIProviderRegistry.provider(for: providerID) == nil ? nil : providerID
+    }
+
     // MARK: - 关键词
 
     /// 触发词闸门与打分共用的触发词并集
@@ -110,7 +155,7 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
 
             results.append(
                 SearchableItem(
-                    id: "ai.\(provider.id)",
+                    id: Self.providerCommandID(provider.id),
                     pluginID: Self.id,
                     title: provider.name,
                     subtitle: provider.description,
@@ -124,6 +169,24 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
         }
 
         return results
+    }
+
+    // MARK: - 执行
+
+    /// 执行一条命令
+    ///
+    /// Provider 命令直接开那个窗口 —— 快捷键绑的就是它；其余（「打开本插件」等）
+    /// 仍然导航进插件面板。
+    public func perform(commandID: String) {
+        guard let providerID = Self.providerID(fromCommandID: commandID) else {
+            EventBus.shared.post(NavigateEvent(pluginID: Self.id))
+            return
+        }
+        // 停用的 Provider 在命令表里已经没有条目，这里只可能撞上「刚停用、命令表还没
+        // 重建」的一瞬。`openOrFocus` 自己会拒绝，别把「没打开」说成打开了。
+        if !windowManager.openOrFocus(providerId: providerID) {
+            log.notice("命令 \(commandID, privacy: .public) 没能打开窗口")
+        }
     }
 
     // MARK: - 视图

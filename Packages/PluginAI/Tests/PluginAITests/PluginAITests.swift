@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import QuickCore
 import Testing
 
 @testable import PluginAI
@@ -257,5 +258,91 @@ struct AIPluginTests {
             #expect(!items.isEmpty, "\(query) 应当有结果")
             #expect(items.allSatisfy { $0.pluginID == AIPlugin.id })
         }
+    }
+}
+
+/// Provider 作为**静态命令**暴露出去的那一份
+///
+/// 快捷键页把用户写的关键字解到具体一条命令，`KeywordResolver` 只认命令声明 ——
+/// 只做动态搜索结果的话，关键字永远解不出来（「没有唯一对上的关键字」）。
+///
+/// 用例避开 `deepseek`：设置页那组用例会临时把它停用，两个 suite 并发跑时
+/// 它的启用状态不是这个 suite 能假设的。
+@MainActor
+@Suite("AI Provider 命令")
+struct AIProviderCommandTests {
+
+    /// 这个 suite 里其他 Provider 的启用状态是稳定的，deepseek 不是
+    private static var stableProviders: [AIProvider] {
+        AIProviderRegistry.all.filter { $0.id != "deepseek" }
+    }
+
+    /// 关键字的解析结果只能有一条：多一条会让 `KeywordResolver` 拒绝猜测，
+    /// 少一条就是用户界面里那句「没有唯一对上的关键字」
+    @Test("服务名与别名都解得到对应的 Provider 命令")
+    func keywordsResolveToProviderCommand() {
+        let commands = AIPlugin.commands
+        for provider in Self.stableProviders {
+            for keyword in [provider.name] + provider.aliases {
+                #expect(
+                    KeywordResolver.match(query: keyword, commands: commands)?.id
+                        == AIPlugin.providerCommandID(provider.id),
+                    "「\(keyword)」应当唯一解到 \(provider.id)")
+            }
+        }
+    }
+
+    /// 命令标题与首个关键字就是快捷键页展示的那一行：标题给名字（人看的），
+    /// 首个关键字给全小写名（输入框里回填 `wakeKeyword`）
+    @Test("命令标题是服务名，首个关键字是它的小写名")
+    func commandShape() throws {
+        for provider in Self.stableProviders {
+            let command = try #require(
+                AIPlugin.functionCommands.first {
+                    $0.id == AIPlugin.providerCommandID(provider.id)
+                },
+                "\(provider.id) 没有对应的命令")
+
+            #expect(command.title == provider.name)
+            #expect(command.keywords.first == provider.name.lowercased())
+            #expect(command.pluginName == AIPlugin.name)
+            #expect(command.icon == provider.icon)
+            #expect(command.showsWhenQueryEmpty == false, "空查询首屏每个插件仍只露一条入口")
+        }
+    }
+
+    /// 静态命令与动态条目 id 不一致的话，聚合搜索的去重会失效 ——
+    /// 面板里就会出现两行 DeepSeek
+    @Test("命令 id 与搜索结果 id 对得上")
+    func commandIDsAlignWithSearchItems() async {
+        let plugin = AIPlugin()
+        let commandIDs = Set(AIPlugin.functionCommands.map(\.id))
+
+        for provider in Self.stableProviders {
+            let commandID = AIPlugin.providerCommandID(provider.id)
+            #expect(commandIDs.contains(commandID), "\(provider.id) 不在命令表里")
+
+            let items = await plugin.dynamicSearch(query: provider.name)
+            #expect(
+                items.map(\.id).filter { $0.hasPrefix("ai.") } == [commandID],
+                "\(provider.id) 的搜索结果 id 与命令 id 必须相同")
+        }
+    }
+
+    @Test("命令 id 反解：Provider 命令返回 Provider id，其他命令返回 nil")
+    func commandIDParsing() {
+        #expect(AIPlugin.providerID(fromCommandID: AIPlugin.providerCommandID("kimi")) == "kimi")
+        #expect(AIPlugin.providerID(fromCommandID: CommandID.openPlugin("ai")) == nil)
+        #expect(AIPlugin.providerID(fromCommandID: "ai.不存在") == nil)
+        #expect(AIPlugin.providerID(fromCommandID: "clipboard.clear") == nil)
+    }
+
+    /// 命令 id 是发布过就不能改的契约：快捷键存的就是它
+    @Test("命令 id 形如 ai.<providerId>")
+    func commandIDFormat() {
+        #expect(AIPlugin.providerCommandID("deepseek") == "ai.deepseek")
+        #expect(
+            Set(AIPlugin.functionCommands.map(\.id)).count == AIPlugin.functionCommands.count,
+            "命令 id 不能重复")
     }
 }
