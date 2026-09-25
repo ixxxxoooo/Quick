@@ -42,7 +42,10 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
 
     // MARK: - 命令
 
-    /// 每个启用的 Provider 一条命令
+    /// 聚合窗口命令的 id：`ai.mergedWindow`
+    public nonisolated static let mergedWindowCommandID = "\(id).mergedWindow"
+
+    /// 每个启用的 Provider 一条命令，加上直接打开聚合窗口的命令
     ///
     /// 它存在的理由**不是搜索**（搜索结果由 `dynamicSearch` 现算，能跟着开关实时变），
     /// 而是**快捷键**：快捷键页把用户写的关键字解到具体一条命令，`KeywordResolver`
@@ -55,7 +58,16 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
     /// 就是「看起来能用」的假象。开关一变，设置页会发 `CommandCatalogChangedEvent`
     /// 让宿主重建快照。
     public nonisolated static var functionCommands: [CommandDescriptor] {
-        AIProviderRegistry.all
+        let mergedWindowCommand = CommandDescriptor(
+            id: mergedWindowCommandID,
+            pluginID: id,
+            pluginName: name,
+            title: "AI 聚合窗口",
+            subtitle: "打开多标签 AI 聚合窗口，保持上次标签页状态",
+            keywords: ["ai 聚合窗口", "ai聚合窗口", "聚合窗口", "ai窗口", "ai window"],
+            icon: "macwindow.on.rectangle"
+        )
+        let providerCommands = AIProviderRegistry.all
             .filter { AIWebViewWindowManager.isProviderEnabled($0.id) }
             .map { provider in
                 CommandDescriptor(
@@ -68,6 +80,7 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
                     icon: provider.icon
                 )
             }
+        return [mergedWindowCommand] + providerCommands
     }
 
     /// Provider 命令的 id：`ai.<providerId>`
@@ -181,6 +194,14 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
     /// Provider 命令走窗口切换（开着再按就关，与主面板 / `plugin.open.*` 热键同语义）；
     /// 其余（「打开本插件」等）仍然导航进插件面板。
     public func perform(commandID: String) {
+        if commandID == Self.mergedWindowCommandID {
+            let wasOpen = windowManager.isMergedWindowOpen()
+            let nowOpen = windowManager.toggleMergedWindow()
+            if !wasOpen, !nowOpen {
+                log.notice("命令 \(commandID, privacy: .public) 没能打开聚合窗口")
+            }
+            return
+        }
         guard let providerID = Self.providerID(fromCommandID: commandID) else {
             EventBus.shared.post(NavigateEvent(pluginID: Self.id))
             return

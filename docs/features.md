@@ -786,6 +786,11 @@
   走 `AIWebViewWindowManager.toggle`：窗口已可见再按一次就 `hideWindow`（保留会话），
   关着才 `openOrFocus`。搜索结果 / 门户卡片上的「打开」仍走 `openOrFocus` ——
   点按钮只表示要到前台，不该把已开的窗口关掉。
+- **聚合窗口提供独立直接唤起命令 `ai.mergedWindow` 并持久保持标签页状态。**
+  静态命令「AI 聚合窗口」（`ai.mergedWindow`，关键词包含 `ai 聚合窗口`、`ai聚合窗口`、`聚合窗口`、`ai窗口`、`ai window`）
+  支持快捷键绑定与搜索直达。执行时切换显隐（开着隐藏、关着打开）；
+  窗口打开或切换时会记住最后选中的标签（`ai.lastActiveTab`）与已打开的所有标签（`ai.openTabs`），
+  在窗口隐藏重新唤起或应用重启后自动恢复当时的标签页状态。
 
 #### 内部结构
 

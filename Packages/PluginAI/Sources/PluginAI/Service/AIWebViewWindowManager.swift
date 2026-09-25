@@ -91,7 +91,7 @@ final class AIWebViewWindowManager {
             return false
         }
 
-        if isMergeMode {
+        if isMergeMode || mergedPanel != nil {
             return openOrFocusMerged(provider: provider)
         } else {
             return openOrFocusSeparate(provider: provider)
@@ -100,7 +100,7 @@ final class AIWebViewWindowManager {
 
     /// 检查指定 Provider 窗口是否打开
     func isWindowOpen(for providerId: String) -> Bool {
-        if isMergeMode {
+        if isMergeMode || mergedPanel != nil {
             guard let panel = mergedPanel, panel.isVisible else { return false }
             return activeProviderID == providerId
         } else {
@@ -108,10 +108,15 @@ final class AIWebViewWindowManager {
         }
     }
 
+    /// 检查聚合窗口是否打开且可见
+    func isMergedWindowOpen() -> Bool {
+        mergedPanel?.isVisible ?? false
+    }
+
     /// 切换 Provider 窗口显隐
     @discardableResult
     func toggle(providerId: String) -> Bool {
-        if isMergeMode {
+        if isMergeMode || mergedPanel != nil {
             if let panel = mergedPanel, panel.isVisible, activeProviderID == providerId {
                 hideWindow(for: providerId)
                 log.notice("切换：隐藏聚合窗口 \(providerId, privacy: .public)")
@@ -127,10 +132,25 @@ final class AIWebViewWindowManager {
         return openOrFocus(providerId: providerId)
     }
 
+    /// 切换聚合窗口显隐
+    @discardableResult
+    func toggleMergedWindow() -> Bool {
+        if let panel = mergedPanel, panel.isVisible {
+            saveMergedFrame()
+            saveTabState()
+            panel.orderOut(nil)
+            syncDockPresence()
+            log.notice("切换：隐藏聚合窗口")
+            return false
+        }
+        return openOrFocusMergedWindow()
+    }
+
     /// 隐藏窗口
     func hideWindow(for providerId: String) {
-        if isMergeMode {
+        if isMergeMode || mergedPanel != nil {
             saveMergedFrame()
+            saveTabState()
             mergedPanel?.orderOut(nil)
             syncDockPresence()
         } else {
@@ -147,18 +167,20 @@ final class AIWebViewWindowManager {
         webViews[providerId]?.stopLoading()
         webViews[providerId] = nil
 
-        if isMergeMode {
+        if isMergeMode || mergedPanel != nil {
             titleTabBar?.removeTab(providerId)
+            saveOpenTabs()
             if activeProviderID == providerId {
-                let remaining = AIProviderRegistry.all.filter {
-                    Self.isProviderEnabled($0.id) && webViews[$0.id] != nil
+                let remaining = (titleTabBar?.tabIDs ?? []).filter {
+                    Self.isProviderEnabled($0) && webViews[$0] != nil
                 }
                 if let next = remaining.first {
-                    switchToTab(next.id)
+                    switchToTab(next)
                 } else {
                     activeProviderID = nil
                     titleTabBar?.selectTab(nil)
                     mergedPanel?.orderOut(nil)
+                    UserDefaults.standard.removeObject(forKey: PluginSettingKey.AIPortal.lastActiveTab)
                 }
             }
         } else {
@@ -174,6 +196,7 @@ final class AIWebViewWindowManager {
     /// 收掉所有窗口
     func closeAll() {
         saveMergedFrame()
+        saveTabState()
         for (id, webView) in webViews {
             webView.stopLoading()
             log.notice("关闭: \(id, privacy: .public)")
@@ -211,12 +234,7 @@ final class AIWebViewWindowManager {
     private var hasDockPresence = false
 
     private func syncDockPresence() {
-        let anyVisible: Bool
-        if isMergeMode {
-            anyVisible = mergedPanel?.isVisible ?? false
-        } else {
-            anyVisible = separateWindows.values.contains { $0.panel.isVisible }
-        }
+        let anyVisible = (mergedPanel?.isVisible ?? false) || separateWindows.values.contains { $0.panel.isVisible }
         if anyVisible, !hasDockPresence {
             ActivationPolicyKeeper.retain("ai.aggregated")
             hasDockPresence = true
@@ -240,12 +258,12 @@ final class AIWebViewWindowManager {
 
     /// 获取所有已打开标签的 Provider ID
     func activeProviderIDs() -> Set<String> {
-        if isMergeMode {
-            guard let panel = mergedPanel, panel.isVisible else { return [] }
-            return Set(webViews.keys)
-        } else {
-            return Set(separateWindows.filter { $0.value.panel.isVisible }.map(\.key))
+        var ids = Set<String>()
+        if let panel = mergedPanel, panel.isVisible {
+            ids.formUnion(webViews.keys)
         }
+        ids.formUnion(separateWindows.filter { $0.value.panel.isVisible }.map(\.key))
+        return ids
     }
 
     // MARK: - 独立窗口模式
@@ -324,6 +342,7 @@ final class AIWebViewWindowManager {
 
     private func openOrFocusMerged(provider: AIProvider) -> Bool {
         ensureMergedWindow()
+        restoreSavedTabsIfNeeded()
         ensureWebView(for: provider)
         switchToTab(provider.id)
 
@@ -336,6 +355,30 @@ final class AIWebViewWindowManager {
 
         EventBus.shared.post(HidePaletteEvent())
         log.notice("聚焦标签: \(provider.name, privacy: .public)")
+        return true
+    }
+
+    /// 打开或聚焦聚合窗口，保持当前/上次选中的标签页状态
+    @discardableResult
+    func openOrFocusMergedWindow() -> Bool {
+        ensureMergedWindow()
+        restoreSavedTabsIfNeeded()
+
+        guard let panel = mergedPanel else { return false }
+
+        if let activeID = activeProviderID, webViews[activeID] != nil {
+            switchToTab(activeID)
+        } else if let firstTab = titleTabBar?.tabIDs.first, webViews[firstTab] != nil {
+            switchToTab(firstTab)
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+        syncDockPresence()
+
+        EventBus.shared.post(HidePaletteEvent())
+        log.notice("聚焦聚合窗口: 当前标签 \(self.activeProviderID ?? "无", privacy: .public)")
         return true
     }
 
@@ -362,6 +405,7 @@ final class AIWebViewWindowManager {
 
         newPanel.onClose = { [weak self] in
             self?.saveMergedFrame()
+            self?.saveTabState()
             self?.mergedPanel?.orderOut(nil)
             self?.syncDockPresence()
         }
@@ -377,7 +421,11 @@ final class AIWebViewWindowManager {
                 self?.destroyWindow(for: id)
             },
             onAddProvider: { [weak self] id in
-                self?.openOrFocus(providerId: id)
+                guard let self else { return }
+                guard let provider = AIProviderRegistry.provider(for: id),
+                    Self.isProviderEnabled(id)
+                else { return }
+                _ = self.openOrFocusMerged(provider: provider)
             },
             onTogglePin: { [weak self] in
                 self?.toggleAlwaysOnTop(forMerged: true)
@@ -458,8 +506,9 @@ final class AIWebViewWindowManager {
 
         webViews[provider.id] = webView
 
-        if isMergeMode {
+        if isMergeMode || mergedPanel != nil {
             titleTabBar?.addTab(id: provider.id, title: provider.name, icon: provider.icon)
+            saveOpenTabs()
         }
     }
 
@@ -480,6 +529,67 @@ final class AIWebViewWindowManager {
 
         if let provider = AIProviderRegistry.provider(for: providerId) {
             mergedPanel?.title = provider.name
+        }
+
+        UserDefaults.standard.set(providerId, forKey: PluginSettingKey.AIPortal.lastActiveTab)
+        saveOpenTabs()
+    }
+
+    // MARK: - 标签页状态持久化
+
+    private func saveTabState() {
+        if let active = activeProviderID {
+            UserDefaults.standard.set(active, forKey: PluginSettingKey.AIPortal.lastActiveTab)
+        }
+        saveOpenTabs()
+    }
+
+    private func saveOpenTabs() {
+        let tabs = titleTabBar?.tabIDs ?? Array(webViews.keys)
+        UserDefaults.standard.set(tabs, forKey: PluginSettingKey.AIPortal.openTabs)
+    }
+
+    private func restoreSavedTabsIfNeeded() {
+        if let bar = titleTabBar, bar.tabCount > 0 {
+            return
+        }
+
+        var savedTabs = UserDefaults.standard.stringArray(forKey: PluginSettingKey.AIPortal.openTabs) ?? []
+        savedTabs = savedTabs.filter { id in
+            AIProviderRegistry.provider(for: id) != nil && Self.isProviderEnabled(id)
+        }
+
+        let savedActive = UserDefaults.standard.string(forKey: PluginSettingKey.AIPortal.lastActiveTab)
+        let validSavedActive: String? = {
+            guard let id = savedActive,
+                AIProviderRegistry.provider(for: id) != nil,
+                Self.isProviderEnabled(id)
+            else { return nil }
+            return id
+        }()
+
+        if let active = validSavedActive, !savedTabs.contains(active) {
+            savedTabs.append(active)
+        }
+
+        if savedTabs.isEmpty {
+            if let firstEnabled = AIProviderRegistry.all.first(where: { Self.isProviderEnabled($0.id) }) {
+                savedTabs.append(firstEnabled.id)
+            }
+        }
+
+        for id in savedTabs {
+            if let provider = AIProviderRegistry.provider(for: id) {
+                ensureWebView(for: provider)
+            }
+        }
+
+        let targetTab = (validSavedActive != nil && savedTabs.contains(validSavedActive!))
+            ? validSavedActive!
+            : (savedTabs.first ?? "")
+
+        if !targetTab.isEmpty {
+            switchToTab(targetTab)
         }
     }
 

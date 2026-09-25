@@ -235,6 +235,97 @@ struct AIWebViewWindowTests {
         #expect(btn.layer?.cornerRadius == 12)
     }
 
+    // MARK: - 聚合窗口与标签状态保持测试
+
+    @Test("openOrFocusMergedWindow 打开聚合窗口并保持选中标签状态")
+    func openOrFocusMergedWindowMaintainsTabState() {
+        let manager = AIWebViewWindowManager()
+        defer { manager.closeAll() }
+
+        #expect(manager.openOrFocusMergedWindow(), "应当成功打开聚合窗口")
+        #expect(manager.isMergedWindowOpen(), "聚合窗口应当处于打开状态")
+
+        // 切换到 chatgpt
+        #expect(manager.openOrFocus(providerId: "chatgpt"))
+        #expect(manager.activeProviderID == "chatgpt")
+
+        // 隐藏窗口
+        manager.hideWindow(for: "chatgpt")
+        #expect(manager.isMergedWindowOpen() == false, "隐藏后聚合窗口应当不可见")
+
+        // 再次调用 openOrFocusMergedWindow，应当恢复显示且保持在 chatgpt 标签页
+        #expect(manager.openOrFocusMergedWindow())
+        #expect(manager.isMergedWindowOpen())
+        #expect(manager.activeProviderID == "chatgpt", "重新打开后应保持当时的标签页状态")
+    }
+
+    @Test("toggleMergedWindow 在聚合窗口可见时隐藏，不可见时打开")
+    func toggleMergedWindowTogglesVisibility() {
+        let manager = AIWebViewWindowManager()
+        defer { manager.closeAll() }
+
+        #expect(manager.toggleMergedWindow(), "第一次应当打开聚合窗口")
+        #expect(manager.isMergedWindowOpen(), "聚合窗口应当可见")
+
+        #expect(manager.toggleMergedWindow() == false, "第二次应当隐藏聚合窗口")
+        #expect(manager.isMergedWindowOpen() == false, "聚合窗口应当隐藏")
+
+        #expect(manager.toggleMergedWindow(), "第三次应当再次打开聚合窗口")
+        #expect(manager.isMergedWindowOpen(), "聚合窗口应当再次可见")
+    }
+
+    @Test("聚合窗口从偏好中恢复已打开的标签列表与最后活动标签")
+    func mergedWindowRestoresSavedTabsFromUserDefaults() {
+        let openTabsKey = PluginSettingKey.AIPortal.openTabs
+        let lastActiveKey = PluginSettingKey.AIPortal.lastActiveTab
+        let savedOpenTabs = UserDefaults.standard.object(forKey: openTabsKey)
+        let savedLastActive = UserDefaults.standard.object(forKey: lastActiveKey)
+        defer {
+            if let savedOpenTabs {
+                UserDefaults.standard.set(savedOpenTabs, forKey: openTabsKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: openTabsKey)
+            }
+            if let savedLastActive {
+                UserDefaults.standard.set(savedLastActive, forKey: lastActiveKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: lastActiveKey)
+            }
+        }
+
+        UserDefaults.standard.set(["deepseek", "chatgpt"], forKey: openTabsKey)
+        UserDefaults.standard.set("chatgpt", forKey: lastActiveKey)
+
+        let manager = AIWebViewWindowManager()
+        defer { manager.closeAll() }
+
+        #expect(manager.openOrFocusMergedWindow())
+        #expect(manager.isMergedWindowOpen())
+        #expect(manager.activeProviderID == "chatgpt", "应当恢复上次选中的标签页")
+        let activeIDs = manager.activeProviderIDs()
+        #expect(activeIDs.contains("deepseek"), "应当恢复已打开的 deepseek 标签")
+        #expect(activeIDs.contains("chatgpt"), "应当恢复已打开的 chatgpt 标签")
+    }
+
+    @Test("AI 聚合窗口命令声明与快捷键关键字匹配")
+    func mergedWindowCommandDeclarationAndMatching() {
+        let commandID = AIPlugin.mergedWindowCommandID
+        #expect(commandID == "ai.mergedWindow")
+        #expect(AIPlugin.functionCommands.contains { $0.id == commandID }, "functionCommands 必须包含聚合窗口命令")
+        #expect(AIPlugin.providerID(fromCommandID: commandID) == nil, "聚合窗口命令不能被误解析为 provider id")
+
+        let matchedByTitle = KeywordResolver.match(query: "AI 聚合窗口", commands: AIPlugin.commands)
+        #expect(matchedByTitle?.id == commandID, "按标题应当解出聚合窗口命令")
+
+        let matchedByKeyword = KeywordResolver.match(query: "聚合窗口", commands: AIPlugin.commands)
+        #expect(matchedByKeyword?.id == commandID, "按别名应当解出聚合窗口命令")
+
+        let plugin = AIPlugin()
+        defer { plugin.deactivate() }
+        plugin.perform(commandID: commandID)
+        // 应当能够通过 perform 打开/切换窗口
+    }
+
     /// 合成一个按下事件
     private static func keyDown(
         keyCode: Int,

@@ -79,6 +79,20 @@ struct AIPortalView: View {
             Spacer()
 
             Button {
+                manager.openOrFocusMergedWindow()
+            } label: {
+                HStack(spacing: DesignTokens.Spacing.xs) {
+                    Image(systemName: "macwindow.on.rectangle")
+                        .font(DesignTokens.Typography.inlineIcon)
+                    Text("聚合窗口")
+                        .font(DesignTokens.Typography.inlineIcon)
+                }
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+            }
+            .buttonStyle(.plain)
+            .help("打开多标签 AI 聚合窗口")
+
+            Button {
                 EventBus.shared.post(ShowPaletteSettingsEvent(pluginID: AIPlugin.id))
             } label: {
                 HStack(spacing: DesignTokens.Spacing.xs) {

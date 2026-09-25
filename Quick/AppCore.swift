@@ -967,13 +967,14 @@ final class AppCore {
         }
         // 功能命令也做切换：面板正在显示该插件时再按同一个插件的快捷键就关掉。
         // plugin.open.* 已在上面处理，这里兜住 clipboard.clear 这类「只会 Navigate 回本插件」的热键。
-        // AI Provider（ai.<id>）除外：它们开的是独立窗口，切换语义在 perform 的 toggle 里；
-        // 若在这里按「面板正显示 ai」直接 hide，⌥D 在门户开着时只会关面板、打不开 DeepSeek。
+        // AI Provider（ai.<id>）与聚合窗口（ai.mergedWindow）除外：它们开的是窗口，切换语义在 perform 的 toggle 里；
+        // 若在这里按「面板正显示 ai」直接 hide，快捷键在门户开着时只会关面板、打不开窗口。
         let ownerPluginID = type(of: plugin).id
-        let isAIProviderCommand = AIPlugin.providerID(fromCommandID: commandID) != nil
+        let isAIWindowCommand =
+            AIPlugin.providerID(fromCommandID: commandID) != nil || commandID == AIPlugin.mergedWindowCommandID
         if paletteCoordinator.isVisible,
             paletteCoordinator.activePluginID == ownerPluginID,
-            !isAIProviderCommand
+            !isAIWindowCommand
         {
             paletteCoordinator.hide()
             let ms = invokeStart.duration(to: .now).invokeMS

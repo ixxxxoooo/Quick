@@ -78,6 +78,10 @@ public enum PluginSettingKey {
         public static let defaultAlwaysOnTop = "ai.defaultAlwaysOnTop"
         /// 是否将所有 AI 窗口合并到一个标签页窗口中（默认关，各 Provider 独立窗口）
         public static let mergeWindows = "ai.mergeWindows"
+        /// 聚合窗口当前/最后选中的标签页 Provider ID
+        public static let lastActiveTab = "ai.lastActiveTab"
+        /// 聚合窗口当前打开的所有标签页 Provider IDs
+        public static let openTabs = "ai.openTabs"
         /// 单个 Provider 的开关
         public static func providerEnabled(_ providerID: String) -> String {
             "ai.provider.\(providerID).enabled"
