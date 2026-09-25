@@ -222,6 +222,19 @@ struct AIWebViewWindowTests {
         #expect(closedActive)
     }
 
+    @Test("标题栏图标按钮保持正圆形且边距为零")
+    func titleBarIconButtonIsCircular() {
+        let btn = AITitleBarIconButton(symbol: "pin", tooltip: "置顶") { }
+        #expect(btn.alignmentRectInsets.top == 0)
+        #expect(btn.alignmentRectInsets.bottom == 0)
+        #expect(btn.alignmentRectInsets.left == 0)
+        #expect(btn.alignmentRectInsets.right == 0)
+
+        btn.frame = NSRect(x: 0, y: 0, width: 24, height: 24)
+        btn.layout()
+        #expect(btn.layer?.cornerRadius == 12)
+    }
+
     /// 合成一个按下事件
     private static func keyDown(
         keyCode: Int,

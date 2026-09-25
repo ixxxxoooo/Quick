@@ -660,6 +660,10 @@ final class AITitleBarIconButton: NSButton {
 
     override var isFlipped: Bool { true }
 
+    override var alignmentRectInsets: NSEdgeInsets {
+        NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+    }
+
     override var isEnabled: Bool {
         didSet {
             alphaValue = isEnabled ? 1.0 : 0.4
@@ -679,7 +683,8 @@ final class AITitleBarIconButton: NSButton {
 
         self.toolTip = tooltip
         self.isBordered = false
-        self.bezelStyle = .accessoryBarAction
+        self.imagePosition = .imageOnly
+        self.imageScaling = .scaleProportionallyDown
         self.target = self
         self.action = #selector(handleClick)
 
@@ -696,6 +701,11 @@ final class AITitleBarIconButton: NSButton {
     }
 
     @available(*, unavailable) required init?(coder _: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        layer?.cornerRadius = min(bounds.width, bounds.height) / 2
+    }
 
     @objc func handleClick() {
         onAction?()
@@ -714,7 +724,7 @@ final class AITitleBarIconButton: NSButton {
 
     private func updateIcon() {
         let sym = (isActive ? activeSymbol : nil) ?? baseSymbol
-        let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
+        let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
         image = NSImage(systemSymbolName: sym, accessibilityDescription: toolTip)?
             .withSymbolConfiguration(config)
         imageScaling = .scaleProportionallyDown
@@ -722,15 +732,22 @@ final class AITitleBarIconButton: NSButton {
     }
 
     private func refreshAppearance() {
-        if isActive {
-            layer?.backgroundColor = NSColor(DesignTokens.Colors.capsuleToggleFill).cgColor
-            contentTintColor = NSColor(DesignTokens.Colors.capsuleToggleGlyph)
-        } else if isHovered {
-            layer?.backgroundColor = NSColor(DesignTokens.Colors.aiTabHover).cgColor
-            contentTintColor = NSColor(DesignTokens.Colors.aiTabSelectedText)
-        } else {
-            layer?.backgroundColor = nil
-            contentTintColor = NSColor(DesignTokens.Colors.aiTabText)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = DesignTokens.Duration.hover
+            context.allowsImplicitAnimation = true
+            if isActive {
+                let baseColor = NSColor(DesignTokens.Colors.capsuleToggleFill)
+                layer?.backgroundColor = isHovered
+                    ? baseColor.withAlphaComponent(min(baseColor.alphaComponent + 0.10, 1.0)).cgColor
+                    : baseColor.cgColor
+                contentTintColor = NSColor(DesignTokens.Colors.capsuleToggleGlyph)
+            } else if isHovered {
+                layer?.backgroundColor = NSColor(DesignTokens.Colors.aiTabSelected).cgColor
+                contentTintColor = NSColor(DesignTokens.Colors.aiTabSelectedText)
+            } else {
+                layer?.backgroundColor = nil
+                contentTintColor = NSColor(DesignTokens.Colors.aiTabText)
+            }
         }
     }
 
@@ -887,7 +904,7 @@ final class AITitleTabBarView: NSView {
         NSLayoutConstraint.activate([
             // 右侧固定操作区
             actionsStackView.trailingAnchor.constraint(
-                equalTo: trailingAnchor, constant: -DesignTokens.Spacing.md),
+                equalTo: trailingAnchor, constant: -DesignTokens.Spacing.lg),
             actionsStackView.centerYAnchor.constraint(equalTo: centerYAnchor),
             actionsStackView.heightAnchor.constraint(
                 equalToConstant: DesignTokens.Size.aiTitleBarTabHeight),
