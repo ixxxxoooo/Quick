@@ -44,9 +44,6 @@ final class AIWebViewWindowManager {
     /// 聚合模式内容容器
     private var contentContainer: NSView?
 
-    /// 聚合模式悬浮胶囊
-    private var mergedCapsule: FloatingCapsuleView?
-
     /// 默认窗口尺寸
     private let defaultWidth: CGFloat = 1100
     private let defaultHeight: CGFloat = 780
@@ -160,6 +157,7 @@ final class AIWebViewWindowManager {
                     switchToTab(next.id)
                 } else {
                     activeProviderID = nil
+                    titleTabBar?.selectTab(nil)
                     mergedPanel?.orderOut(nil)
                 }
             }
@@ -181,7 +179,6 @@ final class AIWebViewWindowManager {
             log.notice("关闭: \(id, privacy: .public)")
         }
         webViews.removeAll()
-        mergedCapsule = nil
         titleTabBar = nil
         if let panel = mergedPanel {
             panel.onClose = nil
@@ -372,11 +369,32 @@ final class AIWebViewWindowManager {
         restoreMergedFrame(newPanel)
 
         // 标签栏嵌入标题栏内部（与红绿灯同行）
-        let tabBar = AITitleTabBarView(onSelect: { [weak self] id in
-            self?.switchToTab(id)
-        }, onClose: { [weak self] id in
-            self?.destroyWindow(for: id)
-        })
+        let tabBar = AITitleTabBarView(
+            onSelect: { [weak self] id in
+                self?.switchToTab(id)
+            },
+            onClose: { [weak self] id in
+                self?.destroyWindow(for: id)
+            },
+            onAddProvider: { [weak self] id in
+                self?.openOrFocus(providerId: id)
+            },
+            onTogglePin: { [weak self] in
+                self?.toggleAlwaysOnTop(forMerged: true)
+            },
+            onReload: { [weak self] in
+                guard let id = self?.activeProviderID else { return }
+                self?.reloadWindow(for: id)
+            },
+            onOpenExternal: { [weak self] in
+                guard let id = self?.activeProviderID else { return }
+                self?.openInBrowser(providerId: id)
+            },
+            onCloseActive: { [weak self] in
+                guard let id = self?.activeProviderID else { return }
+                self?.destroyWindow(for: id)
+            }
+        )
         tabBar.translatesAutoresizingMaskIntoConstraints = false
 
         // 找到标题栏容器并将标签栏加入
@@ -407,14 +425,9 @@ final class AIWebViewWindowManager {
             container.bottomAnchor.constraint(equalTo: hostView.bottomAnchor),
         ])
 
-        // 悬浮胶囊叠在内容区域上
-        let capsuleView = makeCapsule(positionKey: "ai.aggregated", forMerged: true)
-        hostView.addSubview(capsuleView)
-        capsuleView.positionInSuperview()
-
         if PluginDefaults.isEnabled(PluginSettingKey.AIPortal.defaultAlwaysOnTop, default: false) {
             newPanel.level = .floating
-            capsuleView.setToggle(Self.pinActionID, isOn: true, tooltip: "取消置顶")
+            tabBar.setPinned(true)
         }
 
         newPanel.contentView = hostView
@@ -422,7 +435,6 @@ final class AIWebViewWindowManager {
         mergedPanel = newPanel
         titleTabBar = tabBar
         contentContainer = container
-        mergedCapsule = capsuleView
 
         log.notice("创建聚合窗口")
     }
@@ -523,7 +535,7 @@ final class AIWebViewWindowManager {
             guard let panel = mergedPanel else { return }
             let newState = panel.level != .floating
             panel.level = newState ? .floating : .normal
-            mergedCapsule?.setToggle(Self.pinActionID, isOn: newState, tooltip: newState ? "取消置顶" : "窗口置顶")
+            titleTabBar?.setPinned(newState)
         } else if let id = providerId, let win = separateWindows[id] {
             let newState = win.panel.level != .floating
             win.panel.level = newState ? .floating : .normal
@@ -541,7 +553,7 @@ final class AIWebViewWindowManager {
         if isMergeMode {
             guard let panel = mergedPanel else { return }
             panel.level = flag ? .floating : .normal
-            mergedCapsule?.setToggle(Self.pinActionID, isOn: flag, tooltip: flag ? "取消置顶" : "窗口置顶")
+            titleTabBar?.setPinned(flag)
         } else if let win = separateWindows[providerId] {
             win.panel.level = flag ? .floating : .normal
             win.capsule.setToggle(Self.pinActionID, isOn: flag, tooltip: flag ? "取消置顶" : "窗口置顶")
@@ -634,24 +646,208 @@ final class AIWebViewWindowManager {
     }
 }
 
+// MARK: - 标题栏图标按钮
+
+/// 标题栏图标按钮（用于新建标签加号与右侧常驻操作按钮）
+@MainActor
+final class AITitleBarIconButton: NSButton {
+
+    private var isHovered = false
+    private var isActive = false
+    private let baseSymbol: String
+    private let activeSymbol: String?
+    private var onAction: (() -> Void)?
+
+    override var isFlipped: Bool { true }
+
+    override var isEnabled: Bool {
+        didSet {
+            alphaValue = isEnabled ? 1.0 : 0.4
+        }
+    }
+
+    init(
+        symbol: String,
+        activeSymbol: String? = nil,
+        tooltip: String,
+        action: @escaping () -> Void
+    ) {
+        self.baseSymbol = symbol
+        self.activeSymbol = activeSymbol
+        self.onAction = action
+        super.init(frame: .zero)
+
+        self.toolTip = tooltip
+        self.isBordered = false
+        self.bezelStyle = .accessoryBarAction
+        self.target = self
+        self.action = #selector(handleClick)
+
+        wantsLayer = true
+        layer?.cornerRadius = DesignTokens.Size.aiTitleBarTabHeight / 2
+
+        updateIcon()
+        translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: DesignTokens.Size.aiTitleBarTabHeight),
+            heightAnchor.constraint(equalToConstant: DesignTokens.Size.aiTitleBarTabHeight),
+        ])
+    }
+
+    @available(*, unavailable) required init?(coder _: NSCoder) { fatalError() }
+
+    @objc func handleClick() {
+        onAction?()
+    }
+
+    override func performClick(_ sender: Any?) {
+        handleClick()
+    }
+
+    func setActive(_ active: Bool) {
+        guard isActive != active else { return }
+        isActive = active
+        updateIcon()
+        refreshAppearance()
+    }
+
+    private func updateIcon() {
+        let sym = (isActive ? activeSymbol : nil) ?? baseSymbol
+        let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
+        image = NSImage(systemSymbolName: sym, accessibilityDescription: toolTip)?
+            .withSymbolConfiguration(config)
+        imageScaling = .scaleProportionallyDown
+        refreshAppearance()
+    }
+
+    private func refreshAppearance() {
+        if isActive {
+            layer?.backgroundColor = NSColor(DesignTokens.Colors.capsuleToggleFill).cgColor
+            contentTintColor = NSColor(DesignTokens.Colors.capsuleToggleGlyph)
+        } else if isHovered {
+            layer?.backgroundColor = NSColor(DesignTokens.Colors.aiTabHover).cgColor
+            contentTintColor = NSColor(DesignTokens.Colors.aiTabSelectedText)
+        } else {
+            layer?.backgroundColor = nil
+            contentTintColor = NSColor(DesignTokens.Colors.aiTabText)
+        }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(
+            NSTrackingArea(
+                rect: bounds,
+                options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                owner: self
+            )
+        )
+    }
+
+    override func mouseEntered(with _: NSEvent) {
+        guard isEnabled else { return }
+        isHovered = true
+        refreshAppearance()
+    }
+
+    override func mouseExited(with _: NSEvent) {
+        isHovered = false
+        refreshAppearance()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshAppearance()
+    }
+}
+
 // MARK: - 标题栏标签视图
 
 /// 嵌入标题栏的标签栏，用于聚合模式
 ///
-/// 每个打开的 Provider 一个标签项，支持点击切换和关闭
+/// 每个打开的 Provider 一个标签项，支持点击切换和关闭；
+/// 标签栏右侧提供加号弹出菜单快速打开/跳转各个 AI 官网，
+/// 最右侧固定放置置顶、刷新、外部浏览器打开、关闭标签等窗口操作按钮。
 @MainActor
 final class AITitleTabBarView: NSView {
 
     private let onSelect: (String) -> Void
     private let onClose: (String) -> Void
-    private let scrollView = NSScrollView()
-    private let stackView = NSStackView()
-    private var tabs: [(id: String, view: AITabItemView)] = []
-    private var selectedID: String?
+    private let onAddProvider: (String) -> Void
+    private let onTogglePin: () -> Void
+    private let onReload: () -> Void
+    private let onOpenExternal: () -> Void
+    private let onCloseActive: () -> Void
 
-    init(onSelect: @escaping (String) -> Void, onClose: @escaping (String) -> Void) {
+    let scrollView = NSScrollView()
+    let stackView = NSStackView()
+    let actionsStackView = NSStackView()
+    private var tabs: [(id: String, view: AITabItemView)] = []
+    var tabCount: Int { tabs.count }
+    var tabIDs: [String] { tabs.map(\.id) }
+    private(set) var selectedID: String?
+
+    override var mouseDownCanMoveWindow: Bool { true }
+
+    lazy var addButton: AITitleBarIconButton = {
+        AITitleBarIconButton(
+            symbol: "plus",
+            tooltip: "打开 AI 入口",
+            action: { [weak self] in self?.showAddMenu() }
+        )
+    }()
+
+    lazy var pinButton: AITitleBarIconButton = {
+        AITitleBarIconButton(
+            symbol: "pin",
+            activeSymbol: "pin.fill",
+            tooltip: "窗口置顶",
+            action: { [weak self] in self?.onTogglePin() }
+        )
+    }()
+
+    lazy var reloadButton: AITitleBarIconButton = {
+        AITitleBarIconButton(
+            symbol: "arrow.clockwise",
+            tooltip: "刷新当前页面",
+            action: { [weak self] in self?.onReload() }
+        )
+    }()
+
+    lazy var externalButton: AITitleBarIconButton = {
+        AITitleBarIconButton(
+            symbol: "arrow.up.right.square",
+            tooltip: "在浏览器中打开",
+            action: { [weak self] in self?.onOpenExternal() }
+        )
+    }()
+
+    lazy var closeButton: AITitleBarIconButton = {
+        AITitleBarIconButton(
+            symbol: "xmark",
+            tooltip: "关闭当前标签",
+            action: { [weak self] in self?.onCloseActive() }
+        )
+    }()
+
+    init(
+        onSelect: @escaping (String) -> Void,
+        onClose: @escaping (String) -> Void,
+        onAddProvider: @escaping (String) -> Void,
+        onTogglePin: @escaping () -> Void,
+        onReload: @escaping () -> Void,
+        onOpenExternal: @escaping () -> Void,
+        onCloseActive: @escaping () -> Void
+    ) {
         self.onSelect = onSelect
         self.onClose = onClose
+        self.onAddProvider = onAddProvider
+        self.onTogglePin = onTogglePin
+        self.onReload = onReload
+        self.onOpenExternal = onOpenExternal
+        self.onCloseActive = onCloseActive
         super.init(frame: .zero)
         setupViews()
     }
@@ -659,11 +855,12 @@ final class AITitleTabBarView: NSView {
     @available(*, unavailable) required init?(coder _: NSCoder) { fatalError() }
 
     private func setupViews() {
-        // 标题栏内：不画自己的背景，不画分隔线
+        // 1. 标签区 StackView（标签项 + 加号按钮）
         stackView.orientation = .horizontal
         stackView.alignment = .centerY
         stackView.spacing = DesignTokens.Size.aiTabItemSpacing
         stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.addArrangedSubview(addButton)
 
         scrollView.documentView = stackView
         scrollView.hasHorizontalScroller = false
@@ -672,9 +869,36 @@ final class AITitleTabBarView: NSView {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
 
+        // 2. 右侧操作区 StackView
+        actionsStackView.orientation = .horizontal
+        actionsStackView.alignment = .centerY
+        actionsStackView.spacing = DesignTokens.Size.aiTabItemSpacing
+        actionsStackView.translatesAutoresizingMaskIntoConstraints = false
+
+        actionsStackView.addArrangedSubview(pinButton)
+        actionsStackView.addArrangedSubview(reloadButton)
+        actionsStackView.addArrangedSubview(externalButton)
+        actionsStackView.addArrangedSubview(closeButton)
+        addSubview(actionsStackView)
+
+        let scrollWidth = scrollView.widthAnchor.constraint(equalTo: stackView.widthAnchor)
+        scrollWidth.priority = .defaultLow
+
         NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: DesignTokens.Spacing.xs),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -DesignTokens.Spacing.sm),
+            // 右侧固定操作区
+            actionsStackView.trailingAnchor.constraint(
+                equalTo: trailingAnchor, constant: -DesignTokens.Spacing.md),
+            actionsStackView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            actionsStackView.heightAnchor.constraint(
+                equalToConstant: DesignTokens.Size.aiTitleBarTabHeight),
+
+            // 左侧可滚动标签区（最多延伸到操作区左侧）
+            scrollView.leadingAnchor.constraint(
+                equalTo: leadingAnchor, constant: DesignTokens.Spacing.xs),
+            scrollView.trailingAnchor.constraint(
+                lessThanOrEqualTo: actionsStackView.leadingAnchor,
+                constant: -DesignTokens.Spacing.sm),
+            scrollWidth,
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
@@ -693,7 +917,8 @@ final class AITitleTabBarView: NSView {
             onClose: { [weak self] in self?.onClose(id) }
         )
         tabs.append((id: id, view: tab))
-        stackView.addArrangedSubview(tab)
+        let insertIndex = max(0, stackView.arrangedSubviews.count - 1)
+        stackView.insertArrangedSubview(tab, at: insertIndex)
     }
 
     func removeTab(_ id: String) {
@@ -704,15 +929,65 @@ final class AITitleTabBarView: NSView {
         tabs.remove(at: index)
     }
 
-    func selectTab(_ id: String) {
+    func selectTab(_ id: String?) {
         selectedID = id
         for (tabID, view) in tabs {
-            view.setSelected(tabID == id)
+            let isCurrent = (tabID == id)
+            view.setSelected(isCurrent)
+            if isCurrent {
+                view.scrollToVisible(view.bounds)
+            }
         }
+        let hasActive = (id != nil)
+        reloadButton.isEnabled = hasActive
+        externalButton.isEnabled = hasActive
+        closeButton.isEnabled = hasActive
+    }
+
+    func setPinned(_ isPinned: Bool) {
+        pinButton.setActive(isPinned)
+        pinButton.toolTip = isPinned ? "取消置顶" : "窗口置顶"
+    }
+
+    private func showAddMenu() {
+        let menu = NSMenu()
+        let enabledProviders = AIProviderRegistry.all.filter {
+            AIWebViewWindowManager.isProviderEnabled($0.id)
+        }
+        for provider in enabledProviders {
+            let item = NSMenuItem(
+                title: provider.name,
+                action: #selector(handleProviderMenuItem(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = provider.id
+            if let img = NSImage(
+                systemSymbolName: provider.icon, accessibilityDescription: provider.name)?
+                .withSymbolConfiguration(.init(pointSize: 12, weight: .regular))
+            {
+                item.image = img
+            }
+            if provider.id == selectedID {
+                item.state = .on
+            }
+            menu.addItem(item)
+        }
+
+        let point = NSPoint(x: 0, y: addButton.bounds.height + 4)
+        menu.popUp(positioning: nil, at: point, in: addButton)
+    }
+
+    @objc private func handleProviderMenuItem(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        onAddProvider(id)
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
+        for tab in tabs {
+            tab.view.viewDidChangeEffectiveAppearance()
+        }
     }
 }
 

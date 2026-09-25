@@ -115,6 +115,113 @@ struct AIWebViewWindowTests {
         #expect(panel.performKeyEquivalent(with: commandR) == false)
     }
 
+    // MARK: - 标题栏标签栏与操作按钮测试
+
+    @Test("标题栏标签栏支持添加/删除标签，加号按钮始终在末尾")
+    func titleTabBarAddRemoveTabs() {
+        let bar = AITitleTabBarView(
+            onSelect: { _ in },
+            onClose: { _ in },
+            onAddProvider: { _ in },
+            onTogglePin: { },
+            onReload: { },
+            onOpenExternal: { },
+            onCloseActive: { }
+        )
+
+        #expect(bar.tabCount == 0)
+        #expect(bar.mouseDownCanMoveWindow)
+        #expect(bar.stackView.arrangedSubviews.last === bar.addButton)
+
+        bar.addTab(id: "deepseek", title: "DeepSeek", icon: "brain")
+        bar.addTab(id: "chatgpt", title: "ChatGPT", icon: "bubble.left.and.bubble.right")
+
+        #expect(bar.tabCount == 2)
+        #expect(bar.tabIDs == ["deepseek", "chatgpt"])
+        #expect(bar.stackView.arrangedSubviews.last === bar.addButton)
+
+        bar.removeTab("deepseek")
+        #expect(bar.tabCount == 1)
+        #expect(bar.tabIDs == ["chatgpt"])
+        #expect(bar.stackView.arrangedSubviews.last === bar.addButton)
+    }
+
+    @Test("选择标签时操作按钮状态更新，无选中标签时禁用页面操作")
+    func titleTabBarSelectionUpdatesActions() {
+        let bar = AITitleTabBarView(
+            onSelect: { _ in },
+            onClose: { _ in },
+            onAddProvider: { _ in },
+            onTogglePin: { },
+            onReload: { },
+            onOpenExternal: { },
+            onCloseActive: { }
+        )
+
+        bar.addTab(id: "deepseek", title: "DeepSeek", icon: "brain")
+
+        bar.selectTab("deepseek")
+        #expect(bar.selectedID == "deepseek")
+        #expect(bar.reloadButton.isEnabled)
+        #expect(bar.externalButton.isEnabled)
+        #expect(bar.closeButton.isEnabled)
+
+        bar.selectTab(nil)
+        #expect(bar.selectedID == nil)
+        #expect(bar.reloadButton.isEnabled == false)
+        #expect(bar.externalButton.isEnabled == false)
+        #expect(bar.closeButton.isEnabled == false)
+    }
+
+    @Test("置顶状态切换更新按钮提示文本")
+    func titleTabBarPinStatusUpdatesTooltip() {
+        let bar = AITitleTabBarView(
+            onSelect: { _ in },
+            onClose: { _ in },
+            onAddProvider: { _ in },
+            onTogglePin: { },
+            onReload: { },
+            onOpenExternal: { },
+            onCloseActive: { }
+        )
+
+        bar.setPinned(true)
+        #expect(bar.pinButton.toolTip == "取消置顶")
+
+        bar.setPinned(false)
+        #expect(bar.pinButton.toolTip == "窗口置顶")
+    }
+
+    @Test("标题栏操作按钮点击触发对应回调")
+    func titleTabBarActionButtonsTriggerCallbacks() {
+        var pinToggled = false
+        var reloaded = false
+        var openedExternal = false
+        var closedActive = false
+
+        let bar = AITitleTabBarView(
+            onSelect: { _ in },
+            onClose: { _ in },
+            onAddProvider: { _ in },
+            onTogglePin: { pinToggled = true },
+            onReload: { reloaded = true },
+            onOpenExternal: { openedExternal = true },
+            onCloseActive: { closedActive = true }
+        )
+
+        bar.pinButton.performClick(nil)
+        #expect(pinToggled)
+
+        bar.reloadButton.performClick(nil)
+        #expect(reloaded)
+
+        bar.externalButton.performClick(nil)
+        #expect(openedExternal)
+
+        bar.closeButton.performClick(nil)
+        #expect(closedActive)
+    }
+
     /// 合成一个按下事件
     private static func keyDown(
         keyCode: Int,
