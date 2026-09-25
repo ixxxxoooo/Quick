@@ -18,10 +18,8 @@ public final class SystemControlPlugin: QuickPlugin, PluginViewProviding {
     public static let icon = "power.circle.fill"
     public static let description = "macOS 系统级快捷指令聚合，支持锁定屏幕、睡眠、重启、关机、清空废纸篓与外观切换等操作。"
     public static let triggerWords = [
-        "系统控制", "system control", "系统命令",
-        "锁屏", "lock", "睡眠", "sleep", "重启", "restart", "关机", "shutdown",
-        "屏保", "screensaver", "废纸篓", "trash", "弹出", "eject",
-        "深色", "dark", "主题", "theme", "注销", "logout"
+        "系统控制", "锁屏", "睡眠", "重启", "关机",
+        "屏保", "废纸篓", "弹出", "深色", "注销"
     ]
 
     public var isEnabled = true

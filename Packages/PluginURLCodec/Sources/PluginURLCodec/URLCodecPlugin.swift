@@ -20,17 +20,17 @@ public final class URLCodecPlugin: QuickPlugin, PluginViewProviding, PluginSetti
     /// 通用词「编码 / 解码 / encode / decode」归 Base64 插件，这里只保留带 URL 限定的词，
     /// 否则两个插件会在同一条查询上撞车
     public static let triggerWords = [
-        "URL 编解码", "url", "url编码", "url解码", "网址编码", "网址解码", "urlencode", "urldecode"
+        "url", "urlencode", "urldecode"
     ]
 
     public static var functionCommands: [CommandDescriptor] {
         [
             CommandDescriptor(
                 id: "url-codec.encode", pluginID: id, pluginName: name, title: "URL 编码",
-                subtitle: "把文本编码为百分号形式", keywords: ["urlencode", "url编码"], icon: "link"),
+                subtitle: "把文本编码为百分号形式", keywords: ["urlencode"], icon: "link"),
             CommandDescriptor(
                 id: "url-codec.decode", pluginID: id, pluginName: name, title: "URL 解码",
-                subtitle: "把百分号编码还原为文本", keywords: ["urldecode", "url解码"],
+                subtitle: "把百分号编码还原为文本", keywords: ["urldecode"],
                 icon: "arrow.uturn.left")
         ]
     }

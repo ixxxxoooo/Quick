@@ -248,10 +248,10 @@ struct ScreenshotPluginContractTests {
         #expect(ScreenshotPlugin.icon == "camera.fill")
         #expect(
             ScreenshotPlugin.triggerWords == [
-                "截图工具", "截图", "截屏", "screenshot", "区域截图", "框选",
+                "截图", "截屏", "screenshot", "框选",
                 "全屏截图",
                 "窗口截图",
-                "贴图", "钉在桌面", "pin"
+                "贴图", "pin"
             ])
         #expect(Set(ScreenshotPlugin.areaKeywords).isDisjoint(with: ScreenshotPlugin.fullKeywords))
         #expect(Set(ScreenshotPlugin.areaKeywords).isDisjoint(with: ScreenshotPlugin.windowKeywords))

@@ -20,10 +20,10 @@ public final class ScreenshotPlugin: QuickPlugin, PluginViewProviding, PluginSet
     public nonisolated static let icon = "camera.fill"
     public nonisolated static let description =
         "自绘遮罩截图，支持原地框选与标注（矩形、箭头、画笔、文字、马赛克、序号），可保存、复制或钉在桌面。"
-    public nonisolated static let areaKeywords = ["截图工具", "截图", "截屏", "screenshot", "区域截图", "框选"]
+    public nonisolated static let areaKeywords = ["截图", "截屏", "screenshot", "框选"]
     public nonisolated static let fullKeywords = ["全屏截图"]
     public nonisolated static let windowKeywords = ["窗口截图"]
-    public nonisolated static let pinKeywords = ["贴图", "钉在桌面", "pin"]
+    public nonisolated static let pinKeywords = ["贴图", "pin"]
     public nonisolated static let triggerWords =
         areaKeywords + fullKeywords + windowKeywords + pinKeywords
 

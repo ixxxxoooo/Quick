@@ -149,10 +149,23 @@ final class SettingsBridge: SettingsDataSource {
             }
         }
 
-        return results
-            .sorted { $0.score > $1.score }
-            .prefix(8)
-            .map(\.binding)
+        // 按 (pluginName, title) 去重；分数相同时优先取具体功能命令（而非 plugin.open.*）
+        let sorted = results.sorted {
+            if $0.score != $1.score { return $0.score > $1.score }
+            let lhsIsOpen = CommandID.openedPluginID(in: $0.binding.id) != nil
+            let rhsIsOpen = CommandID.openedPluginID(in: $1.binding.id) != nil
+            if lhsIsOpen != rhsIsOpen { return !lhsIsOpen }
+            return false
+        }
+        var seenKeys = Set<String>()
+        var deduped: [SettingsCommandBinding] = []
+        for item in sorted {
+            let key = "\(item.binding.pluginName.lowercased()):\(item.binding.title.lowercased())"
+            if seenKeys.insert(key).inserted {
+                deduped.append(item.binding)
+            }
+        }
+        return Array(deduped.prefix(8))
     }
 
     func retargetShortcut(from commandID: String, keyword: String) -> String? {
@@ -284,7 +297,16 @@ final class SettingsBridge: SettingsDataSource {
     }
 
     private func bindingRow(for command: CommandDescriptor) -> SettingsCommandBinding {
-        SettingsCommandBinding(
+        var seen = Set<String>()
+        var dedupedKeywords: [String] = []
+        let rawKeywords = command.keywords.isEmpty ? [command.title] : command.keywords
+        for word in rawKeywords {
+            let key = word.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !key.isEmpty && seen.insert(key).inserted {
+                dedupedKeywords.append(word)
+            }
+        }
+        return SettingsCommandBinding(
             id: command.id,
             title: command.title,
             subtitle: command.subtitle,
@@ -292,7 +314,7 @@ final class SettingsBridge: SettingsDataSource {
             icon: command.icon,
             isInvocationEnabled: core.settingsStore.isCommandEnabled(command.id),
             keycaps: core.hotKeyService.binding(for: command.id)?.keycaps,
-            keywords: command.keywords.isEmpty ? [command.title] : command.keywords
+            keywords: dedupedKeywords
         )
     }
 

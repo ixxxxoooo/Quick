@@ -97,7 +97,7 @@ struct FeatureSettingsPane: View {
     /// 功能关键字重复，单列只是噪音。没有声明任何功能（命令）的插件，这一节整体不显示。
     @ViewBuilder
     private var wakeSection: some View {
-        let commands = extraCommands.filter { !displayKeywords($0.keywords).isEmpty }
+        let commands = extraCommands.filter { !displayKeywords($0.keywords, title: $0.title).isEmpty }
         if !commands.isEmpty {
             Section {
                 ForEach(commands) { command in
@@ -111,7 +111,7 @@ struct FeatureSettingsPane: View {
                                 isEnabled: command.isInvocationEnabled)
                         }
                     ) {
-                        triggerChips(displayKeywords(command.keywords))
+                        triggerChips(displayKeywords(command.keywords, title: command.title))
                     }
                 }
             } header: {
@@ -129,13 +129,17 @@ struct FeatureSettingsPane: View {
         return dataSource.pluginCommands(pluginID).filter { $0.id != openCommandID }
     }
 
-    /// 展示用的关键字：命令关键字不带空格，带空格的直接不显示；并去重
-    private func displayKeywords(_ keywords: [String]) -> [String] {
+    /// 展示用的关键字：过滤掉空格、与标题重复的词、并大小写去重
+    private func displayKeywords(_ keywords: [String], title: String? = nil) -> [String] {
         var seen = Set<String>()
+        if let title {
+            seen.insert(title.lowercased())
+            seen.insert(title.replacingOccurrences(of: " ", with: "").lowercased())
+        }
         return keywords.filter { word in
-            !word.isEmpty
-                && !word.contains(where: { $0.isWhitespace })
-                && seen.insert(word.lowercased()).inserted
+            let clean = word.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !clean.isEmpty, !clean.contains(where: { $0.isWhitespace }) else { return false }
+            return seen.insert(clean.lowercased()).inserted
         }
     }
 

@@ -26,7 +26,7 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
     /// 精确命中（1.0）盖过真正的 DeepSeek 条目（0.8）。Provider 名由
     /// `AIProviderRegistry.allKeywords` 承载，只喂动态搜索的闸门与打分，不走静态命令。
     public static let triggerWords = [
-        "AI 聚合", "AI Portal", "ai", "AI", "chat", "AI 官网", "AI 设置"
+        "AI 聚合", "ai", "chat"
     ]
 
     public var isEnabled = true

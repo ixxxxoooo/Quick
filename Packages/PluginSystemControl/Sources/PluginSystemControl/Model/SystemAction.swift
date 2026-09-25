@@ -66,15 +66,15 @@ public enum SystemAction: String, CaseIterable, Sendable {
     /// 搜索关键词（中英文混合，参考 Fasty system-control 的 cmds）
     public var keywords: [String] {
         switch self {
-        case .lockScreen: ["锁屏", "锁定", "lock", "lock screen"]
-        case .sleep: ["睡眠", "休眠", "sleep"]
-        case .restart: ["重启", "重新启动", "restart", "reboot"]
-        case .shutdown: ["关机", "关闭", "shutdown", "shut down"]
-        case .logout: ["注销", "登出", "退出登录", "logout", "log out"]
-        case .screenSaver: ["屏保", "屏幕保护", "screensaver", "screen saver"]
-        case .emptyTrash: ["清空废纸篓", "废纸篓", "trash", "empty trash"]
-        case .ejectAll: ["全部弹出", "弹出全部", "推出磁盘", "eject", "eject all"]
-        case .toggleDarkMode: ["深色模式", "暗色", "浅色", "dark mode", "light", "theme", "主题", "切换"]
+        case .lockScreen: ["锁屏", "lock", "lock screen"]
+        case .sleep: ["睡眠", "sleep", "休眠"]
+        case .restart: ["重启", "restart", "reboot"]
+        case .shutdown: ["关机", "shutdown", "shut down"]
+        case .logout: ["注销", "logout", "log out"]
+        case .screenSaver: ["屏保", "screensaver", "screen saver"]
+        case .emptyTrash: ["废纸篓", "trash", "empty trash"]
+        case .ejectAll: ["推出磁盘", "eject", "eject all"]
+        case .toggleDarkMode: ["深色模式", "dark mode", "暗色"]
         }
     }
 }

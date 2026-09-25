@@ -20,10 +20,17 @@ public struct IndexedCommand: Sendable, Identifiable {
     /// 用描述符建索引
     public init(_ descriptor: CommandDescriptor) {
         self.descriptor = descriptor
-        var texts = [MatchText(descriptor.title), MatchText(descriptor.pluginName)]
-        texts.append(contentsOf: descriptor.keywords.map { MatchText($0) })
+        var rawStrings = [descriptor.title, descriptor.pluginName] + descriptor.keywords
         if let subtitle = descriptor.subtitle, !subtitle.isEmpty {
-            texts.append(MatchText(subtitle))
+            rawStrings.append(subtitle)
+        }
+        var seen = Set<String>()
+        var texts: [MatchText] = []
+        for s in rawStrings {
+            let key = s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !key.isEmpty && seen.insert(key).inserted {
+                texts.append(MatchText(s))
+            }
         }
         self.fields = texts
     }
@@ -61,11 +68,39 @@ public enum CommandIndex {
         }
 
         let match = MatchQuery(trimmed)
-        return commands.compactMap { command in
+        let hits: [CommandHit] = commands.compactMap { command in
             let score = command.fields.map { match.score($0) }.max() ?? 0
             guard score > 0 else { return nil }
             return CommandHit(command: command, relevance: score)
         }
+
+        // 同一插件下相同标题的命令（例如「打开插件」与同名功能命令），去重只留一条
+        var seenBest = [String: CommandHit]()
+        for hit in hits {
+            let key = "\(hit.command.descriptor.pluginID):\(hit.command.descriptor.title.lowercased())"
+            if let existing = seenBest[key] {
+                if hit.relevance > existing.relevance {
+                    seenBest[key] = hit
+                } else if hit.relevance == existing.relevance {
+                    let hitIsOpen = CommandID.openedPluginID(in: hit.command.id) != nil
+                    let existingIsOpen = CommandID.openedPluginID(in: existing.command.id) != nil
+                    if !hitIsOpen && existingIsOpen {
+                        seenBest[key] = hit
+                    }
+                }
+            } else {
+                seenBest[key] = hit
+            }
+        }
+        var result: [CommandHit] = []
+        var emitted = Set<String>()
+        for hit in hits {
+            let key = "\(hit.command.descriptor.pluginID):\(hit.command.descriptor.title.lowercased())"
+            if let best = seenBest[key], emitted.insert(key).inserted {
+                result.append(best)
+            }
+        }
+        return result
     }
 
     /// 每个插件取第一条声明了空查询入口的命令

@@ -24,13 +24,13 @@ public final class CalendarPlugin: QuickPlugin, PluginViewProviding, PluginSetti
         [
             CommandDescriptor(
                 id: "calendar.lunar", pluginID: id, pluginName: name, title: "农历",
-                subtitle: "查看农历与节气", keywords: ["农历", "节气"], icon: "moon.stars"),
+                subtitle: "查看农历与节气", keywords: ["节气", "lunar"], icon: "moon.stars"),
             CommandDescriptor(
                 id: "calendar.holiday", pluginID: id, pluginName: name, title: "节假日",
-                subtitle: "查看节假日安排", keywords: ["节假日", "假期"], icon: "flag"),
+                subtitle: "查看节假日安排", keywords: ["假期", "holiday"], icon: "flag"),
             CommandDescriptor(
                 id: "calendar.schedule", pluginID: id, pluginName: name, title: "日程",
-                subtitle: "查看今天的日程", keywords: ["日程", "日程表"], icon: "calendar")
+                subtitle: "查看今天的日程", keywords: ["schedule"], icon: "calendar")
         ]
     }
 

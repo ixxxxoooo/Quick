@@ -18,7 +18,7 @@ public final class ClipboardPlugin: QuickPlugin, PluginViewProviding, PluginSett
     public static let name = "剪贴板"
     public static let icon = "doc.on.clipboard.fill"
     public static let description = "自动记录系统剪贴板历史，支持文本、代码与图片预览，提供快速搜索、置顶收藏与重新复制。"
-    public static let triggerWords = ["剪贴板历史", "剪贴板", "剪切板", "剪切", "clipboard", "粘贴板", "历史"]
+    public static let triggerWords = ["剪贴板", "clipboard", "剪切板"]
 
     /// 面板头部保留搜索框：输入即过滤剪贴板历史
     public static var supportsPanelSearch: Bool { true }
@@ -27,15 +27,15 @@ public final class ClipboardPlugin: QuickPlugin, PluginViewProviding, PluginSett
         [
             CommandDescriptor(
                 id: "clipboard.clear", pluginID: id, pluginName: name, title: "清空剪贴板",
-                subtitle: "清空全部历史记录", keywords: ["清空剪贴板", "清空历史"],
+                subtitle: "清空全部历史记录", keywords: ["clear", "清空"],
                 icon: "trash"),
             CommandDescriptor(
                 id: "clipboard.images", pluginID: id, pluginName: name, title: "剪贴板图片",
-                subtitle: "只看图片类型的记录", keywords: ["剪贴板图片", "图片剪贴板"],
+                subtitle: "只看图片类型的记录", keywords: ["image", "图片"],
                 icon: "photo.on.rectangle"),
             CommandDescriptor(
                 id: "clipboard.favorites", pluginID: id, pluginName: name, title: "剪贴板收藏",
-                subtitle: "只看收藏 / 置顶的记录", keywords: ["剪贴板收藏", "收藏剪贴板"],
+                subtitle: "只看收藏 / 置顶的记录", keywords: ["favorite", "收藏"],
                 icon: "star")
         ]
     }

@@ -23,27 +23,26 @@ public final class SystemMonitorPlugin: QuickPlugin, PluginViewProviding, Plugin
     /// `系统信息` / `monitor` 等词命中，功能命令也各自带自己的关键词。
     /// 这条约束由 `TriggerWordUniquenessTests` 守着。
     public static let triggerWords = [
-        "系统信息", "系统监控", "系统", "system", "信息", "硬件", "进程管理", "monitor", "端口", "port",
-        "cpu", "内存", "磁盘", "电池", "电源"
+        "系统监控", "系统信息", "system", "monitor", "cpu", "内存", "磁盘", "硬件"
     ]
 
     public static var functionCommands: [CommandDescriptor] {
         [
             CommandDescriptor(
                 id: "sysmonitor.cpu", pluginID: id, pluginName: name, title: "CPU 监控",
-                subtitle: "查看 CPU 占用", keywords: ["cpu", "cpu监控"], icon: "cpu"),
+                subtitle: "查看 CPU 占用", keywords: ["cpu"], icon: "cpu"),
             CommandDescriptor(
                 id: "sysmonitor.memory", pluginID: id, pluginName: name, title: "内存监控",
-                subtitle: "查看内存占用", keywords: ["内存", "memory"], icon: "memorychip"),
+                subtitle: "查看内存占用", keywords: ["memory"], icon: "memorychip"),
             CommandDescriptor(
                 id: "sysmonitor.disk", pluginID: id, pluginName: name, title: "磁盘监控",
-                subtitle: "查看磁盘占用", keywords: ["磁盘", "disk"], icon: "internaldrive"),
+                subtitle: "查看磁盘占用", keywords: ["disk"], icon: "internaldrive"),
             CommandDescriptor(
                 id: "sysmonitor.network", pluginID: id, pluginName: name, title: "网络监控",
-                subtitle: "查看网络吞吐", keywords: ["网络监控"], icon: "network"),
+                subtitle: "查看网络吞吐", keywords: ["network-speed"], icon: "network"),
             CommandDescriptor(
                 id: "sysmonitor.temperature", pluginID: id, pluginName: name, title: "温度监控",
-                subtitle: "查看机身温度", keywords: ["温度", "temperature"],
+                subtitle: "查看机身温度", keywords: ["temperature"],
                 icon: "thermometer.medium")
         ]
     }

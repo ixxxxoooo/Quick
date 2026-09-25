@@ -27,7 +27,16 @@ public enum KeywordResolver {
                     $0.compare(trimmed, options: .caseInsensitive) == .orderedSame
                 }
         }
-        guard hits.count == 1 else { return nil }
-        return hits[0]
+        if hits.count == 1 {
+            return hits[0]
+        }
+        // 同一个插件的「打开插件」与单个具体功能命令同时命中时，优先取具体功能命令
+        if Set(hits.map(\.pluginID)).count == 1 {
+            let specificHits = hits.filter { CommandID.openedPluginID(in: $0.id) == nil }
+            if specificHits.count == 1 {
+                return specificHits[0]
+            }
+        }
+        return nil
     }
 }

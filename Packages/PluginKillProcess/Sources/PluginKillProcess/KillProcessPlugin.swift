@@ -18,7 +18,7 @@ public final class KillProcessPlugin: QuickPlugin, PluginViewProviding, PluginSe
     public static let icon = "xmark.octagon.fill"
     public static let description = "按 CPU 或内存排序查看运行中的进程，支持筛选并结束或强制结束。"
     public static let triggerWords = [
-        "结束进程", "杀进程", "进程", "kill", "killprocess", "process", "终止进程", "强制结束"
+        "kill", "杀进程", "进程"
     ]
 
     public static var supportsPanelSearch: Bool { true }
@@ -27,7 +27,7 @@ public final class KillProcessPlugin: QuickPlugin, PluginViewProviding, PluginSe
         [
             CommandDescriptor(
                 id: "killprocess.kill", pluginID: id, pluginName: name, title: "结束进程",
-                subtitle: "按名称查找并结束进程", keywords: ["结束进程", "杀进程"],
+                subtitle: "按名称查找并结束进程", keywords: ["kill", "杀进程"],
                 icon: "xmark.app")
         ]
     }

@@ -12,7 +12,7 @@ import Foundation
 public enum OCRQuery {
 
     /// 触发词列表（插件对外声明的 triggerWords 就是它）
-    public static let triggers = ["OCR", "文字识别", "ocr", "识别", "识别文字", "图片识别", "提取文字", "截图识别", "截图OCR"]
+    public static let triggers = ["ocr", "文字识别", "识别", "提取文字"]
 
     /// 查询是否在问 OCR
     ///

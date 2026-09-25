@@ -24,7 +24,7 @@ public final class LauncherPlugin: QuickPlugin, PluginViewProviding {
     /// 「打开一个网址」，由 `网页` / `网站` / `web` 已经覆盖。冲突词由
     /// `TriggerWordUniquenessTests` 守着。
     public static let triggerWords = [
-        "应用", "app", "打开", "open", "启动", "launch", "网页快开", "网页", "网站", "搜索", "web", "google", "百度"
+        "应用", "app", "open", "launch", "web"
     ]
 
     public var isEnabled = true

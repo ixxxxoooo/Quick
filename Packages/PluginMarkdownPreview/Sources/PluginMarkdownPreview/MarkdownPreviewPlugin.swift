@@ -24,7 +24,7 @@ public final class MarkdownPreviewPlugin: QuickPlugin, PluginViewProviding, Plug
             CommandDescriptor(
                 id: "markdown-preview.preview", pluginID: id, pluginName: name,
                 title: "Markdown 预览", subtitle: "实时渲染 Markdown",
-                keywords: ["markdown预览", "md预览"], icon: "text.alignleft")
+                keywords: ["md"], icon: "text.alignleft")
         ]
     }
 

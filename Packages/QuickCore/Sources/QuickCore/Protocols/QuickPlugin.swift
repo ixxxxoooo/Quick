@@ -127,12 +127,20 @@ public extension QuickPlugin {
 
     /// 默认一条「打开本插件」+ 插件声明的功能命令
     nonisolated static var commands: [CommandDescriptor] {
-        [
+        var seen = Set<String>()
+        var dedupedKeywords: [String] = []
+        for word in triggerWords + [name] {
+            let key = word.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !key.isEmpty && seen.insert(key).inserted {
+                dedupedKeywords.append(word)
+            }
+        }
+        return [
             CommandDescriptor.openPlugin(
                 id: id,
                 name: name,
                 icon: icon,
-                keywords: triggerWords + [name],
+                keywords: dedupedKeywords,
                 subtitle: description.isEmpty ? nil : description
             )
         ] + functionCommands

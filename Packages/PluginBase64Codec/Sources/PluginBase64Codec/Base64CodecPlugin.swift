@@ -17,17 +17,17 @@ public final class Base64CodecPlugin: QuickPlugin, PluginViewProviding, PluginSe
     public static let name = "Base64 编解码"
     public static let icon = "lock.doc.fill"
     public static let description = "普通文本与 Base64 互相转换，支持标准 RFC 4648 与 URL-Safe 编码格式。"
-    public static let triggerWords = ["Base64 编解码", "base64", "编码", "解码"]
+    public static let triggerWords = ["base64", "编码", "解码"]
 
     public static var functionCommands: [CommandDescriptor] {
         [
             CommandDescriptor(
                 id: "base64-codec.encode", pluginID: id, pluginName: name, title: "Base64 编码",
-                subtitle: "把文本编码为 Base64", keywords: ["base64", "base64编码", "b64"],
+                subtitle: "把文本编码为 Base64", keywords: ["b64", "base64encode"],
                 icon: "lock.doc"),
             CommandDescriptor(
                 id: "base64-codec.decode", pluginID: id, pluginName: name, title: "Base64 解码",
-                subtitle: "把 Base64 还原为文本", keywords: ["base64解码", "unbase64"],
+                subtitle: "把 Base64 还原为文本", keywords: ["unbase64", "base64decode"],
                 icon: "lock.open.doc")
         ]
     }
