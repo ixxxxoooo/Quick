@@ -215,6 +215,9 @@ public final class LauncherPlugin: QuickPlugin, PluginViewProviding {
             if offset.isMultiple(of: 64), Task.isCancelled { return items }
             let alias = settingsStore?.alias(for: "app." + entry.bundleID)
             var matchScore = matchQuery.score(entry.matchText)
+            for alt in entry.alternateMatchTexts {
+                matchScore = max(matchScore, matchQuery.score(alt) * 0.95)
+            }
             if let alias, !alias.isEmpty {
                 matchScore = max(matchScore, matchQuery.score(alias.matchText))
             }

@@ -191,7 +191,7 @@ public enum PaletteSearchEngine {
             $0.relevance == $1.relevance ? $0.id < $1.id : $0.relevance > $1.relevance
         }
         let deduped = sorted.filter { item in
-            let key = "\(item.pluginID ?? "")|\(item.title)"
+            let key = "\(item.pluginID)|\(item.title)"
             return seenPluginTitle.insert(key).inserted
         }
 

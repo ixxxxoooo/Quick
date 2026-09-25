@@ -37,4 +37,24 @@ struct AppEntryMatchTests {
         #expect(MatchQuery("studio").matches(code.matchText))
         #expect(!MatchQuery("xyz").matches(code.matchText))
     }
+
+    /// 备选名称（如原始 bundle 英文名或文件包名）也应被索引并能匹配
+    @Test("备用名称能命中匹配")
+    func alternateNamesMatch() {
+        let weChat = AppEntry(
+            id: "com.tencent.xinWeChat",
+            name: "微信",
+            bundleID: "com.tencent.xinWeChat",
+            path: "/Applications/WeChat.app",
+            isSystemApp: false,
+            alternateNames: ["WeChat"]
+        )
+
+        // 主名称匹配（拼音 & 汉字）
+        #expect(MatchQuery("wx").matches(weChat.matchText))
+        #expect(MatchQuery("微信").matches(weChat.matchText))
+
+        // 备用英文名匹配
+        #expect(weChat.alternateMatchTexts.contains { MatchQuery("wechat").matches($0) })
+    }
 }

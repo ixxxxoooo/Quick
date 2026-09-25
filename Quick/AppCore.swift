@@ -714,6 +714,16 @@ final class AppCore {
             }
         )
 
+        // 面板唤出时轻量级校验应用目录 mtime，有变动则自动重扫应用
+        subscriptions.append(
+            bus.on(PaletteVisibilityChangedEvent.self) { [weak self] event in
+                guard event.isVisible else { return }
+                Task { [weak self] in
+                    await self?.appIndex.checkAndRefreshIfNeeded()
+                }
+            }
+        )
+
         subscriptions.append(
             bus.on(CommandCatalogChangedEvent.self) { [weak self] _ in
                 self?.rebuildCommandCatalog()
