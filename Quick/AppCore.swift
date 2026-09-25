@@ -712,6 +712,12 @@ final class AppCore {
         controller.openSettings = { [weak self] in
             self?.settingsWindowController.show(tab: .superPanel)
         }
+        controller.translate = { [weak self] text in
+            guard let self, let translator = self.plugin(withID: TranslatorPlugin.id) as? TranslatorPlugin else {
+                return nil
+            }
+            return await translator.translateOrLookup(text)
+        }
 
         mouseTriggerMonitor.onTrigger = { [weak self] kind in
             Task { @MainActor in

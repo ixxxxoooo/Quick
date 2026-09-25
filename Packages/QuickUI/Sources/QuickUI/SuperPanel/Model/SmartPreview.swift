@@ -11,7 +11,15 @@ public enum SmartPreview: Sendable, Equatable {
     case url(url: String, domain: String)
     case filePath(path: String, exists: Bool, isDirectory: Bool)
     case color(hex: String, rgb: String)
-    case timestamp(original: String, formatted: String, relative: String)
+    case timestamp(
+        original: String,
+        formatted: String,
+        relative: String,
+        unixSeconds: String? = nil,
+        unixMilliseconds: String? = nil,
+        localTime: String? = nil,
+        isFromDateString: Bool = false
+    )
     case base64(decoded: String)
     case urlEncoded(decoded: String)
     case math(expr: String, result: String)
@@ -20,7 +28,13 @@ public enum SmartPreview: Sendable, Equatable {
     case json(summary: String, lineCount: Int)
     case sql(statement: String, lineCount: Int)
     case phone(formatted: String)
-    case translation(source: String, detectedLang: String)
+    case translation(
+        source: String,
+        detectedLang: String,
+        translated: String? = nil,
+        phonetic: String? = nil,
+        senses: [String]? = nil
+    )
     case plainText(summary: String, charCount: Int)
 
     /// Spotlight 卡片标题
@@ -29,7 +43,7 @@ public enum SmartPreview: Sendable, Equatable {
         case .url: "网址"
         case .filePath: "文件路径"
         case .color: "颜色"
-        case .timestamp: "时间戳"
+        case .timestamp(_, _, _, _, _, _, let isFromDateString): isFromDateString ? "时间文本" : "时间戳"
         case .base64: "Base64"
         case .urlEncoded: "URL 编码"
         case .math: "计算结果"
@@ -38,7 +52,10 @@ public enum SmartPreview: Sendable, Equatable {
         case .json: "JSON"
         case .sql: "SQL"
         case .phone: "电话"
-        case .translation(_, let lang): lang == "en" ? "英文文本" : "中文文本"
+        case .translation(_, let lang, let translated, _, _):
+            translated != nil
+                ? (lang == "en" ? "英文翻译" : "翻译")
+                : (lang == "en" ? "英文文本" : "中文文本")
         case .plainText: "文本"
         }
     }
@@ -49,7 +66,8 @@ public enum SmartPreview: Sendable, Equatable {
         case .url(let url, _): url
         case .filePath(let path, let exists, _): exists ? path : "\(path)（不存在）"
         case .color(let hex, let rgb): "\(hex) · \(rgb)"
-        case .timestamp(_, let formatted, let relative): "\(formatted) · \(relative)"
+        case .timestamp(_, let formatted, let relative, let unixSeconds, _, _, let isFromDateString):
+            isFromDateString ? "\(unixSeconds ?? formatted) · \(relative)" : "\(formatted) · \(relative)"
         case .base64(let decoded): decoded
         case .urlEncoded(let decoded): decoded
         case .math(let expr, let result): "\(expr) = \(result)"
@@ -58,7 +76,7 @@ public enum SmartPreview: Sendable, Equatable {
         case .json(let summary, let lines): "\(summary) · \(lines) 行"
         case .sql(let statement, let lines): "\(statement) · \(lines) 行"
         case .phone(let formatted): formatted
-        case .translation(let source, _): source
+        case .translation(let source, _, let translated, _, _): translated ?? source
         case .plainText(let summary, let count): "\(summary)（\(count) 字）"
         }
     }
@@ -69,7 +87,7 @@ public enum SmartPreview: Sendable, Equatable {
         case .url: "link"
         case .filePath: "folder"
         case .color: "paintpalette"
-        case .timestamp: "clock"
+        case .timestamp(_, _, _, _, _, _, let isFromDateString): isFromDateString ? "calendar" : "clock"
         case .base64: "lock.rectangle"
         case .urlEncoded: "percent"
         case .math: "plus.forwardslash.minus"
@@ -89,7 +107,7 @@ public enum SmartPreview: Sendable, Equatable {
         case .url(_, let domain): domain
         case .filePath(_, _, let isDir): isDir ? "目录" : "文件"
         case .color: "HEX"
-        case .timestamp: "Time"
+        case .timestamp(_, _, _, _, _, _, let isFromDateString): isFromDateString ? "Date" : "Time"
         case .base64: "Base64"
         case .urlEncoded: "URL"
         case .math: "Calc"
@@ -98,7 +116,7 @@ public enum SmartPreview: Sendable, Equatable {
         case .json: "JSON"
         case .sql(let statement, _): statement
         case .phone: "Phone"
-        case .translation(_, let lang): lang.uppercased()
+        case .translation(_, let lang, _, _, _): lang.uppercased()
         case .plainText: "Text"
         }
     }

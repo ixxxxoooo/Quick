@@ -16,6 +16,7 @@ struct SuperPanelSpotlightCard: View {
 
     let preview: SmartPreview
     let sourceText: String
+    let onCopy: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
@@ -63,12 +64,62 @@ struct SuperPanelSpotlightCard: View {
 
             Spacer(minLength: DesignTokens.Spacing.sm)
 
-            Text(preview.title)
-                .font(DesignTokens.Typography.compactKeyCap)
-                .padding(.horizontal, DesignTokens.Spacing.sm)
-                .padding(.vertical, DesignTokens.Spacing.xxs)
-                .background(Capsule().fill(DesignTokens.Colors.progress.opacity(0.12)))
-                .foregroundStyle(DesignTokens.Colors.progress)
+            HStack(spacing: DesignTokens.Spacing.xs) {
+                Button {
+                    onCopy(textToCopy)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(DesignTokens.Typography.compactIcon)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        .frame(
+                            width: DesignTokens.Size.windowControlButton,
+                            height: DesignTokens.Size.windowControlButton
+                        )
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap, style: .continuous)
+                                .fill(DesignTokens.Colors.controlSurface)
+                        )
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+                .help("复制")
+
+                Text(preview.title)
+                    .font(DesignTokens.Typography.compactKeyCap)
+                    .padding(.horizontal, DesignTokens.Spacing.sm)
+                    .padding(.vertical, DesignTokens.Spacing.xxs)
+                    .background(Capsule().fill(DesignTokens.Colors.progress.opacity(0.12)))
+                    .foregroundStyle(DesignTokens.Colors.progress)
+            }
+        }
+    }
+
+    private var textToCopy: String {
+        switch preview {
+        case .translation(_, _, let translated, _, _):
+            return translated ?? sourceText
+        case .math(_, let result):
+            return result
+        case .timestamp(_, let formatted, _, let unixSeconds, _, _, let isFromDateString):
+            return isFromDateString ? (unixSeconds ?? formatted) : formatted
+        case .color(let hex, _):
+            return hex
+        case .base64(let decoded):
+            return decoded
+        case .urlEncoded(let decoded):
+            return decoded
+        case .filePath(let path, _, _):
+            return path
+        case .url(let url, _):
+            return url
+        case .email(let email):
+            return email
+        case .ip(let address):
+            return address
+        case .phone(let formatted):
+            return formatted
+        case .json, .sql, .plainText:
+            return sourceText
         }
     }
 
@@ -78,7 +129,8 @@ struct SuperPanelSpotlightCard: View {
         case .url(_, let domain): return domain
         case .filePath(let path, _, _): return (path as NSString).lastPathComponent
         case .color(let hex, _): return hex
-        case .timestamp(_, let formatted, _): return formatted
+        case .timestamp(_, let formatted, _, let unixSeconds, _, _, let isFromDateString):
+            return isFromDateString ? (unixSeconds ?? formatted) : formatted
         case .math(_, let result): return result
         case .email(let email): return email
         case .ip(let address): return address
@@ -87,7 +139,8 @@ struct SuperPanelSpotlightCard: View {
         case .urlEncoded: return "URL 编码"
         case .json(let summary, let lines): return "\(summary) · \(lines) 行"
         case .sql(let statement, let lines): return "\(statement) · \(lines) 行"
-        case .translation: return "文本"
+        case .translation(let source, _, let translated, _, _):
+            return translated ?? source
         case .plainText: return "文本"
         }
     }
@@ -98,9 +151,17 @@ struct SuperPanelSpotlightCard: View {
         case .url(let url, _): return url
         case .filePath(let path, _, _): return path
         case .color(_, let rgb): return rgb
-        case .timestamp(let original, _, let relative): return "\(relative) · \(original)"
+        case .timestamp(let original, _, let relative, _, _, _, _):
+            return "\(relative) · \(original)"
         case .math(let expr, _): return expr
-        case .base64, .urlEncoded, .json, .sql, .email, .ip, .phone, .translation, .plainText:
+        case .translation(let source, _, let translated, let phonetic, _):
+            if let phonetic, !phonetic.isEmpty {
+                return "\(phonetic) · \(source)"
+            } else if translated != nil {
+                return source
+            }
+            return nil
+        case .base64, .urlEncoded, .json, .sql, .email, .ip, .phone, .plainText:
             return nil
         }
     }
@@ -122,13 +183,81 @@ struct SuperPanelSpotlightCard: View {
             jsonDetail
         case .sql:
             decodedDetail(label: "SQL 预览", text: sourceText)
-        case .timestamp, .url, .math, .email, .ip, .phone, .translation, .plainText:
+        case .timestamp(
+            let original,
+            let formatted,
+            let relative,
+            let unixSeconds,
+            let unixMilliseconds,
+            let localTime,
+            let isFromDateString
+        ):
+            timestampDetail(
+                original: original,
+                formatted: formatted,
+                relative: relative,
+                unixSeconds: unixSeconds,
+                unixMilliseconds: unixMilliseconds,
+                localTime: localTime,
+                isFromDateString: isFromDateString
+            )
+        case .translation(let source, _, let translated, _, let senses):
+            translationDetail(source: source, translated: translated, senses: senses)
+        case .url, .math, .email, .ip, .phone, .plainText:
             if let snippet = snippet {
                 Text(snippet)
                     .font(DesignTokens.Typography.rowTrailing)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
                     .lineLimit(2)
             }
+        }
+    }
+
+    private func timestampDetail(
+        original: String,
+        formatted: String,
+        relative: String,
+        unixSeconds: String?,
+        unixMilliseconds: String?,
+        localTime: String?,
+        isFromDateString: Bool
+    ) -> some View {
+        HStack(spacing: DesignTokens.Spacing.xs) {
+            infoChip(relative)
+            if let local = localTime {
+                infoChip("本地: \(local)")
+            }
+            if let sec = unixSeconds {
+                infoChip("时间戳: \(sec)")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func translationDetail(
+        source: String,
+        translated: String?,
+        senses: [String]?
+    ) -> some View {
+        if let senses, !senses.isEmpty {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                ForEach(senses.prefix(2), id: \.self) { sense in
+                    Text(sense)
+                        .font(DesignTokens.Typography.rowTrailing)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+        } else if let translated, translated != source {
+            Text(source)
+                .font(DesignTokens.Typography.rowTrailing)
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+                .lineLimit(2)
+        } else if let snippet = snippet {
+            Text(snippet)
+                .font(DesignTokens.Typography.rowTrailing)
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+                .lineLimit(2)
         }
     }
 

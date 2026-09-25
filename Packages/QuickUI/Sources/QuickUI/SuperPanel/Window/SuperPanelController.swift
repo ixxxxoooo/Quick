@@ -35,6 +35,8 @@ public final class SuperPanelController {
     public var recentItems: (() -> [SuperPanelRecentItem])?
     /// 打开设置窗口并定位到超级面板页
     public var openSettings: (() -> Void)?
+    /// 异步端上翻译 / 查词（由宿主注入）
+    public var translate: (@MainActor (String) async -> (translated: String, phonetic: String?, senses: [String]?)?)?
 
     // MARK: - 内部状态
 
@@ -132,11 +134,31 @@ public final class SuperPanelController {
         // 鼠标选中的文字根本收不到 —— 结果只能退回去读剪贴板（没复制就什么都没有）。
         // 所以先抓、抓完再显示，与 Fasty 的顺序一致。
         let capture = captureSelection
+        let asyncTranslate = translate
         Task.detached(priority: .userInitiated) {
             let clipboard = NSPasteboard.general.string(forType: .string) ?? ""
             let selected = await capture?()
             let source = (selected?.isEmpty == false ? selected : nil) ?? clipboard
-            let previews = SmartPreviewDetector.detect(source)
+            var previews = SmartPreviewDetector.detect(source)
+
+            // 如果已有翻译候选，异步查词/翻译
+            if let idx = previews.firstIndex(where: {
+                if case .translation = $0 { return true }
+                return false
+            }) {
+                if case .translation(let src, let lang, _, _, _) = previews[idx] {
+                    if let result = await asyncTranslate?(src) {
+                        previews[idx] = .translation(
+                            source: src,
+                            detectedLang: lang,
+                            translated: result.translated,
+                            phonetic: result.phonetic,
+                            senses: result.senses
+                        )
+                    }
+                }
+            }
+
             await MainActor.run { [weak self, weak panel] in
                 guard let self, let panel, self.showGeneration == generation else { return }
                 self.presentPanel(panel)
@@ -403,6 +425,44 @@ public final class SuperPanelController {
         panel.onSubmit = { [weak self] in self?.handleSubmit() ?? false }
         panel.onNumber = { [weak self] index in self?.handleNumber(index) ?? false }
         panel.onReplace = { [weak self] in self?.handleReplace() ?? false }
+        panel.onCopy = { [weak self] in
+            guard let self else { return false }
+            let textToCopy: String
+            if let preview = self.model.primaryPreview {
+                switch preview {
+                case .translation(_, _, let translated, _, _):
+                    textToCopy = translated ?? self.model.sourceText
+                case .math(_, let result):
+                    textToCopy = result
+                case .timestamp(_, let formatted, _, let unixSeconds, _, _, let isFromDateString):
+                    textToCopy = isFromDateString ? (unixSeconds ?? formatted) : formatted
+                case .color(let hex, _):
+                    textToCopy = hex
+                case .base64(let decoded):
+                    textToCopy = decoded
+                case .urlEncoded(let decoded):
+                    textToCopy = decoded
+                case .filePath(let path, _, _):
+                    textToCopy = path
+                case .url(let url, _):
+                    textToCopy = url
+                case .email(let email):
+                    textToCopy = email
+                case .ip(let address):
+                    textToCopy = address
+                case .phone(let formatted):
+                    textToCopy = formatted
+                case .json, .sql, .plainText:
+                    textToCopy = self.model.sourceText
+                }
+            } else {
+                textToCopy = self.model.sourceText
+            }
+            let trimmed = textToCopy.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return false }
+            self.copy(trimmed)
+            return true
+        }
         panel.onOpenSettings = { [weak self] in
             self?.openSettingsWindow()
             return true

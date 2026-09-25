@@ -13,18 +13,25 @@ struct SuperPanelHeaderView: View {
     let onClose: () -> Void
 
     var body: some View {
-        HStack(spacing: DesignTokens.Spacing.sm) {
-            if model.hasContext {
-                sourceBadge
-                tabSegment
-            } else {
-                title
+        ZStack {
+            HStack(spacing: DesignTokens.Spacing.sm) {
+                if model.hasContext {
+                    sourceBadge
+                } else {
+                    title
+                }
+
+                Spacer(minLength: DesignTokens.Spacing.sm)
+
+                HStack(spacing: DesignTokens.Spacing.xs) {
+                    iconButton("gearshape", help: "超级面板设置", action: onOpenSettings)
+                    iconButton("xmark", help: "关闭", action: onClose)
+                }
             }
 
-            Spacer(minLength: DesignTokens.Spacing.sm)
-
-            iconButton("gearshape", help: "超级面板设置", action: onOpenSettings)
-            iconButton("xmark", help: "关闭", action: onClose)
+            if model.hasContext {
+                tabSegment
+            }
         }
         .padding(.leading, DesignTokens.Spacing.lg)
         .padding(.trailing, DesignTokens.Spacing.md)
@@ -81,6 +88,7 @@ struct SuperPanelHeaderView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
             }
         }
         .padding(1)
@@ -122,6 +130,7 @@ struct SuperPanelHeaderView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusable(false)
         .help(help)
     }
 }

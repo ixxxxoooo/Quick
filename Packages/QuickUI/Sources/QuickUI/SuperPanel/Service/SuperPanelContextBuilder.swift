@@ -61,15 +61,6 @@ public enum SuperPanelContextBuilder {
 
         result.append(
             SuperPanelAction(
-                id: "sp.copy-text",
-                title: "复制文本",
-                subtitle: snippet,
-                icon: "doc.on.doc",
-                execute: { context.copy(trimmed) }
-            )
-        )
-        result.append(
-            SuperPanelAction(
                 id: "sp.search-web",
                 title: "在 Google 搜索",
                 subtitle: snippet,
@@ -181,19 +172,21 @@ public enum SuperPanelContextBuilder {
                 )
             ]
 
-        case .timestamp(_, let formatted, _):
+        case .timestamp(_, let formatted, _, let unixSeconds, _, let localTime, let isFromDateString):
+            let copyText = isFromDateString ? (unixSeconds ?? formatted) : (localTime ?? formatted)
+            let copyTitle = isFromDateString ? "复制 Unix 时间戳" : "复制格式化时间"
             return [
                 SuperPanelAction(
                     id: "sp.copy-timestamp",
-                    title: "复制格式化时间",
-                    subtitle: formatted,
+                    title: copyTitle,
+                    subtitle: copyText,
                     icon: "clock",
-                    execute: { context.copy(formatted) }
+                    execute: { context.copy(copyText) }
                 ),
                 SuperPanelAction(
                     id: "sp.open-timestamp",
                     title: "打开时间戳转换",
-                    subtitle: formatted,
+                    subtitle: copyText,
                     icon: "calendar",
                     execute: { context.navigate("timestamp-converter") }
                 )
@@ -310,7 +303,7 @@ public enum SuperPanelContextBuilder {
                 )
             ]
 
-        case .translation(let source, let lang):
+        case .translation(let source, let lang, _, _, _):
             let target = lang == "en" ? "中文" : "英文"
             return [
                 SuperPanelAction(

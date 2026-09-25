@@ -24,6 +24,8 @@ final class SuperPanelPanel: NSPanel {
     var onNumber: ((Int) -> Bool)?
     /// ⌥回车：替换原文
     var onReplace: (() -> Bool)?
+    /// ⌘C 复制
+    var onCopy: (() -> Bool)?
     /// ⌘, 打开设置
     var onOpenSettings: (() -> Bool)?
     /// ⌘W 关闭
@@ -122,6 +124,7 @@ final class SuperPanelPanel: NSPanel {
 
         // ⌘ 快捷键（不要求「只有 ⌘」：大写锁定之类的锁定位不该让 ⌘, 失效）
         if modifiers.contains(.command), let chars = event.charactersIgnoringModifiers?.lowercased() {
+            if chars == "c", onCopy?() == true { return }
             if chars == ",", onOpenSettings?() == true { return }
             if chars == "w" {
                 onClose?()

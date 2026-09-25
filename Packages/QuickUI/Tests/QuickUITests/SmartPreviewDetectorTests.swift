@@ -125,6 +125,47 @@ struct SmartPreviewDetectorTests {
         #expect(previews.contains { if case .plainText = $0 { return true } else { return false } })
     }
 
+    @Test("数字时间戳识别")
+    func detectsNumericTimestamp() {
+        let previews = SmartPreviewDetector.detect("1711368000")
+        #expect(previews.contains {
+            if case .timestamp(let orig, _, _, let sec, _, _, let isDate) = $0 {
+                return orig == "1711368000" && sec == "1711368000" && !isDate
+            }
+            return false
+        })
+    }
+
+    @Test("日期字符串识别为时间")
+    func detectsDateStrings() {
+        let previews = SmartPreviewDetector.detect("2024-01-01 12:00:00")
+        #expect(previews.contains {
+            if case .timestamp(let orig, _, _, _, _, _, let isDate) = $0 {
+                return orig == "2024-01-01 12:00:00" && isDate
+            }
+            return false
+        })
+    }
+
+    @Test("英文文本候选与词典直出")
+    func detectsTranslationCandidateWithDict() {
+        let previews = SmartPreviewDetector.detect(
+            "table",
+            dictionaryLookup: { word in
+                if word == "table" {
+                    return (translated: "桌子；表格", phonetic: "ˈteɪbl", senses: ["n. 桌子", "v. 提出"])
+                }
+                return nil
+            }
+        )
+        #expect(previews.contains {
+            if case .translation(let src, let lang, let trans, let phonetic, let senses) = $0 {
+                return src == "table" && lang == "en" && trans == "桌子；表格" && phonetic == "ˈteɪbl" && senses?.count == 2
+            }
+            return false
+        })
+    }
+
     @Test("空输入返回空数组")
     func emptyInput() {
         #expect(SmartPreviewDetector.detect("   ").isEmpty)

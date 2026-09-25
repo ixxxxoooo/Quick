@@ -10,11 +10,16 @@ struct SuperPanelActionListView: View {
 
     let model: SuperPanelModel
     @Binding var hoveredID: String?
+    let onCopy: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let preview = model.primaryPreview {
-                SuperPanelSpotlightCard(preview: preview, sourceText: model.sourceText)
+                SuperPanelSpotlightCard(
+                    preview: preview,
+                    sourceText: model.sourceText,
+                    onCopy: onCopy
+                )
             }
 
             sectionTitle("操作")

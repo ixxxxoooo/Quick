@@ -54,6 +54,45 @@ public final class TranslatorPlugin: QuickPlugin, PluginViewProviding, PluginSet
         history = TranslationHistoryStore(storage: storage)
     }
 
+    // MARK: - 超级面板接入
+
+    /// 同步词典查词（使用 DictionaryServices，毫秒级响应）
+    public func dictionaryLookup(_ text: String) -> (translated: String, phonetic: String?, senses: [String]?)? {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard clean.count <= 60, let entry = dictionary.lookup(clean), !entry.isEmpty else {
+            return nil
+        }
+        let meaning = entry.briefMeaning ?? entry.displayText
+        let senses = entry.senses.prefix(3).map { sense in
+            sense.pos.isEmpty ? sense.meaning : "\(sense.pos) \(sense.meaning)"
+        }
+        return (
+            translated: meaning,
+            phonetic: entry.phonetic.isEmpty ? nil : entry.phonetic,
+            senses: senses.isEmpty ? nil : Array(senses)
+        )
+    }
+
+    /// 异步端上翻译 / 查词（词典命中优先，长文本或未命中走 Apple Translation）
+    public func translateOrLookup(_ text: String) async -> (translated: String, phonetic: String?, senses: [String]?)? {
+        if let dictResult = dictionaryLookup(text) {
+            return dictResult
+        }
+
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return nil }
+
+        do {
+            let outcome = try await service.translateOnce(
+                clean, source: TranslationLanguages.autoCode, target: PluginDefaults.targetLanguage())
+            guard !outcome.result.isEmpty else { return nil }
+            return (translated: outcome.result, phonetic: nil, senses: nil)
+        } catch {
+            log.warning("内联翻译失败：\(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
     // MARK: - QuickPlugin 协议
 
     public func accepts(query: String) -> Bool {

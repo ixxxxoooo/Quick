@@ -44,7 +44,8 @@ struct SuperPanelRootView: View {
                     case .context:
                         SuperPanelActionListView(
                             model: model,
-                            hoveredID: $hoveredID
+                            hoveredID: $hoveredID,
+                            onCopy: onCopyClipboard
                         )
                     case .dock:
                         SuperPanelDockView(

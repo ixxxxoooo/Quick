@@ -26,7 +26,9 @@ public enum SmartPreviewDetector {
             FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
             return isDir.boolValue
         },
-        now: Date = Date()
+        now: Date = Date(),
+        timeZone: TimeZone = .current,
+        dictionaryLookup: ((String) -> (translated: String, phonetic: String?, senses: [String]?)?)? = nil
     ) -> [SmartPreview] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
@@ -36,7 +38,7 @@ public enum SmartPreviewDetector {
         if let preview = detectFilePath(trimmed, fileExists: fileExists, isDirectory: isDirectory) {
             previews.append(preview)
         }
-        if let preview = detectTimestamp(trimmed, now: now) {
+        if let preview = detectTimestamp(trimmed, now: now, timeZone: timeZone) {
             previews.append(preview)
         }
         if let preview = detectURL(trimmed) {
@@ -69,7 +71,7 @@ public enum SmartPreviewDetector {
         if let preview = detectEmail(trimmed) {
             previews.append(preview)
         }
-        if let preview = detectTranslationCandidate(trimmed) {
+        if let preview = detectTranslationCandidate(trimmed, dictionaryLookup: dictionaryLookup) {
             previews.append(preview)
         }
 
@@ -104,22 +106,77 @@ public enum SmartPreviewDetector {
         return .filePath(path: expanded, exists: exists, isDirectory: exists && isDirectory(expanded))
     }
 
-    private static func detectTimestamp(_ text: String, now: Date) -> SmartPreview? {
-        guard text.allSatisfy(\.isNumber), text.count == 10 || text.count == 13 else { return nil }
-        guard let value = Double(text) else { return nil }
+    private static let supportedDateFormats = [
+        "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "yyyy/MM/dd HH:mm:ss",
+        "yyyy/MM/dd", "MM/dd/yyyy"
+    ]
 
-        let seconds = text.count == 13 ? value / 1000 : value
-        // 合理范围：2001 ~ 2100
+    private static func detectTimestamp(_ text: String, now: Date, timeZone: TimeZone) -> SmartPreview? {
+        // 1. 纯数字时间戳（10 位秒 / 13 位毫秒）
+        if text.allSatisfy(\.isNumber), (text.count == 10 || text.count == 13), let value = Double(text) {
+            let seconds = text.count == 13 ? value / 1000 : value
+            // 合理范围：2001 ~ 2100
+            guard seconds > 1_000_000_000, seconds < 4_102_444_800 else { return nil }
+
+            let date = Date(timeIntervalSince1970: seconds)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            formatter.timeZone = timeZone
+            let formatted = formatter.string(from: date)
+
+            let relative = relativeDescription(from: date, to: now)
+            let secStr = "\(Int(seconds))"
+            let msStr = "\(Int(seconds * 1000))"
+            return .timestamp(
+                original: text,
+                formatted: formatted,
+                relative: relative,
+                unixSeconds: secStr,
+                unixMilliseconds: msStr,
+                localTime: formatted,
+                isFromDateString: false
+            )
+        }
+
+        // 2. 日期/时间文本识别
+        guard text.count >= 8, text.count <= 35 else { return nil }
+
+        var parsedDate: Date?
+        if let isoDate = ISO8601DateFormatter().date(from: text) {
+            parsedDate = isoDate
+        } else {
+            for format in supportedDateFormats {
+                let formatter = DateFormatter()
+                formatter.dateFormat = format
+                formatter.timeZone = timeZone
+                if let d = formatter.date(from: text) {
+                    parsedDate = d
+                    break
+                }
+            }
+        }
+
+        guard let date = parsedDate else { return nil }
+        let seconds = date.timeIntervalSince1970
         guard seconds > 1_000_000_000, seconds < 4_102_444_800 else { return nil }
 
-        let date = Date(timeIntervalSince1970: seconds)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.timeZone = .current
-        let formatted = formatter.string(from: date)
-
+        formatter.timeZone = timeZone
+        let localTime = formatter.string(from: date)
         let relative = relativeDescription(from: date, to: now)
-        return .timestamp(original: text, formatted: formatted, relative: relative)
+        let secStr = "\(Int(seconds))"
+        let msStr = "\(Int(seconds * 1000))"
+
+        return .timestamp(
+            original: text,
+            formatted: secStr,
+            relative: relative,
+            unixSeconds: secStr,
+            unixMilliseconds: msStr,
+            localTime: localTime,
+            isFromDateString: true
+        )
     }
 
     private static func relativeDescription(from date: Date, to now: Date) -> String {
@@ -381,17 +438,31 @@ public enum SmartPreviewDetector {
         return .email(email: text)
     }
 
-    private static func detectTranslationCandidate(_ text: String) -> SmartPreview? {
+    private static func detectTranslationCandidate(
+        _ text: String,
+        dictionaryLookup: ((String) -> (translated: String, phonetic: String?, senses: [String]?)?)?
+    ) -> SmartPreview? {
         guard text.count >= 2, text.count <= 500 else { return nil }
         let hasHan = text.contains { $0.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) } }
         let letters = text.filter { $0.isLetter }
         guard letters.count >= 2 else { return nil }
 
+        let lang: String
         if hasHan {
-            return .translation(source: String(text.prefix(80)), detectedLang: "zh")
+            lang = "zh"
+        } else {
+            let latinRatio = Double(letters.count) / Double(max(text.count, 1))
+            guard latinRatio > 0.6 else { return nil }
+            lang = "en"
         }
-        let latinRatio = Double(letters.count) / Double(max(text.count, 1))
-        guard latinRatio > 0.6 else { return nil }
-        return .translation(source: String(text.prefix(80)), detectedLang: "en")
+
+        let lookup = dictionaryLookup?(text)
+        return .translation(
+            source: String(text.prefix(80)),
+            detectedLang: lang,
+            translated: lookup?.translated,
+            phonetic: lookup?.phonetic,
+            senses: lookup?.senses
+        )
     }
 }
