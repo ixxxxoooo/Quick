@@ -229,16 +229,13 @@ struct PaletteRootView: View {
                 detail: "换个关键词试试，或检查对应插件是否已启用"
             )
         } else if results.isEmpty && paletteQuery.text.isEmpty {
-            if isSearching {
-                ProgressView("正在加载应用程序…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                emptyState(
-                    icon: "magnifyingglass",
-                    message: "暂无应用程序",
-                    detail: "正在扫描系统应用，请稍候…"
-                )
-            }
+            // 不要整页 ProgressView：首次启动空查询通常几十毫秒内就有静态命令，
+            // 整页转圈会被当成「卡死」。头部已有小指示器，这里只留轻量占位。
+            emptyState(
+                icon: "magnifyingglass",
+                message: isSearching ? "正在准备…" : "暂无应用程序",
+                detail: isSearching ? "首次启动会扫描应用，马上就好" : "正在扫描系统应用，请稍候…"
+            )
         } else {
             VStack(spacing: 0) {
                 ResultListView(
@@ -368,8 +365,14 @@ struct PaletteRootView: View {
             try? await Task.sleep(for: Self.searchDebounce)
             guard !Task.isCancelled else { return }
 
-            isSearching = true
+            // 延迟挂上「搜索中」：空查询的静态命令通常瞬间返回，立刻转圈会闪一下
+            let showSpinner = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+                isSearching = true
+            }
             let outcome = await searchHandler(text)
+            showSpinner.cancel()
             guard !Task.isCancelled else { return }
 
             results = outcome.items

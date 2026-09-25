@@ -127,8 +127,11 @@
   `ClipboardListView`，视图读 `search?.text` 过滤。没声明搜索的插件拿到的是一份
   `hasHeaderField = false` 的兜底对象，此时退化成不过滤。
 - **键盘导航在有搜索框时走面板转接。** 搜索框拿到焦点后，列表收不到方向键与回车，
-  所以 `ClipboardListView` 在 `onAppear` 置 `search?.wantsNavigation = true`，并消费
-  `PluginSearchQuery.commandToken`：上下移动、左右切标签、回车复制粘贴。转接方有两处：
+  所以 `ClipboardListView` 在 `onAppear` 与 `shownToken` 变化时置
+  `search?.wantsNavigation = true`，并消费 `PluginSearchQuery.commandToken`：上下移动、
+  左右切标签、回车复制粘贴。`shownToken` 是必须的：面板只是 `orderOut` 隐藏时视图还在树上，
+  再次 `show` 会 `reset()` 清掉 `wantsNavigation`，但 `onAppear` 不会再跑 —— 不听
+  `shownToken` 就会「粘贴后再唤醒上下键全废」。转接方有两处：
   主面板在 `PalettePanel.sendEvent`、分离窗口在 `DetachedPluginPanel.sendEvent`
   （`PluginPanelController` 里接线），两条路都在插件没声明要吃按键时返回 false，
   事件沿响应链继续走。这是 [docs/ui.md](ui.md) 里「面板里的键盘导航」在插件内搜索下的延伸。

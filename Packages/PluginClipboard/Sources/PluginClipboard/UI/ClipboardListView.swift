@@ -119,10 +119,11 @@ struct ClipboardListView: View {
         .focusEffectDisabled()
         .onAppear {
             // 声明「方向键与回车归我」，面板据此在 AppKit 层把它们转成命令
-            if hasHeaderSearch {
-                search?.wantsNavigation = true
-            }
-            isFocused = true
+            claimNavigationAndFocus()
+        }
+        // 面板只是 orderOut 再 show 时 onAppear 不会再跑；shownToken 让我们重新抢回导航
+        .onChange(of: search?.shownToken ?? 0) { _, _ in
+            claimNavigationAndFocus()
         }
         // 面板把上下 / 左右 / 回车变成请求记在 `commandToken` 上，这里取走并执行
         .onChange(of: search?.commandToken) { _, _ in
@@ -323,6 +324,17 @@ struct ClipboardListView: View {
     }
 
     // MARK: - 键盘导航
+
+    /// 声明导航归属并把焦点落到列表上
+    ///
+    /// `onAppear` 与 `shownToken` 共用：后者覆盖「粘贴后面板只 orderOut、再次唤醒
+    /// 时视图还在树上」的情况。
+    private func claimNavigationAndFocus() {
+        if hasHeaderSearch {
+            search?.wantsNavigation = true
+        }
+        isFocused = true
+    }
 
     private func switchTab(direction: Int) {
         let tabs = ClipboardTab.allCases

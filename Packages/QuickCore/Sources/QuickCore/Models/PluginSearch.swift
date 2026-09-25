@@ -68,9 +68,21 @@ public final class PluginSearchQuery {
     /// 外部只能这样请求，不能直接设。
     public private(set) var focusToken = 0
 
+    /// 面板带着当前插件再次出现的序号
+    ///
+    /// 面板只是 `orderOut` 隐藏时 SwiftUI 视图还在树上，`onAppear` 不会再跑。
+    /// `show(pluginID:)` 里会 `reset()` 把 `wantsNavigation` 清掉，若没有这个令牌，
+    /// 插件就不知道该重新声明「方向键归我」—— 表现就是粘贴后再唤醒，上下键全废。
+    public private(set) var shownToken = 0
+
     /// 请求把焦点交给头部搜索框
     public func requestFocus() {
         focusToken &+= 1
+    }
+
+    /// 通知插件：面板带着你又出现了（含同插件二次 show）
+    public func notifyShown() {
+        shownToken &+= 1
     }
 
     /// 记下一次导航请求
@@ -82,7 +94,7 @@ public final class PluginSearchQuery {
     /// 清空文本与导航状态
     ///
     /// 进入 / 离开插件时必须调：留在 `wantsNavigation = true` 上，下一个插件会莫名其妙地
-    /// 吃掉方向键。
+    /// 吃掉方向键。不碰 `shownToken`：那是「又出现了」的信号，由 `notifyShown` 单独推进。
     public func reset() {
         text = ""
         wantsNavigation = false

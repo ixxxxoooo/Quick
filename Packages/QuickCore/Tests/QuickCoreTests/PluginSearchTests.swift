@@ -10,7 +10,7 @@ import Testing
 @Suite("插件内搜索桥接")
 struct PluginSearchTests {
 
-    /// 面板按键后插件靠 `commandToken` 变化来取走请求，所以每次 request 都必须递增
+    /// 每次导航请求都递增令牌并记录命令
     @Test("每次导航请求都递增令牌并记录命令")
     func requestIncrementsToken() {
         let search = PluginSearchQuery()
@@ -52,6 +52,22 @@ struct PluginSearchTests {
         #expect(search.text == "")
         #expect(search.wantsNavigation == false)
         #expect(search.lastCommand == nil)
+    }
+
+    /// 同插件二次 show 时 onAppear 不会再跑，靠 shownToken 重新声明导航
+    @Test("notifyShown 递增 shownToken 且不影响 wantsNavigation")
+    func notifyShownIncrementsToken() {
+        let search = PluginSearchQuery()
+        #expect(search.shownToken == 0)
+        search.wantsNavigation = true
+        search.notifyShown()
+        #expect(search.shownToken == 1)
+        #expect(search.wantsNavigation)
+        search.reset()
+        #expect(search.wantsNavigation == false)
+        #expect(search.shownToken == 1, "reset 不碰 shownToken")
+        search.notifyShown()
+        #expect(search.shownToken == 2)
     }
 
     /// 分离窗口注入的是没有头部搜索框的兜底对象

@@ -70,6 +70,9 @@ struct JSONFormatterView: View {
             loadInitialText()
             updateNavigationWants()
         }
+        .onChange(of: search?.shownToken ?? 0) { _, _ in
+            updateNavigationWants()
+        }
         .onChange(of: mode) { _, _ in
             updateNavigationWants()
         }

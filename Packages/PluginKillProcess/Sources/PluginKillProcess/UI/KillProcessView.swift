@@ -59,6 +59,11 @@ struct KillProcessView: View {
             // .task 不会取消，受控循环才能由面板显隐事件叫停
             service.noteViewAppeared()
         }
+        .onChange(of: search?.shownToken ?? 0) { _, _ in
+            search?.wantsNavigation = true
+            isFocused = true
+            syncSelection()
+        }
         .onDisappear {
             service.noteViewDisappeared()
         }

@@ -128,6 +128,12 @@ public final class PaletteCoordinator {
     /// 面板外点击的本地监视器（发往本应用其他窗口的点击）
     private var outsideClickLocalMonitor: Any?
 
+    /// hide 后异步做的焦点恢复 / 键盘布局还原
+    ///
+    /// 必须在下次 show 时取消：否则用户粘贴后立刻再唤出面板，滞后的
+    /// `previousApp.activate()` 会把刚到手的焦点再抢走，键盘看起来像卡死。
+    private var hidePostTask: Task<Void, Never>?
+
     public init() {
         observeClipboardChanges()
     }
@@ -178,6 +184,10 @@ public final class PaletteCoordinator {
     ///   - pluginID: 目标插件 ID（nil 表示主搜索）
     ///   - query: 预填搜索文本
     public func show(pluginID: String? = nil, query: String? = nil) {
+        // 取消尚未执行的 hide 后处理，避免 previousApp.activate 抢走本次焦点
+        hidePostTask?.cancel()
+        hidePostTask = nil
+
         if let query { self.query = query }
 
         if let pluginID {
@@ -226,6 +236,12 @@ public final class PaletteCoordinator {
         // 人类反应时间 > 200 ms，不可能在 10 ms 内开始打字，所以不影响体验。
         // 放在 presentPanel 之前时，10 ms 的系统调用全部变成了面板出现的感知延迟。
         onPanelWillShow?()
+
+        // 插件模式：视图可能还在树上（上次只是 orderOut），onAppear 不会再跑。
+        // reset() 已清掉 wantsNavigation，必须发 shownToken 让插件重新声明导航。
+        if activePluginID != nil {
+            pluginSearch.notifyShown()
+        }
 
         signpost.endInterval("palette.show", interval)
         let totalMS = started.duration(to: .now).ms
@@ -300,7 +316,11 @@ public final class PaletteCoordinator {
         NSApp.activate(ignoringOtherApps: true)
         let activateMS = t2.duration(to: .now).ms
 
-        focusSearchField(in: panel)
+        // 插件模式不要抢焦点到头部搜索框：剪贴板等列表靠自己的 focusable 视图吃方向键，
+        // 焦点落到搜索框上 + wantsNavigation 未恢复时，表现就是「上下键动不了」。
+        if activePluginID == nil {
+            focusSearchField(in: panel)
+        }
 
         if makeKeyMS > 3 || orderFrontMS > 3 || activateMS > 3 {
             log.warning(
@@ -312,10 +332,12 @@ public final class PaletteCoordinator {
         }
 
         Task { @MainActor [weak self, weak panel] in
-            guard let panel, panel.isVisible, !panel.isKeyWindow else { return }
-            self?.log.debug("面板首次未取得 key window，补一次 makeKeyAndOrderFront")
+            guard let self, let panel, panel.isVisible, !panel.isKeyWindow else { return }
+            self.log.debug("面板首次未取得 key window，补一次 makeKeyAndOrderFront")
             panel.makeKeyAndOrderFront(nil)
-            self?.focusSearchField(in: panel)
+            if self.activePluginID == nil {
+                self.focusSearchField(in: panel)
+            }
         }
     }
 
@@ -342,26 +364,36 @@ public final class PaletteCoordinator {
 
     /// 隐藏面板
     /// - Parameter restoreFocus: 是否恢复之前应用的焦点
-    public func hide(restoreFocus: Bool = true) {
+    /// - Returns: 被恢复焦点的上一应用（如果有）
+    @discardableResult
+    public func hide(restoreFocus: Bool = true) -> NSRunningApplication? {
         let started = ContinuousClock.now
         let wasVisible = isVisible
 
-        // 视觉消失必须同步：用户按键后面板要立刻从屏幕上移走
-        panel?.orderOut(nil)
+        let app = restoreFocus ? previousApp : nil
+        previousApp = nil
+
+        // 立即触发上一应用激活：尽早让 WindowServer 开始切焦点
+        if let app, !app.isTerminated {
+            app.activate()
+        }
+
+        if let panel {
+            // 撤掉焦点编辑态，避免与系统输入会话（TextInputUI）产生 deferral block 竞争
+            if panel.firstResponder != nil && panel.firstResponder !== panel {
+                panel.makeFirstResponder(nil)
+            }
+            panel.orderOut(nil)
+        }
         let orderOutMS = started.duration(to: .now).ms
 
         if wasVisible {
-            // 焦点恢复和键盘布局还原不影响「面板消失」的视觉反馈，
-            // 推迟到下一轮 runloop 避免阻塞主线程（键盘布局切换实测 12~15 ms）
-            let app = restoreFocus ? previousApp : nil
             let didHideCallback = onPanelDidHide
-            previousApp = nil
 
-            Task { @MainActor [weak self] in
+            hidePostTask?.cancel()
+            hidePostTask = Task { @MainActor [weak self] in
                 let postStart = ContinuousClock.now
-                if let app, !app.isTerminated {
-                    app.activate()
-                }
+                guard !Task.isCancelled else { return }
                 didHideCallback?()
                 let postMS = postStart.duration(to: .now).ms
                 if postMS > 5 {
@@ -375,9 +407,9 @@ public final class PaletteCoordinator {
                 恢复焦点=\(restoreFocus, privacy: .public)
                 """)
             EventBus.shared.post(PaletteVisibilityChangedEvent(isVisible: false))
-        } else {
-            previousApp = nil
         }
+
+        return app
     }
 
     /// 导航到指定插件
@@ -392,6 +424,10 @@ public final class PaletteCoordinator {
 
         if !isVisible {
             show()
+        } else {
+            // 面板已开着切插件：新视图会 onAppear；同插件带新 context 时视图可能还在，
+            // 仍发 shownToken，让它重新声明导航。
+            pluginSearch.notifyShown()
         }
     }
 

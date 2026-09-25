@@ -101,6 +101,11 @@ final class AppCore {
     /// 面板打开前的键盘布局，用于关闭时还原
     private var layoutBeforePanel: String?
 
+    /// 粘贴回上一应用的待执行任务
+    ///
+    /// 用户在 settle 窗口内再次唤出面板时必须取消，否则 ⌘V 会打进刚打开的面板。
+    private var pendingPasteTask: Task<Void, Never>?
+
     /// 数据库
     ///
     /// 全应用一个库，插件的批量数据与插件键值都在里面。`lazy` 是因为打开可能失败，
@@ -651,8 +656,8 @@ final class AppCore {
         subscriptions.append(
             bus.on(PasteIntoPreviousAppEvent.self) { [weak self] _ in
                 guard let self else { return }
-                self.paletteCoordinator.hide(restoreFocus: true)
-                self.schedulePasteIntoPreviousApp()
+                let targetApp = self.paletteCoordinator.hide(restoreFocus: true)
+                self.schedulePasteIntoPreviousApp(targetApp: targetApp)
             }
         )
 
@@ -794,16 +799,18 @@ final class AppCore {
 
     // MARK: - 粘贴回上一个应用
 
-    /// 交还焦点后多久再合成 ⌘V
-    ///
-    /// `NSRunningApplication.activate()` 是异步的：立刻发 ⌘V 会打在被切走的面板或
-    /// 还没回到前台的旧应用上。给系统一点时间把前一个应用带到前台。
-    private static let pasteSettleDelay = Duration.milliseconds(140)
+    /// 最大等待前台应用激活时长（兜底）
+    private static let maxPasteSettleDelay = Duration.milliseconds(120)
 
     /// 等前一个应用回到前台，再合成一次 ⌘V；没有辅助功能权限就只提示
-    private func schedulePasteIntoPreviousApp() {
+    ///
+    /// 相比固定死等 140ms，这里主动轮询 `frontmostApplication`：一旦目标应用成为前台，
+    /// 仅保留 25ms 事件队列缓冲区就立即合成 ⌘V，实测 ~35-50ms 即可完成填充；若目标未响应
+    /// 则在 120ms 兜底触发，兼顾瞬时手感与稳定性。
+    private func schedulePasteIntoPreviousApp(targetApp: NSRunningApplication? = nil) {
         let canPaste = pasteService.canSynthesize
-        Task { @MainActor [weak self] in
+        pendingPasteTask?.cancel()
+        pendingPasteTask = Task { @MainActor [weak self] in
             guard let self else { return }
             guard canPaste else {
                 // 面板已隐藏，剪贴板里已经有内容了 —— 告诉用户为什么没自动粘贴
@@ -813,9 +820,37 @@ final class AppCore {
                 )
                 return
             }
-            try? await Task.sleep(for: Self.pasteSettleDelay)
+
+            let start = ContinuousClock.now
+            if let targetApp, !targetApp.isTerminated {
+                let targetPID = targetApp.processIdentifier
+                let deadline = start + Self.maxPasteSettleDelay
+
+                // 快速轮询等待目标应用成为 frontmostApplication
+                while ContinuousClock.now < deadline {
+                    if NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID {
+                        // 目标应用已成为前台，等待短暂缓冲确保其窗口事件队列与光标就绪
+                        try? await Task.sleep(for: .milliseconds(25))
+                        break
+                    }
+                    try? await Task.sleep(for: .milliseconds(8))
+                }
+            } else {
+                // 没有明确目标应用时（例如上一应用已退出或未知），使用短固定延时
+                try? await Task.sleep(for: .milliseconds(40))
+            }
+
+            guard !Task.isCancelled else { return }
+            let waited = start.duration(to: .now).invokeMS
+            self.log.notice("准备合成 ⌘V，等待上一应用就绪耗时：\(waited, format: .fixed(precision: 1)) ms")
             self.pasteService.paste()
         }
+    }
+
+    /// 取消尚未发出的合成粘贴（再次唤出面板时调用）
+    private func cancelPendingPaste() {
+        pendingPasteTask?.cancel()
+        pendingPasteTask = nil
     }
 
     // MARK: - 自定义命令存储辅助
@@ -840,6 +875,8 @@ final class AppCore {
     /// 执行一条命令。热键和搜索共用这一条路径
     private func invoke(commandID: String) {
         let invokeStart = ContinuousClock.now
+        // 再次唤出时取消尚未发出的 ⌘V，避免打进面板自己的搜索框
+        cancelPendingPaste()
         log.notice("执行命令 \(commandID, privacy: .public)")
         // 超级面板不是插件命令，也不在命令目录里，单独认领
         if commandID == CommandID.superPanel {

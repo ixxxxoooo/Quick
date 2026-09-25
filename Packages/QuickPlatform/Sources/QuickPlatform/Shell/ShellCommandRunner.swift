@@ -316,7 +316,7 @@ public enum ShellCommandRunner {
     /// - Returns: 脚本全文
     static func scriptBody(command: String, workingDirectory: String) -> String {
         """
-        #!/bin/zsh -il
+        #!/bin/zsh -il +m
         cd \(quoted(workingDirectory)) || exit 1
         \(command)
         if [ -t 0 ]; then exec /bin/zsh -il; fi

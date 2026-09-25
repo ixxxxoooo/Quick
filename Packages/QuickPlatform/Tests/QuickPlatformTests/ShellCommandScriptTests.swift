@@ -17,7 +17,7 @@ struct ShellCommandScriptTests {
 
         // `-il` 而不是 `-l`：zsh 只让交互式 shell 去 source `.zshrc`，
         // 别名与写在那里的 PATH 全靠这个 `-i`
-        #expect(lines.first == "#!/bin/zsh -il")
+        #expect(lines.first == "#!/bin/zsh -il +m")
         #expect(lines[1] == "cd '/tmp' || exit 1")
         #expect(lines[2] == "ls")
     }

@@ -203,6 +203,21 @@ struct PalettePanelTests {
         coordinator.hide(restoreFocus: false)
     }
 
+    /// 同插件二次 show：视图还在树上时 onAppear 不会再跑，必须靠 shownToken 唤醒导航
+    @Test("插件二次 show 会递增 shownToken")
+    func reShowPluginNotifiesShownToken() {
+        let coordinator = PaletteCoordinator()
+        coordinator.show(pluginID: "clipboard")
+        let afterFirst = coordinator.pluginSearch.shownToken
+        #expect(afterFirst >= 1)
+
+        coordinator.hide(restoreFocus: false)
+        coordinator.show(pluginID: "clipboard")
+        #expect(coordinator.pluginSearch.shownToken == afterFirst + 1)
+
+        coordinator.hide(restoreFocus: false)
+    }
+
     /// 主搜索模式下左右键属于搜索框光标，必须放行
     @Test("主搜索模式下左右键不被面板消费")
     func mainSearchDoesNotConsumeTab() {
