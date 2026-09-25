@@ -206,6 +206,7 @@ struct PaletteRootView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("清空搜索")
+                .help("清空搜索内容")
             }
         }
         .frame(width: DesignTokens.Size.headerIconSlot)

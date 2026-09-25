@@ -9,7 +9,6 @@ import SwiftUI
 
 /// AI 聚合门户视图
 ///
-/// 参考 Fasty AI Portal 布局：
 /// 头部品牌区 → Provider 卡片网格（2列）→ 全局偏好
 /// 每个卡片展示 Provider 名称、URL、在线状态、操作按钮
 struct AIPortalView: View {
@@ -25,27 +24,19 @@ struct AIPortalView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: DesignTokens.Spacing.lg) {
-                // 头部品牌区
                 headerSection
-
-                // Provider 卡片网格
                 providerGrid
-
-                // 底部提示
                 footerSection
             }
             .padding(DesignTokens.Spacing.lg)
         }
         .task {
-            // 窗口开关都由本插件自己发起，2 秒的轮询足够贴近；`Task` 的好处是视图
-            // 消失时自动取消，不会留下一个孤儿定时器
             while !Task.isCancelled {
                 refreshActive()
                 try? await Task.sleep(for: Self.activeRefreshInterval)
             }
         }
         .overlay(alignment: .bottom) {
-            // 操作反馈 Toast
             if let msg = feedbackMessage {
                 toastView(msg)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -57,7 +48,6 @@ struct AIPortalView: View {
 
     private var headerSection: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            // 品牌头像
             ZStack {
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
                     .fill(Color.accentColor.opacity(0.12))
@@ -66,8 +56,9 @@ struct AIPortalView: View {
                     .font(.system(size: 20))
                     .foregroundStyle(Color.accentColor)
             }
+            .help("AI 聚合门户")
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 HStack(spacing: DesignTokens.Spacing.sm) {
                     Text("AI 聚合")
                         .font(DesignTokens.Typography.panelTitle)
@@ -80,18 +71,17 @@ struct AIPortalView: View {
                         .foregroundStyle(Color.accentColor)
                         .clipShape(Capsule())
                 }
-                Text("各大 AI 官网独立窗口，保持登录态，一键直达")
+                Text("多标签聚合窗口，保持登录态，一键直达")
                     .font(DesignTokens.Typography.rowTrailing)
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
             }
 
             Spacer()
 
-            // 长得像控件的文字必须是控件：Provider 开关在设置页里，这里给一条真能走的路
             Button {
                 EventBus.shared.post(ShowPaletteSettingsEvent())
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: DesignTokens.Spacing.xs) {
                     Image(systemName: "gearshape")
                         .font(DesignTokens.Typography.inlineIcon)
                     Text("管理中心")
@@ -100,7 +90,7 @@ struct AIPortalView: View {
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             .buttonStyle(.plain)
-            .help("打开设置窗口")
+            .help("打开设置窗口管理 AI Provider")
         }
         .padding(.bottom, DesignTokens.Spacing.sm)
     }
@@ -122,16 +112,12 @@ struct AIPortalView: View {
     }
 
     private func providerCard(_ provider: AIProvider) -> some View {
-        // 停用优先于运行状态：停用的 Provider 打不开，说它「就绪」就是骗人 ——
-        // 用户看到的就是「点了没反应」。
         let isEnabled = !disabledProviders.contains(provider.id)
         let isActive = isEnabled && activeProviders.contains(provider.id)
         let accentColor = Color(hex: provider.accent) ?? Color.accentColor
 
         return VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            // 上部：Logo + 名称 + 状态
             HStack(spacing: DesignTokens.Spacing.sm) {
-                // Provider 图标
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
                         .fill(accentColor.opacity(isEnabled ? 0.12 : 0.05))
@@ -140,14 +126,14 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.iconGlyph)
                         .foregroundStyle(isEnabled ? accentColor : DesignTokens.Colors.textTertiary)
                 }
+                .help(provider.name)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                    HStack(spacing: DesignTokens.Spacing.sm) {
                         Text(provider.name)
                             .font(DesignTokens.Typography.sectionHeader)
                             .foregroundStyle(DesignTokens.Colors.textPrimary)
 
-                        // 状态指示
                         Text(isEnabled ? (isActive ? "运行中" : "就绪") : "已停用")
                             .font(DesignTokens.Typography.compactKeyCap)
                             .padding(.horizontal, DesignTokens.Spacing.sm)
@@ -162,7 +148,6 @@ struct AIPortalView: View {
                                 isActive ? DesignTokens.Colors.success : DesignTokens.Colors.textTertiary)
                     }
 
-                    // 副标题：停用时换成「去哪儿重新打开」，比一个点不动的按钮有用
                     Text(
                         isEnabled
                             ? provider.url.replacingOccurrences(of: "https://", with: "")
@@ -176,16 +161,14 @@ struct AIPortalView: View {
                 Spacer()
             }
 
-            // 操作按钮行
-            HStack(spacing: 6) {
-                // 主操作：打开/聚焦
+            HStack(spacing: DesignTokens.Spacing.sm) {
                 Button {
                     if manager.openOrFocus(providerId: provider.id) {
                         showFeedback("已打开 \(provider.name)")
                     }
                     refreshActive()
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: DesignTokens.Spacing.xs) {
                         Image(systemName: isEnabled ? "macwindow" : "nosign")
                             .font(DesignTokens.Typography.inlineIcon)
                         Text(
@@ -204,8 +187,8 @@ struct AIPortalView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!isEnabled)
+                .help(isEnabled ? (isActive ? "聚焦到 \(provider.name) 标签" : "在聚合窗口中打开 \(provider.name)") : "该服务已在设置中停用")
 
-                // 刷新
                 Button {
                     reloadingID = provider.id
                     manager.reloadWindow(for: provider.id)
@@ -225,11 +208,11 @@ struct AIPortalView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .frame(width: 26, height: 26)
+                .frame(width: 28, height: 28)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .disabled(!isActive)
+                .help("刷新 \(provider.name) 页面")
 
-                // 外部浏览器
                 Button {
                     manager.openInBrowser(providerId: provider.id)
                     showFeedback("已在浏览器中打开")
@@ -238,10 +221,10 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.inlineIcon)
                 }
                 .buttonStyle(.plain)
-                .frame(width: 26, height: 26)
+                .frame(width: 28, height: 28)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
+                .help("在浏览器中打开 \(provider.name)")
 
-                // 关闭窗口
                 Button {
                     manager.destroyWindow(for: provider.id)
                     refreshActive()
@@ -251,9 +234,10 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.inlineIcon)
                 }
                 .buttonStyle(.plain)
-                .frame(width: 26, height: 26)
+                .frame(width: 28, height: 28)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .disabled(!isActive)
+                .help("关闭 \(provider.name) 标签")
             }
         }
         .padding(DesignTokens.Spacing.md)
@@ -268,11 +252,11 @@ struct AIPortalView: View {
     // MARK: - 底部
 
     private var footerSection: some View {
-        VStack(spacing: 4) {
-            Text("搜索 AI 名称可直接打开对应窗口")
+        VStack(spacing: DesignTokens.Spacing.xs) {
+            Text("搜索 AI 名称可直接打开对应标签页")
                 .font(DesignTokens.Typography.inlineIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
-            Text("窗口关闭后登录态仍然保持")
+            Text("关闭标签后登录态仍然保持")
                 .font(DesignTokens.Typography.inlineIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary.opacity(0.7))
         }
@@ -283,7 +267,7 @@ struct AIPortalView: View {
     // MARK: - Toast
 
     private func toastView(_ message: String) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: DesignTokens.Spacing.sm) {
             Image(systemName: "checkmark")
                 .font(DesignTokens.Typography.inlineIcon)
             Text(message)
@@ -297,9 +281,6 @@ struct AIPortalView: View {
         .padding(.bottom, DesignTokens.Spacing.lg)
     }
 
-    /// 活跃状态的刷新间隔
-    ///
-    /// 窗口的开关都由本插件自己发起，2 秒足够贴近；再密只是白跑主 actor。
     private static let activeRefreshInterval = Duration.seconds(2)
 
     // MARK: - 辅助

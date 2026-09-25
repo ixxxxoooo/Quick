@@ -29,16 +29,10 @@ packages:
     path: Packages/PluginCalculator
   PluginSystemControl:
     path: Packages/PluginSystemControl
-  PluginSnippets:
-    path: Packages/PluginSnippets
-  PluginOCR:
-    path: Packages/PluginOCR
   PluginTranslator:
     path: Packages/PluginTranslator
   PluginCalendar:
     path: Packages/PluginCalendar
-  PluginNotes:
-    path: Packages/PluginNotes
   PluginAI:
     path: Packages/PluginAI
   PluginSystemMonitor:
@@ -65,10 +59,6 @@ packages:
     path: Packages/PluginTimestampConverter
   PluginTextDiff:
     path: Packages/PluginTextDiff
-  PluginColorCompare:
-    path: Packages/PluginColorCompare
-  PluginMarkdownPreview:
-    path: Packages/PluginMarkdownPreview
 
 targets:
   Quick:
@@ -112,11 +102,8 @@ targets:
       - package: PluginClipboard
       - package: PluginCalculator
       - package: PluginSystemControl
-      - package: PluginSnippets
-      - package: PluginOCR
       - package: PluginTranslator
       - package: PluginCalendar
-      - package: PluginNotes
       - package: PluginAI
       - package: PluginSystemMonitor
       - package: PluginKillProcess
@@ -130,5 +117,3 @@ targets:
       - package: PluginHashCalculator
       - package: PluginTimestampConverter
       - package: PluginTextDiff
-      - package: PluginColorCompare
-      - package: PluginMarkdownPreview

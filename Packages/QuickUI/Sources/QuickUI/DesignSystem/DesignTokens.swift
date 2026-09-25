@@ -270,6 +270,19 @@ public enum DesignTokens {
         /// 超级面板初始高度（内容量出来前的占位）
         public static let superPanelInitialHeight: CGFloat = 320
 
+        // MARK: AI 聚合标签栏
+
+        /// AI 聚合窗口的标签栏高度
+        public static let aiTabBarHeight: CGFloat = 36
+        /// AI 标签项水平内边距
+        public static let aiTabItemPaddingH: CGFloat = 12
+        /// AI 标签项图标尺寸
+        public static let aiTabIconSize: CGFloat = 16
+        /// AI 标签项间距
+        public static let aiTabItemSpacing: CGFloat = 2
+        /// AI 标签栏关闭按钮尺寸
+        public static let aiTabCloseSize: CGFloat = 14
+
         // MARK: 悬浮胶囊
 
         /// 悬浮胶囊的几何与间距
@@ -644,12 +657,61 @@ public enum DesignTokens {
         /// 结果行来源徽章的文字色
         public static let sourceBadgeText = ramp(dark: 0.45, light: 0.48)
 
+        // MARK: AI 聚合标签栏
+
+        /// AI 标签栏背景
+        public static let aiTabBarBackground = adaptive(
+            dark: NSColor(srgbRed: 32 / 255, green: 32 / 255, blue: 36 / 255, alpha: 1),
+            light: NSColor(srgbRed: 240 / 255, green: 240 / 255, blue: 244 / 255, alpha: 1)
+        )
+
+        /// AI 标签项选中底色
+        public static let aiTabSelected = adaptive(
+            dark: .srgbInk(1, alpha: 0.12),
+            light: .srgbInk(0, alpha: 0.06)
+        )
+
+        /// AI 标签项悬停底色
+        public static let aiTabHover = adaptive(
+            dark: .srgbInk(1, alpha: 0.06),
+            light: .srgbInk(0, alpha: 0.03)
+        )
+
+        /// AI 标签项文字选中色
+        public static let aiTabSelectedText = adaptive(
+            dark: .srgbInk(1, alpha: 0.95),
+            light: .srgbInk(0, alpha: 0.88)
+        )
+
+        /// AI 标签项文字非选中色
+        public static let aiTabText = adaptive(
+            dark: .srgbInk(1, alpha: 0.55),
+            light: .srgbInk(0, alpha: 0.50)
+        )
+
+        /// AI 标签栏分隔线
+        public static let aiTabSeparator = adaptive(
+            dark: .srgbInk(1, alpha: 0.08),
+            light: .srgbInk(0, alpha: 0.06)
+        )
+
         // MARK: 悬浮胶囊
 
         /// 胶囊底色（近不透明，让它在任意网页/内容上都读得清）
         public static let capsuleFill = adaptive(
             dark: NSColor(srgbRed: 28 / 255, green: 28 / 255, blue: 32 / 255, alpha: 0.78),
             light: .srgbInk(1, alpha: 0.82)
+        )
+
+        /// 拖动中的胶囊底色（完全不透明）
+        ///
+        /// 拖动时把实时材质收起来，由这一层单独撑住外观：材质每移动一帧都要重新采样它背后的
+        /// 内容，而这里背后常常是一整块 `WKWebView`（内容在别的进程里），采样代价直接变成
+        /// 拖动时的掉帧。不透明之后合成器连背后都不用看，拖起来才跟手。
+        /// 色相与 `capsuleFill` 相同，只把 alpha 补满 —— 松手换回材质时几乎看不出接缝。
+        public static let capsuleFillDragging = adaptive(
+            dark: NSColor(srgbRed: 28 / 255, green: 28 / 255, blue: 32 / 255, alpha: 1),
+            light: .srgbInk(1, alpha: 1)
         )
 
         /// 胶囊描边

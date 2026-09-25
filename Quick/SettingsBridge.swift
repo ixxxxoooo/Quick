@@ -92,6 +92,69 @@ final class SettingsBridge: SettingsDataSource {
         return describe(commandID: CommandID.launchApp(app.bundleID))
     }
 
+    func fuzzyMatchCommands(_ keyword: String) -> [SettingsCommandBinding] {
+        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        var results: [(binding: SettingsCommandBinding, score: Double)] = []
+
+        for plugin in core.plugins where plugin.isEnabled {
+            for command in type(of: plugin).commands {
+                let keywords = command.keywords.isEmpty ? [command.title] : command.keywords
+                let best = ([command.title] + keywords).compactMap { word -> Double? in
+                    let score = word.fuzzyScore(trimmed)
+                    return score > 0 ? score : nil
+                }.max() ?? 0
+
+                if best > 0 {
+                    results.append((binding: bindingRow(for: command), score: best))
+                }
+            }
+        }
+
+        for cmd in core.loadCustomCommands() where cmd.isEnabled {
+            let words = [cmd.name] + (cmd.alias.map { [$0] } ?? [])
+            let best = words.compactMap { word -> Double? in
+                let score = word.fuzzyScore(trimmed)
+                return score > 0 ? score : nil
+            }.max() ?? 0
+
+            if best > 0 {
+                let desc = CommandDescriptor(
+                    id: CommandID.shell(cmd.id.uuidString),
+                    pluginID: LauncherPlugin.id,
+                    pluginName: "终端命令",
+                    title: cmd.name,
+                    keywords: words,
+                    icon: "terminal"
+                )
+                results.append((binding: bindingRow(for: desc), score: best))
+            }
+        }
+
+        // 按应用名搜索
+        for app in core.appIndex.apps {
+            let score = app.name.fuzzyScore(trimmed)
+            if score > 0 {
+                let binding = SettingsCommandBinding(
+                    id: CommandID.launchApp(app.bundleID),
+                    title: app.name,
+                    pluginName: LauncherPlugin.name,
+                    icon: "app",
+                    isInvocationEnabled: true,
+                    keycaps: nil,
+                    keywords: [app.name]
+                )
+                results.append((binding: binding, score: score))
+            }
+        }
+
+        return results
+            .sorted { $0.score > $1.score }
+            .prefix(8)
+            .map(\.binding)
+    }
+
     func retargetShortcut(from commandID: String, keyword: String) -> String? {
         let current = describe(commandID: commandID)
         if keyword.trimmingCharacters(in: .whitespacesAndNewlines)

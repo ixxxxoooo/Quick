@@ -75,6 +75,7 @@ struct PluginsPane: View {
                                 selectedPluginID = plugin.id
                             }
                             .buttonStyle(.borderless)
+                            .help("查看 \(plugin.name) 的详细设置")
                         }
                     }
                 }

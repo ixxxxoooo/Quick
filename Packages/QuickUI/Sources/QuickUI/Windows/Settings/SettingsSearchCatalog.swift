@@ -38,8 +38,6 @@ enum SettingsSearchCatalog {
         .init(id: "plugins.system", tab: .systemActions, title: "系统控制", subtitle: "插件"),
         .init(id: "features.calculator", tab: .calculator, title: "Calculator / 计算器", subtitle: "插件"),
         .init(id: "features.filesearch", tab: .search, title: "File Search / 文件搜索", subtitle: "搜索来源"),
-        .init(id: "features.snippets", tab: .snippets, title: "Snippets / 代码片段", subtitle: "插件"),
-        .init(id: "features.notes", tab: .notes, title: "Notes / 便签备忘", subtitle: "插件"),
         .init(id: "features.calendar", tab: .calendar, title: "Calendar / 日历日程", subtitle: "插件"),
         .init(id: "features.ai", tab: .ai, title: "AI Assistant / AI 助手", subtitle: "插件"),
         .init(id: "features.translator", tab: .translator, title: "Translator / 划词翻译", subtitle: "插件"),
@@ -68,12 +66,6 @@ enum SettingsSearchCatalog {
             id: "features.textdiff", tab: .textDiff, title: "Text Diff / 文本对比",
             subtitle: "插件"),
         .init(
-            id: "features.markdownpreview", tab: .markdownPreview, title: "Markdown Preview / Markdown 预览",
-            subtitle: "插件"),
-        .init(
-            id: "features.colorcompare", tab: .colorCompare, title: "Color Compare / 颜色工具",
-            subtitle: "插件"),
-        .init(
             id: "features.sysmonitor", tab: .systemMonitor, title: "System Monitor / 系统监控",
             subtitle: "插件"),
         .init(
@@ -82,7 +74,6 @@ enum SettingsSearchCatalog {
         .init(
             id: "features.networktools", tab: .networkTools, title: "Network Tools / 网络诊断",
             subtitle: "插件"),
-        .init(id: "features.ocr", tab: .ocr, title: "OCR / 文字识别", subtitle: "插件"),
         .init(id: "features.screenshot", tab: .screenshot, title: "Screenshot / 截图工具", subtitle: "插件"),
         .init(
             id: "features.superpanel", tab: .superPanel, title: "Super Panel / 超级面板",

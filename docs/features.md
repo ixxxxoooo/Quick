@@ -100,7 +100,7 @@
 | `favorites`（迁移 `launcher.favorites`） | `item_id` + `sort_order`、`created_at` | 每次增删立即写入，顺序由 `sort_order` 决定 |
 | `SettingsStore` (UserDefaults) | 搜索范围、别名映射、自定义命令列表、Shell 回退开关 | 设置变更时立即写入 |
 
-### 剪贴板历史（clipboard）
+### 剪贴板（clipboard）
 
 监听系统剪贴板变化，记录文本历史，支持搜索与收藏。
 
@@ -531,89 +531,6 @@
 - 内容搜索只覆盖已被 Spotlight 索引的文本类型。
 - 超时 2 秒可能截断慢盘上的大结果集。
 
-### 文本片段（snippets）
-
-管理可复用文本模板；主搜索命中后复制到剪贴板（可展开 `{date}` 等占位符），插件面板提供列表与编辑。
-
-#### 不变量
-
-- **数据在 SQLite 表 `snippets`**（迁移 id `snippets.items`），由 `AppCore` 注入的
-  `PluginStorage` 执行；**数据库为真相**，内存缓存每次写后重载。
-- **增删改各一条 SQL**，禁止整表 JSON 重写；读失败时插件仍可启动（空列表 + `.error` 日志）。
-- **动态搜索**：`accepts` 要求查询至少 2 个字符，或命中触发词，或已有片段的 keyword/title
-  子串匹配。
-- **主搜索最多返回 10 条**；选中条目发 `CopyToClipboardEvent` 并关面板。
-- **`autoExpand` 与 `showSnippetHint` 在使用一刻读取**（`PluginDefaults.isEnabled`，
-  未写过时默认均为 true）。
-- **模板变量**：`{date}`、`{time}`、`{datetime}`、`{clipboard}`、`{random}`、`{timestamp}`；
-  读剪贴板仅在模板含 `{clipboard}` 时发生。
-- **日志不得写入片段正文**（只记条数）。
-- **`Model/Snippet.swift` 禁止 AppKit / SwiftUI**。
-
-#### 内部结构
-
-| 文件 | 职责 |
-| --- | --- |
-| `Model/Snippet.swift` | 片段模型与 60 字预览 |
-| `Service/SnippetStore.swift` | SQLite CRUD、搜索过滤 |
-| `Service/TemplateEngine.swift` | 占位符展开 |
-| `UI/SnippetsView.swift` | 双栏列表 + 编辑器 |
-| `SnippetsPlugin.swift` | 迁移声明、搜索、复制动作 |
-
-#### 持久化
-
-| 键 | 含义 | 默认 |
-| --- | --- | --- |
-| `snippets.autoExpand` | 插入前展开模板变量 | true（未写过） |
-| `snippets.showSnippetHint` | 结果行显示 `:keyword` | true（未写过） |
-| SQLite `snippets` 表 | id、title、content、keyword、category、时间戳 | — |
-
-#### 已知限制
-
-- `category` 字段已入库，当前 UI 未提供分类编辑。
-- 无「粘贴到前台应用」；用户需自行 ⌘V。
-
-### 文字识别（ocr）
-
-调用 Vision 对屏幕区域截图做 OCR；结果可在插件面板查看，并可选自动复制到剪贴板。
-
-#### 不变量
-
-- **截图前关面板且不归还焦点**（`HidePaletteEvent(restoreFocus: false)`），短暂延迟后调
-  `/usr/sbin/screencapture -i -s` 交互选区。
-- **识别使用 Vision `RecognizeTextRequest`**（`.accurate`、语言纠正开启）；**每次识别前**
-  重读语言设置。
-- **语言档位**：自动检测时不写死候选语言；指定语言时优先该语言，并追加固定兜底列表。
-- **非法语言存储值一律当作 `auto`**。
-- **空识别结果** HUD「未识别到文字」；**非空**时按 `ocr.autoCopy`（未写过默认 true）决定是否
-  `CopyToClipboardEvent`；关自动复制时 HUD 不得声称「已复制」。
-- **多行文本**按 Vision 观测顺序用换行拼接，不重排。
-- **`Model/` 禁止 AppKit / SwiftUI**；Vision 与 `screencapture` 只在 Service / Plugin 层。
-
-#### 内部结构
-
-| 文件 | 职责 |
-| --- | --- |
-| `Model/OCRQuery.swift` | 触发词与匹配规则 |
-| `Model/OCRPreferences.swift` | 语言档位 → Vision 参数 |
-| `Model/OCRText.swift` | 观测文本拼接 |
-| `Service/OCREngine.swift` | Vision 异步识别、状态 |
-| `UI/OCRResultView.swift` | 结果展示与手动复制 |
-| `OCRPlugin.swift` | 截图流程、`deliver`、命令 `ocr.capture` |
-
-#### 持久化
-
-| 键 | 含义 | 默认 |
-| --- | --- | --- |
-| `ocr.language` | `auto` / `zh-Hans` / `en` / `ja` | `auto` |
-| `ocr.autoCopy` | 识别完成后自动复制 | true（未写过） |
-
-#### 已知限制
-
-- 需要屏幕录制 / 截图相关系统权限；用户取消选区时无文字结果。
-- 临时 PNG 写在系统临时目录，读后删除。
-- 识别语言为「优先」策略，极端混合语种可能排序不理想。
-
 ### 日历（calendar）
 
 读取系统日历今日日程并在插件视图展示；主搜索可预览今日前几条事件；支持农历日期文案。
@@ -652,45 +569,6 @@
 - 设置页三项偏好尚未接入 `CalendarService` / `CalendarView`。
 - 功能命令默认 `perform` 仅打开插件面板。
 - 描述中的「节假日安排」暂无独立数据源，仅农历字符串。
-
-### 笔记（notes）
-
-轻量笔记与待办清单：SQLite 持久化，插件面板双标签（笔记 / 待办），主搜索可列出匹配笔记。
-
-#### 不变量
-
-- **两张表**：`notes`（迁移 `notes.items`）、`todos`（`notes.todos`）；排序规则固定——笔记
-  `created_at DESC, rowid DESC`，待办 `created_at ASC, rowid ASC`。
-- **数据库为真相**：逐条 SQL 写入，失败后重载对齐库内状态。
-- **动态搜索**：触发词用**整词匹配**（`matchesAnyTrigger`），避免 `memory` 误命中 `memo`；
-  剥离触发词后的关键词搜 title/content，空关键词列出笔记（最多 5 条）；选中结果 `action`
-  发布 `NavigateEvent`（可带 `noteID` 上下文）。
-- **笔记编辑需点「保存」**才 `updateNote`；`notes.autoSave` 尚未接线。
-- **日志不得写入笔记/待办正文**。
-- **`Model/NoteModel.swift` 禁止 AppKit / SwiftUI**。
-
-#### 内部结构
-
-| 文件 | 职责 |
-| --- | --- |
-| `Model/NoteModel.swift` | `NoteItem`、`TodoItem`、`NoteCategory` |
-| `Service/NoteStore.swift` | SQLite CRUD、搜索 |
-| `UI/NotesView.swift` | 分段控件、笔记双栏、待办列表 |
-| `NotesPlugin.swift` | 迁移、搜索、生命周期 |
-
-#### 持久化
-
-| 键 | 含义 | 默认 |
-| --- | --- | --- |
-| `notes.autoSave` | 设置页：自动保存 | true（**未接入编辑流程**） |
-| `notes.defaultFormat` | 设置页：默认格式 `plain` | plain（**未接入**） |
-| SQLite `notes` / `todos` | 业务数据 | — |
-
-#### 已知限制
-
-- 无桌面浮动便签窗口；`NoteCategory.sticky` 仅为数据枚举。
-- 设置页「自动保存 / 默认格式」为占位，行为以手动保存为准。
-- 描述中的「Markdown / 富文本」当前为纯文本 `TextEditor`。
 
 ### 网络工具（networktools）
 
@@ -904,6 +782,10 @@
   它们只出现在各自的命令里。这不只是排序问题 —— `KeywordResolver` 要求关键字**唯一**
   命中一条命令，门户入口的名字一旦也等于 `deepseek`，「⌥D + deepseek」就会因为
   「命中两条」而失败。
+- **Provider 快捷键是切换，不是「只开不关」。** `AIPlugin.perform` 对 `ai.<providerId>`
+  走 `AIWebViewWindowManager.toggle`：窗口已可见再按一次就 `hideWindow`（保留会话），
+  关着才 `openOrFocus`。搜索结果 / 门户卡片上的「打开」仍走 `openOrFocus` ——
+  点按钮只表示要到前台，不该把已开的窗口关掉。
 
 #### 内部结构
 
@@ -1008,25 +890,6 @@
 
 见上面不变量里标为「既有行为」的条目：它们是当前实现的取舍，改之前先确认是有意为之。
 
-### 颜色工具（color-compare）
-
-解析、转换并对比颜色。参考 Fasty color-compare。
-
-#### 不变量
-
-- **只认两种写法**：3/6 位 `#HEX`（`#` 必须存在）与 `rgb(r, g, b)`。没有 `rgba()`、`hsl()`，也不认不带 `#` 的 `fff`。
-- **扫描是两趟**：先扫完所有 `#HEX`，再扫所有 `rgb()`，所以条目顺序不等于文本顺序（`"rgb(0,0,0) #FF8800"` 会得到 `#FF8800` 在前）。这是既有行为，有测试锁定。
-- **RGB 分量夹到 0...255**：`rgb(300, 0, 0)` 是合法输入，不夹取会拼出 `#12C0000` 这种 7 位色值，色卡和亮度也都不对。
-- 亮度用 WCAG 公式，输入已按 sRGB 归一化。
-
-#### 内部结构
-
-`Model/ColorCompareLogic.swift` 是纯逻辑（Foundation only，可独立测），`UI/` 里是视图与 `AppStorage` 绑定的选项。
-
-#### 已知限制
-
-见上面不变量里标为「既有行为」的条目：它们是当前实现的取舍，改之前先确认是有意为之。
-
 ### Hash 计算器（hash-calculator）
 
 计算 MD5 / SHA-1 / SHA-256 / SHA-512。参考 Fasty hash-calculator。
@@ -1095,23 +958,6 @@
 - **布尔与数字都是 `NSNumber`**，靠 `CFGetTypeID` 与 `CFBooleanGetTypeID` 区分；
   数字经 `Double` 往返，`1.50` 会显示成 `1.5`（`JSONSerialization` 的既有行为）。
 - **树视图用整行高亮表示命中**，不做子串精确高亮 —— 键或值命中即整行加粗。
-
-### Markdown 预览（markdown-preview）
-
-实时 Markdown 编辑与预览。参考 Fasty markdown-preview。
-
-#### 不变量
-
-- **渲染交给 SwiftUI**：预览就是 `Text(LocalizedStringKey(input))`，这个插件**没有自己的 Markdown 解析器**，所以 GFM 的部分语法（表格、任务列表）取决于系统实现。
-- `Model/` 里唯一真实的逻辑是工具栏的字符数（`characterCountLabel`），空输入返回 nil（不显示）。不要为了「有东西可测」而在这里造一个解析器。
-
-#### 内部结构
-
-`Model/MarkdownPreviewLogic.swift` 是纯逻辑（Foundation only，可独立测），`UI/` 里是视图与 `AppStorage` 绑定的选项。
-
-#### 已知限制
-
-见上面不变量里标为「既有行为」的条目：它们是当前实现的取舍，改之前先确认是有意为之。
 
 ### SQL 格式化（sql-formatter）
 

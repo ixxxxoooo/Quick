@@ -78,7 +78,10 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
     }
 
     /// 从命令 id 反解 Provider id；不是 Provider 命令时返回 nil
-    nonisolated static func providerID(fromCommandID commandID: String) -> String? {
+    ///
+    /// `public`：宿主 `invoke` 要认「这是独立窗口命令」—— 不能按「面板正显示 ai」
+    /// 直接 hide，否则 ⌥D 在门户开着时只会关面板、到不了 `perform` 里的 toggle。
+    public nonisolated static func providerID(fromCommandID commandID: String) -> String? {
         let prefix = "\(id)."
         guard commandID.hasPrefix(prefix) else { return nil }
         let providerID = String(commandID.dropFirst(prefix.count))
@@ -175,16 +178,19 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
 
     /// 执行一条命令
     ///
-    /// Provider 命令直接开那个窗口 —— 快捷键绑的就是它；其余（「打开本插件」等）
-    /// 仍然导航进插件面板。
+    /// Provider 命令走窗口切换（开着再按就关，与主面板 / `plugin.open.*` 热键同语义）；
+    /// 其余（「打开本插件」等）仍然导航进插件面板。
     public func perform(commandID: String) {
         guard let providerID = Self.providerID(fromCommandID: commandID) else {
             EventBus.shared.post(NavigateEvent(pluginID: Self.id))
             return
         }
         // 停用的 Provider 在命令表里已经没有条目，这里只可能撞上「刚停用、命令表还没
-        // 重建」的一瞬。`openOrFocus` 自己会拒绝，别把「没打开」说成打开了。
-        if !windowManager.openOrFocus(providerId: providerID) {
+        // 重建」的一瞬。`toggle` 自己会拒绝。
+        // 开着再按必须关掉：只调 `openOrFocus` 时窗口会一直留在前台，快捷键形同失灵。
+        let wasOpen = windowManager.isWindowOpen(for: providerID)
+        let nowOpen = windowManager.toggle(providerId: providerID)
+        if !wasOpen, !nowOpen {
             log.notice("命令 \(commandID, privacy: .public) 没能打开窗口")
         }
     }

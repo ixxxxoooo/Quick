@@ -34,7 +34,6 @@ struct SettingsSidebarIconTests {
     func pluginSymbolsStaySimple() {
         #expect(!SettingsTab.calculator.systemImage.contains("badge"))
         #expect(SettingsTab.general.systemImage == "gearshape.fill")
-        #expect(SettingsTab.ocr.systemImage == "text.viewfinder")
         #expect(SettingsTab.killProcess.systemImage == "xmark.app.fill")
     }
 }

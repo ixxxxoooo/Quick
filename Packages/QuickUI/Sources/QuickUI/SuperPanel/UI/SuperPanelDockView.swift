@@ -82,6 +82,7 @@ struct SuperPanelDockView: View {
             )
         }
         .buttonStyle(.plain)
+        .help("打开 \(tool.title)")
         .onHover { hovering in
             if hovering {
                 hoveredID = tool.id
@@ -128,6 +129,7 @@ struct SuperPanelDockView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .help("打开「\(item.title)」")
                 .onHover { hovering in
                     hoveredID = hovering ? item.id : (hoveredID == item.id ? nil : hoveredID)
                 }
@@ -160,6 +162,7 @@ struct SuperPanelDockView: View {
                     .foregroundStyle(DesignTokens.Colors.progress)
                 }
                 .buttonStyle(.plain)
+                .help("复制剪贴板内容")
             }
 
             Button {

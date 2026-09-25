@@ -149,8 +149,11 @@ struct SettingsSidebarView: View {
     }
 
     /// 已注册插件里，能对上设置页的那些。顺序跟插件名单一致
+    ///
+    /// 应用启动器是宿主核心能力，已在宿主页面（搜索）中管理，不在插件分类重复出现
     private var pluginRows: [(plugin: SettingsPlugin, tab: SettingsTab)] {
         dataSource.pluginEntries.compactMap { plugin in
+            guard plugin.id != "launcher" else { return nil }
             guard let tab = SettingsTab.tab(forPluginID: plugin.id) else { return nil }
             return (plugin, tab)
         }

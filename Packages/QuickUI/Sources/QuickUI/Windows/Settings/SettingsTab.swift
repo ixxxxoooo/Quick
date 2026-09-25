@@ -52,8 +52,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     // MARK: - 功能插件
     case clipboard
     case calculator
-    case snippets
-    case notes
     case calendar
     case ai
     case translator
@@ -65,12 +63,9 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     case hashCalculator
     case timestampConverter
     case textDiff
-    case markdownPreview
-    case colorCompare
     case systemMonitor
     case killProcess
     case networkTools
-    case ocr
     case screenshot
     case superPanel
 
@@ -94,10 +89,8 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .systemActions: "系统控制"
         case .commands: "终端命令"
 
-        case .clipboard: "剪贴板历史"
+        case .clipboard: "剪贴板"
         case .calculator: "计算器"
-        case .snippets: "文本片段"
-        case .notes: "笔记"
         case .calendar: "日历"
         case .ai: "AI 聚合"
         case .translator: "翻译"
@@ -109,12 +102,9 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .hashCalculator: "Hash 计算器"
         case .timestampConverter: "时间戳转换"
         case .textDiff: "文本对比"
-        case .markdownPreview: "Markdown 预览"
-        case .colorCompare: "颜色工具"
         case .systemMonitor: "系统监控"
         case .killProcess: "结束进程"
         case .networkTools: "网络工具"
-        case .ocr: "文字识别"
         case .screenshot: "截图工具"
         case .superPanel: "超级面板"
 
@@ -139,8 +129,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 
         case .clipboard: "doc.on.clipboard.fill"
         case .calculator: "plus.forwardslash.minus"
-        case .snippets: "text.quote"
-        case .notes: "note.text"
         case .calendar: "calendar"
         case .ai: "sparkles"
         case .translator: "globe"
@@ -152,12 +140,9 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .hashCalculator: "number.square.fill"
         case .timestampConverter: "clock.fill"
         case .textDiff: "arrow.left.arrow.right"
-        case .markdownPreview: "text.alignleft"
-        case .colorCompare: "paintpalette.fill"
         case .systemMonitor: "gauge.with.dots.needle.67percent"
         case .killProcess: "xmark.app.fill"
         case .networkTools: "wifi"
-        case .ocr: "text.viewfinder"
         case .screenshot: "camera.fill"
         case .superPanel: "rectangle.3.group.fill"
 
@@ -182,8 +167,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
 
         case .clipboard: "mint"
         case .calculator: "orange"
-        case .snippets: "purple"
-        case .notes: "yellow"
         case .calendar: "red"
         case .ai: "purple"
         case .translator: "teal"
@@ -195,12 +178,9 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .hashCalculator: "brown"
         case .timestampConverter: "orange"
         case .textDiff: "pink"
-        case .markdownPreview: "blue"
-        case .colorCompare: "pink"
         case .systemMonitor: "green"
         case .killProcess: "red"
         case .networkTools: "cyan"
-        case .ocr: "teal"
         case .screenshot: "purple"
         case .superPanel: "indigo"
 
@@ -215,8 +195,6 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .systemActions: "systemcontrol"
         case .clipboard: "clipboard"
         case .calculator: "calculator"
-        case .snippets: "snippets"
-        case .notes: "notes"
         case .calendar: "calendar"
         case .ai: "ai"
         case .translator: "translator"
@@ -228,12 +206,9 @@ public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
         case .hashCalculator: "hash-calculator"
         case .timestampConverter: "timestamp-converter"
         case .textDiff: "text-diff"
-        case .markdownPreview: "markdown-preview"
-        case .colorCompare: "color-compare"
         case .systemMonitor: "sysmonitor"
         case .killProcess: "killprocess"
         case .networkTools: "networktools"
-        case .ocr: "ocr"
         case .screenshot: "screenshot"
         // 超级面板是宿主级页面，不是插件：它不参与 `pluginEntries` 的映射
         default: nil

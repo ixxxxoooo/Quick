@@ -261,6 +261,8 @@ public protocol CommandSettingsDataSource: AnyObject {
     func boundCommandBindings() -> [SettingsCommandBinding]
     /// 把用户输入的关键字解析成唯一一条命令。对不上、或同时对上多条时返回 nil
     func resolveKeyword(_ keyword: String) -> SettingsCommandBinding?
+    /// 按关键字模糊搜索候选命令，用于输入时下拉提示
+    func fuzzyMatchCommands(_ keyword: String) -> [SettingsCommandBinding]
     /// 把已有快捷键改绑到另一个关键字。成功返回 nil，失败返回给用户看的原因
     func retargetShortcut(from commandID: String, keyword: String) -> String?
     /// 某个插件声明的命令，给插件页介绍用

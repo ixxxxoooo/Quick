@@ -4,15 +4,16 @@
 
 import AppKit
 import Carbon.HIToolbox
+import Foundation
+import QuickCore
 import Testing
 
 @testable import PluginAI
 
-/// AI 窗口的窗口配置
+/// AI 聚合窗口配置测试
 ///
-/// 「能不能在 ⌘Tab / Mission Control 里被找回来」全部由这几个参数决定 —— 它们平时藏在
-/// 建窗口那条会连网加载页面的路上，所以单独抽了 `makePanel` 出来钉住。
-@Suite("AI 窗口配置")
+/// 验证聚合窗口的基本配置与交互行为
+@Suite("AI 聚合窗口配置")
 @MainActor
 struct AIWebViewWindowTests {
 
@@ -58,7 +59,6 @@ struct AIWebViewWindowTests {
     }
 
     /// 主菜单刻意不放 ⌘W（留给主面板），所以这个普通窗口得自己接住它。
-    /// ⌘W 走 `performClose` → `close()` → 隐藏，与点红绿灯一致。
     @Test("⌘W 被接住并触发关闭回调")
     func commandWCloses() throws {
         let panel = try makePanel()
@@ -77,6 +77,30 @@ struct AIWebViewWindowTests {
         #expect(closed == 1)
     }
 
+    /// 快捷键再按一次必须关掉：只 openOrFocus 的话窗口会一直留着，用户以为热键坏了。
+    @Test("toggle 在窗口可见时隐藏，不可见时打开")
+    func toggleHidesVisibleWindow() {
+        let key = PluginSettingKey.AIPortal.providerEnabled("deepseek")
+        let previous = UserDefaults.standard.object(forKey: key)
+        defer {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+        UserDefaults.standard.removeObject(forKey: key)
+
+        let manager = AIWebViewWindowManager()
+        #expect(manager.toggle(providerId: "deepseek"), "第一次应打开")
+
+        #expect(manager.toggle(providerId: "deepseek") == false, "第二次应隐藏")
+
+        #expect(manager.toggle(providerId: "deepseek"), "第三次再打开")
+
+        manager.closeAll()
+    }
+
     /// 其余按键必须放行，否则窗口会吃掉所有键盘输入
     @Test("普通按键不被窗口消费")
     func otherKeysFallThrough() throws {
@@ -91,7 +115,7 @@ struct AIWebViewWindowTests {
         #expect(panel.performKeyEquivalent(with: commandR) == false)
     }
 
-    /// 合成一个按下事件（返回 nil 时由调用方记一条失败，而不是崩掉）
+    /// 合成一个按下事件
     private static func keyDown(
         keyCode: Int,
         modifiers: NSEvent.ModifierFlags,

@@ -86,6 +86,10 @@ public final class FloatingCapsuleView: NSView {
     private var buttons: [String: CapsuleButtonView] = [:]
     private var toggleButton: CapsuleButtonView!
 
+    /// 已生成的圆角遮罩，按尺寸缓存（尺寸只有「收起 / 展开」两种）
+    private var cachedMask: NSImage?
+    private var cachedMaskSize: NSSize = .zero
+
     /// 位置存储键前缀
     private static let positionKeyPrefix = "quick.capsule.pos."
 
@@ -119,8 +123,17 @@ public final class FloatingCapsuleView: NSView {
         addSubview(backdrop)
 
         tintLayer.wantsLayer = true
-        tintLayer.layer?.backgroundColor = NSColor(DesignTokens.Colors.capsuleFill).cgColor
+        tintLayer.layer?.backgroundColor = Self.fillColor(isDragging: false).cgColor
         addSubview(tintLayer)
+    }
+
+    /// 底色：拖动中换成不透明版本
+    ///
+    /// 不透明的那一份不只是颜色 —— 它让合成器在拖动时可以完全不看胶囊背后的内容。
+    private static func fillColor(isDragging: Bool) -> NSColor {
+        isDragging
+            ? NSColor(DesignTokens.Colors.capsuleFillDragging)
+            : NSColor(DesignTokens.Colors.capsuleFill)
     }
 
     private func setupContent() {
@@ -191,7 +204,14 @@ public final class FloatingCapsuleView: NSView {
         layer?.cornerRadius = radius
         backdrop.frame = bounds
         backdrop.layer?.cornerRadius = radius
-        backdrop.maskImage = Self.capsuleMask(size: bounds.size)
+        // 遮罩按尺寸缓存：`layout()` 在拖动期间每个显示周期都会跑一次，而原先每次都
+        // 新建一张 NSImage、`lockFocus` 画一遍再写回 `maskImage` —— 等于每帧重建一次
+        // 图层遮罩，合成器只能跟着重算，拖起来就是一顿一顿的。尺寸只随展开状态变。
+        if cachedMask == nil || cachedMaskSize != bounds.size {
+            cachedMask = Self.capsuleMask(size: bounds.size)
+            cachedMaskSize = bounds.size
+            backdrop.maskImage = cachedMask
+        }
         tintLayer.frame = bounds
         tintLayer.layer?.cornerRadius = radius
 
@@ -256,7 +276,7 @@ public final class FloatingCapsuleView: NSView {
 
     private func applyCollapsedState(animated: Bool) {
         actionsStack.isHidden = isCollapsed
-        toggleButton.updateGlyph(symbol: isCollapsed ? "chevron.left" : "chevron.right")
+        toggleButton.updateGlyph(symbol: isCollapsed ? "chevron.right" : "chevron.left")
         toggleButton.toolTip = isCollapsed ? "展开工具栏" : "收起工具栏"
 
         let target = naturalSize
@@ -285,6 +305,9 @@ public final class FloatingCapsuleView: NSView {
         dragOrigin = convert(event.locationInWindow, from: nil)
         frameOrigin = frame.origin
         isDragging = false
+        // 上一次的拖动若没收到 mouseUp（比如中途弹出面板），外观会停在拖动态 ——
+        // 新的一次按下就是重置点
+        applyDraggingAppearance(false)
     }
 
     public override func mouseDragged(with event: NSEvent) {
@@ -299,20 +322,42 @@ public final class FloatingCapsuleView: NSView {
         if !isDragging, abs(dx) > threshold || abs(dy) > threshold {
             isDragging = true
             alphaValue = 0.92
+            applyDraggingAppearance(true)
         }
         guard isDragging, let superview else { return }
 
-        move(
-            to: NSPoint(x: frameOrigin.x + dx, y: frameOrigin.y + dy),
+        // 拖动期间只改图层位置，跳过完整的 layout() 周期：
+        // setFrameOrigin 不触发 needsLayout，而 frame.origin = 会。
+        // 结合 CATransaction 关掉隐式动画，一帧里只做一次图层位移。
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let target = clampedOrigin(
+            NSPoint(x: frameOrigin.x + dx, y: frameOrigin.y + dy),
             in: superview.bounds.size
         )
+        setFrameOrigin(target)
+        CATransaction.commit()
     }
 
     public override func mouseUp(with _: NSEvent) {
         guard isDragging else { return }
         alphaValue = 1
+        applyDraggingAppearance(false)
         persistPosition()
         isDragging = false
+    }
+
+    /// 拖动期间把实时材质换成静态底色
+    ///
+    /// `NSVisualEffectView` 的 `.withinWindow` 材质每移动一帧都要重新采样窗口里它背后的
+    /// 内容；这块背后经常是一整块 `WKWebView`（内容由别的进程画），采样跟不上指针就是
+    /// 拖动时的掉帧。系统自己的实时缩放也是这么处理的 —— 缩放期间材质不实时。
+    /// 这一段只有零点几秒，换成同色相的不透明版本，松手立刻换回来。
+    ///
+    /// 不加 `private`：测试要能直接切到拖动态再断言外观真的换了（同 `move(to:in:)`）。
+    func applyDraggingAppearance(_ dragging: Bool) {
+        backdrop.isHidden = dragging
+        tintLayer.layer?.backgroundColor = Self.fillColor(isDragging: dragging).cgColor
     }
 
     /// 把胶囊移到父视图坐标系里的某个原点，落点夹在父视图内
@@ -320,7 +365,7 @@ public final class FloatingCapsuleView: NSView {
     /// 抽出来是为了能被测试直接驱动：拖拽的真实入口是 `NSEvent`，
     /// 而这段夹取逻辑才是会写坏位置的部分。
     func move(to origin: NSPoint, in container: NSSize) {
-        frame.origin = clampedOrigin(origin, in: container)
+        setFrameOrigin(clampedOrigin(origin, in: container))
     }
 
     /// 把当前位置写进 `UserDefaults`
@@ -354,7 +399,7 @@ public final class FloatingCapsuleView: NSView {
 
     public override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        tintLayer.layer?.backgroundColor = NSColor(DesignTokens.Colors.capsuleFill).cgColor
+        applyDraggingAppearance(isDragging)
         layer?.borderColor = NSColor(DesignTokens.Colors.capsuleStroke).cgColor
         contentStack.subviews.forEach { $0.needsDisplay = true }
     }

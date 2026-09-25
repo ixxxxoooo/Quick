@@ -54,10 +54,11 @@ struct ShortcutsPane: View {
                         Label("添加", systemImage: "plus")
                     }
                     .buttonStyle(.borderless)
+                    .help("添加一条新的快捷键绑定")
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                    Text("快捷键 + 关键字。关键字就是功能本身，例如「剪贴板」「锁定屏幕」。一个插件可以有多条关键字，分别唤醒不同功能。")
+                    Text("快捷键 + 关键字。输入关键字时支持模糊搜索，从候选列表中选择功能。")
                     if let conflictNote {
                         Text(conflictNote)
                             .foregroundStyle(.orange)
@@ -92,6 +93,7 @@ struct ShortcutsPane: View {
                     reload()
                 }
             )
+            .help("录制唤出面板的全局快捷键")
         }
     }
 
@@ -127,7 +129,12 @@ struct ShortcutsPane: View {
                     reload()
                 }
             )
-            KeywordField(text: row.wakeKeyword, placeholder: "输入关键字") { keyword in
+            .help("录制快捷键")
+            FuzzyKeywordField(
+                text: row.wakeKeyword,
+                placeholder: "输入关键字搜索命令",
+                dataSource: dataSource
+            ) { keyword in
                 conflictNote = dataSource.retargetShortcut(from: row.id, keyword: keyword)
                 reload()
             }
@@ -161,7 +168,12 @@ struct ShortcutsPane: View {
                     }
                 }
             )
-            KeywordField(text: draft.keyword, placeholder: "输入关键字") { keyword in
+            .help("录制快捷键")
+            FuzzyKeywordField(
+                text: draft.keyword,
+                placeholder: "输入关键字搜索命令",
+                dataSource: dataSource
+            ) { keyword in
                 updateDraft(draft.id) { item in
                     item.keyword = keyword
                 }
@@ -235,26 +247,25 @@ private struct DraftBinding: Identifiable {
     var keyword = ""
 }
 
-/// 右侧的关键字输入框。关键字就是要唤醒的功能
+/// 支持模糊搜索下拉候选的关键字输入框
 ///
-/// **这里用 `NSTextField` 而不是 SwiftUI 的 `TextField`。** 在 `Form` 里，`TextField` 的
-/// 第一个参数会被当成**标签**真的画出来（一段 static text 贴左边），可编辑区只剩右边一截：
-/// 表现就是「左边点不动、光标总在后面」，而且那段标签不随输入消失；`prompt:` 也治不好
-/// 内容被排到尾部的问题（`.multilineTextAlignment(.leading)` 对单行 macOS 字段无效）。
-/// 这个输入框要的是「内容居左、占位符在框内、点任意处都能聚焦、光标落最前」，直接下沉到
-/// AppKit 最省事。
-private struct KeywordField: View {
+/// 输入时实时模糊匹配可用命令，显示下拉列表供选择
+struct FuzzyKeywordField: View {
 
     let text: String
     let placeholder: String
+    let dataSource: any CommandSettingsDataSource
     let onSubmit: (String) -> Void
 
     @State private var draft: String
     @State private var isEditing = false
+    @State private var suggestions: [SettingsCommandBinding] = []
+    @State private var showSuggestions = false
 
-    init(text: String, placeholder: String, onSubmit: @escaping (String) -> Void) {
+    init(text: String, placeholder: String, dataSource: any CommandSettingsDataSource, onSubmit: @escaping (String) -> Void) {
         self.text = text
         self.placeholder = placeholder
+        self.dataSource = dataSource
         self.onSubmit = onSubmit
         _draft = State(initialValue: text)
     }
@@ -262,14 +273,15 @@ private struct KeywordField: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
 
-        KeywordTextField(text: $draft, isEditing: $isEditing, placeholder: placeholder, onSubmit: onSubmit)
+        VStack(alignment: .leading, spacing: 0) {
+            KeywordTextField(text: $draft, isEditing: $isEditing, placeholder: placeholder, onSubmit: { value in
+                showSuggestions = false
+                onSubmit(value)
+            })
             .frame(height: 24)
             .padding(.horizontal, DesignTokens.Spacing.sm)
             .frame(maxWidth: .infinity, alignment: .leading)
-            // 与左边的快捷键录制框同一套外观：`cardFill` 底 + `cardStroke` 边。
             .background(shape.fill(DesignTokens.Colors.cardFill))
-            // 聚焦反馈：边框变强调色。系统聚焦圈被关掉了，不给这个的话点上去和没点
-            // 几乎看不出区别（见 ShortcutRecorder 的录制态同款处理）。
             .overlay(
                 shape.strokeBorder(
                     isEditing ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: 1)
@@ -279,13 +291,79 @@ private struct KeywordField: View {
             .onChange(of: text) { _, newValue in
                 if !isEditing { draft = newValue }
             }
+            .onChange(of: draft) { _, newValue in
+                if isEditing {
+                    suggestions = dataSource.fuzzyMatchCommands(newValue)
+                    showSuggestions = !suggestions.isEmpty && !newValue.isEmpty
+                }
+            }
+            .onChange(of: isEditing) { _, editing in
+                if editing {
+                    suggestions = dataSource.fuzzyMatchCommands(draft)
+                    showSuggestions = !suggestions.isEmpty && !draft.isEmpty
+                } else {
+                    showSuggestions = false
+                }
+            }
+
+            if showSuggestions {
+                suggestionsList
+            }
+        }
+    }
+
+    private var suggestionsList: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(suggestions) { suggestion in
+                Button {
+                    draft = suggestion.wakeKeyword
+                    showSuggestions = false
+                    onSubmit(suggestion.wakeKeyword)
+                } label: {
+                    HStack(spacing: DesignTokens.Spacing.sm) {
+                        Image(systemName: suggestion.icon)
+                            .font(DesignTokens.Typography.inlineIcon)
+                            .foregroundStyle(DesignTokens.Colors.textTertiary)
+                            .frame(width: 18)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(suggestion.title)
+                                .font(DesignTokens.Typography.rowTitle)
+                                .foregroundStyle(DesignTokens.Colors.textPrimary)
+                                .lineLimit(1)
+                            if let subtitle = suggestion.subtitle {
+                                Text(subtitle)
+                                    .font(DesignTokens.Typography.compactKeyCap)
+                                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer()
+                        Text(suggestion.pluginName)
+                            .font(DesignTokens.Typography.compactKeyCap)
+                            .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    }
+                    .padding(.horizontal, DesignTokens.Spacing.md)
+                    .padding(.vertical, DesignTokens.Spacing.xs)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("选择「\(suggestion.title)」")
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                .fill(DesignTokens.Colors.cardFill)
+                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: 0.5)
+        )
+        .padding(.top, DesignTokens.Spacing.xxs)
     }
 }
 
 /// 点哪都把插入点放回开头
-///
-/// `controlTextDidBeginEditing` 只赶上 Tab / 编程聚焦；鼠标点击是在它之后才按点击位置
-/// 落插入点的，所以得在 `mouseDown` 之后再纠正一次。
 private final class CaretHomeTextField: NSTextField {
 
     override func mouseDown(with event: NSEvent) {
@@ -295,7 +373,7 @@ private final class CaretHomeTextField: NSTextField {
     }
 }
 
-/// AppKit 背书的单行输入：内容居左、占位符在字段内、聚焦时光标归位到最前
+/// AppKit 背书的单行输入
 private struct KeywordTextField: NSViewRepresentable {
 
     @Binding var text: String
@@ -348,7 +426,6 @@ private struct KeywordTextField: NSViewRepresentable {
             onSubmit = parent.onSubmit
         }
 
-        /// 聚焦即把光标放到最前：无论点哪儿都从开头输入，而不是落在点击处
         func controlTextDidBeginEditing(_ obj: Notification) {
             guard let field = obj.object as? NSTextField else { return }
             isEditing.wrappedValue = true
@@ -362,7 +439,6 @@ private struct KeywordTextField: NSViewRepresentable {
             text.wrappedValue = field.stringValue
         }
 
-        /// 失焦时提交（切到别的行也不丢输入）
         func controlTextDidEndEditing(_ obj: Notification) {
             guard let field = obj.object as? NSTextField else { return }
             text.wrappedValue = field.stringValue
@@ -370,7 +446,6 @@ private struct KeywordTextField: NSViewRepresentable {
             onSubmit(field.stringValue)
         }
 
-        /// 回车：结束编辑，提交交给 `controlTextDidEndEditing`
         func control(
             _ control: NSControl,
             textView: NSTextView,

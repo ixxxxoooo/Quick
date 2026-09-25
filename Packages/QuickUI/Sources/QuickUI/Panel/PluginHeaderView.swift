@@ -79,6 +79,7 @@ struct PluginHeaderView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("返回搜索")
+        .help("返回主搜索 (Esc)")
     }
 
     /// 插件图标 + 名称

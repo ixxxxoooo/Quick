@@ -65,10 +65,12 @@ struct PermissionsPane: View {
         default:
             HStack(spacing: DesignTokens.Spacing.sm) {
                 Button("重新检测") { refresh() }
+                    .help("重新检查权限状态")
                 if let target = dragTarget(for: permission) {
                     Button("拖拽授权") {
                         PermissionDragController.shared.present(target)
                     }
+                    .help("通过拖拽方式授予权限")
                 } else if state?.canRequest == true {
                     Button("申请") {
                         dataSource.requestPermission(permission)
@@ -77,10 +79,12 @@ struct PermissionsPane: View {
                             refresh()
                         }
                     }
+                    .help("向系统申请该权限")
                 } else {
                     Button("打开系统设置") {
                         dataSource.openPermissionSettings(permission)
                     }
+                    .help("前往系统设置手动授权")
                 }
             }
         }

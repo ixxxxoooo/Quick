@@ -7,18 +7,13 @@ import PluginBase64Codec
 import PluginCalculator
 import PluginCalendar
 import PluginClipboard
-import PluginColorCompare
 import PluginHashCalculator
 import PluginJSONFormatter
 import PluginKillProcess
 import PluginLauncher
-import PluginMarkdownPreview
 import PluginNetworkTools
-import PluginNotes
-import PluginOCR
 import PluginSQLFormatter
 import PluginScreenshot
-import PluginSnippets
 import PluginSystemControl
 import PluginSystemMonitor
 import PluginTextDiff
@@ -568,8 +563,6 @@ final class AppCore {
             (SystemControlPlugin.self, { SystemControlPlugin(settingsStore: self.settingsStore) }),
 
             // Phase 3: 效率与工具插件
-            (SnippetsPlugin.self, { SnippetsPlugin(storage: self.storage(for: SnippetsPlugin.id)) }),
-            (OCRPlugin.self, { OCRPlugin() }),
             (TranslatorPlugin.self, { TranslatorPlugin(storage: self.storage(for: TranslatorPlugin.id)) }),
 
             // Phase 3.5: 开发者工具插件（原先是一个 devtools 容器，现在每个工具都是独立插件）
@@ -581,12 +574,9 @@ final class AppCore {
             (HashCalculatorPlugin.self, { HashCalculatorPlugin() }),
             (TimestampConverterPlugin.self, { TimestampConverterPlugin() }),
             (TextDiffPlugin.self, { TextDiffPlugin() }),
-            (MarkdownPreviewPlugin.self, { MarkdownPreviewPlugin() }),
-            (ColorComparePlugin.self, { ColorComparePlugin() }),
 
             // Phase 4: 扩展插件
             (CalendarPlugin.self, { CalendarPlugin() }),
-            (NotesPlugin.self, { NotesPlugin(storage: self.storage(for: NotesPlugin.id)) }),
             (AIPlugin.self, { AIPlugin() }),
             (SystemMonitorPlugin.self, { SystemMonitorPlugin() }),
             (KillProcessPlugin.self, { KillProcessPlugin() }),
@@ -940,9 +930,15 @@ final class AppCore {
             return
         }
         // 功能命令也做切换：面板正在显示该插件时再按同一个插件的快捷键就关掉。
-        // plugin.open.* 已在上面处理，这里兜住 clipboard.clear 这类功能命令热键。
+        // plugin.open.* 已在上面处理，这里兜住 clipboard.clear 这类「只会 Navigate 回本插件」的热键。
+        // AI Provider（ai.<id>）除外：它们开的是独立窗口，切换语义在 perform 的 toggle 里；
+        // 若在这里按「面板正显示 ai」直接 hide，⌥D 在门户开着时只会关面板、打不开 DeepSeek。
         let ownerPluginID = type(of: plugin).id
-        if paletteCoordinator.isVisible, paletteCoordinator.activePluginID == ownerPluginID {
+        let isAIProviderCommand = AIPlugin.providerID(fromCommandID: commandID) != nil
+        if paletteCoordinator.isVisible,
+            paletteCoordinator.activePluginID == ownerPluginID,
+            !isAIProviderCommand
+        {
             paletteCoordinator.hide()
             let ms = invokeStart.duration(to: .now).invokeMS
             log.notice("invoke 完成（功能命令切换关闭 \(ownerPluginID, privacy: .public)）：\(ms, format: .fixed(precision: 1)) ms")
