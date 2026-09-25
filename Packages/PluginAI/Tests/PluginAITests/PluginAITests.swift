@@ -94,6 +94,7 @@ struct AIProviderRegistryTests {
 
         let tongyi = AIProviderRegistry.provider(for: "tongyi")
         #expect(tongyi?.name == "通义千问")
+        #expect(tongyi?.url == "https://chat.qwen.ai/")
         #expect(tongyi?.aliases == ["通义", "千问", "tongyi", "qwen", "阿里"])
     }
 

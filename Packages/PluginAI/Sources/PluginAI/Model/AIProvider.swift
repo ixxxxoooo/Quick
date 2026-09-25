@@ -106,7 +106,7 @@ enum AIProviderRegistry {
         AIProvider(
             id: "tongyi",
             name: "通义千问",
-            url: "https://tongyi.aliyun.com",
+            url: "https://chat.qwen.ai/",
             icon: "cloud",
             accent: "#FF6A00",
             aliases: ["通义", "千问", "tongyi", "qwen", "阿里"],
