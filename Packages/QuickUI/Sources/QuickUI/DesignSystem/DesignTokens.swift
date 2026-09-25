@@ -274,6 +274,10 @@ public enum DesignTokens {
 
         /// AI 聚合窗口的标签栏高度
         public static let aiTabBarHeight: CGFloat = 36
+        /// 标签栏在标题栏中的左侧起始偏移（避让红绿灯区域）
+        public static let aiTitleBarTabLeading: CGFloat = 78
+        /// 标题栏内标签项高度（适配标准标题栏约 28pt）
+        public static let aiTitleBarTabHeight: CGFloat = 26
         /// AI 标签项水平内边距
         public static let aiTabItemPaddingH: CGFloat = 12
         /// AI 标签项图标尺寸

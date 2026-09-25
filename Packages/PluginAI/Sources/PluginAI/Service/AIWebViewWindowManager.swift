@@ -342,7 +342,7 @@ final class AIWebViewWindowManager {
         return true
     }
 
-    /// 确保聚合窗口已创建（标签栏嵌入标题栏）
+    /// 确保聚合窗口已创建（标签栏直接嵌入标题栏，与红绿灯同行）
     private func ensureMergedWindow() {
         guard mergedPanel == nil else { return }
 
@@ -369,29 +369,30 @@ final class AIWebViewWindowManager {
 
         restoreMergedFrame(newPanel)
 
-        // 标签栏嵌入标题栏
+        // 标签栏直接嵌入标题栏（与红绿灯同行）
         let tabBar = AITitleTabBarView(onSelect: { [weak self] id in
             self?.switchToTab(id)
         }, onClose: { [weak self] id in
             self?.destroyWindow(for: id)
         })
-
-        // 将标签栏作为 titlebar accessory
-        let accessory = NSTitlebarAccessoryViewController()
-        accessory.layoutAttribute = .bottom
-        let tabBarHost = NSView(frame: NSRect(x: 0, y: 0, width: 0, height: DesignTokens.Size.aiTabBarHeight))
         tabBar.translatesAutoresizingMaskIntoConstraints = false
-        tabBarHost.addSubview(tabBar)
-        NSLayoutConstraint.activate([
-            tabBar.leadingAnchor.constraint(equalTo: tabBarHost.leadingAnchor),
-            tabBar.trailingAnchor.constraint(equalTo: tabBarHost.trailingAnchor),
-            tabBar.topAnchor.constraint(equalTo: tabBarHost.topAnchor),
-            tabBar.bottomAnchor.constraint(equalTo: tabBarHost.bottomAnchor),
-        ])
-        accessory.view = tabBarHost
-        newPanel.addTitlebarAccessoryViewController(accessory)
 
-        // 内容区域
+        // 找到标题栏容器：红绿灯的父视图就是标题栏
+        // themeFrame → titlebar container
+        if let titlebarContainer = newPanel.standardWindowButton(.closeButton)?.superview?.superview {
+            titlebarContainer.addSubview(tabBar)
+            // 红绿灯区域约 70pt，标签栏从其右侧开始，填满标题栏剩余宽度
+            NSLayoutConstraint.activate([
+                tabBar.leadingAnchor.constraint(
+                    equalTo: titlebarContainer.leadingAnchor,
+                    constant: DesignTokens.Size.aiTitleBarTabLeading),
+                tabBar.trailingAnchor.constraint(equalTo: titlebarContainer.trailingAnchor),
+                tabBar.topAnchor.constraint(equalTo: titlebarContainer.topAnchor),
+                tabBar.bottomAnchor.constraint(equalTo: titlebarContainer.bottomAnchor),
+            ])
+        }
+
+        // 内容区域（fullSizeContentView 模式下内容延伸到标题栏后面）
         let hostView = NSView(frame: newPanel.contentView?.bounds ?? .zero)
         hostView.autoresizingMask = [.width, .height]
 
@@ -658,15 +659,7 @@ final class AITitleTabBarView: NSView {
     @available(*, unavailable) required init?(coder _: NSCoder) { fatalError() }
 
     private func setupViews() {
-        wantsLayer = true
-
-        // 底部分隔线
-        let separator = NSView()
-        separator.wantsLayer = true
-        separator.layer?.backgroundColor = NSColor(DesignTokens.Colors.aiTabSeparator).cgColor
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(separator)
-
+        // 标题栏内：不画自己的背景，不画分隔线
         stackView.orientation = .horizontal
         stackView.alignment = .centerY
         stackView.spacing = DesignTokens.Size.aiTabItemSpacing
@@ -680,7 +673,7 @@ final class AITitleTabBarView: NSView {
         addSubview(scrollView)
 
         NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: DesignTokens.Spacing.sm),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: DesignTokens.Spacing.xs),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -DesignTokens.Spacing.sm),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -689,11 +682,6 @@ final class AITitleTabBarView: NSView {
             stackView.bottomAnchor.constraint(equalTo: scrollView.contentView.bottomAnchor),
             stackView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
             stackView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
-
-            separator.leadingAnchor.constraint(equalTo: leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: trailingAnchor),
-            separator.bottomAnchor.constraint(equalTo: bottomAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 1),
         ])
     }
 
@@ -759,7 +747,7 @@ private final class AITabItemView: NSView {
         iconView.translatesAutoresizingMaskIntoConstraints = false
 
         titleLabel.stringValue = title
-        titleLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        titleLabel.font = .systemFont(ofSize: 11, weight: .medium)
         titleLabel.textColor = NSColor(DesignTokens.Colors.aiTabText)
         titleLabel.isEditable = false
         titleLabel.isBordered = false
@@ -798,9 +786,9 @@ private final class AITabItemView: NSView {
             closeButton.widthAnchor.constraint(equalToConstant: closeSize),
             closeButton.heightAnchor.constraint(equalToConstant: closeSize),
 
-            widthAnchor.constraint(greaterThanOrEqualToConstant: 100),
-            widthAnchor.constraint(lessThanOrEqualToConstant: 180),
-            heightAnchor.constraint(equalToConstant: DesignTokens.Size.aiTabBarHeight - 4),
+            widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
+            widthAnchor.constraint(lessThanOrEqualToConstant: 160),
+            heightAnchor.constraint(equalToConstant: DesignTokens.Size.aiTitleBarTabHeight),
         ])
         translatesAutoresizingMaskIntoConstraints = false
     }
