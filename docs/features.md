@@ -593,7 +593,7 @@
 | `Model/ResolvConf.swift` | resolv.conf 文本 → DNS 列表 |
 | `Service/NetworkService.swift` | IP/DNS 采集、加载状态 |
 | `UI/NetworkToolsView.swift` | 刷新按钮、信息行、复制 |
-| `NetworkToolsPlugin.swift` | 搜索导航、功能命令声明 |
+| `NetworkToolsPlugin.swift` | 触发词与单面板导航 |
 
 #### 持久化
 
@@ -605,8 +605,8 @@
 
 #### 已知限制
 
-- **网络测速**、**Ping**、**DNS 切换** 仅在 `functionCommands` 与触发词文案中出现，**无**
-  `perform` 实现与 UI。
+- **网络测速**、**Ping**、**DNS 切换** 仅在触发词与设置页文案中出现，**无**
+  独立动作与 UI。
 - 公网 IP 依赖第三方 HTTPS 服务，离线或被封时显示「无法获取」。
 - 本机 IP 只反映以太网/Wi‑Fi 常见接口，VPN / 桥接 / 其它接口可能看不到。
 

@@ -117,22 +117,12 @@ struct Base64CodecPluginTests {
         #expect(!Base64CodecPlugin.triggerWords.isEmpty)
     }
 
-    /// 入口由静态命令提供，不再由搜索现算 —— 这条测试因此问的是 `commands`。
-    /// 以前它问的是 `searchItems`，而那个遗留 API 已经删掉了（见 docs/refactor-plan.md Phase 0）。
-    ///
-    /// 注意 id 有两套前缀：默认的「打开本插件」用 `plugin.open.<id>`，
-    /// 功能命令用 `<id>.<功能>`。这不是笔误，是既有约定，见 docs/architecture.md。
-    @Test("声明的命令覆盖编解码两个功能，且 id 带插件前缀")
+    @Test("单一视图插件只声明一条打开入口命令，避免同一视图重复出现多条命令")
     func commandsCoverBothDirections() {
         let commands = Base64CodecPlugin.commands
-        let ids = commands.map(\.id)
-
-        #expect(ids.contains("base64-codec.encode"))
-        #expect(ids.contains("base64-codec.decode"))
-        #expect(ids.contains("plugin.open.base64-codec"))
-        // 功能命令必须带插件前缀：宿主按 "<pluginID>." 前缀回退找执行者
-        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
-        #expect(functionIDs.allSatisfy { $0.hasPrefix("base64-codec.") })
+        #expect(commands.map(\.id) == ["plugin.open.base64-codec"])
+        #expect(commands.first?.keywords.contains("b64") == true)
+        #expect(commands.first?.keywords.contains("unbase64") == true)
         #expect(commands.allSatisfy { $0.pluginID == Base64CodecPlugin.id })
     }
 

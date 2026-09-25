@@ -48,4 +48,27 @@ struct PluginCommandsTests {
         }
         #expect(PlainPlugin.commands.map(\.id) == [CommandID.openPlugin("plain")])
     }
+
+    @Test("打开本插件入口不再重复携带已被子命令认领的触发词")
+    func openPluginExcludesFunctionCommandKeywords() {
+        final class MultiActionPlugin: QuickPlugin {
+            static let id = "multi"
+            static let name = "多动作插件"
+            static let icon = "bolt"
+            var isEnabled = true
+            static let triggerWords = ["总入口", "锁屏", "睡眠"]
+            static var functionCommands: [CommandDescriptor] {
+                [
+                    CommandDescriptor(
+                        id: "multi.lock", pluginID: id, pluginName: name, title: "锁定屏幕",
+                        keywords: ["锁屏"], icon: "lock"),
+                    CommandDescriptor(
+                        id: "multi.sleep", pluginID: id, pluginName: name, title: "睡眠",
+                        keywords: ["睡眠"], icon: "moon")
+                ]
+            }
+        }
+        let openCmd = MultiActionPlugin.commands.first { $0.id == CommandID.openPlugin("multi") }
+        #expect(openCmd?.keywords == ["总入口"])
+    }
 }

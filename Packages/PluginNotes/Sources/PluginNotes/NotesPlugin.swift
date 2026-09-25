@@ -18,18 +18,7 @@ public final class NotesPlugin: QuickPlugin, PluginViewProviding, PluginSettings
     public static let name = "笔记"
     public static let icon = "note.text"
     public static let description = "轻量级便签与待办备忘录，支持极简富文本与 Markdown 记录，编辑即时自动保存且本地安全存储。"
-    public static let triggerWords = ["笔记", "备忘录", "memo", "note", "便签"]
-
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "notes.new", pluginID: id, pluginName: name, title: "新建笔记",
-                subtitle: "创建一条新笔记", keywords: ["new-note"], icon: "square.and.pencil"),
-            CommandDescriptor(
-                id: "notes.todo", pluginID: id, pluginName: name, title: "待办",
-                subtitle: "打开待办列表", keywords: ["todo"], icon: "checklist")
-        ]
-    }
+    public static let triggerWords = ["笔记", "备忘录", "memo", "note", "便签", "待办", "todo"]
 
     public var isEnabled = true
 

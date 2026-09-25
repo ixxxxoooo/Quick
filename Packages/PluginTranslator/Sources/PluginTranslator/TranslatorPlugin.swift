@@ -19,20 +19,7 @@ public final class TranslatorPlugin: QuickPlugin, PluginViewProviding, PluginSet
     public static let icon = "character.book.closed.fill"
     public static let description =
         "端上翻译与系统词典：自动识别语言、中英日韩等多语互译，单词给音标与释义，支持朗读与历史记录。"
-    public static let triggerWords = ["翻译", "translate", "词典", "dict"]
-
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "translator.translate", pluginID: id, pluginName: name, title: "翻译文本",
-                subtitle: "端上翻译一段文本", keywords: ["translate", "tr"],
-                icon: "character.book.closed"),
-            CommandDescriptor(
-                id: "translator.dict", pluginID: id, pluginName: name, title: "查词",
-                subtitle: "查单词的音标与释义", keywords: ["dict", "词典"],
-                icon: "text.book.closed")
-        ]
-    }
+    public static let triggerWords = ["翻译", "translate", "tr", "词典", "dict", "查词"]
 
     public var isEnabled = true
 

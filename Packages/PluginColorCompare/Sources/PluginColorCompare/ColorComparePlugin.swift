@@ -17,20 +17,7 @@ public final class ColorComparePlugin: QuickPlugin, PluginViewProviding, PluginS
     public static let name = "颜色工具"
     public static let icon = "paintpalette.fill"
     public static let description = "HEX、RGB、HSL 色彩格式解析互转与色板对比，支持色彩明暗微调与一键复制颜色代码。"
-    public static let triggerWords = ["颜色", "色值", "color"]
-
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "color-compare.identify", pluginID: id, pluginName: name, title: "颜色识别",
-                subtitle: "识别色值并转换格式", keywords: ["色值", "color-id"],
-                icon: "paintpalette"),
-            CommandDescriptor(
-                id: "color-compare.contrast", pluginID: id, pluginName: name, title: "对比度",
-                subtitle: "计算两种颜色的对比度", keywords: ["contrast"],
-                icon: "circle.lefthalf.filled")
-        ]
-    }
+    public static let triggerWords = ["颜色", "色值", "对比度", "color", "contrast"]
 
     public var isEnabled = true
 

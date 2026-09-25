@@ -23,15 +23,6 @@ public final class KillProcessPlugin: QuickPlugin, PluginViewProviding, PluginSe
 
     public static var supportsPanelSearch: Bool { true }
 
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "killprocess.kill", pluginID: id, pluginName: name, title: "结束进程",
-                subtitle: "按名称查找并结束进程", keywords: ["kill", "杀进程"],
-                icon: "xmark.app")
-        ]
-    }
-
     public var isEnabled = true
 
     private let log = QuickLog.plugin(KillProcessPlugin.id)

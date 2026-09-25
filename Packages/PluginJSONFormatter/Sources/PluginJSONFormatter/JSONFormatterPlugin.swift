@@ -17,27 +17,10 @@ public final class JSONFormatterPlugin: QuickPlugin, PluginViewProviding, Plugin
     public static let name = "JSON 格式化"
     public static let icon = "curlybraces"
     public static let description = "JSON 语法校验、层级高亮、格式化美化与单行紧凑压缩，支持缩进空格调整与一键复制。"
-    public static let triggerWords = ["json", "format"]
+    public static let triggerWords = ["json", "format", "jsonformat", "jsonmin", "unescape", "jsonunescape"]
 
     /// 面板头部保留搜索框：树视图里用它定位字段
     public static var supportsPanelSearch: Bool { true }
-
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "json-formatter.format", pluginID: id, pluginName: name, title: "JSON 格式化",
-                subtitle: "缩进并美化 JSON", keywords: ["jsonformat"],
-                icon: "curlybraces"),
-            CommandDescriptor(
-                id: "json-formatter.minify", pluginID: id, pluginName: name, title: "JSON 压缩",
-                subtitle: "压成单行、去掉空白", keywords: ["jsonmin"],
-                icon: "arrow.down.right.and.arrow.up.left"),
-            CommandDescriptor(
-                id: "json-formatter.unescape", pluginID: id, pluginName: name, title: "JSON 去转义",
-                subtitle: "把转义后的 JSON 字符串还原", keywords: ["unescape", "jsonunescape"],
-                icon: "textformat")
-        ]
-    }
 
     public var isEnabled = true
 

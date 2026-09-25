@@ -19,15 +19,6 @@ public final class TextDiffPlugin: QuickPlugin, PluginViewProviding, PluginSetti
     public static let description = "双栏文本内容直观比对，高亮新增、删除与变动字符，支持忽略空白字符与大小写差异。"
     public static let triggerWords = ["diff", "对比"]
 
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "text-diff.compare", pluginID: id, pluginName: name, title: "文本对比",
-                subtitle: "左右两栏对比差异", keywords: ["diff"],
-                icon: "arrow.left.arrow.right")
-        ]
-    }
-
     public var isEnabled = true
 
     private let log = QuickLog.plugin(TextDiffPlugin.id)

@@ -91,13 +91,10 @@ struct FeatureSettingsPane: View {
 
     // MARK: - 触发关键字
 
-    /// 触发关键字：按功能拆开，每个功能一行 + 它自己的关键字胶囊
-    ///
-    /// 插件默认的「打开本插件」命令不单列 —— 它的关键字就是插件的唤醒词，和下面的
-    /// 功能关键字重复，单列只是噪音。没有声明任何功能（命令）的插件，这一节整体不显示。
+    /// 触发关键字：有独立子命令的插件按子命令逐行展示；单一视图插件直接展示本插件入口及其触发词
     @ViewBuilder
     private var wakeSection: some View {
-        let commands = extraCommands.filter { !displayKeywords($0.keywords, title: $0.title).isEmpty }
+        let commands = wakeCommands.filter { !displayKeywords($0.keywords, title: $0.title).isEmpty }
         if !commands.isEmpty {
             Section {
                 ForEach(commands) { command in
@@ -122,11 +119,13 @@ struct FeatureSettingsPane: View {
         }
     }
 
-    /// 除默认「打开本插件」之外的命令
-    private var extraCommands: [SettingsCommandBinding] {
+    /// 优先展示独立功能命令；若插件只有单一面板入口，则展示该入口命令
+    private var wakeCommands: [SettingsCommandBinding] {
         guard let pluginID = tab.pluginID else { return [] }
+        let all = dataSource.pluginCommands(pluginID)
         let openCommandID = CommandID.openPlugin(pluginID)
-        return dataSource.pluginCommands(pluginID).filter { $0.id != openCommandID }
+        let specific = all.filter { $0.id != openCommandID }
+        return specific.isEmpty ? all : specific
     }
 
     /// 展示用的关键字：过滤掉空格、与标题重复的词、并大小写去重

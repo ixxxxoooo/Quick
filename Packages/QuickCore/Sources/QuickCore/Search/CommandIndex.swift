@@ -82,7 +82,6 @@ public enum CommandIndex {
         }
 
         let match = MatchQuery(trimmed)
-        let trimmedLower = trimmed.lowercased()
         let hits: [CommandHit] = commands.compactMap { command in
             var bestScore = match.score(command.titleText)
 
@@ -91,20 +90,29 @@ public enum CommandIndex {
                 if kwScore > bestScore { bestScore = kwScore }
             }
 
-            let pluginScore = match.score(command.pluginNameText) * 0.80
-            if pluginScore > bestScore { bestScore = pluginScore }
-
-            if bestScore == 0, trimmedLower.count >= 2, let sub = command.subtitleLower, sub.contains(trimmedLower) {
-                bestScore = 0.50
-            }
-
             guard bestScore > 0 else { return nil }
             return CommandHit(command: command, relevance: bestScore)
         }
 
+        // 同一插件若已有具体功能命令（非 plugin.open.*）以更高或相同相关度命中，
+        // 不再并列展示只打开外壳的 plugin.open.* 入口
+        var bestSpecificByPlugin = [String: Double]()
+        for hit in hits where CommandID.openedPluginID(in: hit.command.id) == nil {
+            let pluginID = hit.command.descriptor.pluginID
+            if hit.relevance > (bestSpecificByPlugin[pluginID] ?? 0) {
+                bestSpecificByPlugin[pluginID] = hit.relevance
+            }
+        }
+        let filteredHits = hits.filter { hit in
+            guard let pluginID = CommandID.openedPluginID(in: hit.command.id),
+                let bestSpecific = bestSpecificByPlugin[pluginID]
+            else { return true }
+            return hit.relevance > bestSpecific
+        }
+
         // 同一插件下相同标题的命令（例如「打开插件」与同名功能命令），去重只留一条
         var seenBest = [String: CommandHit]()
-        for hit in hits {
+        for hit in filteredHits {
             let key = "\(hit.command.descriptor.pluginID):\(hit.command.descriptor.title.lowercased())"
             if let existing = seenBest[key] {
                 if hit.relevance > existing.relevance {
@@ -122,7 +130,7 @@ public enum CommandIndex {
         }
         var result: [CommandHit] = []
         var emitted = Set<String>()
-        for hit in hits {
+        for hit in filteredHits {
             let key = "\(hit.command.descriptor.pluginID):\(hit.command.descriptor.title.lowercased())"
             if let best = seenBest[key], emitted.insert(key).inserted {
                 result.append(best)

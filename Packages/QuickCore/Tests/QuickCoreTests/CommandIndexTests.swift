@@ -63,6 +63,26 @@ struct CommandIndexTests {
         let hits = CommandIndex.matching(commands, query: "锁屏")
         #expect(hits.isEmpty)
     }
+
+    @Test("子命令以同等或更高相关度命中时抑制同插件的泛化打开入口")
+    func specificCommandSuppressesGenericOpenCommand() {
+        let commands = [
+            command(
+                id: CommandID.openPlugin("screenshot"),
+                pluginID: "screenshot",
+                title: "截图标注",
+                keywords: ["截图"]
+            ),
+            command(
+                id: "screenshot.capture",
+                pluginID: "screenshot",
+                title: "区域截图",
+                keywords: ["截图", "screenshot"]
+            )
+        ]
+        let hits = CommandIndex.matching(commands, query: "截图")
+        #expect(hits.map(\.command.id) == ["screenshot.capture"])
+    }
 }
 
 @Suite("关键字解析")

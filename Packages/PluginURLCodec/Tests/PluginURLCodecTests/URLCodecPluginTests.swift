@@ -127,17 +127,12 @@ struct URLCodecPluginTests {
         #expect(!URLCodecPlugin.triggerWords.isEmpty)
     }
 
-    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
-    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
-    @Test("编码与解码各有一条命令，且功能命令带插件前缀")
+    @Test("单一视图插件只声明一条打开入口命令，且覆盖编解码触发词")
     func commandsCoverBothDirections() {
         let commands = URLCodecPlugin.commands
-        let ids = commands.map(\.id)
-
-        #expect(ids.contains("url-codec.encode"))
-        #expect(ids.contains("url-codec.decode"))
-        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
-        #expect(functionIDs.allSatisfy { $0.hasPrefix("url-codec.") })
+        #expect(commands.map(\.id) == ["plugin.open.url-codec"])
+        #expect(commands.first?.keywords.contains("urlencode") == true)
+        #expect(commands.first?.keywords.contains("urldecode") == true)
         #expect(commands.allSatisfy { $0.pluginID == URLCodecPlugin.id })
     }
 

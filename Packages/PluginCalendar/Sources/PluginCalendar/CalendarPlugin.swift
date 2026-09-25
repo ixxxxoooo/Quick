@@ -20,20 +20,6 @@ public final class CalendarPlugin: QuickPlugin, PluginViewProviding, PluginSetti
     public static let description = "同步展示系统日历日程与近期事件安排，支持会议链接自动识别与农历视图显示。"
     public static let triggerWords = ["日历", "农历", "节气", "节假日", "假期", "calendar", "lunar", "holiday"]
 
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "calendar.lunar", pluginID: id, pluginName: name, title: "农历",
-                subtitle: "查看农历与节气", keywords: ["节气", "lunar"], icon: "moon.stars"),
-            CommandDescriptor(
-                id: "calendar.holiday", pluginID: id, pluginName: name, title: "节假日",
-                subtitle: "查看节假日安排", keywords: ["假期", "holiday"], icon: "flag"),
-            CommandDescriptor(
-                id: "calendar.schedule", pluginID: id, pluginName: name, title: "日程",
-                subtitle: "查看今天的日程", keywords: ["schedule"], icon: "calendar")
-        ]
-    }
-
     public var isEnabled = true
 
     private let log = QuickLog.plugin(CalendarPlugin.id)

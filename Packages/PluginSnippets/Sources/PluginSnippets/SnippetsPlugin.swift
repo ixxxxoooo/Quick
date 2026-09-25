@@ -20,15 +20,6 @@ public final class SnippetsPlugin: QuickPlugin, PluginViewProviding, PluginSetti
     public static let description = "常用代码片段与模板快捷管理器，支持预定义占位符、动态参数求值与全局快速粘贴插入。"
     public static let triggerWords = ["片段", "snippet", "模板"]
 
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "snippets.new", pluginID: id, pluginName: name, title: "新建片段",
-                subtitle: "创建一条文本片段", keywords: ["new-snippet"],
-                icon: "text.badge.plus")
-        ]
-    }
-
     public var isEnabled = true
 
     private let log = QuickLog.plugin(SnippetsPlugin.id)

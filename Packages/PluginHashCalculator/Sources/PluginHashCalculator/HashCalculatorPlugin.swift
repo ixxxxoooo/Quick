@@ -17,26 +17,7 @@ public final class HashCalculatorPlugin: QuickPlugin, PluginViewProviding, Plugi
     public static let name = "Hash 计算器"
     public static let icon = "number.square.fill"
     public static let description = "实时计算文本数据的 MD5、SHA-1、SHA-256 与 SHA-512 校验散列值，支持大写切换与自动复制。"
-    public static let triggerWords = ["hash", "哈希", "md5", "sha"]
-
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "hash-calculator.md5", pluginID: id, pluginName: name, title: "MD5",
-                subtitle: "计算 MD5 散列", keywords: ["md5"], icon: "number"),
-            CommandDescriptor(
-                id: "hash-calculator.sha1", pluginID: id, pluginName: name, title: "SHA-1",
-                subtitle: "计算 SHA-1 散列", keywords: ["sha1"], icon: "number.square"),
-            CommandDescriptor(
-                id: "hash-calculator.sha256", pluginID: id, pluginName: name, title: "SHA-256",
-                subtitle: "计算 SHA-256 散列", keywords: ["sha256"],
-                icon: "number.square.fill"),
-            CommandDescriptor(
-                id: "hash-calculator.sha512", pluginID: id, pluginName: name, title: "SHA-512",
-                subtitle: "计算 SHA-512 散列", keywords: ["sha512"],
-                icon: "number.circle")
-        ]
-    }
+    public static let triggerWords = ["hash", "哈希", "md5", "sha", "sha1", "sha256", "sha512"]
 
     public var isEnabled = true
 

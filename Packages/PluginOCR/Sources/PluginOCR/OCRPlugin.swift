@@ -37,10 +37,13 @@ public final class OCRPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPr
                 title: "截图识别文字",
                 subtitle: "截取屏幕区域并识别文字",
                 keywords: triggerWords,
-                icon: icon
+                icon: icon,
+                showsWhenQueryEmpty: true
             )
         ]
     }
+
+    public static var commands: [CommandDescriptor] { functionCommands }
 
     public func perform(commandID: String) {
         guard commandID == "ocr.capture" || commandID == CommandID.openPlugin(Self.id) else { return }

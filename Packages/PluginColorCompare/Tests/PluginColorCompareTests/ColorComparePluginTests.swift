@@ -183,18 +183,11 @@ struct ColorComparePluginTests {
         #expect(ColorComparePlugin.triggerWords.allSatisfy { !$0.isEmpty })
     }
 
-    /// 入口由静态命令提供，不再由搜索现算。原测试断言的是 `searchItems` 的返回，
-    /// 而那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
-    @Test("声明的命令覆盖识别与对比度，且 id 带插件前缀")
+    /// 单面板插件只暴露唯一入口命令，触发词收敛到 `triggerWords`。
+    @Test("单面板插件只暴露打开插件入口命令")
     func commandsCoverFeatures() {
         let commands = ColorComparePlugin.commands
-        let ids = commands.map(\.id)
-
-        #expect(ids.contains("color-compare.identify"))
-        #expect(ids.contains("color-compare.contrast"))
-        // 功能命令带插件前缀，宿主按它回退找执行者；「打开本插件」用 plugin.open. 前缀
-        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
-        #expect(functionIDs.allSatisfy { $0.hasPrefix("color-compare.") })
+        #expect(commands.map(\.id) == ["plugin.open.color-compare"])
         #expect(commands.allSatisfy { $0.pluginID == ColorComparePlugin.id })
         #expect(commands.allSatisfy { !$0.title.isEmpty })
     }

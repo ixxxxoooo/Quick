@@ -105,19 +105,11 @@ struct UUIDGeneratorPluginTests {
         #expect(!UUIDGeneratorPlugin.triggerWords.isEmpty)
     }
 
-    /// 入口由静态命令提供，不再由搜索现算 —— 这条测试因此问的是 `commands`。
-    ///
-    /// id 有两套前缀：默认的「打开本插件」是 `plugin.open.<id>`，功能命令是
-    /// `<id>.<功能>`。宿主按 `<pluginID>.` 前缀回退找执行者，所以功能命令必须带前缀。
-    @Test("声明的命令覆盖生成功能，且功能命令带插件前缀")
+    /// 单面板插件只暴露唯一入口命令，触发词收敛到 `triggerWords`。
+    @Test("单面板插件只暴露打开插件入口命令")
     func commandsCoverGenerate() {
         let commands = UUIDGeneratorPlugin.commands
-        let ids = commands.map(\.id)
-
-        #expect(ids.contains("uuid-generator.generate"))
-        #expect(ids.contains("plugin.open.uuid-generator"))
-        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
-        #expect(functionIDs.allSatisfy { $0.hasPrefix("uuid-generator.") })
+        #expect(commands.map(\.id) == ["plugin.open.uuid-generator"])
         #expect(commands.allSatisfy { $0.pluginID == UUIDGeneratorPlugin.id })
     }
 

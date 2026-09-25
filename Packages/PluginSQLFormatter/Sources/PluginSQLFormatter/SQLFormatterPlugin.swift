@@ -17,20 +17,7 @@ public final class SQLFormatterPlugin: QuickPlugin, PluginViewProviding, PluginS
     public static let name = "SQL 格式化"
     public static let icon = "cylinder.fill"
     public static let description = "SQL 查询语句美化排版与单行压缩，支持关键字大小写规范化与自定义缩进风格。"
-    public static let triggerWords = ["sql", "mysql"]
-
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "sql-formatter.format", pluginID: id, pluginName: name, title: "SQL 格式化",
-                subtitle: "缩进并美化 SQL", keywords: ["sqlformat", "sql"],
-                icon: "cylinder"),
-            CommandDescriptor(
-                id: "sql-formatter.minify", pluginID: id, pluginName: name, title: "SQL 压缩",
-                subtitle: "压成单行、去掉空白", keywords: ["sqlmin"],
-                icon: "arrow.down.right.and.arrow.up.left")
-        ]
-    }
+    public static let triggerWords = ["sql", "mysql", "sqlformat", "sqlmin"]
 
     public var isEnabled = true
 

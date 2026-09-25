@@ -126,14 +126,22 @@ public extension QuickPlugin {
     nonisolated static var functionCommands: [CommandDescriptor] { [] }
 
     /// 默认一条「打开本插件」+ 插件声明的功能命令
+    ///
+    /// 若插件声明了具体 `functionCommands`，已被具体功能命令认领的触发词不再重复挂到
+    /// 「打开本插件」上，避免输入具体功能词（如「锁屏」「贴图」）时同时搜出插件总入口。
     nonisolated static var commands: [CommandDescriptor] {
+        let functionClaimed = Set(
+            functionCommands.flatMap { [$0.title] + $0.keywords }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        )
         var seen = Set<String>()
         var dedupedKeywords: [String] = []
-        for word in triggerWords + [name] {
+        for word in triggerWords {
             let key = word.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            if !key.isEmpty && seen.insert(key).inserted {
-                dedupedKeywords.append(word)
+            guard !key.isEmpty, !functionClaimed.contains(key), seen.insert(key).inserted else {
+                continue
             }
+            dedupedKeywords.append(word)
         }
         return [
             CommandDescriptor.openPlugin(

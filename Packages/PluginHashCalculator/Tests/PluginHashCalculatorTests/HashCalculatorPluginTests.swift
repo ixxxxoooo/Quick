@@ -128,19 +128,11 @@ struct HashCalculatorPluginTests {
         #expect(!HashCalculatorPlugin.triggerWords.isEmpty)
     }
 
-    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
-    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
-    @Test("四种散列各有一条命令，且功能命令带插件前缀")
+    /// 单面板插件只暴露唯一入口命令，触发词收敛到 `triggerWords`。
+    @Test("单面板插件只暴露打开插件入口命令")
     func commandsCoverEveryHash() {
         let commands = HashCalculatorPlugin.commands
-        let ids = commands.map(\.id)
-
-        #expect(ids.contains("hash-calculator.md5"))
-        #expect(ids.contains("hash-calculator.sha1"))
-        #expect(ids.contains("hash-calculator.sha256"))
-        #expect(ids.contains("hash-calculator.sha512"))
-        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
-        #expect(functionIDs.allSatisfy { $0.hasPrefix("hash-calculator.") })
+        #expect(commands.map(\.id) == ["plugin.open.hash-calculator"])
         #expect(commands.allSatisfy { $0.pluginID == HashCalculatorPlugin.id })
     }
 

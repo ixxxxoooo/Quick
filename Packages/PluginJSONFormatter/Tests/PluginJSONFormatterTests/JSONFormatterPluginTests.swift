@@ -215,17 +215,11 @@ struct JSONFormatterPluginTests {
         #expect(!JSONFormatterPlugin.triggerWords.isEmpty)
     }
 
-    /// 入口由静态命令承载，不再由搜索现算 —— 原来这条测试问的是 `searchItems` 的返回，
-    /// 那个遗留 API 已删除（见 docs/refactor-plan.md Phase 0）。
-    @Test("格式化与压缩各有一条命令，且功能命令带插件前缀")
+    /// 单面板插件只暴露唯一入口命令，触发词收敛到 `triggerWords`。
+    @Test("单面板插件只暴露打开插件入口命令")
     func commandsCoverBothDirections() {
         let commands = JSONFormatterPlugin.commands
-        let ids = commands.map(\.id)
-
-        #expect(ids.contains("json-formatter.format"))
-        #expect(ids.contains("json-formatter.minify"))
-        let functionIDs = commands.filter { !$0.id.hasPrefix("plugin.open.") }.map(\.id)
-        #expect(functionIDs.allSatisfy { $0.hasPrefix("json-formatter.") })
+        #expect(commands.map(\.id) == ["plugin.open.json-formatter"])
         #expect(commands.allSatisfy { $0.pluginID == JSONFormatterPlugin.id })
     }
 

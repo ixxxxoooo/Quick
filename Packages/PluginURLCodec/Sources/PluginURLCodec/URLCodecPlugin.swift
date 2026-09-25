@@ -23,18 +23,6 @@ public final class URLCodecPlugin: QuickPlugin, PluginViewProviding, PluginSetti
         "url", "urlencode", "urldecode"
     ]
 
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "url-codec.encode", pluginID: id, pluginName: name, title: "URL 编码",
-                subtitle: "把文本编码为百分号形式", keywords: ["urlencode"], icon: "link"),
-            CommandDescriptor(
-                id: "url-codec.decode", pluginID: id, pluginName: name, title: "URL 解码",
-                subtitle: "把百分号编码还原为文本", keywords: ["urldecode"],
-                icon: "arrow.uturn.left")
-        ]
-    }
-
     public var isEnabled = true
 
     private let log = QuickLog.plugin(URLCodecPlugin.id)

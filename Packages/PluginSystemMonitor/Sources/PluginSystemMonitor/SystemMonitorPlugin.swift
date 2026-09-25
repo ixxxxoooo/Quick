@@ -23,29 +23,8 @@ public final class SystemMonitorPlugin: QuickPlugin, PluginViewProviding, Plugin
     /// `系统信息` / `monitor` 等词命中，功能命令也各自带自己的关键词。
     /// 这条约束由 `TriggerWordUniquenessTests` 守着。
     public static let triggerWords = [
-        "系统监控", "系统信息", "system", "monitor", "cpu", "内存", "磁盘", "硬件"
+        "系统监控", "系统信息", "system", "monitor", "cpu", "内存", "memory", "磁盘", "disk", "硬件", "temperature"
     ]
-
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "sysmonitor.cpu", pluginID: id, pluginName: name, title: "CPU 监控",
-                subtitle: "查看 CPU 占用", keywords: ["cpu"], icon: "cpu"),
-            CommandDescriptor(
-                id: "sysmonitor.memory", pluginID: id, pluginName: name, title: "内存监控",
-                subtitle: "查看内存占用", keywords: ["memory"], icon: "memorychip"),
-            CommandDescriptor(
-                id: "sysmonitor.disk", pluginID: id, pluginName: name, title: "磁盘监控",
-                subtitle: "查看磁盘占用", keywords: ["disk"], icon: "internaldrive"),
-            CommandDescriptor(
-                id: "sysmonitor.network", pluginID: id, pluginName: name, title: "网络监控",
-                subtitle: "查看网络吞吐", keywords: ["network-speed"], icon: "network"),
-            CommandDescriptor(
-                id: "sysmonitor.temperature", pluginID: id, pluginName: name, title: "温度监控",
-                subtitle: "查看机身温度", keywords: ["temperature"],
-                icon: "thermometer.medium")
-        ]
-    }
 
     public var isEnabled = true
 

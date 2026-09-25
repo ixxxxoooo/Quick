@@ -17,20 +17,7 @@ public final class TimestampConverterPlugin: QuickPlugin, PluginViewProviding, P
     public static let name = "时间戳转换"
     public static let icon = "clock.fill"
     public static let description = "Unix 时间戳与人类可读标准日期时间互相转换，支持秒/毫秒级精度与跨时区换算。"
-    public static let triggerWords = ["时间戳", "timestamp", "日期"]
-
-    public static var functionCommands: [CommandDescriptor] {
-        [
-            CommandDescriptor(
-                id: "timestamp-converter.toDate", pluginID: id, pluginName: name,
-                title: "时间戳转日期", subtitle: "把时间戳换算成可读日期",
-                keywords: ["todate", "date"], icon: "calendar"),
-            CommandDescriptor(
-                id: "timestamp-converter.now", pluginID: id, pluginName: name, title: "当前时间戳",
-                subtitle: "复制当前 Unix 时间戳", keywords: ["now"],
-                icon: "clock")
-        ]
-    }
+    public static let triggerWords = ["时间戳", "timestamp", "日期", "todate", "date", "now"]
 
     public var isEnabled = true
 
