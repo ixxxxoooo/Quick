@@ -125,10 +125,17 @@ public struct ShowPaletteEvent: PluginEvent {
 }
 
 /// 请求打开设置窗口
+///
+/// `pluginID` 非空时跳到该插件的设置页（精确导航）
 public struct ShowPaletteSettingsEvent: PluginEvent {
     public static let name = "quick.settings.show"
 
-    public init() {}
+    /// 目标插件 ID；nil 表示打开默认页
+    public let pluginID: String?
+
+    public init(pluginID: String? = nil) {
+        self.pluginID = pluginID
+    }
 }
 
 /// 请求将当前插件面板分离为独立窗口

@@ -108,7 +108,7 @@ struct SettingsSidebarView: View {
         )
     }
 
-    /// 分区列表：宿主页面在上，「插件」是分类，每个插件一项，关于在最后
+    /// 分区列表：宿主页面 → 应用启动器（系统级） → 插件 → 关于
     private var browse: some View {
         List(selection: selectionBinding) {
             Section {
@@ -120,6 +120,18 @@ struct SettingsSidebarView: View {
                         isSelected: navigationState.tab == tab
                     )
                     .tag(tab)
+                }
+            }
+            // 应用启动器是系统级功能，放在宿主区域之下、插件列表之上
+            if let launcherRow = launcherEntry {
+                Section("核心功能") {
+                    sidebarRow(
+                        title: launcherRow.plugin.name,
+                        systemImage: launcherRow.tab.systemImage,
+                        tintName: launcherRow.tab.iconTintName,
+                        isSelected: navigationState.tab == launcherRow.tab
+                    )
+                    .tag(launcherRow.tab)
                 }
             }
             Section("插件") {
@@ -148,9 +160,17 @@ struct SettingsSidebarView: View {
         .tint(.clear)
     }
 
+    /// 应用启动器是系统级功能，单独分区显示在搜索下方、插件上方
+    private var launcherEntry: (plugin: SettingsPlugin, tab: SettingsTab)? {
+        guard let plugin = dataSource.pluginEntries.first(where: { $0.id == "launcher" }),
+            let tab = SettingsTab.tab(forPluginID: "launcher")
+        else { return nil }
+        return (plugin, tab)
+    }
+
     /// 已注册插件里，能对上设置页的那些。顺序跟插件名单一致
     ///
-    /// 应用启动器是宿主核心能力，已在宿主页面（搜索）中管理，不在插件分类重复出现
+    /// 应用启动器已在「核心功能」区域展示，不在插件分类重复出现
     private var pluginRows: [(plugin: SettingsPlugin, tab: SettingsTab)] {
         dataSource.pluginEntries.compactMap { plugin in
             guard plugin.id != "launcher" else { return nil }

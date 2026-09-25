@@ -659,12 +659,18 @@ final class AppCore {
             }
         )
 
-        // 打开设置窗口事件
+        // 打开设置窗口事件（支持跳转到指定插件）
         subscriptions.append(
-            bus.on(ShowPaletteSettingsEvent.self) { [weak self] _ in
+            bus.on(ShowPaletteSettingsEvent.self) { [weak self] event in
                 Task { @MainActor in
                     self?.paletteCoordinator.hide(restoreFocus: false)
-                    self?.settingsWindowController.show()
+                    if let pluginID = event.pluginID,
+                        let tab = SettingsTab.tab(forPluginID: pluginID)
+                    {
+                        self?.settingsWindowController.show(tab: tab)
+                    } else {
+                        self?.settingsWindowController.show()
+                    }
                 }
             }
         )

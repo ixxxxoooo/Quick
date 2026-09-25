@@ -180,19 +180,27 @@ public enum PaletteSearchEngine {
 
         let collected = staticItems + dynamicItems.items
 
-        // 去重：`SearchableItem` 的 `Hashable` 只看 id。重复 id 会让 `ForEach` 进入未定义行为。
-        var seen = Set<String>()
-        let deduped = collected.filter { seen.insert($0.id).inserted }
-
-        var sorted = deduped.sorted {
+        // 去重：
+        // 1. 按 id 去重：重复 id 会让 `ForEach` 进入未定义行为
+        // 2. 按「同插件 + 同标题」去重：例如 `plugin.open.json-formatter` 与
+        //    `json-formatter.format` 都叫「JSON 格式化」，只留相关度高的那条
+        var seenIDs = Set<String>()
+        var seenPluginTitle = Set<String>()
+        let idDeduped = collected.filter { seenIDs.insert($0.id).inserted }
+        let sorted = idDeduped.sorted {
             $0.relevance == $1.relevance ? $0.id < $1.id : $0.relevance > $1.relevance
         }
-
-        if trimmed.isEmpty {
-            sorted = promotingRecents(sorted, recents: recentItemIDs)
+        let deduped = sorted.filter { item in
+            let key = "\(item.pluginID ?? "")|\(item.title)"
+            return seenPluginTitle.insert(key).inserted
         }
 
-        let limited = Array(sorted.prefix(resultLimit))
+        var finalSorted = deduped
+        if trimmed.isEmpty {
+            finalSorted = promotingRecents(finalSorted, recents: recentItemIDs)
+        }
+
+        let limited = Array(finalSorted.prefix(resultLimit))
         let timedOutIDs = dynamicItems.timedOutPluginIDs
 
         signpost.endInterval("palette.search", interval)

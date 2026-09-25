@@ -71,7 +71,7 @@ struct AIPortalView: View {
                         .foregroundStyle(Color.accentColor)
                         .clipShape(Capsule())
                 }
-                Text("多标签聚合窗口，保持登录态，一键直达")
+                Text("多窗口 AI 工作台，保持登录态，一键直达")
                     .font(DesignTokens.Typography.rowTrailing)
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
             }
@@ -79,7 +79,7 @@ struct AIPortalView: View {
             Spacer()
 
             Button {
-                EventBus.shared.post(ShowPaletteSettingsEvent())
+                EventBus.shared.post(ShowPaletteSettingsEvent(pluginID: AIPlugin.id))
             } label: {
                 HStack(spacing: DesignTokens.Spacing.xs) {
                     Image(systemName: "gearshape")
@@ -90,7 +90,7 @@ struct AIPortalView: View {
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             .buttonStyle(.plain)
-            .help("打开设置窗口管理 AI Provider")
+            .help("打开 AI 聚合的设置页面")
         }
         .padding(.bottom, DesignTokens.Spacing.sm)
     }
@@ -187,7 +187,7 @@ struct AIPortalView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!isEnabled)
-                .help(isEnabled ? (isActive ? "聚焦到 \(provider.name) 标签" : "在聚合窗口中打开 \(provider.name)") : "该服务已在设置中停用")
+                .help(isEnabled ? (isActive ? "聚焦 \(provider.name) 窗口" : "打开 \(provider.name)") : "该服务已在设置中停用")
 
                 Button {
                     reloadingID = provider.id
@@ -237,7 +237,7 @@ struct AIPortalView: View {
                 .frame(width: 28, height: 28)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .disabled(!isActive)
-                .help("关闭 \(provider.name) 标签")
+                .help("关闭 \(provider.name)")
             }
         }
         .padding(DesignTokens.Spacing.md)
@@ -253,10 +253,10 @@ struct AIPortalView: View {
 
     private var footerSection: some View {
         VStack(spacing: DesignTokens.Spacing.xs) {
-            Text("搜索 AI 名称可直接打开对应标签页")
+            Text("搜索 AI 名称可直接打开对应窗口")
                 .font(DesignTokens.Typography.inlineIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
-            Text("关闭标签后登录态仍然保持")
+            Text("关闭窗口后登录态仍然保持")
                 .font(DesignTokens.Typography.inlineIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary.opacity(0.7))
         }

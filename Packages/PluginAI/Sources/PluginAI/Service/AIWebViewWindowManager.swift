@@ -8,10 +8,13 @@ import QuickUI
 import SwiftUI
 import WebKit
 
-/// AI WebView 聚合窗口管理器
+/// AI WebView 窗口管理器
 ///
-/// 所有 AI Provider 聚合到一个窗口中，通过标签页切换。窗口位置和大小会持久化，
-/// 下次打开恢复到上次的状态。
+/// 支持两种模式：
+/// - **独立窗口**（默认）：每个 Provider 一个独立窗口
+/// - **聚合窗口**：所有 Provider 合并到一个窗口，标签栏嵌入标题栏
+///
+/// 模式通过设置 `ai.mergeWindows` 切换。窗口位置和大小会持久化。
 ///
 /// 由 `AIPlugin` 持有而**不是单例**：窗口是插件的一部分，插件停用时窗口应当一起收掉。
 @MainActor
@@ -19,33 +22,52 @@ final class AIWebViewWindowManager {
 
     private let log = QuickLog.plugin(AIPlugin.id)
 
-    /// 聚合窗口的面板
-    private var panel: AIWebViewPanel?
-
     /// 各 Provider 的 WebView（按需创建，保持登录态）
     private var webViews: [String: WKWebView] = [:]
 
-    /// 标签栏视图
-    private var tabBarView: AITabBarView?
+    // MARK: - 独立窗口模式
 
-    /// 当前选中的 Provider id
+    /// 独立窗口模式下每个 Provider 的窗口
+    private var separateWindows: [String: AIWebViewWindow] = [:]
+
+    // MARK: - 聚合窗口模式
+
+    /// 聚合窗口的面板
+    private var mergedPanel: AIWebViewPanel?
+
+    /// 聚合模式标签栏（嵌入标题栏）
+    private var titleTabBar: AITitleTabBarView?
+
+    /// 当前选中的 Provider id（聚合模式）
     private(set) var activeProviderID: String?
 
-    /// 窗口内容容器
+    /// 聚合模式内容容器
     private var contentContainer: NSView?
 
-    /// 悬浮胶囊
-    private var capsule: FloatingCapsuleView?
+    /// 聚合模式悬浮胶囊
+    private var mergedCapsule: FloatingCapsuleView?
 
     /// 默认窗口尺寸
     private let defaultWidth: CGFloat = 1100
     private let defaultHeight: CGFloat = 780
 
-    /// 窗口位置/大小持久化键
-    private static let frameKey = "quick.ai.aggregated.frame"
+    /// 独立窗口默认尺寸
+    private let separateWidth: CGFloat = 1000
+    private let separateHeight: CGFloat = 700
+
+    /// 窗口位置/大小持久化键前缀
+    private static let mergedFrameKey = "quick.ai.aggregated.frame"
+    private static let separateFramePrefix = "quick.ai.separate."
 
     /// 胶囊里置顶按钮的标识
     private static let pinActionID = "pin"
+
+    // MARK: - 模式查询
+
+    /// 是否处于聚合模式
+    var isMergeMode: Bool {
+        PluginDefaults.isEnabled(PluginSettingKey.AIPortal.mergeWindows, default: false)
+    }
 
     // MARK: - 窗口生命周期
 
@@ -60,7 +82,7 @@ final class AIWebViewWindowManager {
         Set(AIProviderRegistry.all.map(\.id).filter { !Self.isProviderEnabled($0) })
     }
 
-    /// 打开或聚焦指定 Provider 的标签
+    /// 打开或聚焦指定 Provider
     @discardableResult
     func openOrFocus(providerId: String) -> Bool {
         guard let provider = AIProviderRegistry.provider(for: providerId) else {
@@ -68,106 +90,146 @@ final class AIWebViewWindowManager {
             return false
         }
         guard Self.isProviderEnabled(provider.id) else {
-            log.notice("Provider 已在设置中停用，忽略打开请求: \(providerId, privacy: .public)")
+            log.notice("Provider 已在设置中停用: \(providerId, privacy: .public)")
             return false
         }
 
-        ensureWindow()
-        ensureWebView(for: provider)
-        switchToTab(providerId)
-
-        guard let panel else { return false }
-
-        NSApp.activate(ignoringOtherApps: true)
-        panel.makeKeyAndOrderFront(nil)
-        panel.orderFrontRegardless()
-        syncDockPresence()
-
-        EventBus.shared.post(HidePaletteEvent())
-        log.notice("聚焦标签: \(provider.name, privacy: .public)")
-        return true
+        if isMergeMode {
+            return openOrFocusMerged(provider: provider)
+        } else {
+            return openOrFocusSeparate(provider: provider)
+        }
     }
 
-    /// 检查指定 Provider 窗口是否打开（即标签页是否激活且窗口可见）
+    /// 检查指定 Provider 窗口是否打开
     func isWindowOpen(for providerId: String) -> Bool {
-        guard let panel, panel.isVisible else { return false }
-        return activeProviderID == providerId
+        if isMergeMode {
+            guard let panel = mergedPanel, panel.isVisible else { return false }
+            return activeProviderID == providerId
+        } else {
+            return separateWindows[providerId]?.panel.isVisible ?? false
+        }
     }
 
     /// 切换 Provider 窗口显隐
     @discardableResult
     func toggle(providerId: String) -> Bool {
-        if let panel, panel.isVisible, activeProviderID == providerId {
-            hideWindow(for: providerId)
-            log.notice("快捷键切换：隐藏聚合窗口 \(providerId, privacy: .public)")
-            return false
+        if isMergeMode {
+            if let panel = mergedPanel, panel.isVisible, activeProviderID == providerId {
+                hideWindow(for: providerId)
+                log.notice("切换：隐藏聚合窗口 \(providerId, privacy: .public)")
+                return false
+            }
+        } else {
+            if let win = separateWindows[providerId], win.panel.isVisible {
+                hideWindow(for: providerId)
+                log.notice("切换：隐藏独立窗口 \(providerId, privacy: .public)")
+                return false
+            }
         }
         return openOrFocus(providerId: providerId)
     }
 
     /// 隐藏窗口
-    func hideWindow(for _: String) {
-        panel?.orderOut(nil)
-        syncDockPresence()
+    func hideWindow(for providerId: String) {
+        if isMergeMode {
+            saveMergedFrame()
+            mergedPanel?.orderOut(nil)
+            syncDockPresence()
+        } else {
+            if let win = separateWindows[providerId] {
+                saveSeparateFrame(providerId: providerId, panel: win.panel)
+                win.panel.orderOut(nil)
+                syncDockPresence()
+            }
+        }
     }
 
-    /// 关闭某个 Provider 标签（从标签栏移除，销毁 WebView）
+    /// 关闭某个 Provider（销毁 WebView）
     func destroyWindow(for providerId: String) {
         webViews[providerId]?.stopLoading()
         webViews[providerId] = nil
-        tabBarView?.removeTab(providerId)
 
-        if activeProviderID == providerId {
-            let enabledProviders = AIProviderRegistry.all.filter { Self.isProviderEnabled($0.id) }
-            let remaining = enabledProviders.filter { webViews[$0.id] != nil }
-            if let next = remaining.first {
-                switchToTab(next.id)
-            } else {
-                activeProviderID = nil
-                panel?.orderOut(nil)
+        if isMergeMode {
+            titleTabBar?.removeTab(providerId)
+            if activeProviderID == providerId {
+                let remaining = AIProviderRegistry.all.filter {
+                    Self.isProviderEnabled($0.id) && webViews[$0.id] != nil
+                }
+                if let next = remaining.first {
+                    switchToTab(next.id)
+                } else {
+                    activeProviderID = nil
+                    mergedPanel?.orderOut(nil)
+                }
+            }
+        } else {
+            if let win = separateWindows.removeValue(forKey: providerId) {
+                win.panel.onClose = nil
+                win.panel.close()
             }
         }
         syncDockPresence()
-        log.notice("销毁标签: \(providerId, privacy: .public)")
+        log.notice("销毁: \(providerId, privacy: .public)")
     }
 
-    /// 收掉聚合窗口（插件停用 / 应用退出时调用）
+    /// 收掉所有窗口
     func closeAll() {
-        saveWindowFrame()
+        saveMergedFrame()
         for (id, webView) in webViews {
             webView.stopLoading()
-            log.notice("随插件停用关闭标签: \(id, privacy: .public)")
+            log.notice("关闭: \(id, privacy: .public)")
         }
         webViews.removeAll()
-        capsule = nil
-        tabBarView = nil
-        if let panel {
+        mergedCapsule = nil
+        titleTabBar = nil
+        if let panel = mergedPanel {
             panel.onClose = nil
             panel.close()
         }
-        panel = nil
+        mergedPanel = nil
         contentContainer = nil
         activeProviderID = nil
+
+        for (id, win) in separateWindows {
+            saveSeparateFrame(providerId: id, panel: win.panel)
+            win.panel.onClose = nil
+            win.panel.close()
+        }
+        separateWindows.removeAll()
         syncDockPresence()
+    }
+
+    /// 模式切换时重建窗口
+    func rebuildForModeChange() {
+        let openProviders = Array(webViews.keys)
+        closeAll()
+        for id in openProviders {
+            openOrFocus(providerId: id)
+        }
     }
 
     // MARK: - Dock 身份
 
     private var hasDockPresence = false
 
-    /// 只要聚合窗口可见，就暂时占用 Dock 身份
     private func syncDockPresence() {
-        let visible = panel?.isVisible ?? false
-        if visible, !hasDockPresence {
+        let anyVisible: Bool
+        if isMergeMode {
+            anyVisible = mergedPanel?.isVisible ?? false
+        } else {
+            anyVisible = separateWindows.values.contains { $0.panel.isVisible }
+        }
+        if anyVisible, !hasDockPresence {
             ActivationPolicyKeeper.retain("ai.aggregated")
             hasDockPresence = true
-        } else if !visible, hasDockPresence {
+        } else if !anyVisible, hasDockPresence {
             ActivationPolicyKeeper.release("ai.aggregated")
             hasDockPresence = false
         }
     }
 
-    /// 刷新当前活跃标签的页面
+    /// 刷新页面
     func reloadWindow(for providerId: String) {
         guard let webView = webViews[providerId] else { return }
         if let provider = AIProviderRegistry.provider(for: providerId),
@@ -179,12 +241,34 @@ final class AIWebViewWindowManager {
         }
     }
 
-    // MARK: - 窗口构造
+    /// 获取所有已打开标签的 Provider ID
+    func activeProviderIDs() -> Set<String> {
+        if isMergeMode {
+            guard let panel = mergedPanel, panel.isVisible else { return [] }
+            return Set(webViews.keys)
+        } else {
+            return Set(separateWindows.filter { $0.value.panel.isVisible }.map(\.key))
+        }
+    }
 
-    /// 构建面板（仅用于测试断言窗口配置）
-    static func makePanel(provider: AIProvider, size: NSSize) -> AIWebViewPanel {
+    // MARK: - 独立窗口模式
+
+    private func openOrFocusSeparate(provider: AIProvider) -> Bool {
+        ensureWebView(for: provider)
+
+        if let win = separateWindows[provider.id] {
+            NSApp.activate(ignoringOtherApps: true)
+            win.panel.makeKeyAndOrderFront(nil)
+            win.panel.orderFrontRegardless()
+            syncDockPresence()
+            EventBus.shared.post(HidePaletteEvent())
+            return true
+        }
+
+        guard let webView = webViews[provider.id] else { return false }
+
         let panel = AIWebViewPanel(
-            contentRect: NSRect(origin: .zero, size: size),
+            contentRect: NSRect(origin: .zero, size: NSSize(width: separateWidth, height: separateHeight)),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -197,16 +281,74 @@ final class AIWebViewWindowManager {
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.identifier = NSUserInterfaceItemIdentifier("quick.ai.\(provider.id)")
-        return panel
+
+        panel.onClose = { [weak self] in
+            guard let self else { return }
+            self.saveSeparateFrame(providerId: provider.id, panel: panel)
+            panel.orderOut(nil)
+            self.syncDockPresence()
+        }
+
+        restoreSeparateFrame(providerId: provider.id, panel: panel)
+
+        // 内容布局
+        let hostView = NSView(frame: panel.contentView?.bounds ?? .zero)
+        hostView.autoresizingMask = [.width, .height]
+
+        webView.frame = hostView.bounds
+        webView.autoresizingMask = [.width, .height]
+        hostView.addSubview(webView)
+
+        // 悬浮胶囊
+        let capsule = makeCapsule(positionKey: "ai.\(provider.id)", forMerged: false, providerId: provider.id)
+        hostView.addSubview(capsule)
+        capsule.positionInSuperview()
+
+        if PluginDefaults.isEnabled(PluginSettingKey.AIPortal.defaultAlwaysOnTop, default: false) {
+            panel.level = .floating
+            capsule.setToggle(Self.pinActionID, isOn: true, tooltip: "取消置顶")
+        }
+
+        panel.contentView = hostView
+
+        let win = AIWebViewWindow(panel: panel, webView: webView, providerId: provider.id, capsule: capsule)
+        separateWindows[provider.id] = win
+
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+        syncDockPresence()
+        EventBus.shared.post(HidePaletteEvent())
+        log.notice("打开独立窗口: \(provider.name, privacy: .public)")
+        return true
     }
 
-    /// 确保聚合窗口已创建
-    private func ensureWindow() {
-        guard panel == nil else { return }
+    // MARK: - 聚合窗口模式
+
+    private func openOrFocusMerged(provider: AIProvider) -> Bool {
+        ensureMergedWindow()
+        ensureWebView(for: provider)
+        switchToTab(provider.id)
+
+        guard let panel = mergedPanel else { return false }
+
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+        syncDockPresence()
+
+        EventBus.shared.post(HidePaletteEvent())
+        log.notice("聚焦标签: \(provider.name, privacy: .public)")
+        return true
+    }
+
+    /// 确保聚合窗口已创建（标签栏嵌入标题栏）
+    private func ensureMergedWindow() {
+        guard mergedPanel == nil else { return }
 
         let newPanel = AIWebViewPanel(
             contentRect: NSRect(origin: .zero, size: NSSize(width: defaultWidth, height: defaultHeight)),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -220,97 +362,66 @@ final class AIWebViewWindowManager {
         newPanel.identifier = NSUserInterfaceItemIdentifier("quick.ai.aggregated")
 
         newPanel.onClose = { [weak self] in
-            self?.saveWindowFrame()
-            self?.panel?.orderOut(nil)
+            self?.saveMergedFrame()
+            self?.mergedPanel?.orderOut(nil)
             self?.syncDockPresence()
         }
 
-        // 恢复上次的窗口位置和大小
-        restoreWindowFrame(newPanel)
+        restoreMergedFrame(newPanel)
 
-        // 内容布局：标签栏 + WebView 容器 + 悬浮胶囊
-        let hostView = NSView(frame: newPanel.contentView?.bounds ?? .zero)
-        hostView.autoresizingMask = [.width, .height]
-
-        // 标签栏
-        let tabBar = AITabBarView(onSelect: { [weak self] id in
+        // 标签栏嵌入标题栏
+        let tabBar = AITitleTabBarView(onSelect: { [weak self] id in
             self?.switchToTab(id)
         }, onClose: { [weak self] id in
             self?.destroyWindow(for: id)
         })
-        tabBar.translatesAutoresizingMaskIntoConstraints = false
-        hostView.addSubview(tabBar)
 
-        // WebView 容器
+        // 将标签栏作为 titlebar accessory
+        let accessory = NSTitlebarAccessoryViewController()
+        accessory.layoutAttribute = .bottom
+        let tabBarHost = NSView(frame: NSRect(x: 0, y: 0, width: 0, height: DesignTokens.Size.aiTabBarHeight))
+        tabBar.translatesAutoresizingMaskIntoConstraints = false
+        tabBarHost.addSubview(tabBar)
+        NSLayoutConstraint.activate([
+            tabBar.leadingAnchor.constraint(equalTo: tabBarHost.leadingAnchor),
+            tabBar.trailingAnchor.constraint(equalTo: tabBarHost.trailingAnchor),
+            tabBar.topAnchor.constraint(equalTo: tabBarHost.topAnchor),
+            tabBar.bottomAnchor.constraint(equalTo: tabBarHost.bottomAnchor),
+        ])
+        accessory.view = tabBarHost
+        newPanel.addTitlebarAccessoryViewController(accessory)
+
+        // 内容区域
+        let hostView = NSView(frame: newPanel.contentView?.bounds ?? .zero)
+        hostView.autoresizingMask = [.width, .height]
+
         let container = NSView()
         container.translatesAutoresizingMaskIntoConstraints = false
         hostView.addSubview(container)
 
         NSLayoutConstraint.activate([
-            tabBar.topAnchor.constraint(equalTo: hostView.topAnchor),
-            tabBar.leadingAnchor.constraint(equalTo: hostView.leadingAnchor),
-            tabBar.trailingAnchor.constraint(equalTo: hostView.trailingAnchor),
-            tabBar.heightAnchor.constraint(equalToConstant: DesignTokens.Size.aiTabBarHeight),
-
-            container.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
+            container.topAnchor.constraint(equalTo: hostView.topAnchor),
             container.leadingAnchor.constraint(equalTo: hostView.leadingAnchor),
             container.trailingAnchor.constraint(equalTo: hostView.trailingAnchor),
-            container.bottomAnchor.constraint(equalTo: hostView.bottomAnchor)
+            container.bottomAnchor.constraint(equalTo: hostView.bottomAnchor),
         ])
 
-        // 悬浮胶囊叠在 WebView 容器上
-        let capsuleView = FloatingCapsuleView(
-            positionKey: "ai.aggregated",
-            actions: [
-                CapsuleAction(
-                    id: Self.pinActionID,
-                    symbol: "pin",
-                    tooltip: "窗口置顶",
-                    kind: .toggle
-                ) { [weak self] in
-                    self?.toggleAlwaysOnTop()
-                },
-                CapsuleAction(
-                    id: "reload",
-                    symbol: "arrow.clockwise",
-                    tooltip: "刷新当前页面"
-                ) { [weak self] in
-                    guard let activeID = self?.activeProviderID else { return }
-                    self?.reloadWindow(for: activeID)
-                },
-                CapsuleAction(
-                    id: "external",
-                    symbol: "arrow.up.right.square",
-                    tooltip: "在浏览器中打开"
-                ) { [weak self] in
-                    guard let activeID = self?.activeProviderID else { return }
-                    self?.openInBrowser(providerId: activeID)
-                },
-                CapsuleAction(
-                    id: "close",
-                    symbol: "xmark",
-                    tooltip: "关闭当前标签",
-                    kind: .destructive
-                ) { [weak self] in
-                    guard let activeID = self?.activeProviderID else { return }
-                    self?.destroyWindow(for: activeID)
-                }
-            ])
+        // 悬浮胶囊
+        let capsuleView = makeCapsule(positionKey: "ai.aggregated", forMerged: true)
         hostView.addSubview(capsuleView)
         capsuleView.positionInSuperview()
 
-        newPanel.contentView = hostView
-
-        // 窗口默认置顶
         if PluginDefaults.isEnabled(PluginSettingKey.AIPortal.defaultAlwaysOnTop, default: false) {
             newPanel.level = .floating
             capsuleView.setToggle(Self.pinActionID, isOn: true, tooltip: "取消置顶")
         }
 
-        panel = newPanel
-        tabBarView = tabBar
+        newPanel.contentView = hostView
+
+        mergedPanel = newPanel
+        titleTabBar = tabBar
         contentContainer = container
-        capsule = capsuleView
+        mergedCapsule = capsuleView
 
         log.notice("创建聚合窗口")
     }
@@ -333,54 +444,107 @@ final class AIWebViewWindowManager {
         }
 
         webViews[provider.id] = webView
-        tabBarView?.addTab(id: provider.id, title: provider.name, icon: provider.icon)
+
+        if isMergeMode {
+            titleTabBar?.addTab(id: provider.id, title: provider.name, icon: provider.icon)
+        }
     }
 
-    /// 切换到指定标签页
+    /// 聚合模式：切换到指定标签页
     private func switchToTab(_ providerId: String) {
         guard let container = contentContainer,
             let webView = webViews[providerId]
         else { return }
 
-        // 移除当前 WebView
         container.subviews.forEach { $0.removeFromSuperview() }
 
-        // 添加新的 WebView
         webView.frame = container.bounds
         webView.autoresizingMask = [.width, .height]
         container.addSubview(webView)
 
         activeProviderID = providerId
-        tabBarView?.selectTab(providerId)
+        titleTabBar?.selectTab(providerId)
 
-        // 更新窗口标题
         if let provider = AIProviderRegistry.provider(for: providerId) {
-            panel?.title = provider.name
+            mergedPanel?.title = provider.name
         }
+    }
+
+    // MARK: - 胶囊构造
+
+    private func makeCapsule(positionKey: String, forMerged: Bool, providerId: String? = nil) -> FloatingCapsuleView {
+        FloatingCapsuleView(
+            positionKey: positionKey,
+            actions: [
+                CapsuleAction(
+                    id: Self.pinActionID,
+                    symbol: "pin",
+                    tooltip: "窗口置顶",
+                    kind: .toggle
+                ) { [weak self] in
+                    self?.toggleAlwaysOnTop(forMerged: forMerged, providerId: providerId)
+                },
+                CapsuleAction(
+                    id: "reload",
+                    symbol: "arrow.clockwise",
+                    tooltip: "刷新当前页面"
+                ) { [weak self] in
+                    let id = forMerged ? self?.activeProviderID : providerId
+                    guard let id else { return }
+                    self?.reloadWindow(for: id)
+                },
+                CapsuleAction(
+                    id: "external",
+                    symbol: "arrow.up.right.square",
+                    tooltip: "在浏览器中打开"
+                ) { [weak self] in
+                    let id = forMerged ? self?.activeProviderID : providerId
+                    guard let id else { return }
+                    self?.openInBrowser(providerId: id)
+                },
+                CapsuleAction(
+                    id: "close",
+                    symbol: "xmark",
+                    tooltip: forMerged ? "关闭当前标签" : "关闭窗口",
+                    kind: .destructive
+                ) { [weak self] in
+                    let id = forMerged ? self?.activeProviderID : providerId
+                    guard let id else { return }
+                    self?.destroyWindow(for: id)
+                },
+            ])
     }
 
     // MARK: - 窗口置顶
 
+    func toggleAlwaysOnTop(forMerged: Bool = true, providerId: String? = nil) {
+        if forMerged {
+            guard let panel = mergedPanel else { return }
+            let newState = panel.level != .floating
+            panel.level = newState ? .floating : .normal
+            mergedCapsule?.setToggle(Self.pinActionID, isOn: newState, tooltip: newState ? "取消置顶" : "窗口置顶")
+        } else if let id = providerId, let win = separateWindows[id] {
+            let newState = win.panel.level != .floating
+            win.panel.level = newState ? .floating : .normal
+            win.capsule.setToggle(Self.pinActionID, isOn: newState, tooltip: newState ? "取消置顶" : "窗口置顶")
+        }
+    }
+
+    /// 旧接口兼容
     func toggleAlwaysOnTop() {
-        guard let panel else { return }
-        let newState = panel.level != .floating
-        panel.level = newState ? .floating : .normal
-        capsule?.setToggle(
-            Self.pinActionID,
-            isOn: newState,
-            tooltip: newState ? "取消置顶" : "窗口置顶"
-        )
+        toggleAlwaysOnTop(forMerged: true)
     }
 
     /// 设置窗口置顶状态
-    func setAlwaysOnTop(for _: String, flag: Bool) {
-        guard let panel else { return }
-        panel.level = flag ? .floating : .normal
-        capsule?.setToggle(
-            Self.pinActionID,
-            isOn: flag,
-            tooltip: flag ? "取消置顶" : "窗口置顶"
-        )
+    func setAlwaysOnTop(for providerId: String, flag: Bool) {
+        if isMergeMode {
+            guard let panel = mergedPanel else { return }
+            panel.level = flag ? .floating : .normal
+            mergedCapsule?.setToggle(Self.pinActionID, isOn: flag, tooltip: flag ? "取消置顶" : "窗口置顶")
+        } else if let win = separateWindows[providerId] {
+            win.panel.level = flag ? .floating : .normal
+            win.capsule.setToggle(Self.pinActionID, isOn: flag, tooltip: flag ? "取消置顶" : "窗口置顶")
+        }
     }
 
     /// 在外部浏览器中打开
@@ -391,33 +555,26 @@ final class AIWebViewWindowManager {
         NSWorkspace.shared.open(url)
     }
 
-    /// 获取所有已打开标签的 Provider ID
-    func activeProviderIDs() -> Set<String> {
-        guard let panel, panel.isVisible else { return [] }
-        return Set(webViews.keys)
-    }
+    // MARK: - 窗口位置持久化（聚合模式）
 
-    // MARK: - 窗口位置持久化
-
-    private func saveWindowFrame() {
-        guard let panel else { return }
+    private func saveMergedFrame() {
+        guard let panel = mergedPanel else { return }
         let frame = panel.frame
         UserDefaults.standard.set(
             ["x": frame.origin.x, "y": frame.origin.y,
              "w": frame.size.width, "h": frame.size.height],
-            forKey: Self.frameKey
+            forKey: Self.mergedFrameKey
         )
     }
 
-    private func restoreWindowFrame(_ panel: AIWebViewPanel) {
-        if let saved = UserDefaults.standard.dictionary(forKey: Self.frameKey),
+    private func restoreMergedFrame(_ panel: AIWebViewPanel) {
+        if let saved = UserDefaults.standard.dictionary(forKey: Self.mergedFrameKey),
             let x = saved["x"] as? CGFloat,
             let y = saved["y"] as? CGFloat,
             let w = saved["w"] as? CGFloat,
             let h = saved["h"] as? CGFloat
         {
             let frame = NSRect(x: x, y: y, width: max(w, 600), height: max(h, 400))
-            // 确保窗口在可见屏幕范围内
             if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(frame) }) {
                 panel.setFrame(frame, display: false)
                 return
@@ -425,15 +582,64 @@ final class AIWebViewWindowManager {
         }
         panel.center()
     }
+
+    // MARK: - 窗口位置持久化（独立模式）
+
+    private func saveSeparateFrame(providerId: String, panel: AIWebViewPanel) {
+        let frame = panel.frame
+        UserDefaults.standard.set(
+            ["x": frame.origin.x, "y": frame.origin.y,
+             "w": frame.size.width, "h": frame.size.height],
+            forKey: Self.separateFramePrefix + providerId + ".frame"
+        )
+    }
+
+    private func restoreSeparateFrame(providerId: String, panel: AIWebViewPanel) {
+        let key = Self.separateFramePrefix + providerId + ".frame"
+        if let saved = UserDefaults.standard.dictionary(forKey: key),
+            let x = saved["x"] as? CGFloat,
+            let y = saved["y"] as? CGFloat,
+            let w = saved["w"] as? CGFloat,
+            let h = saved["h"] as? CGFloat
+        {
+            let frame = NSRect(x: x, y: y, width: max(w, 600), height: max(h, 400))
+            if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(frame) }) {
+                panel.setFrame(frame, display: false)
+                return
+            }
+        }
+        panel.center()
+    }
+
+    // MARK: - 测试用工厂
+
+    /// 构建面板（仅用于测试断言窗口配置）
+    static func makePanel(provider: AIProvider, size: NSSize) -> AIWebViewPanel {
+        let panel = AIWebViewPanel(
+            contentRect: NSRect(origin: .zero, size: size),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = provider.name
+        panel.titlebarAppearsTransparent = true
+        panel.titleVisibility = .visible
+        panel.isMovableByWindowBackground = true
+        panel.minSize = NSSize(width: 600, height: 400)
+        panel.isReleasedWhenClosed = false
+        panel.hidesOnDeactivate = false
+        panel.identifier = NSUserInterfaceItemIdentifier("quick.ai.\(provider.id)")
+        return panel
+    }
 }
 
-// MARK: - 标签栏视图
+// MARK: - 标题栏标签视图
 
-/// AI 聚合窗口的标签栏
+/// 嵌入标题栏的标签栏，用于聚合模式
 ///
 /// 每个打开的 Provider 一个标签项，支持点击切换和关闭
 @MainActor
-final class AITabBarView: NSView {
+final class AITitleTabBarView: NSView {
 
     private let onSelect: (String) -> Void
     private let onClose: (String) -> Void
@@ -453,7 +659,6 @@ final class AITabBarView: NSView {
 
     private func setupViews() {
         wantsLayer = true
-        layer?.backgroundColor = NSColor(DesignTokens.Colors.aiTabBarBackground).cgColor
 
         // 底部分隔线
         let separator = NSView()
@@ -488,7 +693,7 @@ final class AITabBarView: NSView {
             separator.leadingAnchor.constraint(equalTo: leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: trailingAnchor),
             separator.bottomAnchor.constraint(equalTo: bottomAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 1)
+            separator.heightAnchor.constraint(equalToConstant: 1),
         ])
     }
 
@@ -520,7 +725,6 @@ final class AITabBarView: NSView {
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        layer?.backgroundColor = NSColor(DesignTokens.Colors.aiTabBarBackground).cgColor
     }
 }
 
@@ -596,7 +800,7 @@ private final class AITabItemView: NSView {
 
             widthAnchor.constraint(greaterThanOrEqualToConstant: 100),
             widthAnchor.constraint(lessThanOrEqualToConstant: 180),
-            heightAnchor.constraint(equalToConstant: DesignTokens.Size.aiTabBarHeight - 4)
+            heightAnchor.constraint(equalToConstant: DesignTokens.Size.aiTabBarHeight - 4),
         ])
         translatesAutoresizingMaskIntoConstraints = false
     }

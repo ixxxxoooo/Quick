@@ -76,6 +76,8 @@ public enum PluginSettingKey {
     /// 与 `SettingsKey.AI`（`quick.ai.*`）不同：后者是宿主 AI 基座，供 `AIService` 读 API/模型等。
     public enum AIPortal {
         public static let defaultAlwaysOnTop = "ai.defaultAlwaysOnTop"
+        /// 是否将所有 AI 窗口合并到一个标签页窗口中（默认关，各 Provider 独立窗口）
+        public static let mergeWindows = "ai.mergeWindows"
         /// 单个 Provider 的开关
         public static func providerEnabled(_ providerID: String) -> String {
             "ai.provider.\(providerID).enabled"

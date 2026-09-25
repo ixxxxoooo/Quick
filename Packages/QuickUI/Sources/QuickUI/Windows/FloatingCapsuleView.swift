@@ -326,21 +326,37 @@ public final class FloatingCapsuleView: NSView {
         }
         guard isDragging, let superview else { return }
 
-        // 拖动期间只改图层位置，跳过完整的 layout() 周期：
-        // setFrameOrigin 不触发 needsLayout，而 frame.origin = 会。
-        // 结合 CATransaction 关掉隐式动画，一帧里只做一次图层位移。
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
         let target = clampedOrigin(
             NSPoint(x: frameOrigin.x + dx, y: frameOrigin.y + dy),
             in: superview.bounds.size
         )
-        setFrameOrigin(target)
+
+        // 拖动期间直接写图层位置，完全绕过 AppKit 的 frame/layout 周期。
+        // `layer.position` 是 Core Animation 属性，只走 GPU 合成，
+        // 比 `setFrameOrigin`（还要通知 window server）更快。
+        // 松手后在 mouseUp 里用 `setFrameOrigin` 同步一次真实 frame。
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let anchorOffset = NSPoint(
+            x: (layer?.anchorPoint.x ?? 0) * bounds.width,
+            y: (layer?.anchorPoint.y ?? 0) * bounds.height
+        )
+        layer?.position = NSPoint(
+            x: target.x + anchorOffset.x,
+            y: target.y + anchorOffset.y
+        )
         CATransaction.commit()
+        // 记录最终目标，mouseUp 会用它对齐 frame
+        dragTarget = target
     }
+
+    /// 拖动期间记住的最终位置，用于 mouseUp 对齐 AppKit frame
+    private var dragTarget: NSPoint = .zero
 
     public override func mouseUp(with _: NSEvent) {
         guard isDragging else { return }
+        // 拖动结束：把图层位置同步到 AppKit frame，恢复外观
+        setFrameOrigin(dragTarget)
         alphaValue = 1
         applyDraggingAppearance(false)
         persistPosition()
