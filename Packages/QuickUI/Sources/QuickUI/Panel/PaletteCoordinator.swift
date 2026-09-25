@@ -369,21 +369,34 @@ public final class PaletteCoordinator {
     public func hide(restoreFocus: Bool = true) -> NSRunningApplication? {
         let started = ContinuousClock.now
         let wasVisible = isVisible
+        // 隐藏前是否是 key window、第一响应者是谁：这两点决定了 orderOut 是走
+        // 「普通出栈」（~3 ms）还是「key 窗口 + 输入会话同步拆除」（实测 200-470 ms）。
+        let wasKey = panel?.isKeyWindow ?? false
+        let responderName = panel?.firstResponder.map { String(describing: type(of: $0)) } ?? "无"
 
         let app = restoreFocus ? previousApp : nil
         previousApp = nil
 
         // 立即触发上一应用激活：尽早让 WindowServer 开始切焦点
+        var activateMS = 0.0
         if let app, !app.isTerminated {
+            let t0 = ContinuousClock.now
             app.activate()
+            activateMS = t0.duration(to: .now).ms
         }
 
+        var resignMS = 0.0
+        var orderOutOnlyMS = 0.0
         if let panel {
             // 撤掉焦点编辑态，避免与系统输入会话（TextInputUI）产生 deferral block 竞争
             if panel.firstResponder != nil && panel.firstResponder !== panel {
+                let t1 = ContinuousClock.now
                 panel.makeFirstResponder(nil)
+                resignMS = t1.duration(to: .now).ms
             }
+            let t2 = ContinuousClock.now
             panel.orderOut(nil)
+            orderOutOnlyMS = t2.duration(to: .now).ms
         }
         let orderOutMS = started.duration(to: .now).ms
 
@@ -403,8 +416,13 @@ public final class PaletteCoordinator {
 
             log.notice(
                 """
-                面板已隐藏（同步阶段）：orderOut \(orderOutMS, format: .fixed(precision: 1)) ms，\
-                恢复焦点=\(restoreFocus, privacy: .public)
+                面板已隐藏（同步阶段）：总 \(orderOutMS, format: .fixed(precision: 1)) ms\
+                [激活上一应用 \(activateMS, format: .fixed(precision: 1))，\
+                撤销第一响应者 \(resignMS, format: .fixed(precision: 1))，\
+                orderOut \(orderOutOnlyMS, format: .fixed(precision: 1))]，\
+                恢复焦点=\(restoreFocus, privacy: .public)，\
+                隐藏前是 key=\(wasKey, privacy: .public)，\
+                第一响应者=\(responderName, privacy: .public)
                 """)
             EventBus.shared.post(PaletteVisibilityChangedEvent(isVisible: false))
         }

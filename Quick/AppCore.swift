@@ -656,8 +656,9 @@ final class AppCore {
         subscriptions.append(
             bus.on(PasteIntoPreviousAppEvent.self) { [weak self] _ in
                 guard let self else { return }
+                let requestedAt = ContinuousClock.now
                 let targetApp = self.paletteCoordinator.hide(restoreFocus: true)
-                self.schedulePasteIntoPreviousApp(targetApp: targetApp)
+                self.schedulePasteIntoPreviousApp(targetApp: targetApp, requestedAt: requestedAt)
             }
         )
 
@@ -807,7 +808,10 @@ final class AppCore {
     /// 相比固定死等 140ms，这里主动轮询 `frontmostApplication`：一旦目标应用成为前台，
     /// 仅保留 25ms 事件队列缓冲区就立即合成 ⌘V，实测 ~35-50ms 即可完成填充；若目标未响应
     /// 则在 120ms 兜底触发，兼顾瞬时手感与稳定性。
-    private func schedulePasteIntoPreviousApp(targetApp: NSRunningApplication? = nil) {
+    private func schedulePasteIntoPreviousApp(
+        targetApp: NSRunningApplication? = nil,
+        requestedAt: ContinuousClock.Instant = .now
+    ) {
         let canPaste = pasteService.canSynthesize
         pendingPasteTask?.cancel()
         pendingPasteTask = Task { @MainActor [weak self] in
@@ -842,7 +846,15 @@ final class AppCore {
 
             guard !Task.isCancelled else { return }
             let waited = start.duration(to: .now).invokeMS
-            self.log.notice("准备合成 ⌘V，等待上一应用就绪耗时：\(waited, format: .fixed(precision: 1)) ms")
+            // 从「用户按下回车」到「⌘V 发出」的总时长：隐藏面板 + 等待目标应用就绪。
+            // 用户感知的就是这一段，所以两段都要打，别分开去猜。
+            let total = requestedAt.duration(to: .now).invokeMS
+            self.log.notice(
+                """
+                准备合成 ⌘V：自收到粘贴请求起 \(total, format: .fixed(precision: 1)) ms，\
+                其中等待上一应用就绪 \(waited, format: .fixed(precision: 1)) ms，\
+                目标应用=\(targetApp.map { "\($0.localizedName ?? "?")" } ?? "无", privacy: .public)
+                """)
             self.pasteService.paste()
         }
     }
