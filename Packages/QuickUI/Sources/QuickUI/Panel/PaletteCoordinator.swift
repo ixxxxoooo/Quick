@@ -363,14 +363,18 @@ public final class PaletteCoordinator {
     }
 
     /// 隐藏面板
+    ///
+    /// **同步阶段只做「让面板消失」**：激活上一个应用 → `orderOut`。其余（撤销第一响应者、
+    /// 键盘布局还原）都排到键盘事件派发结束之后，见 `hidePostTask` 的说明。
     /// - Parameter restoreFocus: 是否恢复之前应用的焦点
     /// - Returns: 被恢复焦点的上一应用（如果有）
     @discardableResult
     public func hide(restoreFocus: Bool = true) -> NSRunningApplication? {
         let started = ContinuousClock.now
         let wasVisible = isVisible
-        // 隐藏前是否是 key window、第一响应者是谁：这两点决定了 orderOut 是走
-        // 「普通出栈」（~3 ms）还是「key 窗口 + 输入会话同步拆除」（实测 200-470 ms）。
+        // 隐藏前是否是 key window、第一响应者是谁：这两点曾经解释了「同一条 hide 有时 3 ms、
+        // 有时 400 ms」—— 输入框处于编辑态时（`_SystemTextFieldFieldEditor`）代价全在
+        // 撤销第一响应者上，所以留在这里，出问题时一眼能对上是哪种场景。
         let wasKey = panel?.isKeyWindow ?? false
         let responderName = panel?.firstResponder.map { String(describing: type(of: $0)) } ?? "无"
 
@@ -385,40 +389,62 @@ public final class PaletteCoordinator {
             activateMS = t0.duration(to: .now).ms
         }
 
-        var resignMS = 0.0
         var orderOutOnlyMS = 0.0
         if let panel {
-            // 撤掉焦点编辑态，避免与系统输入会话（TextInputUI）产生 deferral block 竞争
-            if panel.firstResponder != nil && panel.firstResponder !== panel {
-                let t1 = ContinuousClock.now
-                panel.makeFirstResponder(nil)
-                resignMS = t1.duration(to: .now).ms
-            }
-            let t2 = ContinuousClock.now
+            let t1 = ContinuousClock.now
             panel.orderOut(nil)
-            orderOutOnlyMS = t2.duration(to: .now).ms
+            orderOutOnlyMS = t1.duration(to: .now).ms
         }
-        let orderOutMS = started.duration(to: .now).ms
+        let syncMS = started.duration(to: .now).ms
 
         if wasVisible {
             let didHideCallback = onPanelDidHide
+            let panelToResign = panel
 
             hidePostTask?.cancel()
             hidePostTask = Task { @MainActor [weak self] in
-                let postStart = ContinuousClock.now
                 guard !Task.isCancelled else { return }
-                didHideCallback?()
-                let postMS = postStart.duration(to: .now).ms
-                if postMS > 5 {
-                    self?.log.debug("hide 异步后处理：\(postMS, format: .fixed(precision: 1)) ms")
+
+                // 先让出主线程一轮：面板已经不可见，撤销编辑态与还原键盘布局都属于收尾，
+                // 不该排在「已经在等结果的操作」前面。粘贴回上一应用就是那种操作 —— 它由
+                // 隐藏面板的那个事件触发，任务排在本次 hide() 之后，只能靠这里让位。
+                //
+                // 让出之后必须重新查一次取消：这一轮里用户可能又唤出了面板（`show()` 会取消
+                // 本任务），那时再撤销第一响应者会把它刚拿到的编辑态抢掉。
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+
+                // 撤销第一响应者：断开 field editor 与输入法（TextInputUI）的会话。
+                //
+                // **必须在键盘事件派发结束之后做。** 主搜索的输入框处于编辑态时，在 Carbon
+                // 热键回调里同步调用 `makeFirstResponder(nil)` 要阻塞 186-248 ms（输入会话的
+                // deferral block）；原先它排在 orderOut 之前，于是那 200+ ms 面板一直停在屏幕上
+                // ——用户看到的就是「按了快捷键但窗口不关」。挪到本轮事件之后，同一个调用
+                // 实测只要 1-6 ms。延后不影响最终结果：面板已经不可见，这里只负责把
+                // 编辑态与输入法会话收干净，随后再还原键盘布局。
+                var resignMS = 0.0
+                if let panelToResign, panelToResign.firstResponder != nil,
+                    panelToResign.firstResponder !== panelToResign
+                {
+                    let t = ContinuousClock.now
+                    panelToResign.makeFirstResponder(nil)
+                    resignMS = t.duration(to: .now).ms
                 }
+
+                let restoreStart = ContinuousClock.now
+                didHideCallback?()
+                let restoreMS = restoreStart.duration(to: .now).ms
+                self?.log.notice(
+                    """
+                    hide 异步后处理：撤销第一响应者 \(resignMS, format: .fixed(precision: 1)) ms，\
+                    键盘布局还原 \(restoreMS, format: .fixed(precision: 1)) ms
+                    """)
             }
 
             log.notice(
                 """
-                面板已隐藏（同步阶段）：总 \(orderOutMS, format: .fixed(precision: 1)) ms\
+                面板已隐藏（同步阶段）：总 \(syncMS, format: .fixed(precision: 1)) ms\
                 [激活上一应用 \(activateMS, format: .fixed(precision: 1))，\
-                撤销第一响应者 \(resignMS, format: .fixed(precision: 1))，\
                 orderOut \(orderOutOnlyMS, format: .fixed(precision: 1))]，\
                 恢复焦点=\(restoreFocus, privacy: .public)，\
                 隐藏前是 key=\(wasKey, privacy: .public)，\
