@@ -19,7 +19,15 @@ public final class PaletteCoordinator {
     public private(set) var activePluginID: String?
 
     /// 面板是否可见
-    public var isVisible: Bool { panel?.isVisible ?? false }
+    ///
+    /// 隐藏分两步（见 `hide()`）：先让面板在视觉上消失，再在事件派发结束后真正出栈。
+    /// 这两步之间 `panel.isVisible` 还是 true，但对用户来说面板已经关了 —— 所以这里要
+    /// 按逻辑状态回答。否则这个窗口里再按一次快捷键会被判成「面板开着」而走关闭分支，
+    /// 表现就是「按了没反应」。
+    public var isVisible: Bool {
+        if isHiding { return false }
+        return panel?.isVisible ?? false
+    }
 
     /// 搜索框文本
     ///
@@ -128,11 +136,18 @@ public final class PaletteCoordinator {
     /// 面板外点击的本地监视器（发往本应用其他窗口的点击）
     private var outsideClickLocalMonitor: Any?
 
-    /// hide 后异步做的焦点恢复 / 键盘布局还原
+    /// hide 的后处理任务：撤销第一响应者、`orderOut`、键盘布局还原
     ///
-    /// 必须在下次 show 时取消：否则用户粘贴后立刻再唤出面板，滞后的
-    /// `previousApp.activate()` 会把刚到手的焦点再抢走，键盘看起来像卡死。
+    /// 这三件事都要同步拆除输入会话或改系统输入源，放在 Carbon 热键事件派发里做会阻塞
+    /// 300-450 ms，所以整体挪到派发结束之后（见 `hide()` 的两步说明）。
+    /// 必须在下次 show 时取消：面板又要显示了，任务尾巴上的出栈与布局还原会把刚显示出来的
+    /// 面板再拆掉。
     private var hidePostTask: Task<Void, Never>?
+
+    /// 是否处在「已经看不见、但还没真正出栈」的那一小段
+    ///
+    /// 只用来让 `isVisible` 按逻辑状态回答，见它的说明。
+    private var isHiding = false
 
     public init() {
         observeClipboardChanges()
@@ -184,9 +199,16 @@ public final class PaletteCoordinator {
     ///   - pluginID: 目标插件 ID（nil 表示主搜索）
     ///   - query: 预填搜索文本
     public func show(pluginID: String? = nil, query: String? = nil) {
-        // 取消尚未执行的 hide 后处理，避免 previousApp.activate 抢走本次焦点
+        // 取消尚未执行的 hide 后处理，避免 previousApp.activate 抢走本次焦点；
+        // 同时把 hide 的「视觉隐藏」状态整体恢复回来（alpha、鼠标穿透、逻辑可见性），
+        // 否则面板会以 alpha=0 被推到前台，用户看到的是「按了快捷键但面板不出来」。
         hidePostTask?.cancel()
         hidePostTask = nil
+        isHiding = false
+        if let panel {
+            panel.alphaValue = 1
+            panel.ignoresMouseEvents = false
+        }
 
         if let query { self.query = query }
 
@@ -235,6 +257,9 @@ public final class PaletteCoordinator {
         // 键盘布局切换（~10 ms）放在 presentPanel 之后：面板先出现，布局再切。
         // 人类反应时间 > 200 ms，不可能在 10 ms 内开始打字，所以不影响体验。
         // 放在 presentPanel 之前时，10 ms 的系统调用全部变成了面板出现的感知延迟。
+        //
+        // 注意它**不是**隐藏延迟的来源：把切换挪到搜索框拿焦点之前试过，拆除输入会话的
+        // 代价一模一样（见 `hide()` 的两步说明），所以不要为了省那点代价再调整这里。
         onPanelWillShow?()
 
         // 插件模式：视图可能还在树上（上次只是 orderOut），onAppear 不会再跑。
@@ -364,17 +389,25 @@ public final class PaletteCoordinator {
 
     /// 隐藏面板
     ///
-    /// **同步阶段只做「让面板消失」**：激活上一个应用 → `orderOut`。其余（撤销第一响应者、
-    /// 键盘布局还原）都排到键盘事件派发结束之后，见 `hidePostTask` 的说明。
+    /// **分两步，这个顺序是本类型最关键的一条约束：**
+    ///
+    /// 1. **同步阶段只改窗口的合成属性**（`alphaValue = 0` + 鼠标穿透）。这两件事不碰输入
+    ///    会话，在 Carbon 热键事件派发里也只要约 1 ms，所以面板是立刻消失的。
+    /// 2. **真正出栈（撤销第一响应者 + `orderOut`）排到事件派发结束后**，见 `hidePostTask`。
+    ///
+    /// 为什么不能在这一步里顺手把窗口出栈：`makeFirstResponder(nil)` 与 `orderOut` 都会同步
+    /// 拆除输入会话，而在热键事件派发中做这件事要阻塞 300-450 ms（实测：撤销第一响应者
+    /// 289-393 ms、`orderOut` 405-414 ms）。那段时间面板就停在屏幕上 —— 正是「按了快捷键
+    /// 但窗口不关」。两者都试过也没用，所以这里不再挑「哪一步先做」，而是把它整段挪出
+    /// 事件派发。
     /// - Parameter restoreFocus: 是否恢复之前应用的焦点
     /// - Returns: 被恢复焦点的上一应用（如果有）
     @discardableResult
     public func hide(restoreFocus: Bool = true) -> NSRunningApplication? {
         let started = ContinuousClock.now
         let wasVisible = isVisible
-        // 隐藏前是否是 key window、第一响应者是谁：这两点曾经解释了「同一条 hide 有时 3 ms、
-        // 有时 400 ms」—— 输入框处于编辑态时（`_SystemTextFieldFieldEditor`）代价全在
-        // 撤销第一响应者上，所以留在这里，出问题时一眼能对上是哪种场景。
+        // 隐藏前是不是 key window、第一响应者是谁：拆输入会话的代价与它们直接相关，
+        // 出问题时一眼能对上是哪种场景。
         let wasKey = panel?.isKeyWindow ?? false
         let responderName = panel?.firstResponder.map { String(describing: type(of: $0)) } ?? "无"
 
@@ -389,54 +422,61 @@ public final class PaletteCoordinator {
             activateMS = t0.duration(to: .now).ms
         }
 
-        var orderOutOnlyMS = 0.0
+        // 视觉上立刻消失：改合成属性，不碰输入会话
+        var visualMS = 0.0
         if let panel {
             let t1 = ContinuousClock.now
-            panel.orderOut(nil)
-            orderOutOnlyMS = t1.duration(to: .now).ms
+            panel.alphaValue = 0
+            // 面板还在窗口列表里（只是全透明），而它是 nonactivating 浮窗：不关掉鼠标事件的话
+            // 点它所在的位置会被这个看不见的窗口吃掉，而不是落到下面的应用上。
+            panel.ignoresMouseEvents = true
+            visualMS = t1.duration(to: .now).ms
         }
         let syncMS = started.duration(to: .now).ms
 
         if wasVisible {
+            isHiding = true
             let didHideCallback = onPanelDidHide
-            let panelToResign = panel
+            let panelToTearDown = panel
 
             hidePostTask?.cancel()
             hidePostTask = Task { @MainActor [weak self] in
                 guard !Task.isCancelled else { return }
 
-                // 先让出主线程一轮：面板已经不可见，撤销编辑态与还原键盘布局都属于收尾，
-                // 不该排在「已经在等结果的操作」前面。粘贴回上一应用就是那种操作 —— 它由
-                // 隐藏面板的那个事件触发，任务排在本次 hide() 之后，只能靠这里让位。
+                // 先让出主线程一轮：面板已经不在屏幕上了，这里属于收尾，不该排在
+                // 「已经在等结果的操作」前面。粘贴回上一应用就是那种操作 —— 它由隐藏面板的
+                // 那个事件触发，任务排在本次 hide() 之后，只能靠这里让位。
                 //
-                // 让出之后必须重新查一次取消：这一轮里用户可能又唤出了面板（`show()` 会取消
-                // 本任务），那时再撤销第一响应者会把它刚拿到的编辑态抢掉。
+                // 让出之后要重新查一次取消：这一轮里用户可能又唤出了面板（`show()` 会取消
+                // 本任务并把可见性恢复回来），那时再拆除窗口与还原布局就全错了。
                 await Task.yield()
                 guard !Task.isCancelled else { return }
 
-                // 撤销第一响应者：断开 field editor 与输入法（TextInputUI）的会话。
-                //
-                // **必须在键盘事件派发结束之后做。** 主搜索的输入框处于编辑态时，在 Carbon
-                // 热键回调里同步调用 `makeFirstResponder(nil)` 要阻塞 186-248 ms（输入会话的
-                // deferral block）；原先它排在 orderOut 之前，于是那 200+ ms 面板一直停在屏幕上
-                // ——用户看到的就是「按了快捷键但窗口不关」。挪到本轮事件之后，同一个调用
-                // 实测只要 1-6 ms。延后不影响最终结果：面板已经不可见，这里只负责把
-                // 编辑态与输入法会话收干净，随后再还原键盘布局。
                 var resignMS = 0.0
-                if let panelToResign, panelToResign.firstResponder != nil,
-                    panelToResign.firstResponder !== panelToResign
-                {
+                var orderOutMS = 0.0
+                if let panelToTearDown {
+                    // 撤掉焦点编辑态：断开 field editor 与输入法（TextInputUI）的会话
+                    if panelToTearDown.firstResponder != nil,
+                        panelToTearDown.firstResponder !== panelToTearDown
+                    {
+                        let t = ContinuousClock.now
+                        panelToTearDown.makeFirstResponder(nil)
+                        resignMS = t.duration(to: .now).ms
+                    }
                     let t = ContinuousClock.now
-                    panelToResign.makeFirstResponder(nil)
-                    resignMS = t.duration(to: .now).ms
+                    panelToTearDown.orderOut(nil)
+                    orderOutMS = t.duration(to: .now).ms
                 }
 
                 let restoreStart = ContinuousClock.now
                 didHideCallback?()
                 let restoreMS = restoreStart.duration(to: .now).ms
+
+                self?.isHiding = false
                 self?.log.notice(
                     """
                     hide 异步后处理：撤销第一响应者 \(resignMS, format: .fixed(precision: 1)) ms，\
+                    orderOut \(orderOutMS, format: .fixed(precision: 1)) ms，\
                     键盘布局还原 \(restoreMS, format: .fixed(precision: 1)) ms
                     """)
             }
@@ -445,7 +485,7 @@ public final class PaletteCoordinator {
                 """
                 面板已隐藏（同步阶段）：总 \(syncMS, format: .fixed(precision: 1)) ms\
                 [激活上一应用 \(activateMS, format: .fixed(precision: 1))，\
-                orderOut \(orderOutOnlyMS, format: .fixed(precision: 1))]，\
+                视觉隐藏 \(visualMS, format: .fixed(precision: 1))]，\
                 恢复焦点=\(restoreFocus, privacy: .public)，\
                 隐藏前是 key=\(wasKey, privacy: .public)，\
                 第一响应者=\(responderName, privacy: .public)
