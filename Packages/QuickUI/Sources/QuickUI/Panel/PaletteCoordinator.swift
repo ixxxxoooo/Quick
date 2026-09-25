@@ -441,6 +441,9 @@ public final class PaletteCoordinator {
 
             hidePostTask?.cancel()
             hidePostTask = Task { @MainActor [weak self] in
+                // 无论从哪条分支退出，都要把「逻辑上已隐藏」这一位交还回去：中途被取消意味着
+                // 面板又被唤出来了（`show()` 已经把它置回 false），正常走完则窗口已经出栈。
+                defer { self?.isHiding = false }
                 guard !Task.isCancelled else { return }
 
                 // 先让出主线程一轮：面板已经不在屏幕上了，这里属于收尾，不该排在
@@ -455,7 +458,11 @@ public final class PaletteCoordinator {
                 var resignMS = 0.0
                 var orderOutMS = 0.0
                 if let panelToTearDown {
-                    // 撤掉焦点编辑态：断开 field editor 与输入法（TextInputUI）的会话
+                    // 撤掉焦点编辑态：断开 field editor 与输入法（TextInputUI）的会话。
+                    // 这一步可能耗时几百毫秒，而 AppKit 在这种调用里会跑嵌套的 runloop ——
+                    // 也就是说**用户的下一次按键可能在这里面被处理**：`show()` 会把本任务
+                    // 取消掉。所以每拆完一步都要重新确认自己还有效，否则这个「迟到的收尾」
+                    // 会把用户刚打开的面板又 orderOut 掉。
                     if panelToTearDown.firstResponder != nil,
                         panelToTearDown.firstResponder !== panelToTearDown
                     {
@@ -463,16 +470,18 @@ public final class PaletteCoordinator {
                         panelToTearDown.makeFirstResponder(nil)
                         resignMS = t.duration(to: .now).ms
                     }
+                    guard !Task.isCancelled else { return }
+
                     let t = ContinuousClock.now
                     panelToTearDown.orderOut(nil)
                     orderOutMS = t.duration(to: .now).ms
                 }
+                guard !Task.isCancelled else { return }
 
                 let restoreStart = ContinuousClock.now
                 didHideCallback?()
                 let restoreMS = restoreStart.duration(to: .now).ms
 
-                self?.isHiding = false
                 self?.log.notice(
                     """
                     hide 异步后处理：撤销第一响应者 \(resignMS, format: .fixed(precision: 1)) ms，\
