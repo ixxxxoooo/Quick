@@ -19,7 +19,6 @@ struct AIProviderSettingsTests {
     private static let providerID = "deepseek"
     private static let touchedKeys = [
         PluginSettingKey.AIPortal.providerEnabled(providerID),
-        PluginSettingKey.AIPortal.providerKeywords(providerID),
         PluginSettingKey.AIPortal.defaultAlwaysOnTop
     ]
 
@@ -113,52 +112,6 @@ struct AIProviderSettingsTests {
             UserDefaults.standard.set(true, forKey: PluginSettingKey.AIPortal.defaultAlwaysOnTop)
             #expect(
                 PluginDefaults.isEnabled(PluginSettingKey.AIPortal.defaultAlwaysOnTop, default: false))
-        }
-    }
-
-    // MARK: - 自定义触发词
-
-    /// 自定义触发词要走完两条路：过得了触发词闸门（`accepts`），再在结果里直达对应
-    /// Provider —— 只过闸门不出结果，用户打了自己的唤醒词却什么也唤不出来
-    @Test("自定义触发词能过闸门并直达对应 Provider")
-    func customKeywordTriggersProvider() async throws {
-        try await Self.withStandardDefaults {
-            UserDefaults.standard.set(
-                "MyAI, 文心", forKey: PluginSettingKey.AIPortal.providerKeywords(Self.providerID))
-
-            let plugin = AIPlugin()
-            #expect(plugin.accepts(query: "myai"), "自定义词要过得了触发词闸门")
-
-            let items = await plugin.dynamicSearch(query: "myai")
-            #expect(
-                items.map(\.id) == ["plugin.open.ai", "ai.\(Self.providerID)"],
-                "输入自定义词应当直达配置的那个 Provider")
-            #expect(items[1].relevance == 0.8, "自定义词精确命中与内置词同权")
-        }
-    }
-
-    @Test("自定义触发词只命中配置的那个 Provider")
-    func customKeywordScopedToProvider() async throws {
-        try await Self.withStandardDefaults {
-            UserDefaults.standard.set(
-                "myai", forKey: PluginSettingKey.AIPortal.providerKeywords(Self.providerID))
-
-            let items = await AIPlugin().dynamicSearch(query: "myai")
-            #expect(
-                !items.contains { $0.id != "plugin.open.ai" && $0.id != "ai.\(Self.providerID)" },
-                "别的 Provider 不该被这个词带出来")
-        }
-    }
-
-    @Test("没配置自定义触发词时行为不变")
-    func customKeywordEmptyChangesNothing() async throws {
-        try await Self.withStandardDefaults {
-            UserDefaults.standard.set("", forKey: PluginSettingKey.AIPortal.providerKeywords(Self.providerID))
-
-            let items = await AIPlugin().dynamicSearch(query: Self.providerID)
-            #expect(
-                items.contains { $0.id == "ai.\(Self.providerID)" },
-                "内置关键词路径不应受空配置影响")
         }
     }
 }

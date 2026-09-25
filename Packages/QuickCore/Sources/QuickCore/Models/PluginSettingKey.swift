@@ -80,10 +80,6 @@ public enum PluginSettingKey {
         public static func providerEnabled(_ providerID: String) -> String {
             "ai.provider.\(providerID).enabled"
         }
-        /// 单个 Provider 的自定义触发词（逗号/空格分隔的原文，空串表示未配置）
-        public static func providerKeywords(_ providerID: String) -> String {
-            "ai.provider.\(providerID).keywords"
-        }
     }
 
     /// 翻译

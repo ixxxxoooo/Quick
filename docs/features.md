@@ -865,12 +865,14 @@
 - **胶囊是窗口里唯一常驻的控件，且只属于 AI 窗口。** 内容是一整块第三方网页，
   不能依赖页面 DOM（随时会变），所以控制只能浮在上面；分离窗口有自己的标题栏，
   控制长在标题栏里，不用胶囊（见 `docs/architecture.md`）。
-- **Provider 关键词表是匹配的唯一事实来源。** 匹配用的是合并结果：`AIProviderRegistry.all`
-  里每个 Provider 的内置 `keywords`，加上用户在设置页配置的自定义触发词
-  （`PluginSettingKey.AIPortal.providerKeywords(_:)`，由 `AIProviderRegistry.parseCustomKeywords(_:)`
-  统一解析为小写、去空、去重）。合并后的并集（`AIPlugin.searchKeywords`）同时喂给触发词
-  闸门与打分，自定义词与内置词同权 —— 闸门里少了它，`accepts` 放不下对应查询，
-  打分再准也没有机会跑。不要在别处再抄一份。
+- **触发词是「服务名 + 内置别名」，没有用户配置项。** 每条触发词由 `AIProvider.triggerWords`
+  给出：`name.lowercased()` 排第一，其后是内置 `aliases`。名称必须从 `name` 推导，而不是
+  写进别名表 —— 拉丁别名按整词比、中文别名按前缀比，`智谱清言` / `通义千问` 这类全名
+  一条别名都命不中，用户打全名反而搜不到。这个并集（`AIProviderRegistry.allKeywords`，
+  即 `AIPlugin.searchKeywords`）同时喂给触发词闸门与打分，名称与别名同权 ——
+  闸门里少了它，`accepts` 放不下对应查询，打分再准也没有机会跑。不要在别处再抄一份。
+  **不要再加回「自定义触发词」这类设置项**：用户记得住的就是服务叫什么，多一个输入框
+  只会多一处可以填错的地方。
 - **「这个 Provider 能不能用」只有一个判定，而且必须画出来。** 判定是
   `AIWebViewWindowManager.isProviderEnabled(_:)` —— 门户卡片、搜索结果、`openOrFocus`
   三处都问它。**设置页停用的 Provider，在面板上要显示成「已停用」加一个不可点的按钮**，
@@ -897,7 +899,7 @@
 | 类型 | 职责 |
 | --- | --- |
 | `AIPlugin` | 插件入口：搜索结果（门户入口 + 命中的 Provider）与 `makeView()` |
-| `AIProvider` / `AIProviderRegistry` | Provider 元数据与注册表（名称、URL、图标、强调色、关键词） |
+| `AIProvider` / `AIProviderRegistry` | Provider 元数据与注册表（名称、URL、图标、强调色、触发词） |
 | `AIWebViewWindowManager` | 每个 Provider 一个 WebView 窗口，生命周期与 Dock 身份，以及「能不能用」的判定 |
 | `AIWebViewPanel` | 自定义 NSPanel：点红绿灯只隐藏不销毁 |
 | `AIPortalView` | 插件视图：卡片列表，显示每个 Provider 的「运行中 / 就绪 / 已停用」与打开/刷新/关闭 |

@@ -40,25 +40,39 @@ struct AIProviderRegistryTests {
     }
 
     /// 缺了任一字段，搜索结果或设置页就会出现空行/空图标
-    @Test("每个 Provider 的名称、图标、关键词、主色、描述都非空")
+    @Test("每个 Provider 的名称、图标、别名、主色、描述都非空")
     func fieldsAreNonEmpty() {
         for provider in AIProviderRegistry.all {
             #expect(!provider.name.isEmpty, "\(provider.id) 缺少名称")
             #expect(!provider.icon.isEmpty, "\(provider.id) 缺少图标")
-            #expect(!provider.keywords.isEmpty, "\(provider.id) 缺少关键词")
+            #expect(!provider.aliases.isEmpty, "\(provider.id) 缺少别名")
             #expect(!provider.accent.isEmpty, "\(provider.id) 缺少主色")
             #expect(!provider.description.isEmpty, "\(provider.id) 缺少描述")
         }
     }
 
-    /// 关键词是搜索直达的入口，空串会让 fuzzyScore 对任何输入都返回 0（永远搜不到）
-    @Test("关键词没有空串，且都小写存储（比较时统一转小写）")
+    /// 触发词是搜索直达的入口，空串会让 fuzzyScore 对任何输入都返回 0（永远搜不到）
+    @Test("触发词没有空串，且都小写存储（比较时统一转小写）")
     func keywordsAreWellFormed() {
         for provider in AIProviderRegistry.all {
-            for keyword in provider.keywords {
-                #expect(!keyword.isEmpty, "\(provider.id) 有空关键词")
-                #expect(keyword == keyword.lowercased(), "\(provider.id) 的关键词 \(keyword) 未小写")
+            for keyword in provider.triggerWords {
+                #expect(!keyword.isEmpty, "\(provider.id) 有空触发词")
+                #expect(keyword == keyword.lowercased(), "\(provider.id) 的触发词 \(keyword) 未小写")
             }
+        }
+    }
+
+    /// 名称是结构上保证的触发词，而且必须排在首位，否则用户按服务名搜索时
+    /// 会被别名抢在前面 —— 「触发词就是各自的名称」这条承诺就落空了
+    @Test("每个 Provider 的名称都是第一个触发词，且触发词不重复")
+    func nameIsLeadingTriggerWord() {
+        for provider in AIProviderRegistry.all {
+            #expect(
+                provider.triggerWords.first == provider.name.lowercased(),
+                "\(provider.id) 的首个触发词应当是名称")
+            #expect(
+                Set(provider.triggerWords).count == provider.triggerWords.count,
+                "\(provider.id) 的触发词里有重复（名称与别名撞了）")
         }
     }
 
@@ -70,16 +84,16 @@ struct AIProviderRegistryTests {
         #expect(deepseek?.url == "https://chat.deepseek.com")
         #expect(deepseek?.icon == "brain.head.profile")
         #expect(deepseek?.accent == "#4D6BFE")
-        #expect(deepseek?.keywords == ["deepseek", "ds", "深度求索"])
+        #expect(deepseek?.aliases == ["ds", "深度求索"])
 
         let doubao = AIProviderRegistry.provider(for: "doubao")
         #expect(doubao?.name == "豆包")
         #expect(doubao?.url == "https://www.doubao.com/chat/")
-        #expect(doubao?.keywords == ["豆包", "doubao", "字节"])
+        #expect(doubao?.aliases == ["doubao", "字节"])
 
         let tongyi = AIProviderRegistry.provider(for: "tongyi")
         #expect(tongyi?.name == "通义千问")
-        #expect(tongyi?.keywords == ["通义", "千问", "tongyi", "qwen", "阿里"])
+        #expect(tongyi?.aliases == ["通义", "千问", "tongyi", "qwen", "阿里"])
     }
 
     @Test("按 id 查找：命中返回对应项，未命中返回 nil")
@@ -90,24 +104,14 @@ struct AIProviderRegistryTests {
         #expect(AIProviderRegistry.provider(for: "") == nil)
     }
 
-    /// 自定义触发词存的是一整段原文，解析负责统一形态：切开、小写、去空、去重
-    @Test("解析自定义触发词：多分隔符、大小写、去空去重")
-    func parseCustomKeywords() {
-        #expect(AIProviderRegistry.parseCustomKeywords("") == [])
-        #expect(AIProviderRegistry.parseCustomKeywords("  ，； ") == [])
-        #expect(
-            AIProviderRegistry.parseCustomKeywords("MyAI, wenxin；MYAI 、 我 的AI")
-                == ["myai", "wenxin", "我", "的ai"])
-    }
-
-    /// 搜索闸门用的是并集：28 个 Provider 关键词 + 7 个通用词
-    @Test("allKeywords 是 Provider 关键词并集加通用词")
+    /// 搜索闸门用的是并集：30 个 Provider 触发词（名称 + 别名）+ 7 个通用词
+    @Test("allKeywords 是 Provider 触发词并集加通用词")
     func allKeywordsUnion() {
-        let providerKeywords = AIProviderRegistry.all.flatMap(\.keywords)
+        let providerKeywords = AIProviderRegistry.all.flatMap(\.triggerWords)
         let union = AIProviderRegistry.allKeywords
 
         #expect(union.count == providerKeywords.count + 7)
-        #expect(union.count == 35)
+        #expect(union.count == 37)
 
         for keyword in providerKeywords {
             #expect(union.contains(keyword), "并集缺少 \(keyword)")
@@ -180,6 +184,28 @@ struct AIPluginTests {
 
         #expect(items.map(\.id) == ["plugin.open.ai", "ai.tongyi"])
         #expect(items[1].title == "通义千问")
+    }
+
+    /// 触发词就是各自的名称，所以**打全名必须直达** —— 别名表里只有 `智谱` / `通义`
+    /// 这类片段（拉丁别名按整词比、中文别名按前缀比），全名反而一条都命不中。
+    ///
+    /// 用例刻意避开 `deepseek`：设置页那组用例会临时把它停用，两个 suite 并发跑时
+    /// 搜它就只能是时灵时不灵。
+    @Test("搜完整服务名直达对应 Provider")
+    func fullNameQueryFindsProvider() async throws {
+        let cases = [
+            ("智谱清言", "glm"), ("通义千问", "tongyi"),
+            ("chatgpt", "chatgpt"), ("ChatGPT", "chatgpt"),
+            ("豆包", "doubao"), ("kimi", "kimi")
+        ]
+
+        for (query, id) in cases {
+            let items = await AIPlugin().dynamicSearch(query: query)
+            try #require(
+                items.map(\.id) == ["plugin.open.ai", "ai.\(id)"],
+                "搜「\(query)」应当直达 \(id)")
+            #expect(items[1].relevance == 0.8, "整名命中与别名同权")
+        }
     }
 
     /// 触发词闸门按整词匹配：`clipboard` 里的 `ai` 不该放行 ——

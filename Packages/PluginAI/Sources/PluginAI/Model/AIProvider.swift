@@ -19,10 +19,19 @@ struct AIProvider: Identifiable, Sendable {
     let icon: String
     /// 品牌主色（十六进制）
     let accent: String
-    /// 搜索触发关键词
-    let keywords: [String]
+    /// 名称之外的别名触发词
+    let aliases: [String]
     /// 描述文字
     let description: String
+
+    /// 搜索触发词：`name` 永远排第一，后面跟着别名
+    ///
+    /// 名称是从 `name` 推导的，不写进 `aliases` —— 「名字一定能搜到」必须是结构上的
+    /// 保证。只靠别名表会漏：`智谱清言` 的别名里有 `智谱`，但整词 `智谱清言` 命中不了
+    /// 任何一条（拉丁别名按整词比，中文别名按前缀比），用户打全名反而搜不到。
+    var triggerWords: [String] {
+        [name.lowercased()] + aliases
+    }
 }
 
 /// 内置 AI Provider 注册表
@@ -37,7 +46,7 @@ enum AIProviderRegistry {
             url: "https://chat.deepseek.com",
             icon: "brain.head.profile",
             accent: "#4D6BFE",
-            keywords: ["deepseek", "ds", "深度求索"],
+            aliases: ["ds", "深度求索"],
             description: "DeepSeek 官方对话"
         ),
         AIProvider(
@@ -46,7 +55,7 @@ enum AIProviderRegistry {
             url: "https://chatgpt.com",
             icon: "bubble.left.and.text.bubble.right",
             accent: "#10A37F",
-            keywords: ["chatgpt", "gpt", "openai"],
+            aliases: ["gpt", "openai"],
             description: "OpenAI ChatGPT"
         ),
         AIProvider(
@@ -55,7 +64,7 @@ enum AIProviderRegistry {
             url: "https://gemini.google.com",
             icon: "sparkle",
             accent: "#8E75B2",
-            keywords: ["gemini", "谷歌", "bard", "google"],
+            aliases: ["谷歌", "bard", "google"],
             description: "Google Gemini"
         ),
         AIProvider(
@@ -64,7 +73,7 @@ enum AIProviderRegistry {
             url: "https://claude.ai",
             icon: "text.bubble",
             accent: "#D97706",
-            keywords: ["claude", "anthropic"],
+            aliases: ["anthropic"],
             description: "Anthropic Claude"
         ),
         AIProvider(
@@ -73,7 +82,7 @@ enum AIProviderRegistry {
             url: "https://www.doubao.com/chat/",
             icon: "leaf",
             accent: "#3B82F6",
-            keywords: ["豆包", "doubao", "字节"],
+            aliases: ["doubao", "字节"],
             description: "字节跳动豆包"
         ),
         AIProvider(
@@ -82,7 +91,7 @@ enum AIProviderRegistry {
             url: "https://kimi.moonshot.cn",
             icon: "moon",
             accent: "#6366F1",
-            keywords: ["kimi", "月之暗面", "moonshot"],
+            aliases: ["月之暗面", "moonshot"],
             description: "月之暗面 Kimi"
         ),
         AIProvider(
@@ -91,7 +100,7 @@ enum AIProviderRegistry {
             url: "https://chatglm.cn",
             icon: "wand.and.stars",
             accent: "#0F62FE",
-            keywords: ["glm", "chatglm", "智谱", "zhipu", "清言"],
+            aliases: ["glm", "chatglm", "智谱", "zhipu", "清言"],
             description: "智谱 ChatGLM"
         ),
         AIProvider(
@@ -100,7 +109,7 @@ enum AIProviderRegistry {
             url: "https://tongyi.aliyun.com",
             icon: "cloud",
             accent: "#FF6A00",
-            keywords: ["通义", "千问", "tongyi", "qwen", "阿里"],
+            aliases: ["通义", "千问", "tongyi", "qwen", "阿里"],
             description: "阿里云通义千问"
         )
     ]
@@ -110,26 +119,8 @@ enum AIProviderRegistry {
         all.first { $0.id == id }
     }
 
-    /// 全部关键词并集（用于搜索闸门匹配）
+    /// 全部触发词并集（用于搜索闸门匹配）
     static var allKeywords: [String] {
-        all.flatMap(\.keywords) + ["ai", "AI", "聊天", "对话", "chat", "ai portal", "ai聚合"]
-    }
-
-    /// 解析用户为某个 Provider 配置的自定义触发词
-    ///
-    /// 设置页存的是一整段原文（逗号 / 顿号 / 分号 / 空白分隔），这里统一切开、
-    /// 小写、去空、去重，与内置关键词的存储约定一致（全小写、无空串，
-    /// 见 `AIProviderRegistryTests.keywordsAreWellFormed`）。放在注册表而不是插件层：
-    /// 解析规则就是关键词规范本身，改要跟着内置关键词的约定一起改。
-    static func parseCustomKeywords(_ raw: String) -> [String] {
-        let separators = CharacterSet(charactersIn: ",，、;； \t\n\r")
-        var seen = Set<String>()
-        var keywords: [String] = []
-        for token in raw.components(separatedBy: separators) {
-            let keyword = token.trimmingCharacters(in: .whitespaces).lowercased()
-            guard !keyword.isEmpty, seen.insert(keyword).inserted else { continue }
-            keywords.append(keyword)
-        }
-        return keywords
+        all.flatMap(\.triggerWords) + ["ai", "AI", "聊天", "对话", "chat", "ai portal", "ai聚合"]
     }
 }

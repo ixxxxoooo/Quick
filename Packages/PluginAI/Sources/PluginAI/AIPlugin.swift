@@ -42,24 +42,13 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
 
     // MARK: - 关键词
 
-    /// 触发词闸门与打分共用的关键词并集：内置关键词 + 用户自定义触发词
+    /// 触发词闸门与打分共用的触发词并集
     ///
-    /// 自定义词必须进闸门 —— 否则 `accepts` 放不下对应查询，下面的打分再准
-    /// 也没有机会跑。实时读偏好：设置页改完立即生效，不用重启插件。
-    ///
-    /// `nonisolated`：闸门在无隔离的搜索路径上跑，而这里只读 `UserDefaults`
-    /// 与不可变的注册表，没有需要主 actor 保护的状态。
+    /// 每个 Provider 的触发词就是它自己的名称加上内置别名（`AIProvider.triggerWords`），
+    /// 全部来自注册表 —— 没有用户配置项，所以这里可以是一个 `nonisolated` 常量式读取，
+    /// 不必回主 actor。
     nonisolated static var searchKeywords: [String] {
         AIProviderRegistry.allKeywords
-            + AIProviderRegistry.all.flatMap { customKeywords(for: $0.id) }
-    }
-
-    /// 用户在设置页为某个 Provider 配置的自定义触发词
-    nonisolated static func customKeywords(for providerID: String) -> [String] {
-        AIProviderRegistry.parseCustomKeywords(
-            UserDefaults.standard.string(
-                forKey: PluginSettingKey.AIPortal.providerKeywords(providerID)
-            ) ?? "")
     }
 
     // MARK: - 搜索
@@ -107,8 +96,8 @@ public final class AIPlugin: QuickPlugin, PluginViewProviding, PluginSettingsPro
             // 设置页关掉的 Provider 不进搜索结果
             guard AIWebViewWindowManager.isProviderEnabled(provider.id) else { continue }
 
-            // 打分用合并后的关键词：自定义词与内置词一视同仁
-            let keywords = provider.keywords + Self.customKeywords(for: provider.id)
+            // 打分用这个 Provider 自己的触发词：名称与别名一视同仁
+            let keywords = provider.triggerWords
             let matchScore =
                 keywords.compactMap { word -> Double? in
                     let score = word.fuzzyScore(keyword)

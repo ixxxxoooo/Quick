@@ -36,7 +36,7 @@ struct AISettingsView: View {
             } footer: {
                 Text(
                     "每个 AI 服务在独立窗口中运行，关闭窗口后登录态保持。"
-                    + "在「自定义触发词」里填唤醒词（逗号或空格分隔），搜索输入它即可直达对应服务。"
+                    + "触发词就是服务自己的名称（下面列出的别名同样可用），搜索输入它即可直达。"
                 )
             }
         }
@@ -48,14 +48,11 @@ struct AISettingsView: View {
 private struct AIProviderSettingsRow: View {
     let provider: AIProvider
     @AppStorage private var isEnabled: Bool
-    @AppStorage private var customKeywords: String
 
     init(provider: AIProvider) {
         self.provider = provider
         self._isEnabled = AppStorage(
             wrappedValue: true, PluginSettingKey.AIPortal.providerEnabled(provider.id))
-        self._customKeywords = AppStorage(
-            wrappedValue: "", PluginSettingKey.AIPortal.providerKeywords(provider.id))
     }
 
     var body: some View {
@@ -77,9 +74,11 @@ private struct AIProviderSettingsRow: View {
                 }
             }
 
-            TextField("自定义触发词（逗号或空格分隔）", text: $customKeywords)
-                .textFieldStyle(.plain)
-                .font(DesignTokens.Typography.rowTrailing)
+            // 触发词是只读的：它就是服务名，用户没有要配的东西 ——
+            // 列出来只是让人知道打什么能搜到，别做成一个长得像输入框的摆设
+            Text("触发词：\(provider.triggerWords.joined(separator: "、"))")
+                .font(DesignTokens.Typography.compactKeyCap)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
         }
     }
 }
