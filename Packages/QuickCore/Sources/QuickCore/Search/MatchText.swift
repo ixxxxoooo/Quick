@@ -63,15 +63,16 @@ public struct MatchQuery: Sendable {
     public func score(_ candidate: MatchText) -> Double {
         guard !folded.isEmpty else { return 0 }
 
-        let literal = Self.literalScore(candidate.folded, query: folded)
+        let literal = Self.literalScore(candidate.folded, query: folded, allowSubsequence: true)
 
         // 查询词带汉字时字面就够了；候选不是中文时 candidate.pinyin 本来就是 nil。
         guard !hasHan, let pinyin = candidate.pinyin else { return literal }
 
         // 拼音的分要压在字面之下：用户打 `wx` 时，名字真就叫 WX 的那个该排在「微信」前面。
         // 全拼比首字母更明确，所以权重更大。
-        let full = Self.literalScore(pinyin.latin, query: folded) * Self.fullPinyinWeight
-        let initials = Self.literalScore(pinyin.initials, query: folded) * Self.initialsWeight
+        // 全拼只接受完整、前缀或连续包含匹配，严禁散落子序列（避免长中文句子拼音与英文短词巧合命中）
+        let full = Self.literalScore(pinyin.latin, query: folded, allowSubsequence: false) * Self.fullPinyinWeight
+        let initials = Self.literalScore(pinyin.initials, query: folded, allowSubsequence: true) * Self.initialsWeight
         return max(literal, full, initials)
     }
 
@@ -80,12 +81,14 @@ public struct MatchQuery: Sendable {
     /// 字面的逐级打分：完全 `1.0` > 前缀 `0.9` > 包含 `0.7` > 子序列 `[0.35, 0.65]` > 不匹配 `0`
     ///
     /// 前三级的分值不能随便改：插件把它们当刻度用（例如片段标题再乘 0.8），改了就是动了全盘排序。
-    private static func literalScore(_ target: String, query: String) -> Double {
+    private static func literalScore(_ target: String, query: String, allowSubsequence: Bool = true) -> Double {
         guard !target.isEmpty else { return 0 }
 
         if target == query { return 1.0 }
         if target.hasPrefix(query) { return 0.9 }
         if target.contains(query) { return 0.7 }
+
+        guard allowSubsequence else { return 0 }
 
         // 先过一遍子序列再建字符数组：绝大多数候选连子序列都不是，不该为它们分配。
         guard containsSubsequence(target, query) else { return 0 }
@@ -152,6 +155,9 @@ public struct MatchQuery: Sendable {
             var bonus = 0
             var previousMatch = -2
             var matchedAll = true
+            var wordStartCount = 0
+            var maxAdjacent = 1
+            var currentAdjacent = 1
 
             for character in query {
                 while cursor < target.count, target[cursor] != character { cursor += 1 }
@@ -161,13 +167,33 @@ public struct MatchQuery: Sendable {
                 }
 
                 bonus += 1
-                if isWordStart(in: target, at: cursor) { bonus += Run.wordStartBonus }
-                if cursor == previousMatch + 1 { bonus += Run.adjacentBonus }
+                if isWordStart(in: target, at: cursor) {
+                    bonus += Run.wordStartBonus
+                    wordStartCount += 1
+                }
+                if cursor == previousMatch + 1 {
+                    bonus += Run.adjacentBonus
+                    currentAdjacent += 1
+                    maxAdjacent = max(maxAdjacent, currentAdjacent)
+                } else {
+                    currentAdjacent = 1
+                }
 
                 previousMatch = cursor
                 cursor += 1
             }
             guard matchedAll else { continue }
+
+            // 锚点与紧凑度防噪门禁（对齐 VS Code / Raycast 模糊匹配规范）：
+            // 1. 首字符落在词首，或有至少 3 个连续命中字符，或命中多个词首；
+            //    拒绝随机散落在单词深处的孤立字符匹配（如 "sqlformat" 中的 l-o-r-a）。
+            // 2. 对于 4 字符及以上的查询，若字符散落跨度极大（无连续字符且非全词首缩写），直接过滤。
+            let startsAtBoundary = isWordStart(in: target, at: start)
+            let hasContiguousChunk = maxAdjacent >= 3
+            let hasMultipleBoundaries = wordStartCount >= 2
+
+            guard startsAtBoundary || hasContiguousChunk || hasMultipleBoundaries else { continue }
+            if query.count >= 4 && maxAdjacent < 2 && wordStartCount < query.count { continue }
 
             let run = Run(bonus: bonus)
             let quality = run.quality(queryCount: query.count, targetCount: target.count)

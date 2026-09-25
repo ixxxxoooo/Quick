@@ -14,7 +14,8 @@ public enum SearchScopes {
         "/System/Applications",
         "/System/Applications/Utilities",
         "~/Applications",
-        "/System/Library/CoreServices"
+        "/System/Library/CoreServices/Applications",
+        "/System/Library/CoreServices/Finder.app"
     ]
 
     /// 路径以 ~ 缩写表示（便于多设备或多用户下配置持久化）

@@ -12,27 +12,41 @@ public struct IndexedCommand: Sendable, Identifiable {
     /// 原始描述符
     public let descriptor: CommandDescriptor
 
-    /// 标题、插件名、关键词、副标题的匹配形态
-    public let fields: [MatchText]
+    /// 标题匹配形态（权重 1.0）
+    public let titleText: MatchText
+
+    /// 触发关键字匹配形态（权重 0.9）
+    public let keywordTexts: [MatchText]
+
+    /// 插件分类名匹配形态（权重 0.8）
+    public let pluginNameText: MatchText
+
+    /// 副标题小写文本（仅用于精确连续子串包含，不转写拼音、不走散落子序列）
+    public let subtitleLower: String?
 
     public var id: String { descriptor.id }
 
     /// 用描述符建索引
     public init(_ descriptor: CommandDescriptor) {
         self.descriptor = descriptor
-        var rawStrings = [descriptor.title, descriptor.pluginName] + descriptor.keywords
-        if let subtitle = descriptor.subtitle, !subtitle.isEmpty {
-            rawStrings.append(subtitle)
-        }
+        self.titleText = MatchText(descriptor.title)
+        self.pluginNameText = MatchText(descriptor.pluginName)
+
         var seen = Set<String>()
-        var texts: [MatchText] = []
-        for s in rawStrings {
+        var keywords: [MatchText] = []
+        for s in descriptor.keywords {
             let key = s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             if !key.isEmpty && seen.insert(key).inserted {
-                texts.append(MatchText(s))
+                keywords.append(MatchText(s))
             }
         }
-        self.fields = texts
+        self.keywordTexts = keywords
+
+        if let sub = descriptor.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !sub.isEmpty {
+            self.subtitleLower = sub
+        } else {
+            self.subtitleLower = nil
+        }
     }
 }
 
@@ -68,10 +82,24 @@ public enum CommandIndex {
         }
 
         let match = MatchQuery(trimmed)
+        let trimmedLower = trimmed.lowercased()
         let hits: [CommandHit] = commands.compactMap { command in
-            let score = command.fields.map { match.score($0) }.max() ?? 0
-            guard score > 0 else { return nil }
-            return CommandHit(command: command, relevance: score)
+            var bestScore = match.score(command.titleText)
+
+            for kw in command.keywordTexts {
+                let kwScore = match.score(kw) * 0.90
+                if kwScore > bestScore { bestScore = kwScore }
+            }
+
+            let pluginScore = match.score(command.pluginNameText) * 0.80
+            if pluginScore > bestScore { bestScore = pluginScore }
+
+            if bestScore == 0, trimmedLower.count >= 2, let sub = command.subtitleLower, sub.contains(trimmedLower) {
+                bestScore = 0.50
+            }
+
+            guard bestScore > 0 else { return nil }
+            return CommandHit(command: command, relevance: bestScore)
         }
 
         // 同一插件下相同标题的命令（例如「打开插件」与同名功能命令），去重只留一条

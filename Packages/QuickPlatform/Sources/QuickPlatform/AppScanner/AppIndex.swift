@@ -145,18 +145,25 @@ public final class AppIndex {
         for path in searchPaths {
             let url = URL(fileURLWithPath: path)
             if url.pathExtension == "app" {
-                if let bundle = Bundle(url: url) {
+                if let bundle = Bundle(url: url), isUserFacingApplication(bundle: bundle, url: url) {
                     let entry = makeAppEntry(bundle: bundle, url: url, isSystem: path.hasPrefix("/System"))
                     results.append(entry)
                 }
                 continue
             }
 
+            let isShallowCoreServices =
+                path.hasPrefix("/System/Library/CoreServices") && !path.contains("/Applications")
+            let options: FileManager.DirectoryEnumerationOptions =
+                isShallowCoreServices
+                ? [.skipsHiddenFiles, .skipsPackageDescendants, .skipsSubdirectoryDescendants]
+                : [.skipsHiddenFiles, .skipsPackageDescendants]
+
             guard
                 let enumerator = FileManager.default.enumerator(
                     at: url,
                     includingPropertiesForKeys: [.isApplicationKey],
-                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                    options: options
                 )
             else {
                 QuickLog.platform.debug("应用目录不可枚举，已跳过：\(path, privacy: .public)")
@@ -166,12 +173,39 @@ public final class AppIndex {
             for case let fileURL as URL in enumerator {
                 guard fileURL.pathExtension == "app" else { continue }
                 guard let bundle = Bundle(url: fileURL) else { continue }
+                guard isUserFacingApplication(bundle: bundle, url: fileURL) else { continue }
                 let entry = makeAppEntry(bundle: bundle, url: fileURL, isSystem: path.hasPrefix("/System"))
                 results.append(entry)
             }
         }
 
         return results
+    }
+
+    /// 校验该 Bundle 是否为面向用户的应用程序（排除系统内部后台服务、Agent 与无 UI 进程）
+    nonisolated private static func isUserFacingApplication(bundle: Bundle, url: URL) -> Bool {
+        let path = url.path
+        let info = bundle.infoDictionary ?? [:]
+
+        // 1. 排除无 UI 的纯后台工具（如 AddressBookUrlForwarder）
+        if let bg = info["LSBackgroundOnly"] {
+            let s = "\(bg)".trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if s == "1" || s == "true" { return false }
+        }
+
+        // 2. 系统目录（/System）下排除内部 UIElement 代理与后台服务（如 FileProvider-Feedback, LaunchPolicyAlertAgent）
+        if path.hasPrefix("/System/") {
+            if let ui = info["LSUIElement"] {
+                let s = "\(ui)".trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if s == "1" || s == "true" { return false }
+            }
+            let fileName = url.lastPathComponent
+            if fileName.hasSuffix("Agent.app") || fileName.hasSuffix("Service.app") || fileName.hasSuffix("Helper.app") {
+                return false
+            }
+        }
+
+        return true
     }
 
     nonisolated private static func makeAppEntry(bundle: Bundle, url: URL, isSystem: Bool) -> AppEntry {

@@ -224,9 +224,13 @@ public final class LauncherPlugin: QuickPlugin, PluginViewProviding {
             guard matchScore > 0 else { continue }
 
             let ranking = rankingStore.score(for: entry.bundleID)
-            // 收藏是用户显式排定的顺序，权重要压过使用频率
             let isFavorite = favoritesStore.isFavorite(entry.bundleID)
-            let finalScore = isFavorite ? 1.0 : matchScore * 0.7 + ranking * 0.3
+            // 匹配阶梯主导：保留 100% 匹配度基础分，避免未打开过的新装应用被扣掉 30% 权重；
+            // 使用频次与收藏作为同阶平级增益（Boost），常规应用享有微量基础提权以优先于次级工具。
+            let usageBoost = ranking * 0.08
+            let favoriteBoost = isFavorite ? 0.05 : 0.0
+            let appPriorityBoost = entry.isSystemApp ? 0.0 : 0.02
+            let finalScore = min(1.0, matchScore + usageBoost + favoriteBoost + appPriorityBoost)
 
             let hasAlias = !(alias ?? "").isEmpty
             let subtitle =

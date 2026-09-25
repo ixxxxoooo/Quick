@@ -89,4 +89,16 @@ struct FuzzyMatchTests {
         #expect(query.score(MatchText("Calculator")) == "Calculator".fuzzyScore("vsc"))
         #expect(!query.matches(MatchText("Calculator")))
     }
+
+    /// 紧凑模糊匹配（如 Lorca 对 lora）应命中，而单词深处散落的字符巧合（如 sqlformat 对 lora）必须判为 0
+    @Test("防噪门禁：剔除无词首且无连续长串的散落巧合匹配")
+    func noiseGateFiltersScatteredFalsePositives() {
+        let query = MatchQuery("lora")
+        #expect(query.score(MatchText("Lorca")) > 0.5)
+        #expect(query.score(MatchText("sqlformat")) == 0)
+        #expect(query.score(MatchText("AddressBookUrlForwarder")) == 0)
+        #expect(query.score(MatchText("FileProvider-Feedback")) == 0)
+        #expect(query.score(MatchText("LaunchPolicyAlertAgent")) == 0)
+        #expect(query.score(MatchText("批量生成标准 RFC 4122 v4 UUID/GUID")) == 0)
+    }
 }
