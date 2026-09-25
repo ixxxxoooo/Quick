@@ -180,3 +180,27 @@ struct SyntaxHighlighterTests {
         #expect(seen.count == SyntaxTokenKind.allCases.count)
     }
 }
+
+@Suite("代码编辑器配置")
+@MainActor
+struct CodeEditorConfigurationTests {
+
+    @Test("自动换行控制水平滚动条与文本容器追踪")
+    func wrapLinesConfiguresTextView() {
+        let textView = NSTextView()
+        let scrollView = NSScrollView()
+        scrollView.documentView = textView
+
+        // 默认不换行
+        CodeEditorView.configureWrapping(textView: textView, wrapLines: false, in: scrollView)
+        #expect(scrollView.hasHorizontalScroller == true)
+        #expect(textView.isHorizontallyResizable == true)
+        #expect(textView.textContainer?.widthTracksTextView == false)
+
+        // 开启换行
+        CodeEditorView.configureWrapping(textView: textView, wrapLines: true, in: scrollView)
+        #expect(scrollView.hasHorizontalScroller == false)
+        #expect(textView.isHorizontallyResizable == false)
+        #expect(textView.textContainer?.widthTracksTextView == true)
+    }
+}

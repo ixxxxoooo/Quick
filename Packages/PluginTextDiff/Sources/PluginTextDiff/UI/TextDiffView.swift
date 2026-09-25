@@ -31,6 +31,9 @@ struct TextDiffView: View {
     @State private var addedCount = 0
     @State private var removedCount = 0
 
+    /// 是否开启自动换行（与插件设置同步）
+    @AppStorage(PluginSettingKey.TextDiff.wrapLines) private var wrapLines = false
+
     /// 语法高亮语言。对比任意文本时默认纯文本
     @State private var language: CodeLanguage = .plain
 
@@ -78,6 +81,13 @@ struct TextDiffView: View {
             } label: {
                 Label("清空", systemImage: "trash")
             }.buttonStyle(.bordered).controlSize(.small)
+
+            Toggle(isOn: $wrapLines) {
+                Label("换行", systemImage: "text.wrap")
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .help("自动换行")
 
             Picker("语法", selection: $language) {
                 ForEach(CodeLanguage.allCases, id: \.self) { option in
@@ -144,6 +154,7 @@ struct TextDiffView: View {
                 language: language,
                 lineStates: states,
                 showsLineNumbers: true,
+                wrapLines: wrapLines,
                 scrollSync: scrollSync,
                 syncRole: role
             )

@@ -173,6 +173,7 @@ public enum PluginSettingKey {
     public enum TextDiff {
         public static let ignoreWhitespace = "textDiff.ignoreWhitespace"
         public static let ignoreCase = "textDiff.ignoreCase"
+        public static let wrapLines = "textDiff.wrapLines"
     }
 
     /// Markdown 预览

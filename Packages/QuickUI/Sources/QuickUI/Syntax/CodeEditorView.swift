@@ -37,6 +37,9 @@ public struct CodeEditorView: NSViewRepresentable {
     /// 是否显示行号
     public let showsLineNumbers: Bool
 
+    /// 是否开启自动换行
+    public let wrapLines: Bool
+
     /// 垂直滚动同步（一对编辑器共用同一实例）
     public let scrollSync: EditorScrollSync?
 
@@ -49,6 +52,7 @@ public struct CodeEditorView: NSViewRepresentable {
         lineStates: [LineState] = [],
         lineHeight: CGFloat = DesignTokens.Size.codeEditorLineHeight,
         showsLineNumbers: Bool = true,
+        wrapLines: Bool = false,
         scrollSync: EditorScrollSync? = nil,
         syncRole: EditorScrollSync.Role = .leading
     ) {
@@ -57,6 +61,7 @@ public struct CodeEditorView: NSViewRepresentable {
         self.lineStates = lineStates
         self.lineHeight = lineHeight
         self.showsLineNumbers = showsLineNumbers
+        self.wrapLines = wrapLines
         self.scrollSync = scrollSync
         self.syncRole = syncRole
     }
@@ -67,8 +72,6 @@ public struct CodeEditorView: NSViewRepresentable {
         let scrollView = NSTextView.scrollableTextView()
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
-        // 不软换行：长行走横向滚动，左右两栏才不会因为某一行折行而整体错位
-        scrollView.hasHorizontalScroller = true
         scrollView.scrollerStyle = .overlay
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
@@ -80,13 +83,9 @@ public struct CodeEditorView: NSViewRepresentable {
         textView.drawsBackground = false
         textView.textContainerInset = NSSize(
             width: DesignTokens.Spacing.sm, height: DesignTokens.Spacing.xs)
-        textView.isHorizontallyResizable = true
         textView.isVerticallyResizable = true
-        textView.maxSize = NSSize(
-            width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.textContainer?.widthTracksTextView = false
-        textView.textContainer?.containerSize = NSSize(
-            width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+
+        Self.configureWrapping(textView: textView, wrapLines: wrapLines, in: scrollView)
 
         // 关掉会改写输入 / 依赖拼写服务的功能（非激活面板里它们还会引发越界异常）
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -102,7 +101,8 @@ public struct CodeEditorView: NSViewRepresentable {
         context.coordinator.applyHighlight(force: true)
 
         if showsLineNumbers {
-            let ruler = LineNumberRulerView(textView: textView, lineHeight: lineHeight)
+            let ruler = LineNumberRulerView(
+                textView: textView, lineHeight: lineHeight, wrapLines: wrapLines)
             scrollView.verticalRulerView = ruler
             scrollView.hasVerticalRuler = true
             scrollView.rulersVisible = true
@@ -114,16 +114,55 @@ public struct CodeEditorView: NSViewRepresentable {
     }
 
     public func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        let previousWrapLines = context.coordinator.parent.wrapLines
         context.coordinator.parent = self
 
         guard let textView = scrollView.documentView as? NSTextView else { return }
+
+        if previousWrapLines != wrapLines {
+            Self.configureWrapping(textView: textView, wrapLines: wrapLines, in: scrollView)
+            context.coordinator.ruler?.wrapLines = wrapLines
+            context.coordinator.applyHighlight(force: true)
+            textView.needsLayout = true
+            textView.needsDisplay = true
+        }
+
         if textView.string != text {
             textView.string = text
             context.coordinator.applyHighlight(force: true)
-        } else {
+        } else if previousWrapLines == wrapLines {
             context.coordinator.applyHighlight(force: false)
         }
         scrollSync?.attach(scrollView, role: syncRole)
+    }
+
+    /// 配置换行与横向滚动行为
+    static func configureWrapping(
+        textView: NSTextView, wrapLines: Bool, in scrollView: NSScrollView
+    ) {
+        scrollView.hasHorizontalScroller = !wrapLines
+        if wrapLines {
+            textView.isHorizontallyResizable = false
+            textView.autoresizingMask = [.width]
+            textView.textContainer?.widthTracksTextView = true
+            let width = max(scrollView.contentSize.width, 100)
+            textView.textContainer?.containerSize = NSSize(
+                width: width,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+        } else {
+            textView.isHorizontallyResizable = true
+            textView.autoresizingMask = []
+            textView.maxSize = NSSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+            textView.textContainer?.widthTracksTextView = false
+            textView.textContainer?.containerSize = NSSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+        }
     }
 
     public static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
@@ -141,9 +180,10 @@ public struct CodeEditorView: NSViewRepresentable {
         weak var textView: NSTextView?
         weak var ruler: LineNumberRulerView?
 
-        /// 上次上色时的语言 / 逐行状态，用来跳过无谓的重排
+        /// 上次上色时的语言 / 逐行状态 / 换行设置，用来跳过无谓的重排
         private var appliedLanguage: CodeLanguage?
         private var appliedStates: [CodeEditorView.LineState] = []
+        private var appliedWrapLines: Bool?
 
         init(_ parent: CodeEditorView) {
             self.parent = parent
@@ -160,9 +200,13 @@ public struct CodeEditorView: NSViewRepresentable {
             guard let textView, let storage = textView.textStorage else { return }
             let language = parent.language
             let states = parent.lineStates
-            guard force || language != appliedLanguage || states != appliedStates else { return }
+            let wrapLines = parent.wrapLines
+            guard force || language != appliedLanguage || states != appliedStates
+                || wrapLines != appliedWrapLines
+            else { return }
             appliedLanguage = language
             appliedStates = states
+            appliedWrapLines = wrapLines
 
             let text = textView.string
             let fullRange = NSRange(location: 0, length: storage.length)
@@ -172,7 +216,7 @@ public struct CodeEditorView: NSViewRepresentable {
             let paragraph = NSMutableParagraphStyle()
             paragraph.minimumLineHeight = parent.lineHeight
             paragraph.maximumLineHeight = parent.lineHeight
-            paragraph.lineBreakMode = .byClipping
+            paragraph.lineBreakMode = wrapLines ? .byWordWrapping : .byClipping
 
             let baseAttributes: [NSAttributedString.Key: Any] = [
                 .font: font,
@@ -249,10 +293,12 @@ final class LineNumberRulerView: NSRulerView {
 
     private weak var textView: NSTextView?
     private let lineHeight: CGFloat
+    var wrapLines: Bool
 
-    init(textView: NSTextView, lineHeight: CGFloat) {
+    init(textView: NSTextView, lineHeight: CGFloat, wrapLines: Bool = false) {
         self.textView = textView
         self.lineHeight = lineHeight
+        self.wrapLines = wrapLines
         super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
         clientView = textView
         ruleThickness = DesignTokens.Size.codeEditorGutter
@@ -274,25 +320,117 @@ final class LineNumberRulerView: NSRulerView {
             .foregroundColor: NSColor(DesignTokens.Colors.textTertiary)
         ]
 
-        let lineCount = max(1, textView.string.components(separatedBy: "\n").count)
         let inset = textView.textContainerInset.height
-        let visible = textView.visibleRect
-        let firstLine = max(0, Int((visible.minY - inset) / lineHeight))
-        let lastLine = min(lineCount - 1, Int((visible.maxY - inset) / lineHeight))
-        guard firstLine <= lastLine else { return }
 
-        for index in firstLine...lastLine {
-            let y = inset + CGFloat(index) * lineHeight
-            let point = convert(NSPoint(x: 0, y: y), from: textView)
-            let label = "\(index + 1)" as NSString
-            let size = label.size(withAttributes: attributes)
-            label.draw(
-                at: NSPoint(
-                    x: ruleThickness - size.width - DesignTokens.Spacing.sm,
-                    y: point.y + (lineHeight - size.height) / 2
-                ),
-                withAttributes: attributes
-            )
+        if !wrapLines {
+            let lineCount = max(1, textView.string.components(separatedBy: "\n").count)
+            let visible = textView.visibleRect
+            let firstLine = max(0, Int((visible.minY - inset) / lineHeight))
+            let lastLine = min(lineCount - 1, Int((visible.maxY - inset) / lineHeight))
+            guard firstLine <= lastLine else { return }
+
+            for index in firstLine...lastLine {
+                let y = inset + CGFloat(index) * lineHeight
+                let point = convert(NSPoint(x: 0, y: y), from: textView)
+                let label = "\(index + 1)" as NSString
+                let size = label.size(withAttributes: attributes)
+                label.draw(
+                    at: NSPoint(
+                        x: ruleThickness - size.width - DesignTokens.Spacing.sm,
+                        y: point.y + (lineHeight - size.height) / 2
+                    ),
+                    withAttributes: attributes
+                )
+            }
+        } else {
+            guard let layoutManager = textView.layoutManager,
+                let textContainer = textView.textContainer
+            else { return }
+            let nsString = textView.string as NSString
+            let stringLength = nsString.length
+
+            if stringLength == 0 {
+                let point = convert(NSPoint(x: 0, y: inset), from: textView)
+                let label = "1" as NSString
+                let size = label.size(withAttributes: attributes)
+                label.draw(
+                    at: NSPoint(
+                        x: ruleThickness - size.width - DesignTokens.Spacing.sm,
+                        y: point.y + (lineHeight - size.height) / 2
+                    ),
+                    withAttributes: attributes
+                )
+                return
+            }
+
+            let visibleRect = textView.visibleRect
+            let visibleGlyphRange = layoutManager.glyphRange(
+                forBoundingRect: visibleRect, in: textContainer)
+            let visibleCharRange = layoutManager.characterRange(
+                forGlyphRange: visibleGlyphRange, actualGlyphRange: nil)
+
+            // 计算 visibleCharRange 起始处的行号与字符位置
+            var lineNum = 1
+            var pos = 0
+            let targetPos = min(visibleCharRange.location, stringLength)
+
+            while pos < targetPos {
+                var lineStart = 0
+                var lineEnd = 0
+                var contentsEnd = 0
+                nsString.getLineStart(
+                    &lineStart, end: &lineEnd, contentsEnd: &contentsEnd,
+                    for: NSRange(location: pos, length: 0))
+                if lineEnd <= pos { break }
+                pos = lineEnd
+                if pos <= targetPos {
+                    lineNum += 1
+                }
+            }
+
+            let maxCharPos = min(NSMaxRange(visibleCharRange), stringLength)
+            while pos < stringLength && pos <= maxCharPos {
+                var lineStart = 0
+                var lineEnd = 0
+                var contentsEnd = 0
+                nsString.getLineStart(
+                    &lineStart, end: &lineEnd, contentsEnd: &contentsEnd,
+                    for: NSRange(location: pos, length: 0))
+
+                let glyphIndex = layoutManager.glyphIndexForCharacter(at: pos)
+                let lineFragmentRect = layoutManager.lineFragmentRect(
+                    forGlyphAt: glyphIndex, effectiveRange: nil)
+                let y = lineFragmentRect.origin.y + inset
+                let point = convert(NSPoint(x: 0, y: y), from: textView)
+
+                let label = "\(lineNum)" as NSString
+                let size = label.size(withAttributes: attributes)
+                label.draw(
+                    at: NSPoint(
+                        x: ruleThickness - size.width - DesignTokens.Spacing.sm,
+                        y: point.y + (lineHeight - size.height) / 2
+                    ),
+                    withAttributes: attributes
+                )
+
+                lineNum += 1
+                if lineEnd <= pos { break }
+                pos = lineEnd
+            }
+
+            if layoutManager.extraLineFragmentRect.height > 0 {
+                let y = layoutManager.extraLineFragmentRect.origin.y + inset
+                let point = convert(NSPoint(x: 0, y: y), from: textView)
+                let label = "\(lineNum)" as NSString
+                let size = label.size(withAttributes: attributes)
+                label.draw(
+                    at: NSPoint(
+                        x: ruleThickness - size.width - DesignTokens.Spacing.sm,
+                        y: point.y + (lineHeight - size.height) / 2
+                    ),
+                    withAttributes: attributes
+                )
+            }
         }
     }
 }

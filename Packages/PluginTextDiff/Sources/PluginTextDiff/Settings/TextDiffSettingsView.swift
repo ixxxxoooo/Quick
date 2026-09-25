@@ -9,9 +9,18 @@ import SwiftUI
 struct TextDiffSettingsView: View {
     @AppStorage(PluginSettingKey.TextDiff.ignoreWhitespace) private var ignoreWhitespace = false
     @AppStorage(PluginSettingKey.TextDiff.ignoreCase) private var ignoreCase = false
+    @AppStorage(PluginSettingKey.TextDiff.wrapLines) private var wrapLines = false
 
     var body: some View {
         Section {
+            Toggle(isOn: $wrapLines) {
+                SettingsRow(
+                    title: "自动换行",
+                    subtitle: "超出编辑器宽度的长文本自动折行显示。",
+                    icon: { SettingsRowIcon(systemImage: "text.wrap") }
+                )
+            }
+
             Toggle(isOn: $ignoreWhitespace) {
                 SettingsRow(
                     title: "忽略空白字符差异",

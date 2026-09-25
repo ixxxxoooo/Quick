@@ -338,7 +338,15 @@ public final class PluginPanelController {
     // MARK: - 尺寸记忆
 
     private func saveWindowSize(pluginID: String, window: NSWindow) {
-        let size = window.frame.size
+        let size: CGSize
+        if let panel = window as? DetachedPluginPanel,
+            panel.isMaximized,
+            let restoreSize = panel.restoreFrame?.size
+        {
+            size = restoreSize
+        } else {
+            size = window.frame.size
+        }
         let dict: [String: CGFloat] = ["width": size.width, "height": size.height]
         UserDefaults.standard.set(dict, forKey: Self.sizeKeyPrefix + pluginID)
     }
@@ -405,6 +413,48 @@ final class DetachedPluginPanel: NSPanel {
     var onSubmit: (() -> Bool)?
     /// ⌘F 回调：把焦点交给标题栏搜索框，返回 `true` 表示已消费
     var onSearchFocus: (() -> Bool)?
+
+    /// 最大化恢复状态
+    private(set) var isMaximized: Bool = false
+    var restoreFrame: NSRect?
+
+    /// 窗口当前尺寸是否与所在屏幕的可用区域一致
+    var isActuallyMaximized: Bool {
+        guard let screen = self.screen ?? NSScreen.main else { return false }
+        let visibleFrame = screen.visibleFrame
+        return abs(frame.origin.x - visibleFrame.origin.x) < 2
+            && abs(frame.origin.y - visibleFrame.origin.y) < 2
+            && abs(frame.width - visibleFrame.width) < 2
+            && abs(frame.height - visibleFrame.height) < 2
+    }
+
+    /// 双击标题栏切换最大化 / 恢复
+    func toggleMaximize() {
+        guard let screen = self.screen ?? NSScreen.main else { return }
+        let visibleFrame = screen.visibleFrame
+
+        if isMaximized || isActuallyMaximized {
+            // 恢复
+            var target = restoreFrame ?? NSRect(
+                x: visibleFrame.midX - DesignTokens.Size.detachedPanelDefaultWidth / 2,
+                y: visibleFrame.midY - DesignTokens.Size.detachedPanelDefaultHeight / 2,
+                width: DesignTokens.Size.detachedPanelDefaultWidth,
+                height: DesignTokens.Size.detachedPanelDefaultHeight
+            )
+            target.size.width = min(target.size.width, visibleFrame.width)
+            target.size.height = min(target.size.height, visibleFrame.height)
+            target.origin.x = min(max(target.origin.x, visibleFrame.minX), visibleFrame.maxX - target.size.width)
+            target.origin.y = min(max(target.origin.y, visibleFrame.minY), visibleFrame.maxY - target.size.height)
+
+            setFrame(target, display: true, animate: true)
+            isMaximized = false
+        } else {
+            // 最大化
+            restoreFrame = frame
+            setFrame(visibleFrame, display: true, animate: true)
+            isMaximized = true
+        }
+    }
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -579,11 +629,11 @@ private struct DetachedPanelContentView: View {
     /// 加高一档（`titleBarHeight`），否则 20pt 的输入框会把整条栏位顶满。
     private var titleBar: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
-            Image(systemName: pluginIcon)
-                .font(DesignTokens.Typography.inlineIcon)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-
             if search.hasHeaderField {
+                Image(systemName: pluginIcon)
+                    .font(DesignTokens.Typography.inlineIcon)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+
                 SearchFieldView(
                     query: Binding(
                         get: { search.text },
@@ -596,19 +646,29 @@ private struct DetachedPanelContentView: View {
                     focusTrigger: search.focusToken
                 )
                 .frame(maxWidth: DesignTokens.Size.detachedSearchFieldMaxWidth)
-            } else {
-                Text(pluginName)
-                    .font(DesignTokens.Typography.sectionHeader)
-                    .foregroundStyle(DesignTokens.Colors.textPrimary)
-                    .lineLimit(1)
-            }
 
-            // 剩余空白整块是拖拽区。拖拽区**不能铺到按钮上面** ——
-            // 它是一个真实的 `NSView`，盖住按钮会把点击吃掉（见 `WindowDragArea`）。
-            // 撑满标题栏高度，整条栏位都拖得动，而不是只有中间那一行。
-            Spacer(minLength: DesignTokens.Spacing.md)
+                // 剩余空白整块是拖拽区。拖拽区**不能铺到按钮上面** ——
+                // 它是一个真实的 `NSView`，盖住按钮会把点击吃掉（见 `WindowDragArea`）。
+                // 撑满标题栏高度，整条栏位都拖得动，而不是只有中间那一行。
+                Spacer(minLength: DesignTokens.Spacing.md)
+                    .frame(maxHeight: .infinity)
+                    .background(WindowDragArea())
+            } else {
+                HStack(spacing: DesignTokens.Spacing.sm) {
+                    Image(systemName: pluginIcon)
+                        .font(DesignTokens.Typography.inlineIcon)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+
+                    Text(pluginName)
+                        .font(DesignTokens.Typography.sectionHeader)
+                        .foregroundStyle(DesignTokens.Colors.textPrimary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: DesignTokens.Spacing.md)
+                }
                 .frame(maxHeight: .infinity)
                 .background(WindowDragArea())
+            }
 
             BarButton(
                 title: isPinned ? "取消窗口置顶" : "窗口置顶",
@@ -660,12 +720,34 @@ struct WindowDragArea: NSViewRepresentable {
 ///
 /// 独立类型而不是匿名内部类，是为了让测试能断言它真的挂上去了 ——
 /// 「窗口拖不动」是个只能靠手试才发现的问题，值得一条结构性断言守着。
+/// 同时支持双击顶部最大化与恢复窗口。
 final class WindowDragView: NSView {
+
+    private var lastClickTime: TimeInterval = 0
+    private var lastClickLocation: NSPoint = .zero
 
     /// 窗口没被激活时，第一次按下也要能拖起来
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
+        let now = event.timestamp
+        let location = event.locationInWindow
+        let isDouble = (event.clickCount >= 2 && event.clickCount % 2 == 0) || (
+            (now - lastClickTime <= NSEvent.doubleClickInterval)
+            && hypot(location.x - lastClickLocation.x, location.y - lastClickLocation.y) < 5
+        )
+
+        if isDouble {
+            lastClickTime = 0
+            if let panel = window as? DetachedPluginPanel {
+                panel.toggleMaximize()
+                return
+            }
+        } else {
+            lastClickTime = now
+            lastClickLocation = location
+        }
+
         window?.performDrag(with: event)
     }
 }

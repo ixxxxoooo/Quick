@@ -454,6 +454,47 @@ struct PluginPanelControllerTests {
         #expect(calls.value == afterClose)
     }
 
+    @Test("分离窗口支持双击最大化与恢复")
+    func detachedWindowMaximizeAndRestore() {
+        let controller = PluginPanelController()
+        let view = AnyView(Text("测试"))
+
+        controller.detach(
+            pluginID: "maximize-test",
+            pluginName: "最大化测试",
+            icon: "macwindow",
+            viewProvider: { view },
+            sourceWindow: nil
+        )
+
+        guard let panel = detachedPanel("maximize-test") as? DetachedPluginPanel else {
+            Issue.record("未找到 DetachedPluginPanel")
+            return
+        }
+
+        guard let screen = panel.screen ?? NSScreen.main else {
+            controller.closeAll()
+            return
+        }
+
+        let initialFrame = panel.frame
+        #expect(panel.isMaximized == false)
+
+        // 最大化
+        panel.toggleMaximize()
+        #expect(panel.isMaximized == true)
+        #expect(abs(panel.frame.width - screen.visibleFrame.width) < 2)
+        #expect(abs(panel.frame.height - screen.visibleFrame.height) < 2)
+
+        // 再次调用恢复
+        panel.toggleMaximize()
+        #expect(panel.isMaximized == false)
+        #expect(abs(panel.frame.width - initialFrame.width) < 2)
+        #expect(abs(panel.frame.height - initialFrame.height) < 2)
+
+        controller.closeAll()
+    }
+
     /// 在 @MainActor 闭包里计数的可变盒子
     private final class Counter {
         private(set) var value = 0
