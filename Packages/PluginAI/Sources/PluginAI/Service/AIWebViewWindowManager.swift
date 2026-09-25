@@ -740,9 +740,12 @@ private final class AITabItemView: NSView {
 
     private func setupViews(title: String, icon: String) {
         wantsLayer = true
-        layer?.cornerRadius = DesignTokens.Radius.barControl
+        // 半高圆角 → 药丸形，比固定值更适配标题栏
+        layer?.cornerRadius = DesignTokens.Size.aiTitleBarTabHeight / 2
 
-        iconView.image = NSImage(systemSymbolName: icon, accessibilityDescription: title)
+        let iconSize = DesignTokens.Size.aiTabIconSize
+        iconView.image = NSImage(systemSymbolName: icon, accessibilityDescription: title)?
+            .withSymbolConfiguration(.init(pointSize: iconSize - 2, weight: .medium))
         iconView.imageScaling = .scaleProportionallyDown
         iconView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -756,7 +759,9 @@ private final class AITabItemView: NSView {
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "关闭标签")
+        let closeSize = DesignTokens.Size.aiTabCloseSize
+        closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "关闭标签")?
+            .withSymbolConfiguration(.init(pointSize: closeSize - 4, weight: .medium))
         closeButton.imageScaling = .scaleProportionallyDown
         closeButton.isBordered = false
         closeButton.bezelStyle = .accessoryBarAction
@@ -770,24 +775,24 @@ private final class AITabItemView: NSView {
         addSubview(titleLabel)
         addSubview(closeButton)
 
-        let closeSize = DesignTokens.Size.aiTabCloseSize
+        let padding = DesignTokens.Size.aiTabItemPaddingH
         NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: DesignTokens.Size.aiTabItemPaddingH),
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: padding),
             iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: DesignTokens.Size.aiTabIconSize),
-            iconView.heightAnchor.constraint(equalToConstant: DesignTokens.Size.aiTabIconSize),
+            iconView.widthAnchor.constraint(equalToConstant: iconSize),
+            iconView.heightAnchor.constraint(equalToConstant: iconSize),
 
-            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: DesignTokens.Spacing.xs),
+            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 4),
             titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -DesignTokens.Spacing.xxs),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -2),
 
-            closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -DesignTokens.Spacing.sm),
+            closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -padding + 2),
             closeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             closeButton.widthAnchor.constraint(equalToConstant: closeSize),
             closeButton.heightAnchor.constraint(equalToConstant: closeSize),
 
-            widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
-            widthAnchor.constraint(lessThanOrEqualToConstant: 160),
+            widthAnchor.constraint(greaterThanOrEqualToConstant: 70),
+            widthAnchor.constraint(lessThanOrEqualToConstant: 150),
             heightAnchor.constraint(equalToConstant: DesignTokens.Size.aiTitleBarTabHeight),
         ])
         translatesAutoresizingMaskIntoConstraints = false

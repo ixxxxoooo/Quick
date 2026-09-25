@@ -274,18 +274,18 @@ public enum DesignTokens {
 
         /// AI 聚合窗口的标签栏高度
         public static let aiTabBarHeight: CGFloat = 36
-        /// 标签栏在标题栏中的左侧起始偏移（避让红绿灯区域）
-        public static let aiTitleBarTabLeading: CGFloat = 78
+        /// 标签栏在标题栏中的左侧起始偏移（避让红绿灯 + 呼吸空间）
+        public static let aiTitleBarTabLeading: CGFloat = 80
         /// 标题栏内标签项高度（适配标准标题栏约 28pt）
-        public static let aiTitleBarTabHeight: CGFloat = 26
+        public static let aiTitleBarTabHeight: CGFloat = 24
         /// AI 标签项水平内边距
-        public static let aiTabItemPaddingH: CGFloat = 12
+        public static let aiTabItemPaddingH: CGFloat = 8
         /// AI 标签项图标尺寸
-        public static let aiTabIconSize: CGFloat = 16
+        public static let aiTabIconSize: CGFloat = 13
         /// AI 标签项间距
-        public static let aiTabItemSpacing: CGFloat = 2
+        public static let aiTabItemSpacing: CGFloat = 4
         /// AI 标签栏关闭按钮尺寸
-        public static let aiTabCloseSize: CGFloat = 14
+        public static let aiTabCloseSize: CGFloat = 12
 
         // MARK: 悬浮胶囊
 
@@ -669,28 +669,28 @@ public enum DesignTokens {
             light: NSColor(srgbRed: 240 / 255, green: 240 / 255, blue: 244 / 255, alpha: 1)
         )
 
-        /// AI 标签项选中底色
+        /// AI 标签项选中底色（标题栏内需要足够柔和）
         public static let aiTabSelected = adaptive(
-            dark: .srgbInk(1, alpha: 0.12),
-            light: .srgbInk(0, alpha: 0.06)
+            dark: .srgbInk(1, alpha: 0.10),
+            light: .srgbInk(0, alpha: 0.08)
         )
 
         /// AI 标签项悬停底色
         public static let aiTabHover = adaptive(
-            dark: .srgbInk(1, alpha: 0.06),
-            light: .srgbInk(0, alpha: 0.03)
+            dark: .srgbInk(1, alpha: 0.05),
+            light: .srgbInk(0, alpha: 0.04)
         )
 
         /// AI 标签项文字选中色
         public static let aiTabSelectedText = adaptive(
-            dark: .srgbInk(1, alpha: 0.95),
-            light: .srgbInk(0, alpha: 0.88)
+            dark: .srgbInk(1, alpha: 0.90),
+            light: .srgbInk(0, alpha: 0.85)
         )
 
         /// AI 标签项文字非选中色
         public static let aiTabText = adaptive(
-            dark: .srgbInk(1, alpha: 0.55),
-            light: .srgbInk(0, alpha: 0.50)
+            dark: .srgbInk(1, alpha: 0.50),
+            light: .srgbInk(0, alpha: 0.45)
         )
 
         /// AI 标签栏分隔线
