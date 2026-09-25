@@ -342,18 +342,20 @@ final class AIWebViewWindowManager {
         return true
     }
 
-    /// 确保聚合窗口已创建（标签栏直接嵌入标题栏，与红绿灯同行）
+    /// 确保聚合窗口已创建（标签栏嵌入标题栏，内容区在标题栏下方，互不重叠）
     private func ensureMergedWindow() {
         guard mergedPanel == nil else { return }
 
+        // 不使用 fullSizeContentView：内容区域自然在标题栏下方，不会重叠
         let newPanel = AIWebViewPanel(
             contentRect: NSRect(origin: .zero, size: NSSize(width: defaultWidth, height: defaultHeight)),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         newPanel.title = "AI 聚合"
-        newPanel.titlebarAppearsTransparent = true
+        // 标题栏保持不透明，标签嵌在里面；隐藏系统标题文字
+        newPanel.titlebarAppearsTransparent = false
         newPanel.titleVisibility = .hidden
         newPanel.isMovableByWindowBackground = true
         newPanel.minSize = NSSize(width: 600, height: 400)
@@ -369,7 +371,7 @@ final class AIWebViewWindowManager {
 
         restoreMergedFrame(newPanel)
 
-        // 标签栏直接嵌入标题栏（与红绿灯同行）
+        // 标签栏嵌入标题栏内部（与红绿灯同行）
         let tabBar = AITitleTabBarView(onSelect: { [weak self] id in
             self?.switchToTab(id)
         }, onClose: { [weak self] id in
@@ -377,11 +379,9 @@ final class AIWebViewWindowManager {
         })
         tabBar.translatesAutoresizingMaskIntoConstraints = false
 
-        // 找到标题栏容器：红绿灯的父视图就是标题栏
-        // themeFrame → titlebar container
+        // 找到标题栏容器并将标签栏加入
         if let titlebarContainer = newPanel.standardWindowButton(.closeButton)?.superview?.superview {
             titlebarContainer.addSubview(tabBar)
-            // 红绿灯区域约 70pt，标签栏从其右侧开始，填满标题栏剩余宽度
             NSLayoutConstraint.activate([
                 tabBar.leadingAnchor.constraint(
                     equalTo: titlebarContainer.leadingAnchor,
@@ -392,7 +392,7 @@ final class AIWebViewWindowManager {
             ])
         }
 
-        // 内容区域（fullSizeContentView 模式下内容延伸到标题栏后面）
+        // 内容区域：不用 fullSizeContentView，contentView 自然在标题栏下方
         let hostView = NSView(frame: newPanel.contentView?.bounds ?? .zero)
         hostView.autoresizingMask = [.width, .height]
 
@@ -407,7 +407,7 @@ final class AIWebViewWindowManager {
             container.bottomAnchor.constraint(equalTo: hostView.bottomAnchor),
         ])
 
-        // 悬浮胶囊
+        // 悬浮胶囊叠在内容区域上
         let capsuleView = makeCapsule(positionKey: "ai.aggregated", forMerged: true)
         hostView.addSubview(capsuleView)
         capsuleView.positionInSuperview()
