@@ -60,4 +60,18 @@ struct ActivationPolicyKeeperTests {
         ActivationPolicyKeeper.release("test.never-registered")
         #expect(ActivationPolicyKeeper.requiredPolicy == .accessory)
     }
+
+    @Test("命令行测试进程保持 prohibited，不向 Dock 注册 swiftpm-testing-helper 图标")
+    func doesNotPromoteProhibitedTestRunnerProcess() {
+        let app = NSApplication.shared
+        #expect(app.activationPolicy() == .prohibited)
+
+        ActivationPolicyKeeper.retain("test.dock-guard")
+        #expect(ActivationPolicyKeeper.requiredPolicy == .regular)
+        #expect(app.activationPolicy() == .prohibited)
+
+        ActivationPolicyKeeper.release("test.dock-guard")
+        #expect(ActivationPolicyKeeper.requiredPolicy == .accessory)
+        #expect(app.activationPolicy() == .prohibited)
+    }
 }

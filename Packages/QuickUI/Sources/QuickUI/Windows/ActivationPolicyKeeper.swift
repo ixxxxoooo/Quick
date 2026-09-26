@@ -45,9 +45,14 @@ public enum ActivationPolicyKeeper {
     }
 
     /// 把策略落到 `NSApp` 上
+    ///
+    /// 仅当宿主进程已处于非 `.prohibited` 状态（真实 `.app` 启动即 `.accessory`）时才下发：
+    /// `swift test` 的 `swiftpm-testing-helper` 是命令行进程（初始 `.prohibited`），一旦调
+    /// `setActivationPolicy(.regular)` 就会向 Dock 注册一个 `exec` 图标并在退出后残留。
     private static func apply() {
         let policy = requiredPolicy
-        NSApp.setActivationPolicy(policy)
+        guard let app = NSApp, app.activationPolicy() != .prohibited else { return }
+        app.setActivationPolicy(policy)
         QuickLog.ui.debug(
             "激活策略已应用：\(policy == .regular ? "regular" : "accessory", privacy: .public)，持有者 \(holders.count, privacy: .public) 个"
         )
