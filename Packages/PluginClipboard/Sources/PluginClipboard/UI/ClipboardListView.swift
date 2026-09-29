@@ -247,6 +247,10 @@ struct ClipboardListView: View {
                     .fill(isSelected ? Color.accentColor : Color.clear)
             )
             .foregroundStyle(isSelected ? .white : DesignTokens.Colors.textSecondary)
+            // 命中区铺满整个标签（图标 + 文字 + 计数 + 内边距）：`.plain` 按钮只按子视图
+            // 自身的字形框做 HitTest，不补 `contentShape` 就得点准文字才切得动。
+            // 再各向外扩半个间距，把两个标签之间那 4pt 死区也吃掉。
+            .contentShape(Rectangle().inset(by: -DesignTokens.Spacing.xs / 2))
         }
         .buttonStyle(.plain)
     }
