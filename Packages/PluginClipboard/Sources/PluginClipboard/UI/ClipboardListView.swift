@@ -416,17 +416,19 @@ private struct ClipboardRowView: View {
 
     /// 行内容
     ///
-    /// 图片行**居中**：缩略图最多占 `clipboardThumbMaxWidth` 那点宽度，贴着左侧时右边整片
-    /// 是空的，看着像没排完。元信息跟着图片一起居中，收藏按钮改成浮在右端 ——
-    /// 留在 `HStack` 里会把居中的图片往左推半个按钮宽。
+    /// 图片行**只有缩略图居中**：它最多占 `clipboardThumbMaxWidth` 那点宽度，贴着左侧时右边
+    /// 整片是空的，看着像没排完。元信息（尺寸、时间）保持原来的位置不动 —— 底部那行时间
+    /// 跟着图片一起漂会让人以为整行都在动。收藏按钮浮在右端：留在 `HStack` 里会把居中的
+    /// 图片往左推半个按钮宽。
     @ViewBuilder
     private var rowContent: some View {
         if entry.type == .image {
-            VStack(spacing: DesignTokens.Spacing.xs) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                 leadingContent
+                    .frame(maxWidth: .infinity, alignment: .center)
                 metadataRow
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .trailing) { favoriteButton }
         } else {
             // 文字行：不再显示左侧图标，预览与元信息占满整行
