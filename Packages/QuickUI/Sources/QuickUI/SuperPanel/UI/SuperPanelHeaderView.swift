@@ -61,7 +61,7 @@ struct SuperPanelHeaderView: View {
     }
 
     private var tabSegment: some View {
-        HStack(spacing: 1) {
+        HStack(spacing: DesignTokens.Size.hairline) {
             ForEach(SuperPanelTab.allCases) { tab in
                 Button {
                     model.select(tab)
@@ -86,12 +86,16 @@ struct SuperPanelHeaderView: View {
                                     ? DesignTokens.Colors.selection
                                     : Color.clear)
                     )
+                    // 命中区铺满整块「图标 + 文字 + 内边距」：`.plain` 按钮只按子视图自身的
+                    // 字形框做 HitTest，不补 `contentShape` 就是「必须点准文字才切换」。
+                    // 再向外扩半个分隔缝，把两个标签之间的那 1pt 死区也盖住。
+                    .contentShape(Rectangle().inset(by: -DesignTokens.Size.hairline / 2))
                 }
                 .buttonStyle(.plain)
                 .focusable(false)
             }
         }
-        .padding(1)
+        .padding(DesignTokens.Size.hairline)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.menu + 1, style: .continuous)
                 .fill(DesignTokens.Colors.controlSurface)
