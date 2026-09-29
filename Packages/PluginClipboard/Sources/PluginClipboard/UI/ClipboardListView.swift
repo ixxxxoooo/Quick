@@ -414,16 +414,23 @@ private struct ClipboardRowView: View {
     /// 仅复制（不动面板、不粘贴）
     let onCopy: () -> Void
 
-    var body: some View {
-        HStack(spacing: DesignTokens.Spacing.md) {
-            if entry.type == .image {
-                // 图片：缩略图在上，来源/时间等元信息排在图片下面
-                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                    leadingContent
-                    metadataRow
-                }
-            } else {
-                // 文字：不再显示左侧图标，预览与元信息占满整行
+    /// 行内容
+    ///
+    /// 图片行**居中**：缩略图最多占 `clipboardThumbMaxWidth` 那点宽度，贴着左侧时右边整片
+    /// 是空的，看着像没排完。元信息跟着图片一起居中，收藏按钮改成浮在右端 ——
+    /// 留在 `HStack` 里会把居中的图片往左推半个按钮宽。
+    @ViewBuilder
+    private var rowContent: some View {
+        if entry.type == .image {
+            VStack(spacing: DesignTokens.Spacing.xs) {
+                leadingContent
+                metadataRow
+            }
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .trailing) { favoriteButton }
+        } else {
+            // 文字行：不再显示左侧图标，预览与元信息占满整行
+            HStack(spacing: DesignTokens.Spacing.md) {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                     // 预览要压平换行、截断，对长文本是实打实的字符串扫描 —— 走缓存，
                     // 别让每次重绘、每次滚回来都重算一遍
@@ -434,12 +441,16 @@ private struct ClipboardRowView: View {
 
                     metadataRow
                 }
+
+                Spacer(minLength: 0)
+
+                favoriteButton
             }
-
-            Spacer(minLength: 0)
-
-            favoriteButton
         }
+    }
+
+    var body: some View {
+        rowContent
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .padding(.vertical, DesignTokens.Spacing.md)
         .background {
@@ -594,15 +605,18 @@ private struct ClipboardThumbnail: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
-                // 解码完成前占住同样的位置，避免行高跳一下
+                // 解码完成前占住同样的位置，避免行高跳一下。
+                // `Shape` 的固有高度只有 10pt，不显式给高度的话这里只留一条细缝，图片一出来
+                // 行高还是会跳 —— 固定成缩略图高度上限才真的「占住位置」。
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
                     .fill(DesignTokens.Colors.controlSurface)
+                    .frame(height: DesignTokens.Size.clipboardThumbHeight)
             }
         }
         .frame(
             maxWidth: DesignTokens.Size.clipboardThumbMaxWidth,
             maxHeight: DesignTokens.Size.clipboardThumbHeight,
-            alignment: .leading
+            alignment: .center
         )
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.row))
         .task(id: entry.id) {
