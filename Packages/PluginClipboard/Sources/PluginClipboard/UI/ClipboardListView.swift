@@ -613,12 +613,15 @@ private struct ClipboardThumbnail: View {
             } else {
                 // 解码完成前占住同样的位置，避免行高跳一下。
                 // `Shape` 的固有高度只有 10pt，不显式给高度的话这里只留一条细缝，图片一出来
-                // 行高还是会跳 —— 固定成缩略图高度上限才真的「占住位置」。
+                // 行高还是会跳 —— 固定成缩略图高度才真的「占住位置」。
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
                     .fill(DesignTokens.Colors.controlSurface)
                     .frame(height: DesignTokens.Size.clipboardThumbHeight)
             }
         }
+        // 高度固定 `clipboardThumbHeight`、宽度随原图比例：`.fit` 保住比例，帧占满行的可用
+        // 宽度（上限 `clipboardThumbMaxWidth`），图片在帧里居中。所以宽图不会被压扁，
+        // 竖图也不会被拉宽。
         .frame(
             maxWidth: DesignTokens.Size.clipboardThumbMaxWidth,
             maxHeight: DesignTokens.Size.clipboardThumbHeight,
@@ -664,10 +667,17 @@ private struct ClipboardThumbnail: View {
     }
 
     /// 缩略图最长边的像素数（显示尺寸 × 2，覆盖 Retina）
-    nonisolated private static let thumbnailMaxPixelSize: CGFloat = 360
+    ///
+    /// 行高 300pt 之后，一张宽图要显示到 `clipboardThumbMaxWidth` 那么宽 —— 按最长边
+    /// （宽度上限 × 2）缩，Retina 下才不糊。
+    nonisolated private static let thumbnailMaxPixelSize: CGFloat =
+        DesignTokens.Size.clipboardThumbMaxWidth * 2
 }
 
 /// 缩略图缓存（按条目 id）
+///
+/// 按**字节**封顶，不按条数：行高提到 `clipboardThumbHeight` 之后，单个缩略图在 Retina 下
+/// 就是 1400×600 级别的位图（约 3.4MB），只按条数限制能占到几百 MB —— 那是隐形的大头。
 @MainActor
 private final class ClipboardThumbnailCache {
 
@@ -676,7 +686,7 @@ private final class ClipboardThumbnailCache {
     private let cache = NSCache<NSString, NSImage>()
 
     private init() {
-        cache.countLimit = 200
+        cache.totalCostLimit = 96 * 1024 * 1024
     }
 
     func image(for id: UUID) -> NSImage? {
@@ -684,7 +694,15 @@ private final class ClipboardThumbnailCache {
     }
 
     func store(_ image: NSImage, for id: UUID) {
-        cache.setObject(image, forKey: id.uuidString as NSString)
+        cache.setObject(image, forKey: id.uuidString as NSString, cost: Self.cost(of: image))
+    }
+
+    /// 位图占的字节数：按**像素**算（Retina 下同一个 NSImage 的像素是点的 4 倍）
+    private static func cost(of image: NSImage) -> Int {
+        let pixels = image.representations.reduce(0) { total, representation in
+            total + representation.pixelsWide * representation.pixelsHigh
+        }
+        return max(pixels, 1) * 4
     }
 }
 
