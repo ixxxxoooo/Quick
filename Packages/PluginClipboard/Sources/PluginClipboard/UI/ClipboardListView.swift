@@ -584,8 +584,8 @@ private struct ClipboardRowView: View {
 
     /// 图片缩略图（只有图片行才有前置内容）
     ///
-    /// 高度固定，宽度按比例，宽图也不会撑破行。解码走 `ClipboardThumbnail` 的后台缩略图，
-    /// 不在这里同步 `NSImage(data:)`。
+    /// 最大高度 `clipboardThumbHeight`（300），宽度按比例自适应，宽图也不会撑破行。
+    /// 解码走 `ClipboardThumbnail` 的后台缩略图，不在这里同步 `NSImage(data:)`。
     private var leadingContent: some View {
         ClipboardThumbnail(entry: entry)
     }
@@ -607,30 +607,51 @@ private struct ClipboardThumbnail: View {
     var body: some View {
         Group {
             if let image {
+                // 最大高度不超过 `clipboardThumbHeight`（300），宽度随原图比例自适应；
+                // 小图以自身尺寸为上限，不被强行拉大；圆角直接裁在图片自身边缘上。
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous))
+                    .frame(
+                        maxWidth: min(max(image.size.width, 1), DesignTokens.Size.clipboardThumbMaxWidth),
+                        maxHeight: min(max(image.size.height, 1), DesignTokens.Size.clipboardThumbHeight),
+                        alignment: .center
+                    )
             } else {
-                // 解码完成前占住同样的位置，避免行高跳一下。
-                // `Shape` 的固有高度只有 10pt，不显式给高度的话这里只留一条细缝，图片一出来
-                // 行高还是会跳 —— 固定成缩略图高度才真的「占住位置」。
+                // 解码完成前按原图比例预估高度占住位置，避免宽扁图或小图加载完后行高跳变。
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
                     .fill(DesignTokens.Colors.controlSurface)
-                    .frame(height: DesignTokens.Size.clipboardThumbHeight)
+                    .frame(
+                        maxWidth: DesignTokens.Size.clipboardThumbMaxWidth,
+                        minHeight: placeholderHeight,
+                        maxHeight: placeholderHeight
+                    )
             }
         }
-        // 高度固定 `clipboardThumbHeight`、宽度随原图比例：`.fit` 保住比例，帧占满行的可用
-        // 宽度（上限 `clipboardThumbMaxWidth`），图片在帧里居中。所以宽图不会被压扁，
-        // 竖图也不会被拉宽。
-        .frame(
-            maxWidth: DesignTokens.Size.clipboardThumbMaxWidth,
-            maxHeight: DesignTokens.Size.clipboardThumbHeight,
-            alignment: .center
-        )
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.row))
         .task(id: entry.id) {
             await load()
         }
+    }
+
+    /// 根据 `imageSizeDescription`（如 `"1824×556"`）预估占位高度，上限为 `clipboardThumbHeight`
+    private var placeholderHeight: CGFloat {
+        guard let desc = entry.imageSizeDescription else {
+            return DesignTokens.Size.clipboardThumbHeight
+        }
+        let parts = desc.split(separator: "×")
+        guard parts.count == 2,
+            let width = Double(parts[0]),
+            let height = Double(parts[1]),
+            width > 0,
+            height > 0
+        else {
+            return DesignTokens.Size.clipboardThumbHeight
+        }
+        let maxW = Double(DesignTokens.Size.clipboardThumbMaxWidth)
+        let maxH = Double(DesignTokens.Size.clipboardThumbHeight)
+        let scale = min(1.0, min(maxW / width, maxH / height))
+        return CGFloat((height * scale).rounded())
     }
 
     private func load() async {

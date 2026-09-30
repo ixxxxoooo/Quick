@@ -148,10 +148,10 @@ public enum DesignTokens {
         public static let codeEditorLineHeight = scaled(20)
         /// 代码编辑器行号槽宽度
         public static let codeEditorGutter = scaled(44)
-        /// 剪贴板图片缩略图的高度（固定值，直接当预览看）
+        /// 剪贴板图片缩略图的最大高度（不随 `panelScale` 放大，严格不超过 300）
         ///
-        /// 高度固定、宽度随原图比例 —— 改这个数只影响纵向，宽图不会因此变形。
-        public static let clipboardThumbHeight = scaled(300)
+        /// 最大高度 300、宽度随原图比例自适应 —— 宽图按行宽等比缩小，高图按高度上限等比缩小。
+        public static let clipboardThumbHeight: CGFloat = 300
         /// 剪贴板图片缩略图的最大宽度（上限，行更窄时跟着收）
         public static let clipboardThumbMaxWidth = scaled(720)
         /// 剪贴板来源应用图标尺寸
