@@ -52,10 +52,19 @@ struct AIWebViewWindowTests {
         #expect(panel.identifier?.rawValue == "quick.ai.deepseek")
     }
 
-    @Test("标题就是 Provider 显示名")
+    @Test("标题就是 Provider 显示名，且关闭窗口背景拖拽以免拦截 WebView 点击")
     func titleIsProviderName() throws {
         let panel = try makePanel()
         #expect(panel.title == "DeepSeek")
+        #expect(panel.isMovableByWindowBackground == false)
+    }
+
+    @Test("WebView 使用原生 Safari User-Agent（不含 Chrome 伪装，避免 Kimi Lexical 编辑器输入失效）")
+    func usesNativeSafariUserAgent() {
+        let ua = AIWebViewWindowManager.safariUserAgent
+        #expect(ua.contains("AppleWebKit/"))
+        #expect(ua.contains("Safari/"))
+        #expect(!ua.contains("Chrome/"))
     }
 
     /// 主菜单刻意不放 ⌘W（留给主面板），所以这个普通窗口得自己接住它。

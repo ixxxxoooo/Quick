@@ -266,17 +266,22 @@ final class AIWebViewWindowManager {
         return ids
     }
 
+    /// 标准 macOS Safari User-Agent（避免 Kimi 等使用 Lexical 富文本编辑器的站点将 WebKit 误判为 Chrome/Blink 内核而拦截输入）
+    static let safariUserAgent =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15"
+
     // MARK: - 独立窗口模式
 
     private func openOrFocusSeparate(provider: AIProvider) -> Bool {
         ensureWebView(for: provider)
 
         if let win = separateWindows[provider.id] {
-            NSApp.activate(ignoringOtherApps: true)
+            EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
             win.panel.makeKeyAndOrderFront(nil)
             win.panel.orderFrontRegardless()
             syncDockPresence()
-            EventBus.shared.post(HidePaletteEvent())
+            NSApp.activate(ignoringOtherApps: true)
+            win.panel.makeFirstResponder(win.webView)
             return true
         }
 
@@ -291,7 +296,7 @@ final class AIWebViewWindowManager {
         panel.title = provider.name
         panel.titlebarAppearsTransparent = true
         panel.titleVisibility = .visible
-        panel.isMovableByWindowBackground = true
+        panel.isMovableByWindowBackground = false
         panel.minSize = NSSize(width: 600, height: 400)
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
@@ -329,11 +334,12 @@ final class AIWebViewWindowManager {
         let win = AIWebViewWindow(panel: panel, webView: webView, providerId: provider.id, capsule: capsule)
         separateWindows[provider.id] = win
 
-        NSApp.activate(ignoringOtherApps: true)
+        EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         syncDockPresence()
-        EventBus.shared.post(HidePaletteEvent())
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeFirstResponder(webView)
         log.notice("打开独立窗口: \(provider.name, privacy: .public)")
         return true
     }
@@ -348,12 +354,14 @@ final class AIWebViewWindowManager {
 
         guard let panel = mergedPanel else { return false }
 
-        NSApp.activate(ignoringOtherApps: true)
+        EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         syncDockPresence()
-
-        EventBus.shared.post(HidePaletteEvent())
+        NSApp.activate(ignoringOtherApps: true)
+        if let webView = webViews[provider.id] {
+            panel.makeFirstResponder(webView)
+        }
         log.notice("聚焦标签: \(provider.name, privacy: .public)")
         return true
     }
@@ -372,12 +380,14 @@ final class AIWebViewWindowManager {
             switchToTab(firstTab)
         }
 
-        NSApp.activate(ignoringOtherApps: true)
+        EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         syncDockPresence()
-
-        EventBus.shared.post(HidePaletteEvent())
+        NSApp.activate(ignoringOtherApps: true)
+        if let activeID = activeProviderID, let webView = webViews[activeID] {
+            panel.makeFirstResponder(webView)
+        }
         log.notice("聚焦聚合窗口: 当前标签 \(self.activeProviderID ?? "无", privacy: .public)")
         return true
     }
@@ -397,7 +407,7 @@ final class AIWebViewWindowManager {
         // 标题栏保持不透明，标签嵌在里面；隐藏系统标题文字
         newPanel.titlebarAppearsTransparent = false
         newPanel.titleVisibility = .hidden
-        newPanel.isMovableByWindowBackground = true
+        newPanel.isMovableByWindowBackground = false
         newPanel.minSize = NSSize(width: 600, height: 400)
         newPanel.isReleasedWhenClosed = false
         newPanel.hidesOnDeactivate = false
@@ -497,8 +507,7 @@ final class AIWebViewWindowManager {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
-        webView.customUserAgent =
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+        webView.customUserAgent = Self.safariUserAgent
 
         if let url = URL(string: provider.url) {
             webView.load(URLRequest(url: url))
@@ -523,6 +532,7 @@ final class AIWebViewWindowManager {
         webView.frame = container.bounds
         webView.autoresizingMask = [.width, .height]
         container.addSubview(webView)
+        mergedPanel?.makeFirstResponder(webView)
 
         activeProviderID = providerId
         titleTabBar?.selectTab(providerId)
@@ -747,7 +757,7 @@ final class AIWebViewWindowManager {
         panel.title = provider.name
         panel.titlebarAppearsTransparent = true
         panel.titleVisibility = .visible
-        panel.isMovableByWindowBackground = true
+        panel.isMovableByWindowBackground = false
         panel.minSize = NSSize(width: 600, height: 400)
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
