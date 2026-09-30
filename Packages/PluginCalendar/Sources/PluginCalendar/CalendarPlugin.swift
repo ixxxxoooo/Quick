@@ -24,9 +24,6 @@ public final class CalendarPlugin: QuickPlugin, PluginViewProviding, PluginSetti
 
     private let log = QuickLog.plugin(CalendarPlugin.id)
 
-    /// EventKit 事件存储
-    private let eventStore = EKEventStore()
-
     /// 日历服务
     private let calendarService: CalendarService
 

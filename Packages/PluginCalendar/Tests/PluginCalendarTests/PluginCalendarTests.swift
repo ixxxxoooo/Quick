@@ -28,7 +28,10 @@ private func makeEvent(
     title: String = "事件",
     start: Date,
     end: Date,
-    isAllDay: Bool = false
+    isAllDay: Bool = false,
+    location: String? = nil,
+    notes: String? = nil,
+    url: URL? = nil
 ) -> CalendarEvent {
     CalendarEvent(
         id: id,
@@ -36,11 +39,14 @@ private func makeEvent(
         startDate: start,
         endDate: end,
         isAllDay: isAllDay,
-        calendarColor: ""
+        calendarColor: "#3B82F6",
+        location: location,
+        notes: notes,
+        url: url
     )
 }
 
-@Suite("日历事件时间范围")
+@Suite("日历事件时间范围与归属")
 struct CalendarEventTimeRangeTests {
 
     @Test("定时事件显示为「起 - 止」，都是 24 小时制两位")
@@ -82,6 +88,20 @@ struct CalendarEventTimeRangeTests {
         )
         #expect(event.timeRange == "08:00 - 09:05")
     }
+
+    @Test("事件跨天命中检测与会议链接提取")
+    func multiDayOccurrenceAndMeetingLink() {
+        let event = makeEvent(
+            start: gregorianDate(year: 2026, month: 9, day: 29, hour: 14),
+            end: gregorianDate(year: 2026, month: 9, day: 30, hour: 11),
+            notes: "请准时参会：https://meeting.tencent.com/dm/abc123456。"
+        )
+        let cal = CalendarFormatting.mondayFirstGregorianCalendar()
+        #expect(event.occurs(on: gregorianDate(year: 2026, month: 9, day: 29), calendar: cal))
+        #expect(event.occurs(on: gregorianDate(year: 2026, month: 9, day: 30), calendar: cal))
+        #expect(!event.occurs(on: gregorianDate(year: 2026, month: 10, day: 1), calendar: cal))
+        #expect(event.meetingURL?.absoluteString == "https://meeting.tencent.com/dm/abc123456")
+    }
 }
 
 @Suite("日历事件排序")
@@ -121,7 +141,7 @@ struct CalendarEventSortingTests {
     }
 }
 
-@Suite("农历文本")
+@Suite("农历、节气、节假日与月历网格")
 struct CalendarFormattingTests {
 
     /// 农历文本由「中国日历 + zh_CN」这组配置决定，配置被改会在界面上悄悄变化，
@@ -138,6 +158,61 @@ struct CalendarFormattingTests {
     @Test("春节当天是正月初一")
     func springFestival() {
         #expect(CalendarFormatting.lunar(for: gregorianDate(year: 2026, month: 2, day: 17)).hasSuffix("正月初一"))
+    }
+
+    @Test("月历网格固定生成 6 行 × 7 列（周一为首日）")
+    func monthGridShapeAndLeadingMonday() throws {
+        let sep2026 = gregorianDate(year: 2026, month: 9, day: 30)
+        let rows = CalendarFormatting.monthGrid(for: sep2026, today: sep2026)
+
+        #expect(rows.count == 6)
+        #expect(rows.allSatisfy { $0.days.count == 7 })
+
+        // 2026-09-01 是周二，第一行第一格应为 2026-08-31（周一，非本月）
+        let firstCell = try #require(rows.first?.days.first)
+        #expect(firstCell.month == 8 && firstCell.day == 31)
+        #expect(!firstCell.isCurrentMonth)
+
+        let secondCell = try #require(rows.first?.days.dropFirst().first)
+        #expect(secondCell.month == 9 && secondCell.day == 1)
+        #expect(secondCell.isCurrentMonth)
+    }
+
+    @Test("传统节日、除夕（大小月自适应）、二十四节气与法定调休标记")
+    func festivalsSolarTermsAndWorkdayMarks() {
+        // 2026-02-16 是乙巳年腊月廿九（小月最后一天），应识别为除夕
+        let newYearEve = CalendarFormatting.dayCell(for: gregorianDate(year: 2026, month: 2, day: 16))
+        #expect(newYearEve.festivals.contains("除夕"))
+        #expect(newYearEve.subtitle == "除夕")
+        #expect(newYearEve.workdayMark == .holiday)
+
+        // 2026-02-17 春节
+        let spring = CalendarFormatting.dayCell(for: gregorianDate(year: 2026, month: 2, day: 17))
+        #expect(spring.cyclicalYearText == "丙午马年")
+        #expect(spring.festivals.contains("春节"))
+        #expect(spring.subtitle == "春节")
+        #expect(spring.workdayMark == .holiday)
+
+        // 2026-09-23 秋分
+        let autumnEquinox = CalendarFormatting.dayCell(for: gregorianDate(year: 2026, month: 9, day: 23))
+        #expect(autumnEquinox.solarTerm == "秋分")
+        #expect(autumnEquinox.subtitle == "秋分")
+        #expect(autumnEquinox.isSubtitleHighlighted)
+
+        // 2026-09-25 中秋节（八月十五）
+        let midAutumn = CalendarFormatting.dayCell(for: gregorianDate(year: 2026, month: 9, day: 25))
+        #expect(midAutumn.festivals.contains("中秋节"))
+        #expect(midAutumn.subtitle == "中秋节")
+        #expect(midAutumn.workdayMark == .holiday)
+
+        // 2026-09-20 国庆前调休上班
+        let makeup = CalendarFormatting.dayCell(for: gregorianDate(year: 2026, month: 9, day: 20))
+        #expect(makeup.workdayMark == .workday)
+
+        // 2026-09-11 农历八月初一（无节气节日时初一显示农历月份「八月」）
+        let firstLunarDay = CalendarFormatting.dayCell(for: gregorianDate(year: 2026, month: 9, day: 11))
+        #expect(firstLunarDay.lunarDayText == "初一")
+        #expect(firstLunarDay.subtitle == "八月")
     }
 }
 

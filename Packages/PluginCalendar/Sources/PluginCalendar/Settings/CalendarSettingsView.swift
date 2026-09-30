@@ -7,43 +7,28 @@ import QuickUI
 import SwiftUI
 
 struct CalendarSettingsView: View {
-    @AppStorage(PluginSettingKey.Calendar.reminderMinutes) private var reminderMinutes = 10
     @AppStorage(PluginSettingKey.Calendar.autoExtractMeetingLinks) private var autoLinks = true
     @AppStorage(PluginSettingKey.Calendar.showWeekNumber) private var showWeekNumber = false
 
     var body: some View {
         Section {
-            Picker(selection: $reminderMinutes) {
-                Text("5 分钟").tag(5)
-                Text("10 分钟").tag(10)
-                Text("15 分钟").tag(15)
-                Text("30 分钟").tag(30)
-            } label: {
+            Toggle(isOn: $showWeekNumber) {
                 SettingsRow(
-                    title: "提前提醒时间",
-                    subtitle: "在日程开始前多久发出通知。",
-                    icon: { SettingsRowIcon(systemImage: "bell") }
+                    title: "显示周数",
+                    subtitle: "在月历看板顶部与网格左侧显示当前是第几周。",
+                    icon: { SettingsRowIcon(systemImage: "number") }
                 )
             }
 
             Toggle(isOn: $autoLinks) {
                 SettingsRow(
                     title: "提取会议链接",
-                    subtitle: "自动识别腾讯会议、Zoom、Google Meet 等会议链接。"
-                )
-            }
-
-            Toggle(isOn: $showWeekNumber) {
-                SettingsRow(
-                    title: "显示周数",
-                    subtitle: "在日历视图中显示当前是第几周。"
+                    subtitle: "自动识别日程中的腾讯会议、飞书、Zoom、Google Meet 等在线会议链接并显示快捷加入按钮。",
+                    icon: { SettingsRowIcon(systemImage: "video") }
                 )
             }
         } header: {
-            Text("日程与提醒")
-        } footer: {
-            PendingFeatureNote(detail: "这三项还没有实现：EventKit 只用来读日程，提醒、会议链接提取和周数都还没有接上。")
+            Text("日历看板与日程")
         }
-        .disabled(true)
     }
 }

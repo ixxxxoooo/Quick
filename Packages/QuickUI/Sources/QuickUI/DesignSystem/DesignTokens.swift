@@ -239,6 +239,24 @@ public enum DesignTokens {
         /// 插件模式头部图标尺寸
         public static let pluginHeaderIcon = scaled(20)
 
+        // MARK: 日历看板
+
+        /// 日历看板双栏与网格规格
+        public enum Calendar {
+            /// 右侧选中日期详情与日程列表的宽度
+            public static let detailSidebarWidth = scaled(260)
+            /// 月历左侧周数列宽度
+            public static let weekColumnWidth = scaled(26)
+            /// 月历单元格高度（6 行正好装进面板内容区，无需滚动）
+            public static let cellHeight = scaled(52)
+            /// 月历单元格底部事件指示点直径
+            public static let eventDot = scaled(4)
+            /// 日程行左侧日历色条宽度
+            public static let eventBarWidth = scaled(3)
+            /// 法定节假日「休 / 班」角标尺寸
+            public static let workdayBadge = scaled(14)
+        }
+
         // MARK: 分离窗口
 
         /// 分离窗口默认宽度

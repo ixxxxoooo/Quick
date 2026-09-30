@@ -38,5 +38,12 @@
     <string>Quick 用 AppleScript 执行你主动选择的系统操作：切换深色模式、睡眠、重启、关机、退出登录、清空废纸篓、推出磁盘。</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Quick 只在你主动查看天气时使用你的大致位置（公里级），不会在启动时申请，也不会记录或上传。</string>
+    <!-- 日历用途说明。EventKit 的 requestFullAccessToEvents() 要求 Info.plist 声明
+         NSCalendarsFullAccessUsageDescription（保留 NSCalendarsUsageDescription 兼容查询），
+         缺失时系统会静默拒绝日历访问权限。 -->
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Quick 在日历看板与搜索结果中展示你的系统日历日程安排，不会修改或上传你的日历数据。</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Quick 在日历看板与搜索结果中展示你的系统日历日程安排，不会修改或上传你的日历数据。</string>
 </dict>
 </plist>
