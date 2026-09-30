@@ -27,8 +27,8 @@
 ## 2. 日常命令
 
 ```bash
-./Scripts/run-tests.sh       # 跑全部包的测试
-./Scripts/run-tests.sh QuickCore PluginCalculator   # 只跑指定的包
+./Scripts/run-tests.sh QuickCore PluginCalculator   # 只跑修改涉及的包（日常首选）
+./Scripts/run-tests.sh       # 跑全部包的测试（仅全量巡检时用，不要每次都跑）
 ./Scripts/build.sh           # 构建 Debug .app
 ./Scripts/build.sh --run     # 构建并启动（轻量；日常改动请用 restart.sh）
 ./Scripts/restart.sh         # 构建 + 杀旧进程 + 启动新实例（改完必跑）
@@ -39,8 +39,7 @@
 ./Scripts/new-plugin.sh PluginFoo   # 生成新功能插件骨架
 ```
 
-**提交前的最小动作**：`./Scripts/run-tests.sh`。
-钩子会替你跑一次测试，但先自己跑能省一轮往返。
+**提交前的最小动作**：`./Scripts/run-tests.sh <修改的包>`（只测改动内容，不要每次全量测试）。
 
 ---
 
@@ -158,13 +157,10 @@ open -a "$(./Scripts/build.sh --path)" --args -showPalette
 
 | 钩子 | 检查 |
 | --- | --- |
-| `pre-commit` | **跑全量测试** |
+| `pre-commit` | **只跑暂存改动涉及的包测试** |
 | `commit-msg` | 校验 Conventional Commits 格式，并拒绝非 ASCII 主题行（等价于强制英文） |
 
-**测试失败就拒绝提交。** 这是刻意的：本项目的规则是「每次提交前必须跑完测试」。
-
-**不要用 `git commit --no-verify` 绕过。** 如果确实需要（例如紧急修复一个只改文档的提交），
-在推送前必须补跑一次 `./Scripts/run-tests.sh`。
+**测试失败就拒绝提交。** 每次只跑修改涉及的包测试，避免无意义的耗时全量测试。
 
 ### 提交信息格式
 

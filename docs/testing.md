@@ -1,7 +1,7 @@
 # 测试
 
-**测试是提交的硬门禁。** 每次提交前 `./Scripts/run-tests.sh` 必须全绿，
-`pre-commit` 钩子会强制执行。
+**针对修改内容做定向测试，不要每次跑全量测试。** 日常改动后只需运行受影响包的测试：
+`./Scripts/run-tests.sh <Pkg>...`，`pre-commit` 钩子也只跑改动涉及的包。
 
 ---
 
@@ -138,12 +138,13 @@ EventKit、Vision、Spotlight、CoreLocation、Accessibility、`screencapture` �
 ## 5. 怎么跑
 
 ```bash
-./Scripts/run-tests.sh                    # 全部包
-./Scripts/run-tests.sh QuickCore          # 单个包
-./Scripts/run-tests.sh PluginCalculator QuickCore   # 多个包
+./Scripts/run-tests.sh QuickCore                    # 单个包（日常修改首选）
+./Scripts/run-tests.sh PluginCalculator QuickCore   # 多个修改涉及的包
+./Scripts/run-tests.sh                              # 全部包（仅需全量巡检时手动运行）
 ```
 
-脚本会对每个声明了测试的包执行 `swift test`，汇总结果，**任何一个包失败就整体退出非零**
+日常开发与提交前**只跑修改涉及的包**，不要每次都执行无参的全量 `./Scripts/run-tests.sh`。
+脚本会对指定的包执行 `swift test`，汇总结果，**任何一个包失败就整体退出非零**
 —— 这正是 `pre-commit` 钩子依赖的信号。
 
 底层等价于：

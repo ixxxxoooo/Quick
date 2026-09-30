@@ -122,12 +122,12 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 
 ```bash
 ./Scripts/setup.sh                 # 首次克隆后执行一次：启用 git 钩子
-./Scripts/run-tests.sh             # 跑全量测试（提交前必跑）
+./Scripts/run-tests.sh <Pkg>...    # 只跑本次修改涉及的包测试（不要每次跑全量）
 ./Scripts/build.sh                 # 构建 .app
 ./Scripts/restart.sh               # 构建 + 杀旧进程 + 启动新实例（改完必跑）
 ```
 
-提交时 `pre-commit` 钩子会自动再跑一遍，失败即拒绝提交。见
+提交时 `pre-commit` 钩子会自动针对改动的包跑测试，失败即拒绝提交。见
 [docs/development.md#提交](docs/development.md)。
 
 ### 每次改动的收尾（强制）
@@ -158,7 +158,7 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 3. 在 `Quick/AppCore.swift#registerPlugins()` 里注册。**这是唯一实例化插件的地方。**
 4. 在 `project.yml` 里加两处（`packages:` 与 `Quick` target 的 `dependencies:`），
    然后 `xcodegen generate`。
-5. 加测试，`./Scripts/run-tests.sh` 必须全绿。
+5. 加测试，`./Scripts/run-tests.sh PluginFoo` 必须全绿。
 6. 加日志：`QuickLog.plugin("<id>")`，覆盖 `activate()` / `deactivate()` / 错误路径。
 7. 在 `docs/features.md` 写下这个插件的不变量。
 8. 提交。
@@ -167,7 +167,7 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 
 每一项都不可跳过；细节见 [docs/testing.md](docs/testing.md)。
 
-- `./Scripts/run-tests.sh` 全绿 —— **这是提交的硬门禁**。
+- 针对修改的包运行 `./Scripts/run-tests.sh <Pkg>...` 通过 —— **只测改动内容，不要每次跑全量测试**。
 - `./Scripts/build.sh` 通过，且**没有新增警告**（当前基线是 0 个新警告）。
 - App 实际启动过，面板能被快捷键唤出，Esc 能关闭，CPU 空闲时接近 0。
 - `grep -rln 'import AppKit\|import SwiftUI\|import Cocoa' Packages/*/Sources/*/Model/` 无输出。
@@ -220,5 +220,5 @@ docs(standards): state the logging contract for plugins
 
 `commit-msg` 钩子会校验格式并拒绝非 ASCII 主题行（等价于强制英文）。
 
-**每次提交前必须跑完测试。** `pre-commit` 钩子会强制执行，不要用 `--no-verify` 绕过；
-万一绕过了，在推送前补跑一次。
+**每次提交前只针对修改的包跑测试（`./Scripts/run-tests.sh <Pkg>...`），不要每次跑全量测试。**
+`pre-commit` 钩子也会只跑暂存改动涉及的包测试。
