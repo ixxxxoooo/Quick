@@ -45,9 +45,9 @@ struct SystemMonitorView: View {
             Divider().opacity(0.35)
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            footer
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    footer
+                }
         }
         .onAppear {
             selectedTab = SystemMonitorPreferences.tab(storedValue: defaultTabRaw)
@@ -61,33 +61,14 @@ struct SystemMonitorView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: DesignTokens.Spacing.xxs) {
-                    ForEach(SystemMonitorTab.allCases) { tab in
-                        sidebarRow(tab)
-                    }
+        ScrollView {
+            LazyVStack(spacing: DesignTokens.Spacing.xxs) {
+                ForEach(SystemMonitorTab.allCases) { tab in
+                    sidebarRow(tab)
                 }
-                .padding(.horizontal, DesignTokens.Spacing.sm)
-                .padding(.vertical, DesignTokens.Spacing.md)
             }
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: DesignTokens.Spacing.sm) {
-                Image(systemName: "gauge.with.dots.needle.67percent")
-                    .font(DesignTokens.Typography.sidebarIcon)
-                Text("系统监控")
-                    .font(DesignTokens.Typography.bar)
-            }
-            .foregroundStyle(DesignTokens.Colors.textSecondary)
-            .padding(.horizontal, DesignTokens.Spacing.lg)
-            .padding(.vertical, DesignTokens.Spacing.sm)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(DesignTokens.Colors.controlSurface)
-            )
-            .padding(DesignTokens.Spacing.md)
+            .padding(.horizontal, DesignTokens.Spacing.sm)
+            .padding(.vertical, DesignTokens.Spacing.md)
         }
     }
 
@@ -258,7 +239,6 @@ struct SystemMonitorView: View {
         }
         .padding(.horizontal, DesignTokens.Spacing.xl)
         .frame(height: DesignTokens.Size.bottomBarHeight)
-        .background(DesignTokens.Colors.cardFill.opacity(0.35))
     }
 
     private func openActivityMonitor() {
