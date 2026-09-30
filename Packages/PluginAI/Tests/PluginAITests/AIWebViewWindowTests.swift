@@ -67,6 +67,90 @@ struct AIWebViewWindowTests {
         #expect(!ua.contains("Chrome/"))
     }
 
+    @Test("WebView 外部链接与新窗口链接使用默认浏览器打开，同站点导航保持在 WebView 内")
+    func externalAndNewWindowLinksOpenInDefaultBrowser() throws {
+        let kimiCurrent = try #require(URL(string: "https://kimi.moonshot.cn/chat/abc"))
+        let externalURL = try #require(URL(string: "https://github.com/apple/swift"))
+        let sameSiteURL = try #require(URL(string: "https://kimi.moonshot.cn/chat/def"))
+        let sameFamilyURL = try #require(URL(string: "https://www.kimi.com/chat/xyz"))
+        let mailtoURL = try #require(URL(string: "mailto:support@example.com"))
+        let blankURL = try #require(URL(string: "about:blank"))
+
+        // 1. target="_blank" 或 window.open 触发的新窗口请求应由默认浏览器打开
+        #expect(
+            AIWebViewNavigationHandler.shouldOpenInDefaultBrowser(
+                targetURL: externalURL,
+                currentURL: kimiCurrent,
+                isNewWindow: true,
+                isLinkActivated: true
+            )
+        )
+        #expect(
+            AIWebViewNavigationHandler.shouldOpenInDefaultBrowser(
+                targetURL: sameSiteURL,
+                currentURL: kimiCurrent,
+                isNewWindow: true,
+                isLinkActivated: false
+            )
+        )
+
+        // 2. 当前帧点击跨域链接应由默认浏览器打开
+        #expect(
+            AIWebViewNavigationHandler.shouldOpenInDefaultBrowser(
+                targetURL: externalURL,
+                currentURL: kimiCurrent,
+                isNewWindow: false,
+                isLinkActivated: true
+            )
+        )
+
+        // 3. 当前帧点击同域或同品牌域名家族链接保持在 WebView 内打开
+        #expect(
+            AIWebViewNavigationHandler.shouldOpenInDefaultBrowser(
+                targetURL: sameSiteURL,
+                currentURL: kimiCurrent,
+                isNewWindow: false,
+                isLinkActivated: true
+            ) == false
+        )
+        #expect(
+            AIWebViewNavigationHandler.shouldOpenInDefaultBrowser(
+                targetURL: sameFamilyURL,
+                currentURL: kimiCurrent,
+                isNewWindow: false,
+                isLinkActivated: true
+            ) == false
+        )
+
+        // 4. 非用户点击的自动重定向（如 OAuth / SSO 跳转）保持在 WebView 内
+        #expect(
+            AIWebViewNavigationHandler.shouldOpenInDefaultBrowser(
+                targetURL: externalURL,
+                currentURL: kimiCurrent,
+                isNewWindow: false,
+                isLinkActivated: false
+            ) == false
+        )
+
+        // 5. mailto: 等系统协议走外部打开，about:blank 不走外部打开
+        #expect(
+            AIWebViewNavigationHandler.shouldOpenInDefaultBrowser(
+                targetURL: mailtoURL,
+                currentURL: kimiCurrent,
+                isNewWindow: false,
+                isLinkActivated: true
+            )
+        )
+        #expect(
+            AIWebViewNavigationHandler.shouldOpenInDefaultBrowser(
+                targetURL: blankURL,
+                currentURL: kimiCurrent,
+                isNewWindow: true,
+                isLinkActivated: false
+            ) == false
+        )
+    }
+
     /// 主菜单刻意不放 ⌘W（留给主面板），所以这个普通窗口得自己接住它。
     @Test("⌘W 被接住并触发关闭回调")
     func commandWCloses() throws {

@@ -25,6 +25,9 @@ final class AIWebViewWindowManager {
     /// 各 Provider 的 WebView（按需创建，保持登录态）
     private var webViews: [String: WKWebView] = [:]
 
+    /// WebView 导航与新窗口代理（拦截外部链接与 target="_blank" / window.open 并交给系统默认浏览器打开）
+    private let navigationHandler = AIWebViewNavigationHandler()
+
     // MARK: - 独立窗口模式
 
     /// 独立窗口模式下每个 Provider 的窗口
@@ -504,10 +507,13 @@ final class AIWebViewWindowManager {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.preferences.isElementFullscreenEnabled = true
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
         webView.customUserAgent = Self.safariUserAgent
+        webView.navigationDelegate = navigationHandler
+        webView.uiDelegate = navigationHandler
 
         if let url = URL(string: provider.url) {
             webView.load(URLRequest(url: url))
@@ -1306,4 +1312,148 @@ final class AIWebViewPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+}
+
+// MARK: - WebView 链接跳转代理（默认浏览器打开外部链接）
+
+/// 负责拦截 `WKWebView` 中的新窗口链接（`target="_blank"` / `window.open`）及跨站外部链接，
+/// 统一通过 `NSWorkspace.shared.open` 交给 macOS 系统默认浏览器打开。
+@MainActor
+final class AIWebViewNavigationHandler: NSObject, WKNavigationDelegate, WKUIDelegate {
+
+    private let log = QuickLog.plugin(AIPlugin.id)
+    private var lastOpenedURL: URL?
+    private var lastOpenedAt: ContinuousClock.Instant?
+
+    /// 判定某个导航请求是否应当交给系统默认浏览器打开（纯函数，便于单元测试）
+    static func shouldOpenInDefaultBrowser(
+        targetURL: URL,
+        currentURL: URL?,
+        isNewWindow: Bool,
+        isLinkActivated: Bool
+    ) -> Bool {
+        guard let scheme = targetURL.scheme?.lowercased() else { return false }
+
+        if scheme == "mailto" || scheme == "tel" {
+            return true
+        }
+
+        guard scheme == "http" || scheme == "https" else {
+            return false
+        }
+
+        // target="_blank" 或 window.open 等新窗口请求一律用系统默认浏览器打开
+        if isNewWindow {
+            return true
+        }
+
+        // 用户主动点击的普通 <a href> 链接：若跳出当前 AI 站点域名族，则用系统默认浏览器打开
+        if isLinkActivated,
+            let targetHost = targetURL.host?.lowercased(),
+            let currentHost = currentURL?.host?.lowercased(),
+            !isSameSiteFamily(hostA: targetHost, hostB: currentHost)
+        {
+            return true
+        }
+
+        return false
+    }
+
+    /// 判断两个域名是否属于同一 AI 站点族（例如 `kimi.moonshot.cn` 与 `www.kimi.com`）
+    static func isSameSiteFamily(hostA: String, hostB: String) -> Bool {
+        if hostA == hostB { return true }
+        let rootA = registrableRoot(of: hostA)
+        let rootB = registrableRoot(of: hostB)
+        if rootA == rootB { return true }
+
+        let kimiFamily: Set<String> = ["moonshot.cn", "kimi.com", "kimi.ai"]
+        if kimiFamily.contains(rootA), kimiFamily.contains(rootB) {
+            return true
+        }
+
+        let qwenFamily: Set<String> = ["qwen.ai", "aliyun.com", "tongyi.com"]
+        if qwenFamily.contains(rootA), qwenFamily.contains(rootB) {
+            return true
+        }
+
+        return false
+    }
+
+    private static func registrableRoot(of host: String) -> String {
+        let parts = host.split(separator: ".").map(String.init)
+        guard parts.count >= 2 else { return host }
+        // 处理常见二级公共后缀（如 .com.cn / .org.cn）
+        if parts.count >= 3,
+            parts.last == "cn",
+            ["com", "net", "org", "gov", "edu"].contains(parts[parts.count - 2])
+        {
+            return parts.suffix(3).joined(separator: ".")
+        }
+        return parts.suffix(2).joined(separator: ".")
+    }
+
+    // MARK: - WKNavigationDelegate
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
+    ) {
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+
+        let isNewWindow = (navigationAction.targetFrame == nil)
+        let isLinkActivated = (navigationAction.navigationType == .linkActivated)
+
+        if Self.shouldOpenInDefaultBrowser(
+            targetURL: url,
+            currentURL: webView.url,
+            isNewWindow: isNewWindow,
+            isLinkActivated: isLinkActivated
+        ) {
+            openInDefaultBrowser(url)
+            decisionHandler(.cancel)
+            return
+        }
+
+        decisionHandler(.allow)
+    }
+
+    // MARK: - WKUIDelegate
+
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        if let url = navigationAction.request.url,
+            Self.shouldOpenInDefaultBrowser(
+                targetURL: url,
+                currentURL: webView.url,
+                isNewWindow: true,
+                isLinkActivated: true
+            )
+        {
+            openInDefaultBrowser(url)
+        }
+        return nil
+    }
+
+    private func openInDefaultBrowser(_ url: URL) {
+        let now = ContinuousClock.now
+        if let lastURL = lastOpenedURL,
+            let lastTime = lastOpenedAt,
+            lastURL == url,
+            lastTime.duration(to: now) < .milliseconds(300)
+        {
+            return
+        }
+        lastOpenedURL = url
+        lastOpenedAt = now
+        NSWorkspace.shared.open(url)
+        log.info("已在系统默认浏览器中打开外部链接: \(url.absoluteString, privacy: .public)")
+    }
 }

@@ -802,6 +802,11 @@
   支持快捷键绑定与搜索直达。执行时切换显隐（开着隐藏、关着打开）；
   窗口打开或切换时会记住最后选中的标签（`ai.lastActiveTab`）与已打开的所有标签（`ai.openTabs`），
   在窗口隐藏重新唤起或应用重启后自动恢复当时的标签页状态。
+- **页面内的新窗口链接与外部链接统一走系统默认浏览器打开。** `WKWebView` 默认丢弃
+  `target="_blank"`（`navigationAction.targetFrame == nil`）与 `window.open(...)`，
+  因此必须由 `AIWebViewNavigationHandler` 实现 `WKNavigationDelegate` 与 `WKUIDelegate`，
+  对新窗口请求、用户点击的跨站点链接及 `mailto:` 等系统协议调用 `NSWorkspace.shared.open`，
+  同时放行同域/同品牌域名家族的页内导航与登录自动重定向。
 
 #### 内部结构
 
