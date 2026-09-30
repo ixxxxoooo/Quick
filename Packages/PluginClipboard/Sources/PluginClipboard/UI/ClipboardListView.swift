@@ -280,6 +280,9 @@ struct ClipboardListView: View {
                             },
                             onCopy: {
                                 copyOnly(entry)
+                            },
+                            onCopyInline: {
+                                copyInline(entry)
                             }
                         )
                         .id(entry.id)
@@ -383,6 +386,12 @@ struct ClipboardListView: View {
         EventBus.shared.post(HidePaletteEvent())
     }
 
+    /// 行内复制按钮：仅写剪贴板并给出对勾反馈，保持面板打开
+    private func copyInline(_ entry: ClipboardEntry) {
+        writeToPasteboard(entry)
+        hover.markCopied(entry)
+    }
+
     private func writeToPasteboard(_ entry: ClipboardEntry) {
         if entry.type == .image, let data = entry.imageData {
             // 图片直接写 PNG（走 PasteboardService 的 copyImage 会丢失原始字节）
@@ -415,14 +424,17 @@ private struct ClipboardRowView: View {
     /// 指针进出这一行（由列表统一记录）
     let onHoverChange: (Bool) -> Void
 
-    /// 仅复制（不动面板、不粘贴）
+    /// 仅复制并关闭面板（右键菜单）
     let onCopy: () -> Void
+
+    /// 行内复制按钮（仅复制并显示对勾，保持面板打开）
+    let onCopyInline: () -> Void
 
     /// 行内容
     ///
     /// 图片行**只有缩略图居中**：它最多占 `clipboardThumbMaxWidth` 那点宽度，贴着左侧时右边
     /// 整片是空的，看着像没排完。元信息（尺寸、时间）保持原来的位置不动 —— 底部那行时间
-    /// 跟着图片一起漂会让人以为整行都在动。收藏按钮浮在右端：留在 `HStack` 里会把居中的
+    /// 跟着图片一起漂会让人以为整行都在动。操作按钮浮在右端：留在 `HStack` 里会把居中的
     /// 图片往左推半个按钮宽。
     @ViewBuilder
     private var rowContent: some View {
@@ -433,7 +445,7 @@ private struct ClipboardRowView: View {
                 metadataRow
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(alignment: .trailing) { favoriteButton }
+            .overlay(alignment: .trailing) { trailingButtons }
         } else {
             // 文字行：不再显示左侧图标，预览与元信息占满整行
             HStack(spacing: DesignTokens.Spacing.md) {
@@ -450,7 +462,7 @@ private struct ClipboardRowView: View {
 
                 Spacer(minLength: 0)
 
-                favoriteButton
+                trailingButtons
             }
         }
     }
@@ -556,7 +568,37 @@ private struct ClipboardRowView: View {
         }
     }
 
-    // MARK: - 收藏
+    // MARK: - 右侧操作按钮
+
+    /// 右侧常驻操作区（复制 + 收藏）
+    private var trailingButtons: some View {
+        HStack(spacing: DesignTokens.Spacing.xxs) {
+            copyButton
+            favoriteButton
+        }
+    }
+
+    /// 右侧的复制按钮：仅写剪贴板并短暂变为对勾，不影响整行的「复制并粘贴」手势
+    private var copyButton: some View {
+        let isCopied = hover.isCopied(entry)
+        return Button {
+            onCopyInline()
+        } label: {
+            Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                .font(DesignTokens.Typography.inlineIcon)
+                .foregroundStyle(
+                    isCopied ? DesignTokens.Colors.success : DesignTokens.Colors.textTertiary
+                )
+                .frame(
+                    width: DesignTokens.Size.clipboardFavoriteButton,
+                    height: DesignTokens.Size.clipboardFavoriteButton
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("复制")
+        .help("复制")
+    }
 
     /// 右侧的收藏按钮：点一下切换收藏，不影响整行的「复制」手势
     private var favoriteButton: some View {
@@ -745,15 +787,20 @@ private enum ClipboardPreviewCache {
     }
 }
 
-/// 列表统一的悬停状态
+/// 列表统一的悬停与复制反馈状态
 ///
-/// 做成引用类型让行自己去读：悬停变化只失效读它的行，不像列表 `@State` 那样
+/// 做成引用类型让行自己去读：悬停或复制状态变化只失效读它的行，不像列表 `@State` 那样
 /// 带着整个 body（含 O(n) 的计数与过滤）一起重算。
 @MainActor
 @Observable
 private final class ClipboardHoverState {
 
     private(set) var hoveredID: UUID?
+
+    private(set) var copiedKey: String?
+
+    @ObservationIgnored
+    private var copyResetTask: Task<Void, Never>?
 
     func setHovered(_ id: UUID, _ hovering: Bool) {
         if hovering {
@@ -766,4 +813,29 @@ private final class ClipboardHoverState {
     func clear() {
         hoveredID = nil
     }
+
+    func isCopied(_ entry: ClipboardEntry) -> Bool {
+        guard let copiedKey else { return false }
+        return copiedKey == Self.copyKey(for: entry)
+    }
+
+    func markCopied(_ entry: ClipboardEntry) {
+        let key = Self.copyKey(for: entry)
+        copiedKey = key
+        copyResetTask?.cancel()
+        copyResetTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(DesignTokens.Duration.copyFeedback))
+            guard !Task.isCancelled, let self, self.copiedKey == key else { return }
+            self.copiedKey = nil
+        }
+    }
+
+    // 按内容特征而非 UUID 匹配：写入剪贴板后监听器会去重并换新 UUID，按 UUID 会提前丢失对勾反馈
+    private static func copyKey(for entry: ClipboardEntry) -> String {
+        if entry.type == .image {
+            return "img:\(entry.imageSizeDescription ?? ""):\(entry.imageData?.count ?? 0)"
+        }
+        return "txt:\(entry.text)"
+    }
 }
+
