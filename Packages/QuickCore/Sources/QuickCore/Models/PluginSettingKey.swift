@@ -147,6 +147,7 @@ public enum PluginSettingKey {
     public enum SQLFormatter {
         public static let keywordCase = "sqlFormatter.keywordCase"
         public static let indent = "sqlFormatter.indent"
+        public static let wrapLines = "sqlFormatter.wrapLines"
     }
 
     /// Base64 编解码

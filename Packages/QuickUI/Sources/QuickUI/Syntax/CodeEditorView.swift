@@ -40,6 +40,15 @@ public struct CodeEditorView: NSViewRepresentable {
     /// 是否开启自动换行
     public let wrapLines: Bool
 
+    /// 空内容时的占位提示
+    public let placeholder: String
+
+    /// 出现时是否自动取得第一响应者焦点
+    public let autoFocus: Bool
+
+    /// 用户在编辑器内执行粘贴（⌘V / 右键粘贴）后的回调
+    public let onPaste: (() -> Void)?
+
     /// 垂直滚动同步（一对编辑器共用同一实例）
     public let scrollSync: EditorScrollSync?
 
@@ -53,6 +62,9 @@ public struct CodeEditorView: NSViewRepresentable {
         lineHeight: CGFloat = DesignTokens.Size.codeEditorLineHeight,
         showsLineNumbers: Bool = true,
         wrapLines: Bool = false,
+        placeholder: String = "",
+        autoFocus: Bool = false,
+        onPaste: (() -> Void)? = nil,
         scrollSync: EditorScrollSync? = nil,
         syncRole: EditorScrollSync.Role = .leading
     ) {
@@ -62,6 +74,9 @@ public struct CodeEditorView: NSViewRepresentable {
         self.lineHeight = lineHeight
         self.showsLineNumbers = showsLineNumbers
         self.wrapLines = wrapLines
+        self.placeholder = placeholder
+        self.autoFocus = autoFocus
+        self.onPaste = onPaste
         self.scrollSync = scrollSync
         self.syncRole = syncRole
     }
@@ -69,7 +84,7 @@ public struct CodeEditorView: NSViewRepresentable {
     public func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     public func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
+        let scrollView = CodeEditorTextView.scrollableTextView()
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.scrollerStyle = .overlay
@@ -84,6 +99,15 @@ public struct CodeEditorView: NSViewRepresentable {
         textView.textContainerInset = NSSize(
             width: DesignTokens.Spacing.sm, height: DesignTokens.Spacing.xs)
         textView.isVerticallyResizable = true
+
+        if let editorTextView = textView as? CodeEditorTextView {
+            editorTextView.placeholderString = placeholder
+            editorTextView.autoFocus = autoFocus
+            let coordinator = context.coordinator
+            editorTextView.onPaste = { [weak coordinator] in
+                coordinator?.handlePaste()
+            }
+        }
 
         Self.configureWrapping(textView: textView, wrapLines: wrapLines, in: scrollView)
 
@@ -119,6 +143,14 @@ public struct CodeEditorView: NSViewRepresentable {
 
         guard let textView = scrollView.documentView as? NSTextView else { return }
 
+        if let editorTextView = textView as? CodeEditorTextView {
+            if editorTextView.placeholderString != placeholder {
+                editorTextView.placeholderString = placeholder
+                editorTextView.needsDisplay = true
+            }
+            editorTextView.autoFocus = autoFocus
+        }
+
         if previousWrapLines != wrapLines {
             Self.configureWrapping(textView: textView, wrapLines: wrapLines, in: scrollView)
             context.coordinator.ruler?.wrapLines = wrapLines
@@ -130,6 +162,7 @@ public struct CodeEditorView: NSViewRepresentable {
         if textView.string != text {
             textView.string = text
             context.coordinator.applyHighlight(force: true)
+            textView.needsDisplay = true
         } else if previousWrapLines == wrapLines {
             context.coordinator.applyHighlight(force: false)
         }
@@ -193,6 +226,17 @@ public struct CodeEditorView: NSViewRepresentable {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
             applyHighlight(force: true)
+            textView.needsDisplay = true
+        }
+
+        /// 处理编辑器内粘贴事件：调用外部回调，并同步可能被原地改写后的文本
+        func handlePaste() {
+            parent.onPaste?()
+            if let textView, textView.string != parent.text {
+                textView.string = parent.text
+                applyHighlight(force: true)
+                textView.needsDisplay = true
+            }
         }
 
         /// 重新上色。`force` 为假时，语言与逐行状态都没变就直接返回
@@ -280,6 +324,67 @@ public struct CodeEditorView: NSViewRepresentable {
             case .removed: NSColor(DesignTokens.Colors.destructive).withAlphaComponent(0.12)
             }
         }
+    }
+}
+
+// MARK: - 自定义 NSTextView（粘贴回调 + 占位提示 + 自动聚焦）
+
+final class CodeEditorTextView: NSTextView {
+
+    var onPaste: (() -> Void)?
+    var placeholderString: String = ""
+    var autoFocus: Bool = false
+    private var didAutoFocus = false
+    private var isHandlingPaste = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard autoFocus, !didAutoFocus, let window else { return }
+        didAutoFocus = true
+        Task { @MainActor [weak self, weak window] in
+            guard let self, let window else { return }
+            window.makeFirstResponder(self)
+        }
+    }
+
+    override func paste(_ sender: Any?) {
+        if isHandlingPaste {
+            super.paste(sender)
+            return
+        }
+        isHandlingPaste = true
+        super.paste(sender)
+        isHandlingPaste = false
+        onPaste?()
+    }
+
+    override func pasteAsPlainText(_ sender: Any?) {
+        if isHandlingPaste {
+            super.pasteAsPlainText(sender)
+            return
+        }
+        isHandlingPaste = true
+        super.pasteAsPlainText(sender)
+        isHandlingPaste = false
+        onPaste?()
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard string.isEmpty, !placeholderString.isEmpty else { return }
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = DesignTokens.Size.codeEditorLineHeight
+        paragraph.maximumLineHeight = DesignTokens.Size.codeEditorLineHeight
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: DesignTokens.Typography.codeNSFont,
+            .foregroundColor: NSColor(DesignTokens.Colors.textTertiary),
+            .paragraphStyle: paragraph
+        ]
+        let inset = textContainerInset
+        let padding = textContainer?.lineFragmentPadding ?? 5
+        let point = NSPoint(x: inset.width + padding, y: inset.height)
+        (placeholderString as NSString).draw(at: point, withAttributes: attributes)
     }
 }
 

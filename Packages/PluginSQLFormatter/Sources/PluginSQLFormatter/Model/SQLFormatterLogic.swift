@@ -10,64 +10,200 @@ import Foundation
 /// SwiftUI/AppKit（仓库红线，靠 grep 保证），视图只负责把结果写进 @State。
 enum SQLFormatterLogic {
 
-    /// 需要独占一行的双词关键字（按出现的词序匹配，大小写不敏感）
+    /// 关键字大小写风格
+    enum KeywordCase: String, CaseIterable, Sendable {
+        case uppercase = "uppercase"
+        case lowercase = "lowercase"
+
+        init(rawOrDefault raw: String) {
+            self = KeywordCase(rawValue: raw.lowercased()) ?? .uppercase
+        }
+
+        func apply(to text: String) -> String {
+            switch self {
+            case .uppercase: text.uppercased()
+            case .lowercase: text.lowercased()
+            }
+        }
+    }
+
+    /// 需要独占一行的三词子句（必须在双词与单词关键字之前匹配）
+    private static let threeWordClauses: Set<[String]> = [
+        ["LEFT", "OUTER", "JOIN"], ["RIGHT", "OUTER", "JOIN"], ["FULL", "OUTER", "JOIN"],
+        ["CREATE", "UNIQUE", "INDEX"], ["CREATE", "OR", "REPLACE"],
+        ["INSERT", "OR", "REPLACE"], ["INSERT", "OR", "IGNORE"]
+    ]
+
+    /// 需要独占一行的双词子句（按出现的词序匹配，大小写不敏感）
     ///
     /// 必须在单词关键字之前判断 —— 否则 `LEFT` 先被当成普通词处理，`JOIN`
     /// 再单独换行，多词子句就被拆散了。
     private static let twoWordClauses: Set<[String]> = [
-        ["INSERT", "INTO"], ["DELETE", "FROM"], ["CREATE", "TABLE"],
-        ["ALTER", "TABLE"], ["DROP", "TABLE"], ["GROUP", "BY"],
-        ["ORDER", "BY"], ["UNION", "ALL"], ["LEFT", "JOIN"],
-        ["RIGHT", "JOIN"], ["INNER", "JOIN"], ["OUTER", "JOIN"],
-        ["CROSS", "JOIN"]
+        ["INSERT", "INTO"], ["INSERT", "IGNORE"], ["DELETE", "FROM"], ["TRUNCATE", "TABLE"],
+        ["CREATE", "TABLE"], ["ALTER", "TABLE"], ["DROP", "TABLE"],
+        ["CREATE", "VIEW"], ["DROP", "VIEW"], ["CREATE", "INDEX"], ["DROP", "INDEX"],
+        ["GROUP", "BY"], ["ORDER", "BY"], ["PARTITION", "BY"],
+        ["UNION", "ALL"], ["UNION", "DISTINCT"], ["EXCEPT", "ALL"], ["INTERSECT", "ALL"],
+        ["LEFT", "JOIN"], ["RIGHT", "JOIN"], ["INNER", "JOIN"], ["OUTER", "JOIN"],
+        ["CROSS", "JOIN"], ["FULL", "JOIN"], ["NATURAL", "JOIN"],
+        ["WITH", "RECURSIVE"], ["FOR", "UPDATE"], ["FETCH", "FIRST"], ["FETCH", "NEXT"]
     ]
 
-    /// 需要独占一行的单词关键字
-    private static let clauseStarters: Set<String> = [
-        "SELECT", "FROM", "WHERE", "AND", "OR", "JOIN", "ON", "UNION",
-        "HAVING", "VALUES", "UPDATE", "SET", "LIMIT", "OFFSET",
-        "CASE", "WHEN", "THEN", "ELSE", "END", "AS"
+    /// 顶层主子句关键字（独占一行，按当前括号层级基准缩进）
+    private static let majorClauseStarters: Set<String> = [
+        "SELECT", "FROM", "WHERE", "JOIN", "STRAIGHT_JOIN", "UNION", "EXCEPT", "INTERSECT",
+        "HAVING", "VALUES", "UPDATE", "SET", "LIMIT", "OFFSET", "WITH", "RETURNING", "WINDOW"
     ]
 
-    /// 格式化：关键字独占一行并统一大写
+    /// 从属子句关键字（独占一行，在当前括号基准缩进上 +1 级）
+    private static let subClauseStarters: Set<String> = [
+        "AND", "OR", "ON", "USING"
+    ]
+
+    /// 行内关键字（不触发换行，但随 `KeywordCase` 规范化大小写）
+    private static let inlineKeywords: Set<String> = [
+        "AS", "DISTINCT", "ALL", "IN", "IS", "NOT", "NULL", "TRUE", "FALSE",
+        "LIKE", "ILIKE", "RLIKE", "BETWEEN", "EXISTS", "ASC", "DESC",
+        "OVER", "INTO", "TABLE", "INDEX", "VIEW", "DEFAULT", "PRIMARY",
+        "KEY", "FOREIGN", "REFERENCES", "UNIQUE", "CHECK", "CONSTRAINT",
+        "IF", "TEMPORARY", "CASCADE", "RESTRICT", "ONLY", "ROWS", "THEN",
+        "COUNT", "SUM", "AVG", "MIN", "MAX", "COALESCE", "CAST", "NULLIF", "IFNULL"
+    ]
+
+    /// 后接 `(` 时应保留一个空格的关键字（函数名不在其中，故 `COUNT(*)` 紧贴而 `IN (1, 2)` 留空）
+    private static let keywordsWithSpaceBeforeParen: Set<String> = [
+        "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "EXISTS", "VALUES",
+        "SET", "ON", "USING", "HAVING", "WHEN", "THEN", "ELSE", "CASE", "AS",
+        "JOIN", "UNION", "EXCEPT", "INTERSECT", "BY", "WITH"
+    ]
+
+    /// 括号类型：子查询块括号换行并缩进，普通行内括号保持紧凑
+    private enum ParenKind {
+        case subquery
+        case inline
+    }
+
+    // MARK: - 格式化
+
+    /// 格式化：子句分行、层级缩进、关键字统一大小写
     ///
-    /// 先做词法分析，字符串字面量、引号标识符、注释整体透传 —— 绝不能像旧的
-    /// 正则写法那样把换行插进 `'FROM'` 这类字符串值里。
-    ///
-    /// 顺带把每行前导空格清掉，否则双击格式化的结果会一层层往外漂。
-    /// `indent` 当前不产生实际缩进（保持与旧行为一致）。
-    static func format(_ input: String, indent: Int) -> String {
+    /// 先做词法分析，字符串字面量、引号标识符、参数占位符与注释整体透传 ——
+    /// 绝不把换行插进 `'FROM'` 这类字符串值里，也不拆散 `:param` / `#{id}`。
+    static func format(
+        _ input: String,
+        indent: Int,
+        keywordCase: KeywordCase = .uppercase
+    ) -> String {
         let tokens = tokenize(input).filter {
             if case .whitespace = $0 { return false }
             return true
         }
+        guard !tokens.isEmpty else { return "" }
 
-        var lines: [String] = []
+        let indentUnit = String(repeating: " ", count: max(0, indent))
+        var lines: [(level: Int, text: String)] = []
         var builder = LineBuilder()
-        // 上一个产出的 token 是否「像标识符」—— 决定 `(` 是函数调用还是子查询开头
+
+        var subqueryDepth = 0
+        var caseDepth = 0
+        var currentLineLevel = 0
+        var parenStack: [ParenKind] = []
+        // 上一个产出的 token 是否「像函数名/普通标识符」—— 决定 `(` 是紧贴还是留空格
         var identLike = false
+        // `BETWEEN expr AND expr` 中的第一个 `AND` 留在行内，不当作 WHERE 子句折行
+        var pendingBetween = false
+
+        func flushLine(nextLevel: Int) {
+            let text = builder.finish().trimmingCharacters(in: .init(charactersIn: " "))
+            if !text.isEmpty {
+                lines.append((level: currentLineLevel, text: text))
+            }
+            currentLineLevel = max(0, nextLevel)
+        }
 
         var index = 0
         while index < tokens.count {
             switch tokens[index] {
             case .word(let word):
                 let upper = word.uppercased()
-                if index + 1 < tokens.count,
+                let baseLevel = subqueryDepth + caseDepth
+
+                // 1. 三词子句
+                if index + 2 < tokens.count,
+                    case .word(let second) = tokens[index + 1],
+                    case .word(let third) = tokens[index + 2],
+                    threeWordClauses.contains([upper, second.uppercased(), third.uppercased()])
+                {
+                    flushLine(nextLevel: baseLevel)
+                    let phrase = "\(upper) \(second.uppercased()) \(third.uppercased())"
+                    builder.token(keywordCase.apply(to: phrase))
+                    identLike = false
+                    pendingBetween = false
+                    index += 3
+                }
+                // 2. 双词子句
+                else if index + 1 < tokens.count,
                     case .word(let nextWord) = tokens[index + 1],
                     twoWordClauses.contains([upper, nextWord.uppercased()])
                 {
-                    lines.append(builder.finish())
-                    builder.token("\(upper) \(nextWord.uppercased())")
+                    flushLine(nextLevel: baseLevel)
+                    let phrase = "\(upper) \(nextWord.uppercased())"
+                    builder.token(keywordCase.apply(to: phrase))
                     identLike = false
+                    pendingBetween = false
                     index += 2
-                } else if clauseStarters.contains(upper) {
-                    lines.append(builder.finish())
-                    builder.token(upper)
+                }
+                // 3. 主子句
+                else if majorClauseStarters.contains(upper) {
+                    flushLine(nextLevel: baseLevel)
+                    builder.token(keywordCase.apply(to: upper))
+                    identLike = false
+                    pendingBetween = false
+                    index += 1
+                }
+                // 4. 从属子句（AND / OR / ON / USING）
+                else if subClauseStarters.contains(upper) {
+                    if upper == "AND", pendingBetween {
+                        pendingBetween = false
+                        builder.token(keywordCase.apply(to: upper))
+                    } else {
+                        flushLine(nextLevel: baseLevel + 1)
+                        builder.token(keywordCase.apply(to: upper))
+                    }
                     identLike = false
                     index += 1
-                } else {
-                    builder.token(word)
-                    identLike = true
+                }
+                // 5. CASE ... WHEN ... THEN ... ELSE ... END
+                else if upper == "CASE" {
+                    builder.token(keywordCase.apply(to: upper))
+                    caseDepth += 1
+                    identLike = false
+                    index += 1
+                } else if upper == "WHEN" || upper == "ELSE" {
+                    let whenLevel = subqueryDepth + max(1, caseDepth)
+                    flushLine(nextLevel: whenLevel)
+                    builder.token(keywordCase.apply(to: upper))
+                    identLike = false
+                    index += 1
+                } else if upper == "END" {
+                    let wasInCase = caseDepth > 0
+                    caseDepth = max(0, caseDepth - 1)
+                    if wasInCase {
+                        flushLine(nextLevel: subqueryDepth + caseDepth)
+                    }
+                    builder.token(keywordCase.apply(to: upper))
+                    identLike = false
+                    index += 1
+                }
+                // 6. 行内关键字与普通标识符
+                else {
+                    if upper == "BETWEEN" {
+                        pendingBetween = true
+                    }
+                    let formattedWord = inlineKeywords.contains(upper)
+                        ? keywordCase.apply(to: upper) : word
+                    builder.token(formattedWord)
+                    identLike = !keywordsWithSpaceBeforeParen.contains(upper)
                     index += 1
                 }
 
@@ -78,33 +214,53 @@ enum SQLFormatterLogic {
 
             case .lineComment:
                 builder.token(tokens[index].literal)
-                lines.append(builder.finish())
+                flushLine(nextLevel: subqueryDepth + caseDepth)
                 identLike = false
                 index += 1
 
             case .punctuation(let punctuation):
                 switch punctuation {
-                case ".":
-                    // 限定名 `a.id` 与小数点紧贴两侧
+                case ".", "::":
+                    // 限定名 `a.id` 与类型转换 `a::text` 紧贴两侧
                     builder.glue(punctuation)
                     identLike = true
                 case "(":
+                    let isSubquery = containsSubqueryClause(tokens: tokens, openParenIndex: index)
                     if identLike {
                         builder.glue(punctuation)
                     } else {
                         builder.token(punctuation)
+                    }
+                    if isSubquery {
+                        parenStack.append(.subquery)
+                        subqueryDepth += 1
+                        flushLine(nextLevel: subqueryDepth + caseDepth)
+                    } else {
+                        parenStack.append(.inline)
                         builder.glueNextToken()
                     }
                     identLike = false
                 case ")":
-                    builder.tight(punctuation)
+                    let kind = parenStack.popLast() ?? .inline
+                    switch kind {
+                    case .subquery:
+                        subqueryDepth = max(0, subqueryDepth - 1)
+                        flushLine(nextLevel: subqueryDepth + caseDepth)
+                        builder.token(punctuation)
+                    case .inline:
+                        builder.tight(punctuation)
+                    }
                     identLike = true
                 case ",":
                     builder.tight(punctuation)
                     identLike = false
                 case ";":
                     builder.tight(punctuation)
-                    lines.append(builder.finish())
+                    subqueryDepth = 0
+                    caseDepth = 0
+                    parenStack.removeAll()
+                    pendingBetween = false
+                    flushLine(nextLevel: 0)
                     identLike = false
                 default:
                     builder.token(punctuation)
@@ -116,16 +272,40 @@ enum SQLFormatterLogic {
                 index += 1
             }
         }
-        lines.append(builder.finish())
+        flushLine(nextLevel: 0)
 
         return lines
-            .map { $0.trimmingCharacters(in: .init(charactersIn: " ")) }
-            .filter { !$0.isEmpty }
+            .map { String(repeating: indentUnit, count: $0.level) + $0.text }
             .joined(separator: "\n")
     }
 
+    /// 判断 `(` 内部同层是否包含子查询主子句（如 `SELECT`）
+    private static func containsSubqueryClause(tokens: [Token], openParenIndex: Int) -> Bool {
+        var depth = 1
+        var index = openParenIndex + 1
+        while index < tokens.count, depth > 0 {
+            switch tokens[index] {
+            case .punctuation("("):
+                depth += 1
+            case .punctuation(")"):
+                depth -= 1
+            case .word(let word) where depth == 1:
+                let upper = word.uppercased()
+                if upper == "SELECT" || upper == "WITH" {
+                    return true
+                }
+            default:
+                break
+            }
+            index += 1
+        }
+        return false
+    }
+
+    // MARK: - 压缩
+
     /// 压缩：折行与连续空白归一成单个空格，字面量与注释原样保留
-    static func minify(_ input: String) -> String {
+    static func minify(_ input: String, keywordCase: KeywordCase? = nil) -> String {
         let tokens = tokenize(input).filter {
             if case .whitespace = $0 { return false }
             return true
@@ -152,15 +332,25 @@ enum SQLFormatterLogic {
 
         for token in tokens {
             switch token {
-            case .word, .string, .quoted, .number, .blockComment:
+            case .word(let word):
+                let upper = word.uppercased()
+                let isKnownKeyword = majorClauseStarters.contains(upper)
+                    || subClauseStarters.contains(upper)
+                    || inlineKeywords.contains(upper)
+                    || ["CASE", "WHEN", "ELSE", "END", "LEFT", "RIGHT", "INNER", "OUTER", "CROSS", "FULL", "NATURAL", "GROUP", "ORDER", "PARTITION", "BY", "INSERT", "DELETE", "TRUNCATE", "CREATE", "ALTER", "DROP", "FOR", "FETCH", "FIRST", "NEXT", "RECURSIVE", "IGNORE"].contains(upper)
+                let emitted = (isKnownKeyword && keywordCase != nil)
+                    ? keywordCase!.apply(to: word) : word
+                emit(emitted)
+                identLike = !keywordsWithSpaceBeforeParen.contains(upper)
+            case .string, .quoted, .number, .blockComment:
                 emit(token.literal)
-                identLike = !clauseStarters.contains(token.literal.uppercased())
+                identLike = true
             case .lineComment:
                 emit(token.literal)
                 identLike = false
             case .punctuation(let punctuation):
                 switch punctuation {
-                case ".":
+                case ".", "::":
                     glue(punctuation)
                     identLike = true
                 case "(":
@@ -188,11 +378,19 @@ enum SQLFormatterLogic {
         return output.trimmingCharacters(in: .whitespaces)
     }
 
+    // MARK: - 统计
+
     /// 语句条数（按分号切分，忽略空段）
     static func statementCount(in input: String) -> Int {
         input.components(separatedBy: ";").filter {
             !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }.count
+    }
+
+    /// 文本行数（空串为 0）
+    static func lineCount(in input: String) -> Int {
+        guard !input.isEmpty else { return 0 }
+        return input.components(separatedBy: "\n").count
     }
 
     /// 人类可读的字节数
@@ -210,7 +408,7 @@ enum SQLFormatterLogic {
         case word(String)
         /// 单引号字符串字面量（含引号，整体透传）
         case string(String)
-        /// 双引号/反引号标识符（含引号，整体透传）
+        /// 双引号/反引号/方括号标识符或参数占位符（整体透传）
         case quoted(String)
         /// 数字
         case number(String)
@@ -262,7 +460,6 @@ enum SQLFormatterLogic {
             }
 
             if character == "`" {
-                // MySQL 反引号标识符：到下一个反引号为止
                 let start = index
                 index = input.index(after: index)
                 while index < input.endIndex, input[index] != "`" {
@@ -273,6 +470,86 @@ enum SQLFormatterLogic {
                 continue
             }
 
+            // SQL Server / SQLite 方括号标识符：[table_name]
+            if character == "[" {
+                let start = index
+                index = input.index(after: index)
+                while index < input.endIndex, input[index] != "]" {
+                    index = input.index(after: index)
+                }
+                if index < input.endIndex { index = input.index(after: index) }
+                tokens.append(.quoted(String(input[start..<index])))
+                continue
+            }
+
+            // MyBatis / 模板占位符：#{...} 或 ${...}
+            if (character == "#" || character == "$"),
+                input.index(after: index) < input.endIndex,
+                input[input.index(after: index)] == "{"
+            {
+                let start = index
+                index = input.index(index, offsetBy: 2, limitedBy: input.endIndex) ?? input.endIndex
+                while index < input.endIndex, input[index] != "}" {
+                    index = input.index(after: index)
+                }
+                if index < input.endIndex { index = input.index(after: index) }
+                tokens.append(.quoted(String(input[start..<index])))
+                continue
+            }
+
+            // PostgreSQL 位置参数 / 变量：$1, $param
+            if character == "$",
+                input.index(after: index) < input.endIndex,
+                input[input.index(after: index)].isLetter
+                    || input[input.index(after: index)].isNumber
+                    || input[input.index(after: index)] == "_"
+            {
+                let start = index
+                index = input.index(after: index)
+                while index < input.endIndex,
+                    input[index].isLetter || input[index].isNumber || input[index] == "_"
+                {
+                    index = input.index(after: index)
+                }
+                tokens.append(.quoted(String(input[start..<index])))
+                continue
+            }
+
+            // MySQL / SQL Server 变量：@var, @@global_var
+            if character == "@" {
+                let start = index
+                index = input.index(after: index)
+                if index < input.endIndex, input[index] == "@" {
+                    index = input.index(after: index)
+                }
+                while index < input.endIndex,
+                    input[index].isLetter || input[index].isNumber || input[index] == "_"
+                {
+                    index = input.index(after: index)
+                }
+                tokens.append(.quoted(String(input[start..<index])))
+                continue
+            }
+
+            // 命名参数 :param（排除 :: 与 :=）
+            if character == ":" {
+                let next = input.index(after: index)
+                if next < input.endIndex,
+                    input[next].isLetter || input[next] == "_"
+                {
+                    let start = index
+                    index = next
+                    while index < input.endIndex,
+                        input[index].isLetter || input[index].isNumber || input[index] == "_"
+                    {
+                        index = input.index(after: index)
+                    }
+                    tokens.append(.quoted(String(input[start..<index])))
+                    continue
+                }
+            }
+
+            // 行注释：-- 到行尾
             if character == "-",
                 input.index(after: index) < input.endIndex,
                 input[input.index(after: index)] == "-"
@@ -285,6 +562,7 @@ enum SQLFormatterLogic {
                 continue
             }
 
+            // 块注释：/* ... */
             if character == "/",
                 input.index(after: index) < input.endIndex,
                 input[input.index(after: index)] == "*"
@@ -325,11 +603,21 @@ enum SQLFormatterLogic {
                 continue
             }
 
-            // 双字符运算符优先
+            // 三字符运算符（如 <=>、->>、#>>）
+            if let thirdIndex = input.index(index, offsetBy: 3, limitedBy: input.endIndex) {
+                let three = String(input[index..<thirdIndex])
+                if ["<=>", "->>", "#>>"].contains(three) {
+                    tokens.append(.punctuation(three))
+                    index = thirdIndex
+                    continue
+                }
+            }
+
+            // 双字符运算符
             let nextIndex = input.index(after: index)
             if nextIndex < input.endIndex {
                 let two = String(character) + String(input[nextIndex])
-                if ["<=", ">=", "<>", "!=", "||", "::"].contains(two) {
+                if ["<=", ">=", "<>", "!=", "||", "::", ":=", "->", "#>", "<<", ">>", "~*", "!~"].contains(two) {
                     tokens.append(.punctuation(two))
                     index = input.index(after: nextIndex)
                     continue
@@ -342,7 +630,7 @@ enum SQLFormatterLogic {
         return tokens
     }
 
-    /// 消费带「双写引号」转义的序列（单引号字符串或双引号标识符）
+    /// 消费带「双写引号」或「反斜杠」转义的序列（单引号字符串或双引号标识符）
     private static func consumeQuotedSequence(
         _ input: String,
         start: String.Index,
@@ -352,6 +640,11 @@ enum SQLFormatterLogic {
     ) -> String.Index {
         var index = input.index(after: start)
         while index < input.endIndex {
+            if input[index] == "\\" {
+                let nextIndex = input.index(after: index)
+                index = nextIndex < input.endIndex ? input.index(after: nextIndex) : input.endIndex
+                continue
+            }
             if input[index] == quote {
                 let nextIndex = input.index(after: index)
                 // 双写引号是转义，不是结束

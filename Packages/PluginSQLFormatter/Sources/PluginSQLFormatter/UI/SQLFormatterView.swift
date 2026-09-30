@@ -8,22 +8,38 @@ import SwiftUI
 
 /// SQL 格式化面板
 ///
-/// 布局与 Fasty sql-formatter 一致：工具栏 → 编辑区（输入 / 输出）→ 状态栏。
-/// 输出带 SQL 语法高亮，见 `CodeTextView`。
+/// 单栏原地编辑：`格式化` / `压缩` 直接改写同一个带实时 SQL 语法高亮与行号的编辑区，
+/// 粘贴（⌘V / 右键粘贴 / 跨面板带入）时自动原地格式化；平时手动打字只做高亮不重排，避免光标跳动。
 struct SQLFormatterView: View {
-    /// 输入文本归插件所有：主面板与分离窗口共享同一份，分离时内容自然带过去
+
+    private enum ActionState {
+        case formatted
+        case minified
+    }
+
+    /// 当前文本（唯一真相：主面板与分离窗口共享同一份，分离时内容自然带过去）
     @Bindable var buffer: TextBuffer
 
-    private var input: String {
+    private var text: String {
         get { buffer.text }
         nonmutating set { buffer.text = newValue }
     }
-    @State private var output = ""
-    @State private var indent = 2
-    @State private var statementCount = 0
 
-    /// 粘贴检测跳转时携带的初始文本
+    /// 与设置页共用的持久化偏好
+    @AppStorage(PluginSettingKey.SQLFormatter.indent) private var indent = 2
+    @AppStorage(PluginSettingKey.SQLFormatter.keywordCase) private var keywordCaseRaw = "uppercase"
+    @AppStorage(PluginSettingKey.SQLFormatter.wrapLines) private var wrapLines = false
+
+    @State private var statementCount = 0
+    @State private var lineCount = 0
+    @State private var lastAction: ActionState?
+
+    /// 粘贴检测或超级面板跳转时携带的初始文本
     @Environment(\.pluginContext) private var pluginContext
+
+    private var resolvedKeywordCase: SQLFormatterLogic.KeywordCase {
+        SQLFormatterLogic.KeywordCase(rawOrDefault: keywordCaseRaw)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,29 +47,42 @@ struct SQLFormatterView: View {
 
             Divider().opacity(0.3)
 
-            HSplitView {
-                editorPane(title: "输入") {
-                    TextEditor(text: $buffer.text)
-                        .font(DesignTokens.Typography.code)
-                        .scrollContentBackground(.hidden)
-                        .padding(DesignTokens.Spacing.sm)
+            CodeEditorView(
+                text: $buffer.text,
+                language: .sql,
+                showsLineNumbers: true,
+                wrapLines: wrapLines,
+                placeholder: "粘贴或输入 SQL 语句，粘贴时自动原地格式化…",
+                autoFocus: true,
+                onPaste: {
+                    formatSQL()
                 }
-
-                editorPane(title: "输出") {
-                    CodeTextView(output, language: .sql, placeholder: "格式化结果会显示在这里")
-                }
-            }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Divider().opacity(0.3)
 
             statusBar
         }
-        .onChange(of: input) { _, _ in autoFormat() }
         .onAppear {
-            // 从导航上下文读取初始输入（粘贴检测自动跳转场景）。
-            // **带了初始文本就覆盖**：缓冲区是插件级的、会跨次保留，只在「空」时加载会被旧内容挡住。
-            if let initialQuery = pluginContext["query"], !initialQuery.isEmpty {
-                input = initialQuery
+            loadInitialText()
+        }
+        .onChange(of: pluginContext) { _, _ in
+            loadInitialText()
+        }
+        .onChange(of: text) { _, _ in
+            refreshStats()
+        }
+        .onChange(of: indent) { _, _ in
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            formatSQL()
+        }
+        .onChange(of: keywordCaseRaw) { _, _ in
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            if lastAction == .minified {
+                compactSQL()
+            } else {
+                formatSQL()
             }
         }
     }
@@ -79,24 +108,40 @@ struct SQLFormatterView: View {
             .controlSize(.small)
 
             Button {
-                EventBus.shared.post(CopyToClipboardEvent(text: output.isEmpty ? input : output))
+                EventBus.shared.post(CopyToClipboardEvent(text: text))
             } label: {
                 Label("复制", systemImage: "doc.on.doc")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .disabled(text.isEmpty)
 
             Button {
-                input = ""
-                output = ""
-                statementCount = 0
+                clear()
             } label: {
                 Label("清空", systemImage: "trash")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .disabled(text.isEmpty)
+
+            Toggle(isOn: $wrapLines) {
+                Label("换行", systemImage: "text.wrap")
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .help("自动换行")
 
             Spacer()
+
+            Picker("", selection: $keywordCaseRaw) {
+                Text("大写").tag("uppercase")
+                Text("小写").tag("lowercase")
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: DesignTokens.Size.settingsControl)
+            .help("SQL 关键字大小写风格")
 
             // 标签自己写：分段控件自带标签会被挤成竖排窄条
             Text("缩进")
@@ -109,29 +154,10 @@ struct SQLFormatterView: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 140)
+            .frame(width: DesignTokens.Size.settingsControlWide)
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .padding(.vertical, DesignTokens.Spacing.sm)
-    }
-
-    // MARK: - 编辑区
-
-    private func editorPane<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(DesignTokens.Typography.rowTrailing)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-                .padding(.horizontal, DesignTokens.Spacing.md)
-                .padding(.top, DesignTokens.Spacing.sm)
-
-            content()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .frame(minWidth: 200)
     }
 
     // MARK: - 状态栏
@@ -143,13 +169,18 @@ struct SQLFormatterView: View {
                     .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
-            if !input.isEmpty {
-                Text(SQLFormatterLogic.byteSize(input))
+            if lineCount > 0 {
+                Text("\(lineCount) 行")
                     .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
-            if !output.isEmpty {
-                Text("已格式化")
+            if !text.isEmpty {
+                Text(SQLFormatterLogic.byteSize(text))
+                    .font(DesignTokens.Typography.keyCap)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            }
+            if !text.isEmpty, let lastAction {
+                Text(lastAction == .formatted ? "已格式化" : "已压缩")
                     .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.success)
             }
@@ -161,21 +192,55 @@ struct SQLFormatterView: View {
 
     // MARK: - 动作
 
-    private func autoFormat() {
-        guard !input.isEmpty else {
-            output = ""
-            statementCount = 0
+    /// 从导航上下文读取初始输入（粘贴检测自动跳转 / 超级面板带入），并自动原地格式化
+    private func loadInitialText() {
+        guard let initialQuery = pluginContext["query"], !initialQuery.isEmpty else {
+            refreshStats()
             return
         }
-        formatSQL()
+        text = SQLFormatterLogic.format(
+            initialQuery,
+            indent: indent,
+            keywordCase: resolvedKeywordCase
+        )
+        lastAction = .formatted
+        refreshStats()
+    }
+
+    private func refreshStats() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            statementCount = 0
+            lineCount = 0
+            lastAction = nil
+            return
+        }
+        statementCount = SQLFormatterLogic.statementCount(in: text)
+        lineCount = SQLFormatterLogic.lineCount(in: text)
     }
 
     private func formatSQL() {
-        output = SQLFormatterLogic.format(input, indent: indent)
-        statementCount = SQLFormatterLogic.statementCount(in: input)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        text = SQLFormatterLogic.format(
+            text,
+            indent: indent,
+            keywordCase: resolvedKeywordCase
+        )
+        lastAction = .formatted
+        refreshStats()
     }
 
     private func compactSQL() {
-        output = SQLFormatterLogic.minify(input)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        text = SQLFormatterLogic.minify(text, keywordCase: resolvedKeywordCase)
+        lastAction = .minified
+        refreshStats()
+    }
+
+    private func clear() {
+        text = ""
+        statementCount = 0
+        lineCount = 0
+        lastAction = nil
     }
 }

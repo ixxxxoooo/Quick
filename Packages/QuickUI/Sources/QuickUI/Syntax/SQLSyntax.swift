@@ -19,12 +19,15 @@ public enum SQLSyntax {
     static let keywords: Set<String> = [
         // 查询
         "SELECT", "FROM", "WHERE", "GROUP", "BY", "ORDER", "HAVING", "LIMIT", "OFFSET",
-        "DISTINCT", "AS", "UNION", "ALL", "EXISTS", "IN", "BETWEEN", "LIKE", "IS",
-        "ASC", "DESC", "WITH", "RETURNING", "WINDOW", "OVER", "PARTITION",
+        "DISTINCT", "AS", "UNION", "ALL", "EXCEPT", "INTERSECT", "EXISTS", "IN", "BETWEEN",
+        "LIKE", "ILIKE", "RLIKE", "IS", "ASC", "DESC", "WITH", "RECURSIVE", "RETURNING",
+        "WINDOW", "OVER", "PARTITION", "FOR", "FETCH", "FIRST", "NEXT", "ROWS", "ONLY",
         // 连接
-        "JOIN", "INNER", "LEFT", "RIGHT", "FULL", "OUTER", "CROSS", "ON", "USING",
+        "JOIN", "INNER", "LEFT", "RIGHT", "FULL", "OUTER", "CROSS", "NATURAL",
+        "STRAIGHT_JOIN", "ON", "USING",
         // 增删改
         "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE", "REPLACE", "MERGE",
+        "TRUNCATE", "IGNORE",
         // 结构
         "CREATE", "ALTER", "DROP", "TABLE", "INDEX", "VIEW", "TRIGGER", "SCHEMA",
         "DATABASE", "COLUMN", "PRIMARY", "FOREIGN", "KEY", "REFERENCES", "UNIQUE",
@@ -33,8 +36,9 @@ public enum SQLSyntax {
         "AND", "OR", "NOT", "CASE", "WHEN", "THEN", "ELSE", "END", "NULL", "TRUE", "FALSE",
         // 事务
         "BEGIN", "COMMIT", "ROLLBACK", "TRANSACTION", "SAVEPOINT",
-        // 聚合
-        "COUNT", "SUM", "AVG", "MIN", "MAX", "COALESCE", "CAST", "NULLIF"
+        // 聚合与常用函数
+        "COUNT", "SUM", "AVG", "MIN", "MAX", "COALESCE", "CAST", "NULLIF", "IFNULL",
+        "CONCAT", "SUBSTRING", "NOW", "ROW_NUMBER", "RANK", "DENSE_RANK"
     ]
 
     /// 把文本切成 token
@@ -66,7 +70,7 @@ public enum SQLSyntax {
                 continue
             }
 
-            // 字符串：单引号，内部的 '' 表示一个单引号
+            // 字符串：单引号，内部的 '' 或 \' 表示转义单引号
             if character == "'" {
                 let end = endOfSQLString(in: text, from: index)
                 tokens.append(SyntaxToken(range: index..<end, kind: .string))
@@ -77,8 +81,24 @@ public enum SQLSyntax {
             // 被引号括起来的标识符：双引号或反引号（保留大小写、可能是关键字同形词）
             if character == "\"" || character == "`" {
                 let end = SyntaxScanner.endOfQuotedString(
-                    in: text, from: index, quote: character, escape: false)
+                    in: text, from: index, quote: character, escape: true)
                 tokens.append(SyntaxToken(range: index..<end, kind: .key))
+                index = end
+                continue
+            }
+
+            // 方括号标识符：[table_name]（SQL Server / SQLite）
+            if character == "[" {
+                let end = endOfBracketIdentifier(in: text, from: index)
+                tokens.append(SyntaxToken(range: index..<end, kind: .key))
+                index = end
+                continue
+            }
+
+            // MyBatis / 模板参数：#{...} 或 ${...}
+            if (character == "#" || character == "$"), peek(text, index, offset: 1) == "{" {
+                let end = endOfBracePlaceholder(in: text, from: index)
+                tokens.append(SyntaxToken(range: index..<end, kind: .literal))
                 index = end
                 continue
             }
@@ -150,12 +170,17 @@ public enum SQLSyntax {
 
     /// SQL 字符串的结束位置
     ///
-    /// SQL 用两个连续单引号表示字符串里的单引号（`'it''s'`），不是反斜杠转义。
-    /// 按反斜杠处理会让 `'it''s'` 提前结束，把后面半句也染成字符串。
+    /// 同时兼容 SQL 标准的双写单引号（`'it''s'`）与 MySQL/PG 常见的反斜杠转义（`'it\'s'`）。
     private static func endOfSQLString(in text: String, from start: String.Index) -> String.Index {
         var index = text.index(after: start)
         while index < text.endIndex {
-            guard text[index] == "'" else {
+            let ch = text[index]
+            if ch == "\\" {
+                let next = text.index(after: index)
+                index = next < text.endIndex ? text.index(after: next) : text.endIndex
+                continue
+            }
+            guard ch == "'" else {
                 index = text.index(after: index)
                 continue
             }
@@ -166,6 +191,32 @@ public enum SQLSyntax {
                 continue
             }
             return next
+        }
+        return text.endIndex
+    }
+
+    private static func endOfBracketIdentifier(
+        in text: String, from start: String.Index
+    ) -> String.Index {
+        var index = text.index(after: start)
+        while index < text.endIndex {
+            if text[index] == "]" {
+                return text.index(after: index)
+            }
+            index = text.index(after: index)
+        }
+        return text.endIndex
+    }
+
+    private static func endOfBracePlaceholder(
+        in text: String, from start: String.Index
+    ) -> String.Index {
+        var index = text.index(start, offsetBy: 2, limitedBy: text.endIndex) ?? text.endIndex
+        while index < text.endIndex {
+            if text[index] == "}" {
+                return text.index(after: index)
+            }
+            index = text.index(after: index)
         }
         return text.endIndex
     }

@@ -14,6 +14,16 @@ struct SQLFormatterLogicTests {
         #expect(result == "SELECT a\nFROM t")
     }
 
+    @Test("关键字小写模式统一输出小写关键字并保留标识符大小写")
+    func formatLowercasesKeywordsWhenRequested() {
+        let result = SQLFormatterLogic.format(
+            "SELECT userId AS uid FROM UserTable WHERE userId IN (1, 2) ORDER BY uid DESC",
+            indent: 2,
+            keywordCase: .lowercase
+        )
+        #expect(result == "select userId as uid\nfrom UserTable\nwhere userId in (1, 2)\norder by uid desc")
+    }
+
     /// 大小写混写也要归一，否则用户为了格式化得先把语句重打一遍
     @Test("大小写混写的关键字同样被识别")
     func formatIsCaseInsensitive() {
@@ -24,13 +34,64 @@ struct SQLFormatterLogicTests {
         #expect(!result.lowercased().contains("select id from"))
     }
 
-    /// 缩进值是视图暴露的可调项，无论选 2 还是 4 都必须产出一致的分行结果
-    @Test("缩进参数不影响分行结果")
-    func indentDoesNotChangeLineBreaks() {
-        let two = SQLFormatterLogic.format("select a from t", indent: 2)
-        let four = SQLFormatterLogic.format("select a from t", indent: 4)
-        #expect(two == four)
-        #expect(two.components(separatedBy: "\n").count == 2)
+    @Test("缩进参数控制从属子句与子查询的缩进宽度且重复格式化幂等")
+    func indentControlsSubclauseAndIsIdempotent() {
+        let sql = "select * from users u left join orders o on u.id = o.user_id where u.status = 1 and o.amount > 10"
+        let two = SQLFormatterLogic.format(sql, indent: 2)
+        let four = SQLFormatterLogic.format(sql, indent: 4)
+
+        #expect(two.contains("\n  ON u.id = o.user_id"))
+        #expect(two.contains("\n  AND o.amount > 10"))
+        #expect(four.contains("\n    ON u.id = o.user_id"))
+        #expect(four.contains("\n    AND o.amount > 10"))
+
+        // 重复格式化不会继续累加缩进
+        let formattedTwice = SQLFormatterLogic.format(two, indent: 2)
+        #expect(formattedTwice == two)
+    }
+
+    @Test("子查询括号自动换行缩进，普通括号与函数调用保持行内")
+    func subqueryIndentationAndInlineParens() {
+        let sql = "select count(*), id from users where id in (select user_id from orders where total > 100) and status in (1, 2)"
+        let result = SQLFormatterLogic.format(sql, indent: 2)
+        let expected = """
+            SELECT COUNT(*), id
+            FROM users
+            WHERE id IN (
+              SELECT user_id
+              FROM orders
+              WHERE total > 100
+            )
+              AND status IN (1, 2)
+            """
+        #expect(result == expected)
+    }
+
+    @Test("BETWEEN 表达式内的 AND 保持在同一行，不误拆为 WHERE 条件行")
+    func betweenAndStaysInline() {
+        let sql = "select * from logs where created_at between '2026-01-01' and '2026-12-31' and level = 'error'"
+        let result = SQLFormatterLogic.format(sql, indent: 2)
+        let expected = """
+            SELECT *
+            FROM logs
+            WHERE created_at BETWEEN '2026-01-01' AND '2026-12-31'
+              AND level = 'error'
+            """
+        #expect(result == expected)
+    }
+
+    @Test("CASE WHEN THEN ELSE END 结构化缩进")
+    func caseWhenIndentation() {
+        let sql = "select id, case when score >= 90 then 'A' else 'B' end as grade from exams"
+        let result = SQLFormatterLogic.format(sql, indent: 2)
+        let expected = """
+            SELECT id, CASE
+              WHEN score >= 90 THEN 'A'
+              ELSE 'B'
+            END AS grade
+            FROM exams
+            """
+        #expect(result == expected)
     }
 
     @Test("格式化清掉多余空行")
@@ -41,24 +102,44 @@ struct SQLFormatterLogicTests {
     }
 
     /// 字符串字面量整体透传，关键字形态的内容不能被插入换行
-    @Test("格式化不改写字符串字面量内部的关键字")
+    @Test("格式化不改写字符串字面量内部的关键字与转义引号")
     func formatPreservesStringLiterals() {
         let result = SQLFormatterLogic.format(
-            "select * from t where name = 'FROM' or note = 'SELECT x'", indent: 2)
+            #"select * from t where name = 'FROM' or note = 'it\'s SELECT x' or tag = 'a''b'"#,
+            indent: 2
+        )
         #expect(result.contains("'FROM'"))
-        #expect(result.contains("'SELECT x'"))
+        #expect(result.contains(#"'it\'s SELECT x'"#))
+        #expect(result.contains("'a''b'"))
         #expect(!result.contains("\nFROM'"))
         #expect(!result.contains("\nSELECT x'"))
     }
 
-    /// 多词子句作为整体换行，`LEFT JOIN` 不能被拆成 `LEFT` + `JOIN`；限定名不能被拆成 `a. id`
+    /// 多词子句作为整体换行，`LEFT JOIN` / `LEFT OUTER JOIN` 不能被拆开；限定名与类型转换紧贴
     @Test("多词关键字与限定名的间距保持正确")
     func formatKeepsMultiWordClausesTogether() {
-        let result = SQLFormatterLogic.format("select * from a left join b on a.id = b.id", indent: 2)
+        let result = SQLFormatterLogic.format(
+            "select a.id::text from a left join b on a.id = b.id left outer join c on b.id = c.id",
+            indent: 2
+        )
         #expect(result.contains("LEFT JOIN b"))
+        #expect(result.contains("LEFT OUTER JOIN c"))
         #expect(!result.contains("\nJOIN b"))
         #expect(result.contains("a.id = b.id"))
+        #expect(result.contains("a.id::text"))
         #expect(!result.contains("a. id"))
+    }
+
+    @Test("命名参数、变量、MyBatis 占位符与方括号标识符不被拆碎")
+    func formatPreservesPlaceholdersAndBracketIdentifiers() {
+        let sql = "select [user_id] from ${table_name} where id = :user_id and dept = #{deptId} and org = $1 and tz = @@time_zone"
+        let result = SQLFormatterLogic.format(sql, indent: 2)
+        #expect(result.contains("[user_id]"))
+        #expect(result.contains("${table_name}"))
+        #expect(result.contains(":user_id"))
+        #expect(result.contains("#{deptId}"))
+        #expect(result.contains("$1"))
+        #expect(result.contains("@@time_zone"))
     }
 
     /// 裸 UNION 与 UNION ALL 是两个词法形态：前者单词、后者双词，都必须独占一行
@@ -74,18 +155,24 @@ struct SQLFormatterLogicTests {
         #expect(result == "SELECT 'x  y' FROM t")
     }
 
-    @Test("压缩把折行归一成单个空格")
+    @Test("压缩把折行归一成单个空格并支持关键字大小写转换")
     func minifyCollapsesWhitespace() {
         let result = SQLFormatterLogic.minify("SELECT\n  a\nFROM   t")
         #expect(result == "SELECT a FROM t")
+
+        let lower = SQLFormatterLogic.minify("SELECT\n  a\nFROM   t", keywordCase: .lowercase)
+        #expect(lower == "select a from t")
     }
 
-    @Test("语句条数按分号统计并忽略空段")
-    func countsStatements() {
+    @Test("语句条数与行数统计")
+    func countsStatementsAndLines() {
         #expect(SQLFormatterLogic.statementCount(in: "") == 0)
         #expect(SQLFormatterLogic.statementCount(in: "select 1") == 1)
         #expect(SQLFormatterLogic.statementCount(in: "select 1; select 2;") == 2)
         #expect(SQLFormatterLogic.statementCount(in: "select 1;\n\n;") == 1)
+
+        #expect(SQLFormatterLogic.lineCount(in: "") == 0)
+        #expect(SQLFormatterLogic.lineCount(in: "SELECT 1\nFROM t") == 2)
     }
 
     @Test("字节数按 1024 进位格式化")

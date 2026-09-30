@@ -984,21 +984,24 @@
 
 ### SQL 格式化（sql-formatter）
 
-格式化与压缩 SQL 语句。参考 Fasty sql-formatter。
+单栏原地编辑、格式化与压缩 SQL 语句，内置实时 SQL 语法高亮与行号。
 
 #### 不变量
 
-- **关键词表的顺序是有意义的**：长关键词（如 `LEFT JOIN`）必须排在短关键词（`JOIN`）之前，否则先匹配到短词会把长词切碎。改表时保持这个顺序。
-- **缩进参数目前不产生视觉效果**：分行后每行都做了 `trimmingCharacters(in: " ")`，把刚插入的缩进又去掉了。这是既有行为，已被测试锁定；要让它生效得同时改缩进与 trim 两处。
-- 它是按正则改写的格式化器，不是 SQL 解析器：方言差异、字符串字面量里的关键词都不会被特殊处理。
+- **单栏原地格式化，不再分输入/输出两栏。** 「格式化」「压缩」以及粘贴（`⌘V` / 右键粘贴 / 跨面板带入）都把结果直接写回同一个编辑区（`SQLFormatterView.buffer.text`），文本只有这一份真相。
+- **粘贴即格式化，手动打字只高亮不重排。** `CodeEditorView` 在 `NSTextView.paste(_:)` / `pasteAsPlainText(_:)` 完成后触发 `onPaste` 回调执行原地格式化；平时逐字敲击修改只走 `textDidChange` 重刷语法高亮属性，不触发布局重排，避免打字时光标跳走。
+- **子句匹配按三词 → 双词 → 单词顺序**：长关键词（如 `LEFT OUTER JOIN`、`LEFT JOIN`）必须在短关键词（`JOIN`）之前判定，否则先匹配到短词会把复合子句切碎。
+- **结构化层级缩进**：
+  - 顶层主子句（`SELECT` / `FROM` / `WHERE` / `GROUP BY` / `ORDER BY` / `JOIN` 等）处于当前子查询括号深度基准；
+  - 从属子句（`AND` / `OR` / `ON` / `USING`）在基准上 `+1` 级缩进，但 `BETWEEN expr AND expr` 内的第一个 `AND` 保持在同一行；
+  - `CASE ... WHEN ... THEN ... ELSE ... END` 块内 `WHEN` / `ELSE` 缩进 `+1` 级，`END` 回退；
+  - 子查询括号 `(SELECT ...)` 自动换行并递进括号深度，普通行内括号（如 `COUNT(*)`、`IN (1, 2)`）保持行内紧凑。
+- **设置项与工具栏共用 `@AppStorage` 键**：`sqlFormatter.indent`（2 / 4 空格）、`sqlFormatter.keywordCase`（`uppercase` / `lowercase`）、`sqlFormatter.wrapLines`（自动换行），切换时立即重排。
+- **词法透传保护**：单/双引号字面量（兼容 `''` 双写与 `\'` 反斜杠转义）、反引号 `` `id` ``、方括号 `[id]`、命名参数 `:param`、变量 `@var` / `@@var`、位置参数 `$1` 及 MyBatis 占位符 `#{id}` / `${table}` 均作为完整词法单元透传，绝不拆散或改写大小写。
 
 #### 内部结构
 
-`Model/SQLFormatterLogic.swift` 是纯逻辑（Foundation only，可独立测），`UI/` 里是视图与 `AppStorage` 绑定的选项。
-
-#### 已知限制
-
-见上面不变量里标为「既有行为」的条目：它们是当前实现的取舍，改之前先确认是有意为之。
+`Model/SQLFormatterLogic.swift` 是纯逻辑（Foundation only，可独立测），`UI/SQLFormatterView.swift` 基于 `QuickUI/Syntax/CodeEditorView` 提供单栏高亮编辑与工具栏，`Settings/SQLFormatterSettingsView.swift` 提供插件设置页。
 
 ### 文本对比（text-diff）
 

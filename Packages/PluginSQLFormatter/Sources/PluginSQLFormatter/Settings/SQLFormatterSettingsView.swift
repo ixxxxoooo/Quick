@@ -9,6 +9,7 @@ import SwiftUI
 struct SQLFormatterSettingsView: View {
     @AppStorage(PluginSettingKey.SQLFormatter.keywordCase) private var keywordCase = "uppercase"
     @AppStorage(PluginSettingKey.SQLFormatter.indent) private var indent = 2
+    @AppStorage(PluginSettingKey.SQLFormatter.wrapLines) private var wrapLines = false
 
     var body: some View {
         Section {
@@ -18,7 +19,7 @@ struct SQLFormatterSettingsView: View {
             } label: {
                 SettingsRow(
                     title: "关键字大小写",
-                    subtitle: "格式化时 SELECT、FROM 等 SQL 关键字的风格。",
+                    subtitle: "格式化与压缩时 SELECT、FROM 等 SQL 关键字的风格。",
                     icon: { SettingsRowIcon(systemImage: "textformat") }
                 )
             }
@@ -29,8 +30,16 @@ struct SQLFormatterSettingsView: View {
             } label: {
                 SettingsRow(
                     title: "缩进宽度",
-                    subtitle: "每层子查询与表达式的缩进空格数。",
+                    subtitle: "每层子查询、条件从句与 CASE 分支的缩进空格数。",
                     icon: { SettingsRowIcon(systemImage: "increase.indent") }
+                )
+            }
+
+            Toggle(isOn: $wrapLines) {
+                SettingsRow(
+                    title: "自动换行",
+                    subtitle: "在 SQL 编辑器中自动折行显示超长语句，关闭时横向滚动。",
+                    icon: { SettingsRowIcon(systemImage: "text.wrap") }
                 )
             }
         } header: {
