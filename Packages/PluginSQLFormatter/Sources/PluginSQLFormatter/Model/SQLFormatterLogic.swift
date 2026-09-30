@@ -27,6 +27,9 @@ enum SQLFormatterLogic {
         }
     }
 
+    /// 单行字符软上限：超过此长度时，遇到逗号自动折行
+    private static let maxLineLength = 72
+
     /// 需要独占一行的三词子句（必须在双词与单词关键字之前匹配）
     private static let threeWordClauses: Set<[String]> = [
         ["LEFT", "OUTER", "JOIN"], ["RIGHT", "OUTER", "JOIN"], ["FULL", "OUTER", "JOIN"],
@@ -79,13 +82,13 @@ enum SQLFormatterLogic {
 
     /// 括号类型：子查询块括号换行并缩进，普通行内括号保持紧凑
     private enum ParenKind {
-        case subquery
+        case subquery(savedMultilineSelect: Bool)
         case inline
     }
 
     // MARK: - 格式化
 
-    /// 格式化：子句分行、层级缩进、关键字统一大小写
+    /// 格式化：子句分行、层级缩进、长字段列表自动折行、关键字统一大小写
     ///
     /// 先做词法分析，字符串字面量、引号标识符、参数占位符与注释整体透传 ——
     /// 绝不把换行插进 `'FROM'` 这类字符串值里，也不拆散 `:param` / `#{id}`。
@@ -105,9 +108,12 @@ enum SQLFormatterLogic {
         var builder = LineBuilder()
 
         var subqueryDepth = 0
+        var inlineParenDepth = 0
         var caseDepth = 0
         var currentLineLevel = 0
         var parenStack: [ParenKind] = []
+        // 当前 SELECT 子句是否因字段过多/过长而启用「每字段一行」模式
+        var multilineSelect = false
         // 上一个产出的 token 是否「像函数名/普通标识符」—— 决定 `(` 是紧贴还是留空格
         var identLike = false
         // `BETWEEN expr AND expr` 中的第一个 `AND` 留在行内，不当作 WHERE 子句折行
@@ -134,6 +140,7 @@ enum SQLFormatterLogic {
                     case .word(let third) = tokens[index + 2],
                     threeWordClauses.contains([upper, second.uppercased(), third.uppercased()])
                 {
+                    multilineSelect = false
                     flushLine(nextLevel: baseLevel)
                     let phrase = "\(upper) \(second.uppercased()) \(third.uppercased())"
                     builder.token(keywordCase.apply(to: phrase))
@@ -146,6 +153,7 @@ enum SQLFormatterLogic {
                     case .word(let nextWord) = tokens[index + 1],
                     twoWordClauses.contains([upper, nextWord.uppercased()])
                 {
+                    multilineSelect = false
                     flushLine(nextLevel: baseLevel)
                     let phrase = "\(upper) \(nextWord.uppercased())"
                     builder.token(keywordCase.apply(to: phrase))
@@ -157,6 +165,22 @@ enum SQLFormatterLogic {
                 else if majorClauseStarters.contains(upper) {
                     flushLine(nextLevel: baseLevel)
                     builder.token(keywordCase.apply(to: upper))
+                    if upper == "SELECT" {
+                        multilineSelect = shouldBreakSelectItems(tokens: tokens, selectIndex: index)
+                        if multilineSelect {
+                            // 若紧跟 DISTINCT，把 DISTINCT 留在 SELECT 同一行再换行
+                            if index + 1 < tokens.count,
+                                case .word(let next) = tokens[index + 1],
+                                next.uppercased() == "DISTINCT"
+                            {
+                                builder.token(keywordCase.apply(to: "DISTINCT"))
+                                index += 1
+                            }
+                            flushLine(nextLevel: baseLevel + 1)
+                        }
+                    } else {
+                        multilineSelect = false
+                    }
                     identLike = false
                     pendingBetween = false
                     index += 1
@@ -166,8 +190,12 @@ enum SQLFormatterLogic {
                     if upper == "AND", pendingBetween {
                         pendingBetween = false
                         builder.token(keywordCase.apply(to: upper))
+                    } else if inlineParenDepth > 0, builder.count < maxLineLength {
+                        // 行内短括号条件（如 `(a = 1 AND b = 2)`）未超长时保持行内，超长再换行
+                        builder.token(keywordCase.apply(to: upper))
                     } else {
-                        flushLine(nextLevel: baseLevel + 1)
+                        let extraIndent = multilineSelect ? 2 : 1
+                        flushLine(nextLevel: baseLevel + extraIndent)
                         builder.token(keywordCase.apply(to: upper))
                     }
                     identLike = false
@@ -180,7 +208,8 @@ enum SQLFormatterLogic {
                     identLike = false
                     index += 1
                 } else if upper == "WHEN" || upper == "ELSE" {
-                    let whenLevel = subqueryDepth + max(1, caseDepth)
+                    let selectExtra = multilineSelect ? 1 : 0
+                    let whenLevel = subqueryDepth + selectExtra + max(1, caseDepth)
                     flushLine(nextLevel: whenLevel)
                     builder.token(keywordCase.apply(to: upper))
                     identLike = false
@@ -189,7 +218,8 @@ enum SQLFormatterLogic {
                     let wasInCase = caseDepth > 0
                     caseDepth = max(0, caseDepth - 1)
                     if wasInCase {
-                        flushLine(nextLevel: subqueryDepth + caseDepth)
+                        let selectExtra = multilineSelect ? 1 : 0
+                        flushLine(nextLevel: subqueryDepth + selectExtra + caseDepth)
                     }
                     builder.token(keywordCase.apply(to: upper))
                     identLike = false
@@ -213,8 +243,14 @@ enum SQLFormatterLogic {
                 index += 1
 
             case .lineComment:
-                builder.token(tokens[index].literal)
-                flushLine(nextLevel: subqueryDepth + caseDepth)
+                let commentLevel = subqueryDepth + caseDepth + (multilineSelect ? 1 : 0)
+                if !builder.isEmpty {
+                    builder.token(tokens[index].literal)
+                    flushLine(nextLevel: commentLevel)
+                } else {
+                    builder.token(tokens[index].literal)
+                    flushLine(nextLevel: commentLevel)
+                }
                 identLike = false
                 index += 1
 
@@ -232,32 +268,45 @@ enum SQLFormatterLogic {
                         builder.token(punctuation)
                     }
                     if isSubquery {
-                        parenStack.append(.subquery)
+                        parenStack.append(.subquery(savedMultilineSelect: multilineSelect))
+                        multilineSelect = false
                         subqueryDepth += 1
                         flushLine(nextLevel: subqueryDepth + caseDepth)
                     } else {
                         parenStack.append(.inline)
+                        inlineParenDepth += 1
                         builder.glueNextToken()
                     }
                     identLike = false
                 case ")":
                     let kind = parenStack.popLast() ?? .inline
                     switch kind {
-                    case .subquery:
+                    case .subquery(let savedMultiline):
                         subqueryDepth = max(0, subqueryDepth - 1)
-                        flushLine(nextLevel: subqueryDepth + caseDepth)
+                        multilineSelect = savedMultiline
+                        flushLine(nextLevel: subqueryDepth + caseDepth + (multilineSelect ? 1 : 0))
                         builder.token(punctuation)
                     case .inline:
+                        inlineParenDepth = max(0, inlineParenDepth - 1)
                         builder.tight(punctuation)
                     }
                     identLike = true
                 case ",":
                     builder.tight(punctuation)
+                    let baseLevel = subqueryDepth + caseDepth
+                    if multilineSelect, inlineParenDepth == 0, caseDepth == 0 {
+                        flushLine(nextLevel: baseLevel + 1)
+                    } else if builder.count >= maxLineLength {
+                        let wrapLevel = baseLevel + (multilineSelect ? 1 : 0) + max(1, min(inlineParenDepth, 2))
+                        flushLine(nextLevel: wrapLevel)
+                    }
                     identLike = false
                 case ";":
                     builder.tight(punctuation)
                     subqueryDepth = 0
+                    inlineParenDepth = 0
                     caseDepth = 0
+                    multilineSelect = false
                     parenStack.removeAll()
                     pendingBetween = false
                     flushLine(nextLevel: 0)
@@ -277,6 +326,47 @@ enum SQLFormatterLogic {
         return lines
             .map { String(repeating: indentUnit, count: $0.level) + $0.text }
             .joined(separator: "\n")
+    }
+
+    /// 判断 `SELECT` 子句是否应当将字段列表拆分为每行一个字段（顶层字段 >= 4 个或总字符数 > `maxLineLength`）
+    private static func shouldBreakSelectItems(tokens: [Token], selectIndex: Int) -> Bool {
+        var depth = 0
+        var topLevelCommas = 0
+        var charCount = 6
+        var index = selectIndex + 1
+
+        while index < tokens.count {
+            switch tokens[index] {
+            case .punctuation("("):
+                depth += 1
+                charCount += 1
+            case .punctuation(")"):
+                if depth == 0 { return topLevelCommas >= 3 || charCount > maxLineLength }
+                depth -= 1
+                charCount += 1
+            case .punctuation(";"):
+                if depth == 0 { return topLevelCommas >= 3 || charCount > maxLineLength }
+            case .punctuation(",") where depth == 0:
+                topLevelCommas += 1
+                charCount += 2
+                if topLevelCommas >= 3 { return true }
+            case .word(let word) where depth == 0:
+                let upper = word.uppercased()
+                if majorClauseStarters.contains(upper)
+                    || ["LEFT", "RIGHT", "INNER", "OUTER", "CROSS", "FULL", "NATURAL", "GROUP", "ORDER", "FOR", "FETCH"].contains(upper)
+                {
+                    return topLevelCommas >= 3 || charCount > maxLineLength
+                }
+                charCount += word.count + 1
+            default:
+                charCount += tokens[index].literal.count + 1
+            }
+            if charCount > maxLineLength && topLevelCommas >= 1 {
+                return true
+            }
+            index += 1
+        }
+        return topLevelCommas >= 3 || charCount > maxLineLength
     }
 
     /// 判断 `(` 内部同层是否包含子查询主子句（如 `SELECT`）
@@ -549,13 +639,13 @@ enum SQLFormatterLogic {
                 }
             }
 
-            // 行注释：-- 到行尾
+            // 行注释：-- 到行尾（注意使用 isNewline 以兼容 \r\n 扩展字素簇）
             if character == "-",
                 input.index(after: index) < input.endIndex,
                 input[input.index(after: index)] == "-"
             {
                 let start = index
-                while index < input.endIndex, input[index] != "\n" {
+                while index < input.endIndex, !input[index].isNewline {
                     index = input.index(after: index)
                 }
                 tokens.append(.lineComment(String(input[start..<index])))
@@ -667,6 +757,9 @@ enum SQLFormatterLogic {
     private struct LineBuilder {
         private var line = ""
         private var glueNext = false
+
+        var isEmpty: Bool { line.isEmpty }
+        var count: Int { line.count }
 
         /// 常规词法片段：与前文以单个空格分隔
         mutating func token(_ text: String) {

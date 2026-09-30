@@ -146,7 +146,7 @@ public enum SQLSyntax {
 
     private static func endOfLine(in text: String, from start: String.Index) -> String.Index {
         var index = start
-        while index < text.endIndex, text[index] != "\n" {
+        while index < text.endIndex, !text[index].isNewline {
             index = text.index(after: index)
         }
         return index

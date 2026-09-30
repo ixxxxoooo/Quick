@@ -9,7 +9,7 @@ import SwiftUI
 struct SQLFormatterSettingsView: View {
     @AppStorage(PluginSettingKey.SQLFormatter.keywordCase) private var keywordCase = "uppercase"
     @AppStorage(PluginSettingKey.SQLFormatter.indent) private var indent = 2
-    @AppStorage(PluginSettingKey.SQLFormatter.wrapLines) private var wrapLines = false
+    @AppStorage(PluginSettingKey.SQLFormatter.wrapLines) private var wrapLines = true
 
     var body: some View {
         Section {

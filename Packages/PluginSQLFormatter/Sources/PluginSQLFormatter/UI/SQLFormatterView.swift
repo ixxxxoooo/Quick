@@ -28,7 +28,7 @@ struct SQLFormatterView: View {
     /// 与设置页共用的持久化偏好
     @AppStorage(PluginSettingKey.SQLFormatter.indent) private var indent = 2
     @AppStorage(PluginSettingKey.SQLFormatter.keywordCase) private var keywordCaseRaw = "uppercase"
-    @AppStorage(PluginSettingKey.SQLFormatter.wrapLines) private var wrapLines = false
+    @AppStorage(PluginSettingKey.SQLFormatter.wrapLines) private var wrapLines = true
 
     @State private var statementCount = 0
     @State private var lineCount = 0

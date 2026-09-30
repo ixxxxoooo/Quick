@@ -84,14 +84,34 @@ public struct CodeEditorView: NSViewRepresentable {
     public func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     public func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = CodeEditorTextView.scrollableTextView()
+        let scrollView = NSScrollView()
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.scrollerStyle = .overlay
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
+        scrollView.clipsToBounds = true
+        scrollView.contentView.clipsToBounds = true
 
-        guard let textView = scrollView.documentView as? NSTextView else { return scrollView }
+        // 显式构建 TextKit 1 栈（NSTextStorage → NSLayoutManager → NSTextContainer），
+        // 避免 NSTextView 默认以 TextKit 2 启动后在行号绘制访问 layoutManager 时触发运行期降级导致图层分裂。
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+        let textContainer = NSTextContainer(
+            containerSize: NSSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+        )
+        layoutManager.addTextContainer(textContainer)
+
+        let textView = CodeEditorTextView(frame: .zero, textContainer: textContainer)
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
@@ -100,16 +120,12 @@ public struct CodeEditorView: NSViewRepresentable {
             width: DesignTokens.Spacing.sm, height: DesignTokens.Spacing.xs)
         textView.isVerticallyResizable = true
 
-        if let editorTextView = textView as? CodeEditorTextView {
-            editorTextView.placeholderString = placeholder
-            editorTextView.autoFocus = autoFocus
-            let coordinator = context.coordinator
-            editorTextView.onPaste = { [weak coordinator] in
-                coordinator?.handlePaste()
-            }
+        textView.placeholderString = placeholder
+        textView.autoFocus = autoFocus
+        let coordinator = context.coordinator
+        textView.onPaste = { [weak coordinator] in
+            coordinator?.handlePaste()
         }
-
-        Self.configureWrapping(textView: textView, wrapLines: wrapLines, in: scrollView)
 
         // 关掉会改写输入 / 依赖拼写服务的功能（非激活面板里它们还会引发越界异常）
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -120,9 +136,7 @@ public struct CodeEditorView: NSViewRepresentable {
         textView.isGrammarCheckingEnabled = false
         textView.smartInsertDeleteEnabled = false
 
-        textView.string = text
-        context.coordinator.textView = textView
-        context.coordinator.applyHighlight(force: true)
+        scrollView.documentView = textView
 
         if showsLineNumbers {
             let ruler = LineNumberRulerView(
@@ -131,7 +145,14 @@ public struct CodeEditorView: NSViewRepresentable {
             scrollView.hasVerticalRuler = true
             scrollView.rulersVisible = true
             context.coordinator.ruler = ruler
+            context.coordinator.observeClipView(scrollView.contentView)
         }
+
+        Self.configureWrapping(textView: textView, wrapLines: wrapLines, in: scrollView)
+
+        textView.string = text
+        context.coordinator.textView = textView
+        context.coordinator.applyHighlight(force: true)
 
         scrollSync?.attach(scrollView, role: syncRole)
         return scrollView
@@ -155,14 +176,18 @@ public struct CodeEditorView: NSViewRepresentable {
             Self.configureWrapping(textView: textView, wrapLines: wrapLines, in: scrollView)
             context.coordinator.ruler?.wrapLines = wrapLines
             context.coordinator.applyHighlight(force: true)
+            textView.layoutManager?.ensureLayout(for: textView.textContainer!)
             textView.needsLayout = true
             textView.needsDisplay = true
+            context.coordinator.ruler?.needsDisplay = true
         }
 
         if textView.string != text {
             textView.string = text
+            Self.configureWrapping(textView: textView, wrapLines: wrapLines, in: scrollView)
             context.coordinator.applyHighlight(force: true)
             textView.needsDisplay = true
+            context.coordinator.ruler?.needsDisplay = true
         } else if previousWrapLines == wrapLines {
             context.coordinator.applyHighlight(force: false)
         }
@@ -174,13 +199,14 @@ public struct CodeEditorView: NSViewRepresentable {
         textView: NSTextView, wrapLines: Bool, in scrollView: NSScrollView
     ) {
         scrollView.hasHorizontalScroller = !wrapLines
+        let clipWidth = max(scrollView.contentSize.width, 100)
         if wrapLines {
             textView.isHorizontallyResizable = false
             textView.autoresizingMask = [.width]
+            textView.frame.size.width = clipWidth
             textView.textContainer?.widthTracksTextView = true
-            let width = max(scrollView.contentSize.width, 100)
             textView.textContainer?.containerSize = NSSize(
-                width: width,
+                width: clipWidth,
                 height: CGFloat.greatestFiniteMagnitude
             )
         } else {
@@ -192,7 +218,7 @@ public struct CodeEditorView: NSViewRepresentable {
             )
             textView.textContainer?.widthTracksTextView = false
             textView.textContainer?.containerSize = NSSize(
-                width: CGFloat.greatestFiniteMagnitude,
+                width: 10_000_000,
                 height: CGFloat.greatestFiniteMagnitude
             )
         }
@@ -200,6 +226,7 @@ public struct CodeEditorView: NSViewRepresentable {
 
     public static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
         MainActor.assumeIsolated {
+            coordinator.detachClipObserver()
             coordinator.parent.scrollSync?.detach()
         }
     }
@@ -212,6 +239,7 @@ public struct CodeEditorView: NSViewRepresentable {
         var parent: CodeEditorView
         weak var textView: NSTextView?
         weak var ruler: LineNumberRulerView?
+        private var clipBoundsObserver: NSObjectProtocol?
 
         /// 上次上色时的语言 / 逐行状态 / 换行设置，用来跳过无谓的重排
         private var appliedLanguage: CodeLanguage?
@@ -220,6 +248,28 @@ public struct CodeEditorView: NSViewRepresentable {
 
         init(_ parent: CodeEditorView) {
             self.parent = parent
+        }
+
+        func observeClipView(_ clipView: NSClipView) {
+            detachClipObserver()
+            clipView.postsBoundsChangedNotifications = true
+            clipView.postsFrameChangedNotifications = true
+            clipBoundsObserver = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification,
+                object: clipView,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.ruler?.needsDisplay = true
+                }
+            }
+        }
+
+        func detachClipObserver() {
+            if let clipBoundsObserver {
+                NotificationCenter.default.removeObserver(clipBoundsObserver)
+                self.clipBoundsObserver = nil
+            }
         }
 
         public func textDidChange(_ notification: Notification) {
@@ -234,8 +284,13 @@ public struct CodeEditorView: NSViewRepresentable {
             parent.onPaste?()
             if let textView, textView.string != parent.text {
                 textView.string = parent.text
+                if let scrollView = textView.enclosingScrollView {
+                    CodeEditorView.configureWrapping(
+                        textView: textView, wrapLines: parent.wrapLines, in: scrollView)
+                }
                 applyHighlight(force: true)
                 textView.needsDisplay = true
+                ruler?.needsDisplay = true
             }
         }
 
@@ -260,7 +315,7 @@ public struct CodeEditorView: NSViewRepresentable {
             let paragraph = NSMutableParagraphStyle()
             paragraph.minimumLineHeight = parent.lineHeight
             paragraph.maximumLineHeight = parent.lineHeight
-            paragraph.lineBreakMode = wrapLines ? .byWordWrapping : .byClipping
+            paragraph.lineBreakMode = wrapLines ? .byCharWrapping : .byClipping
 
             let baseAttributes: [NSAttributedString.Key: Any] = [
                 .font: font,
@@ -327,7 +382,7 @@ public struct CodeEditorView: NSViewRepresentable {
     }
 }
 
-// MARK: - 自定义 NSTextView（粘贴回调 + 占位提示 + 自动聚焦）
+// MARK: - 自定义 NSTextView（粘贴回调 + 占位提示 + 自动聚焦 + 换行宽度同步）
 
 final class CodeEditorTextView: NSTextView {
 
@@ -345,6 +400,21 @@ final class CodeEditorTextView: NSTextView {
             guard let self, let window else { return }
             window.makeFirstResponder(self)
         }
+    }
+
+    override func layout() {
+        if textContainer?.widthTracksTextView == true,
+            let clipWidth = enclosingScrollView?.contentSize.width,
+            clipWidth > 0,
+            abs(frame.width - clipWidth) > 0.5
+        {
+            setFrameSize(NSSize(width: clipWidth, height: frame.height))
+            textContainer?.containerSize = NSSize(
+                width: clipWidth,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+        }
+        super.layout()
     }
 
     override func paste(_ sender: Any?) {
@@ -407,6 +477,7 @@ final class LineNumberRulerView: NSRulerView {
         super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
         clientView = textView
         ruleThickness = DesignTokens.Size.codeEditorGutter
+        clipsToBounds = true
     }
 
     @available(*, unavailable) required init(coder: NSCoder) { fatalError() }
@@ -414,6 +485,22 @@ final class LineNumberRulerView: NSRulerView {
     override var isFlipped: Bool { true }
 
     override var requiredThickness: CGFloat { DesignTokens.Size.codeEditorGutter }
+
+    /// 自定义绘制：不调用 `super.draw(_:)`，因为 `NSRulerView` 默认以非翻转坐标画边框竖线，
+    /// 在 `isFlipped = true` 时会导致竖线向上偏移超出 `NSScrollView` 捅穿顶部工具栏。
+    override func draw(_ dirtyRect: NSRect) {
+        drawHashMarksAndLabels(in: dirtyRect)
+
+        let hairline = DesignTokens.Size.hairline
+        let separatorRect = NSRect(
+            x: bounds.maxX - hairline,
+            y: bounds.minY,
+            width: hairline,
+            height: bounds.height
+        )
+        NSColor(DesignTokens.Colors.separator).setFill()
+        separatorRect.fill()
+    }
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
         guard let textView else { return }

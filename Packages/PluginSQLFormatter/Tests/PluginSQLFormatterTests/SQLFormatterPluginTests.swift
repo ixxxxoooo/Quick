@@ -149,6 +149,35 @@ struct SQLFormatterLogicTests {
         #expect(result == "SELECT 1\nUNION\nSELECT 2\nUNION ALL\nSELECT 3")
     }
 
+    @Test("CRLF 行尾的单行注释不会吞噬后续 SQL 语句")
+    func formatHandlesLineCommentsWithCRLF() {
+        let sql = "select a -- comment line\r\nfrom users where id = 1"
+        let result = SQLFormatterLogic.format(sql, indent: 2)
+        let expected = """
+            SELECT a -- comment line
+            FROM users
+            WHERE id = 1
+            """
+        #expect(result == expected)
+    }
+
+    @Test("SELECT 投影字段较多时自动每行一个字段并缩进")
+    func formatBreaksMultiItemSelectList() {
+        let sql = "select id, user_name, email, status, created_at from users where status = 1"
+        let result = SQLFormatterLogic.format(sql, indent: 2)
+        let expected = """
+            SELECT
+              id,
+              user_name,
+              email,
+              status,
+              created_at
+            FROM users
+            WHERE status = 1
+            """
+        #expect(result == expected)
+    }
+
     @Test("压缩保留字符串字面量内部的空白")
     func minifyPreservesLiteralWhitespace() {
         let result = SQLFormatterLogic.minify("SELECT 'x  y'\nFROM t")
