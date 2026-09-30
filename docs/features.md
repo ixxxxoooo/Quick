@@ -540,18 +540,19 @@
 
 ### 日历（calendar）
 
-双栏日历看板：左侧 6×7 月历网格（支持农历、二十四节气、中国传统与公历节日、法定节假日「休/班」角标、系统日程圆点），右侧展示选中日期黄历详情与系统日历事件列表（支持在线会议链接一键加入）；主搜索可预览今日前几条事件。
+双栏日历看板：左侧支持 **日 / 月 / 年** 三种视图切换（日视图展示大字台历与完整老黄历详卡；月视图展示 6×7 月历网格、农历、二十四节气、中国传统与公历节日、法定节假日「休/班」角标、系统日程圆点；年视图展示 12 个月迷你概览），右侧展示选中日期详情、传统黄历（宜忌 / 干支 / 值神 / 冲煞）与系统日历事件列表（支持在线会议链接一键加入）；主搜索可预览今日前几条事件。
 
 #### 不变量
 
-- **EventKit 权限**：`Info.plist` 必须声明 `NSCalendarsFullAccessUsageDescription` 与
-  `NSCalendarsUsageDescription`；`activate()` 调用 `requestFullAccessToEvents()`；**未授权时
-  `todayEvents()` / `events(from:to:)` 返回空数组**，不伪造日程，看板右侧展示权限引导。
+- **EventKit 权限与日历源过滤**：`Info.plist` 必须声明 `NSCalendarsFullAccessUsageDescription` 与
+  `NSCalendarsUsageDescription`；`activate()` 调用 `requestFullAccessToEvents()`；**未授权或关闭「同步系统日历日程」时
+  `todayEvents()` / `events(from:to:)` 返回空数组**。支持在设置页按系统日历源（`EKCalendar`）单独启用/停用，以便在系统已订阅「中国节假日」时避免与内置节假日重复；当全部日历源均被取消勾选时直接返回空数组（不能把空数组传给 `predicateForEvents`，否则 EventKit 会回退为查询全部日历）。
 - **事件模型为纯值类型 `CalendarEvent`**：排序、跨天命中（`occurs(on:calendar:)`）与在线会议链接提取
   （`meetingURL`）在 Model 层可测；`EKEvent` 只在 `CalendarService` 翻译一次。
-- **月历网格与历法计算在 `CalendarFormatting`（纯 Foundation）完成**：
-  - 网格固定 6 行 × 7 列（42 天，周一为首日），保证切换月份时面板高度不跳变。
-  - 单元格副标签优先级：**节日 > 二十四节气 > 初一显示农历月名 > 农历日**；除夕通过「明日是否为正月初一」判定，自动适配腊月大小月（廿九/三十）。
+- **月历/年历网格、历法与老黄历计算在 `CalendarFormatting`（纯 Foundation）完成**：
+  - 月历网格固定 6 行 × 7 列（42 天，周一为首日），年视图固定 12 个迷你月网格。
+  - 单元格副标签优先级：**节日 > 二十四节气 > 初一显示农历月名 > 农历日**，并受 `calendar.showLunar` 与 `calendar.showBuiltInHolidays` 开关动态控制；除夕通过「明日是否为正月初一」判定，自动适配腊月大小月（廿九/三十）。
+  - 传统黄历（`CalendarAlmanac`）基于六十甲子干支纪年/五虎遁月/基准日推算日柱、建除十二值神、六冲与四仲煞向、喜/财/福吉神方位、彭祖百忌及每日宜忌，受 `calendar.showAlmanac` 开关控制。
   - 监听 `.EKEventStoreChanged` 自动刷新当前月历网格内的系统日程。
 - **动态搜索**：命中触发词后拉取今日事件；无事件时仍返回一条「今日无日程」占位项；有事件时
   **最多 5 条**；选中任一条结果 `action` 发布 `NavigateEvent`（事件项可带 `eventID` 上下文）。
@@ -562,18 +563,23 @@
 | 文件 | 职责 |
 | --- | --- |
 | `Model/CalendarEvent.swift` | 事件值类型、时间范围、排序、跨天判定、在线会议链接识别 |
-| `Model/CalendarFormatting.swift` | 6×7 月历网格、农历与干支生肖、二十四节气、传统/公历节日、法定调休标记 |
-| `Service/CalendarService.swift` | EventKit 权限状态、按区间查询事件、监听 `.EKEventStoreChanged` |
-| `UI/CalendarView.swift` | 左月历网格 + 右侧选中日黄历详情与当日日程列表（支持方向键选日） |
-| `Settings/CalendarSettingsView.swift` | 显示周数、自动提取会议链接开关 |
+| `Model/CalendarFormatting.swift` | 日/月/年模型、6×7 月历网格、农历与干支生肖、二十四节气、传统/公历节日、法定调休标记、传统老黄历（干支/值神/冲煞/吉神/彭祖百忌/宜忌） |
+| `Service/CalendarService.swift` | EventKit 权限状态、日历源列表与按源过滤、按区间查询事件、监听 `.EKEventStoreChanged` |
+| `UI/CalendarView.swift` | 左侧日/月/年多视图看板 + 右侧选中日黄历详情与当日日程列表（支持方向键选日） |
+| `Settings/CalendarSettingsView.swift` | 农历与节气、内置中国节假日、传统黄历、周数、系统日历总开关及按日历源勾选 |
 | `CalendarPlugin.swift` | 搜索、命令声明 |
 
 #### 持久化
 
 | 键 | 含义 | 默认 |
 | --- | --- | --- |
-| `calendar.autoExtractMeetingLinks` | 自动提取会议链接并展示「加入」按钮 | true |
+| `calendar.showLunar` | 显示农历与二十四节气 | true |
+| `calendar.showBuiltInHolidays` | 显示内置中国节假日与法定「休/班」角标 | true |
+| `calendar.showAlmanac` | 显示传统黄历（宜忌、干支、值神、冲煞、吉神方位、彭祖百忌） | true |
 | `calendar.showWeekNumber` | 在月历看板显示周数 | false |
+| `calendar.showSystemEvents` | 同步并显示系统日历日程 | true |
+| `calendar.disabledCalendarIDs` | 逗号分隔的已停用系统日历源 ID 列表 | `""` |
+| `calendar.autoExtractMeetingLinks` | 自动提取会议链接并展示「加入」按钮 | true |
 
 ### 网络工具（networktools）
 

@@ -255,6 +255,10 @@ public enum DesignTokens {
             public static let eventBarWidth = scaled(3)
             /// 法定节假日「休 / 班」角标尺寸
             public static let workdayBadge = scaled(14)
+            /// 黄历「宜 / 忌」标签徽标尺寸
+            public static let almanacBadge = scaled(20)
+            /// 年视图迷你月份网格单行高度
+            public static let miniCellHeight = scaled(14)
         }
 
         // MARK: 分离窗口
@@ -440,6 +444,9 @@ public enum DesignTokens {
         /// 计算器输入 / 结果字体
         public static let calculator = Font.system(
             size: calculatorSize, weight: .regular, design: .monospaced)
+        /// 日历日视图大号日期数字字体
+        public static let calendarHeroDay = Font.system(
+            size: scaled(44), weight: .semibold, design: .rounded)
         /// 行内代码
         public static let inlineCode = scaledStyle(.body).monospaced()
     }

@@ -214,6 +214,52 @@ struct CalendarFormattingTests {
         #expect(firstLunarDay.lunarDayText == "初一")
         #expect(firstLunarDay.subtitle == "八月")
     }
+
+    @Test("传统黄历计算（四柱干支、建除十二值神、冲煞、吉神方位、彭祖百忌、宜忌）")
+    func traditionalAlmanacCalculation() {
+        // 2000-01-01 基准日为戊午日
+        let refAlmanac = CalendarFormatting.almanac(for: gregorianDate(year: 2000, month: 1, day: 1))
+        #expect(refAlmanac.dayStemBranch == "戊午日")
+        #expect(refAlmanac.clashAndSha == "冲鼠(壬子) 煞北")
+        #expect(refAlmanac.pengZuTaboo == "戊不受田 · 午不苫盖")
+        #expect(!refAlmanac.yi.isEmpty)
+        #expect(!refAlmanac.ji.isEmpty)
+
+        // 2026-09-30 丙午年丁酉月
+        let sep30Almanac = CalendarFormatting.almanac(for: gregorianDate(year: 2026, month: 9, day: 30))
+        #expect(sep30Almanac.yearStemBranch == "丙午年")
+        #expect(sep30Almanac.monthStemBranch == "丁酉月")
+        #expect(sep30Almanac.zodiac == "马")
+        #expect(sep30Almanac.dutyTwelveGod.hasSuffix("日"))
+        #expect(sep30Almanac.godDirections.contains("喜神"))
+        #expect(sep30Almanac.godDirections.contains("财神"))
+        #expect(sep30Almanac.godDirections.contains("福神"))
+    }
+
+    @Test("年视图生成 12 个月迷你网格且设置开关控制单元格副标签")
+    func yearMonthsAndSubtitleToggles() {
+        let sep2026 = gregorianDate(year: 2026, month: 9, day: 25)  // 中秋节，八月十五
+        let months = CalendarFormatting.yearMonths(for: sep2026, today: sep2026)
+        #expect(months.count == 12)
+        #expect(months.first?.month == 1 && months.last?.month == 12)
+        #expect(months.allSatisfy { $0.weeks.count == 6 })
+
+        let midAutumn = CalendarFormatting.dayCell(for: sep2026)
+        // 全开：优先显示节日「中秋节」
+        #expect(midAutumn.displaySubtitle(showLunar: true, showHolidays: true).text == "中秋节")
+        // 关闭内置节假日、开启农历：退回显示农历日「十五」
+        #expect(midAutumn.displaySubtitle(showLunar: true, showHolidays: false).text == "十五")
+        #expect(!midAutumn.displaySubtitle(showLunar: true, showHolidays: false).isHighlighted)
+        // 关闭农历、开启节假日：仍显示「中秋节」
+        #expect(midAutumn.displaySubtitle(showLunar: false, showHolidays: true).text == "中秋节")
+        // 全关：返回空字符串
+        #expect(midAutumn.displaySubtitle(showLunar: false, showHolidays: false).text.isEmpty)
+
+        // 日历源禁用集合编解码
+        let encoded = CalendarPreferences.encodedDisabledIDs(["cal-b", "cal-a"])
+        #expect(encoded == "cal-a,cal-b")
+        #expect(CalendarPreferences.disabledIDs(from: encoded) == ["cal-a", "cal-b"])
+    }
 }
 
 @MainActor
@@ -225,6 +271,7 @@ struct CalendarServiceTests {
     func noAccessReturnsEmpty() async {
         let service = CalendarService()
         #expect(await service.todayEvents().isEmpty)
+        #expect(service.availableCalendars().isEmpty)
     }
 
     @Test("农历信息非空")
@@ -244,7 +291,10 @@ struct CalendarPluginTests {
         #expect(CalendarPlugin.name == "日历")
         #expect(CalendarPlugin.icon == "calendar")
         #expect(
-            CalendarPlugin.triggerWords == ["日历", "农历", "节气", "节假日", "假期", "calendar", "lunar", "holiday"])
+            CalendarPlugin.triggerWords == [
+                "日历", "农历", "黄历", "宜忌", "节气", "节假日", "假期", "calendar", "lunar", "almanac", "holiday"
+            ]
+        )
     }
 
     /// 测试进程里没有日历权限，所以 `todayEvents()` 走空分支 —— 插件应给出

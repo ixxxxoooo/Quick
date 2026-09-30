@@ -17,8 +17,10 @@ public final class CalendarPlugin: QuickPlugin, PluginViewProviding, PluginSetti
     public static let id = "calendar"
     public static let name = "日历"
     public static let icon = "calendar"
-    public static let description = "同步展示系统日历日程与近期事件安排，支持会议链接自动识别与农历视图显示。"
-    public static let triggerWords = ["日历", "农历", "节气", "节假日", "假期", "calendar", "lunar", "holiday"]
+    public static let description = "同步展示系统日历日程与近期事件安排，支持日月年多视图、农历节气、传统黄历与会议链接识别。"
+    public static let triggerWords = [
+        "日历", "农历", "黄历", "宜忌", "节气", "节假日", "假期", "calendar", "lunar", "almanac", "holiday"
+    ]
 
     public var isEnabled = true
 
@@ -79,7 +81,7 @@ public final class CalendarPlugin: QuickPlugin, PluginViewProviding, PluginSetti
     }
 
     public func makeSettingsView() -> AnyView? {
-        AnyView(CalendarSettingsView())
+        AnyView(CalendarSettingsView(service: calendarService))
     }
 
     public func activate() {

@@ -15,6 +15,14 @@ enum CalendarAuthorizationState: Sendable, Equatable {
     case denied
 }
 
+/// 系统日历源信息（供设置页按日历启用/停用，避免与内置节假日重复）
+struct CalendarSource: Identifiable, Sendable, Equatable {
+    let id: String
+    let title: String
+    let colorHex: String
+    let isSubscriptionOrHoliday: Bool
+}
+
 /// 日历服务
 ///
 /// 封装 EventKit 操作，提供日历权限管理、按日/按区间事件查询与系统日历变更通知。
@@ -69,6 +77,29 @@ final class CalendarService {
         }
     }
 
+    /// 获取系统中全部可用的事件日历源
+    func availableCalendars() -> [CalendarSource] {
+        guard hasAccess else { return [] }
+        return eventStore.calendars(for: .event)
+            .map { cal in
+                let isSub = cal.type == .subscription
+                    || cal.title.localizedStandardContains("节假日")
+                    || cal.title.localizedStandardContains("Holiday")
+                return CalendarSource(
+                    id: cal.calendarIdentifier,
+                    title: Self.nonEmpty(cal.title) ?? "未命名日历",
+                    colorHex: Self.hexColor(from: cal.cgColor),
+                    isSubscriptionOrHoliday: isSub
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.isSubscriptionOrHoliday != rhs.isSubscriptionOrHoliday {
+                    return lhs.isSubscriptionOrHoliday && !rhs.isSubscriptionOrHoliday
+                }
+                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            }
+    }
+
     /// 获取今日事件
     func todayEvents() async -> [CalendarEvent] {
         guard hasAccess else { return [] }
@@ -84,11 +115,31 @@ final class CalendarService {
     /// 获取指定日期区间内的全部事件（左闭右开 `[startDate, endDate)`）
     func events(from startDate: Date, to endDate: Date) async -> [CalendarEvent] {
         guard hasAccess, startDate < endDate else { return [] }
+        guard PluginDefaults.isEnabled(CalendarPreferences.showSystemEvents, default: true) else {
+            return []
+        }
+
+        let rawDisabled = UserDefaults.standard.string(forKey: CalendarPreferences.disabledCalendarIDs) ?? ""
+        let disabledIDs = CalendarPreferences.disabledIDs(from: rawDisabled)
+
+        let targetCalendars: [EKCalendar]?
+        if disabledIDs.isEmpty {
+            targetCalendars = nil
+        } else {
+            let filtered = eventStore.calendars(for: .event).filter {
+                !disabledIDs.contains($0.calendarIdentifier)
+            }
+            // EventKit 中 calendars 传空数组会回退为查询所有日历，因此全部被禁用时直接返回空
+            if filtered.isEmpty {
+                return []
+            }
+            targetCalendars = filtered
+        }
 
         let predicate = eventStore.predicateForEvents(
             withStart: startDate,
             end: endDate,
-            calendars: nil
+            calendars: targetCalendars
         )
         let ekEvents = eventStore.events(matching: predicate)
 

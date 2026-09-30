@@ -7,15 +7,22 @@ import QuickCore
 import QuickUI
 import SwiftUI
 
-/// 日历看板主视图：左侧月历网格（含农历、节气、节假日、日程圆点）+ 右侧选中日详情与系统日程列表
+/// 日历看板主视图：左侧日/月/年多视图看板 + 右侧选中日详情、传统黄历与系统日程列表
 struct CalendarView: View {
 
     let service: CalendarService
 
     @AppStorage(PluginSettingKey.Calendar.showWeekNumber) private var showWeekNumber = false
     @AppStorage(PluginSettingKey.Calendar.autoExtractMeetingLinks) private var autoExtractLinks = true
+    @AppStorage(CalendarPreferences.showLunar) private var showLunar = true
+    @AppStorage(CalendarPreferences.showBuiltInHolidays) private var showBuiltInHolidays = true
+    @AppStorage(CalendarPreferences.showAlmanac) private var showAlmanac = true
+    @AppStorage(CalendarPreferences.showSystemEvents) private var showSystemEvents = true
+    @AppStorage(CalendarPreferences.disabledCalendarIDs) private var disabledCalendarIDs = ""
 
-    /// 当前展示的月份基准日期
+    /// 当前看板视图模式（日 / 月 / 年）
+    @State private var boardMode: CalendarBoardMode = .month
+    /// 当前展示的月份/年份基准日期
     @State private var displayedMonth: Date = Date()
     /// 当前选中的日期
     @State private var selectedDate: Date = Date()
@@ -35,13 +42,24 @@ struct CalendarView: View {
         CalendarFormatting.monthGrid(for: displayedMonth)
     }
 
+    /// 当前年份的 12 个迷你月历
+    private var yearMiniMonths: [CalendarMiniMonth] {
+        CalendarFormatting.yearMonths(for: displayedMonth)
+    }
+
     /// 当前选中日期的完整日历信息
     private var selectedDayCell: CalendarDayCell {
         CalendarFormatting.dayCell(for: selectedDate, referenceMonth: displayedMonth)
     }
 
+    /// 当前选中日期的传统黄历信息
+    private var selectedAlmanac: CalendarAlmanac {
+        CalendarFormatting.almanac(for: selectedDate)
+    }
+
     /// 当前选中日期当天的事件列表
     private var selectedDayEvents: [CalendarEvent] {
+        guard showSystemEvents else { return [] }
         let cal = gregorian
         return CalendarEvent.sortedByStart(
             gridEvents.filter { $0.occurs(on: selectedDate, calendar: cal) }
@@ -50,7 +68,7 @@ struct CalendarView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            monthBoard
+            leftBoardContainer
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Rectangle()
@@ -92,52 +110,68 @@ struct CalendarView: View {
     /// 驱动月份事件重新加载的复合键
     private var reloadTaskKey: String {
         let comps = gregorian.dateComponents([.year, .month], from: displayedMonth)
-        return "\(comps.year ?? 0)-\(comps.month ?? 0)-\(service.changeToken)-\(service.hasAccess)"
+        return "\(comps.year ?? 0)-\(comps.month ?? 0)-\(service.changeToken)-\(service.hasAccess)-\(showSystemEvents)-\(disabledCalendarIDs)"
     }
 
-    // MARK: - 左侧：月历网格看板
+    // MARK: - 左侧：多模式日历看板（日 / 月 / 年）
 
-    private var monthBoard: some View {
+    private var leftBoardContainer: some View {
         VStack(spacing: DesignTokens.Spacing.sm) {
-            monthHeaderBar
-            weekdayHeaderRow
-            monthGridBody
+            boardHeaderBar
+
+            switch boardMode {
+            case .day:
+                dayBoardBody
+            case .month:
+                weekdayHeaderRow
+                monthGridBody
+            case .year:
+                yearBoardBody
+            }
         }
         .padding(.horizontal, DesignTokens.Spacing.xl)
         .padding(.vertical, DesignTokens.Spacing.md)
     }
 
-    /// 月历顶部导航栏：公历年月 + 干支生肖年 + 周数 + 上月/今天/下月按钮
-    private var monthHeaderBar: some View {
-        let monthCell = CalendarFormatting.dayCell(for: displayedMonth)
+    /// 看板顶部导航栏：标题 + 干支纪年 + 周数 + 视图切换器（日/月/年） + 前后步进按钮
+    private var boardHeaderBar: some View {
+        let refDate = boardMode == .day ? selectedDate : displayedMonth
+        let refCell = CalendarFormatting.dayCell(for: refDate)
         let selectedWeek = gregorian.component(.weekOfYear, from: selectedDate)
 
         return HStack(spacing: DesignTokens.Spacing.sm) {
-            Text(CalendarFormatting.monthTitle(for: displayedMonth))
+            Text(headerTitleText)
                 .font(DesignTokens.Typography.panelTitle)
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
+                .lineLimit(1)
 
-            Text(monthCell.cyclicalYearText)
-                .font(DesignTokens.Typography.keyCap)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-                .padding(.horizontal, DesignTokens.Spacing.sm)
-                .padding(.vertical, DesignTokens.Spacing.xxs)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(DesignTokens.Colors.controlSurface)
-                )
+            if showLunar {
+                Text(refCell.cyclicalYearText)
+                    .font(DesignTokens.Typography.keyCap)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    .padding(.horizontal, DesignTokens.Spacing.sm)
+                    .padding(.vertical, DesignTokens.Spacing.xxs)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(DesignTokens.Colors.controlSurface)
+                    )
+                    .lineLimit(1)
+            }
 
-            if showWeekNumber {
+            if showWeekNumber && boardMode != .year {
                 Text("第 \(selectedWeek) 周")
                     .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .lineLimit(1)
             }
 
             Spacer(minLength: 0)
 
+            modeSwitcher
+
             HStack(spacing: DesignTokens.Spacing.xs) {
-                navIconButton(systemImage: "chevron.left", label: "上个月") {
-                    shiftMonth(by: -1)
+                navIconButton(systemImage: "chevron.left", label: previousStepLabel) {
+                    stepBoard(by: -1)
                 }
 
                 Button {
@@ -146,7 +180,7 @@ struct CalendarView: View {
                     Text("今天")
                         .font(DesignTokens.Typography.keyCap)
                         .foregroundStyle(DesignTokens.Colors.textPrimary)
-                        .padding(.horizontal, DesignTokens.Spacing.md)
+                        .padding(.horizontal, DesignTokens.Spacing.sm)
                         .frame(height: DesignTokens.Size.windowControlButton)
                         .background(
                             RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap, style: .continuous)
@@ -156,11 +190,75 @@ struct CalendarView: View {
                 }
                 .buttonStyle(.plain)
 
-                navIconButton(systemImage: "chevron.right", label: "下个月") {
-                    shiftMonth(by: 1)
+                navIconButton(systemImage: "chevron.right", label: nextStepLabel) {
+                    stepBoard(by: 1)
                 }
             }
         }
+    }
+
+    private var headerTitleText: String {
+        switch boardMode {
+        case .day:
+            return CalendarFormatting.fullDateTitle(for: selectedDate)
+        case .month:
+            return CalendarFormatting.monthTitle(for: displayedMonth)
+        case .year:
+            return CalendarFormatting.yearTitle(for: displayedMonth)
+        }
+    }
+
+    private var previousStepLabel: String {
+        switch boardMode {
+        case .day: return "上一天"
+        case .month: return "上个月"
+        case .year: return "上一年"
+        }
+    }
+
+    private var nextStepLabel: String {
+        switch boardMode {
+        case .day: return "下一天"
+        case .month: return "下个月"
+        case .year: return "下一年"
+        }
+    }
+
+    /// 日 / 月 / 年 视图模式分段切换器
+    private var modeSwitcher: some View {
+        HStack(spacing: DesignTokens.Spacing.xxs) {
+            ForEach(CalendarBoardMode.allCases) { mode in
+                let isCurrent = boardMode == mode
+                Button {
+                    boardMode = mode
+                } label: {
+                    Text(mode.rawValue)
+                        .font(DesignTokens.Typography.keyCap)
+                        .foregroundStyle(
+                            isCurrent
+                                ? Color.accentColor
+                                : DesignTokens.Colors.textSecondary
+                        )
+                        .padding(.horizontal, DesignTokens.Spacing.sm)
+                        .frame(height: DesignTokens.Size.windowControlButton)
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap, style: .continuous)
+                                .fill(
+                                    isCurrent
+                                        ? Color.accentColor.opacity(0.18)
+                                        : Color.clear
+                                )
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(DesignTokens.Spacing.xxs)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap, style: .continuous)
+                .fill(DesignTokens.Colors.controlSurface)
+        )
     }
 
     private func navIconButton(
@@ -186,6 +284,176 @@ struct CalendarView: View {
         .accessibilityLabel(label)
         .help(label)
     }
+
+    // MARK: - 模式一：日视图（大字日历台历 + 完整黄历宜忌面板）
+
+    private var dayBoardBody: some View {
+        let cell = selectedDayCell
+        let almanac = selectedAlmanac
+        let weekdayText = CalendarFormatting.weekdayTitle(for: cell.date)
+        let relativeText = CalendarFormatting.relativeDayDescription(for: cell.date)
+
+        return ScrollView {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+                // 顶部台历主卡片
+                HStack(alignment: .center, spacing: DesignTokens.Spacing.xl) {
+                    Text("\(cell.day)")
+                        .font(DesignTokens.Typography.calendarHeroDay)
+                        .foregroundStyle(cell.isToday ? Color.accentColor : DesignTokens.Colors.textPrimary)
+
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                        HStack(spacing: DesignTokens.Spacing.sm) {
+                            Text(weekdayText)
+                                .font(DesignTokens.Typography.panelTitle)
+                                .foregroundStyle(DesignTokens.Colors.textPrimary)
+
+                            Text(relativeText)
+                                .font(DesignTokens.Typography.keyCap)
+                                .foregroundStyle(
+                                    cell.isToday ? Color.accentColor : DesignTokens.Colors.textSecondary
+                                )
+                                .padding(.horizontal, DesignTokens.Spacing.sm)
+                                .padding(.vertical, DesignTokens.Spacing.xxs)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(
+                                            cell.isToday
+                                                ? Color.accentColor.opacity(0.16)
+                                                : DesignTokens.Colors.controlSurface
+                                        )
+                                )
+                        }
+
+                        if showLunar {
+                            Text("农历 \(cell.lunarMonthText)\(cell.lunarDayText) · \(cell.cyclicalYearText)")
+                                .font(DesignTokens.Typography.rowTitle)
+                                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        }
+
+                        dayBadgesRow(for: cell)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(DesignTokens.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                        .fill(DesignTokens.Colors.cardFill)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                        .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairline)
+                )
+
+                if showAlmanac {
+                    fullAlmanacCard(almanac)
+                }
+            }
+            .padding(.top, DesignTokens.Spacing.xs)
+        }
+        .scrollIndicators(.never)
+    }
+
+    /// 完整传统黄历卡片（用于「日」视图或关闭系统日程时的详情展示）
+    private func fullAlmanacCard(_ almanac: CalendarAlmanac) -> some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+            HStack(spacing: DesignTokens.Spacing.sm) {
+                Text(almanac.pillarSummary)
+                    .font(DesignTokens.Typography.rowTitle)
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+
+                Spacer(minLength: 0)
+
+                tagChip("值神 · \(almanac.dutyTwelveGod)", tint: DesignTokens.Colors.progress)
+                tagChip(almanac.clashAndSha, tint: DesignTokens.Colors.warning)
+            }
+
+            Rectangle()
+                .fill(DesignTokens.Colors.hairline)
+                .frame(height: DesignTokens.Size.hairline)
+
+            // 宜 / 忌 双行
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                almanacYiJiRow(
+                    badge: "宜",
+                    items: almanac.yi,
+                    tint: DesignTokens.Colors.success
+                )
+
+                almanacYiJiRow(
+                    badge: "忌",
+                    items: almanac.ji,
+                    tint: DesignTokens.Colors.destructive
+                )
+            }
+
+            Rectangle()
+                .fill(DesignTokens.Colors.hairline)
+                .frame(height: DesignTokens.Size.hairline)
+
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                HStack(spacing: DesignTokens.Spacing.sm) {
+                    Text("吉神方位")
+                        .font(DesignTokens.Typography.compactKeyCap)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    Text(almanac.godDirections)
+                        .font(DesignTokens.Typography.keyCap)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                }
+
+                HStack(spacing: DesignTokens.Spacing.sm) {
+                    Text("彭祖百忌")
+                        .font(DesignTokens.Typography.compactKeyCap)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    Text(almanac.pengZuTaboo)
+                        .font(DesignTokens.Typography.keyCap)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                }
+            }
+        }
+        .padding(DesignTokens.Spacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                .fill(DesignTokens.Colors.cardFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairline)
+        )
+    }
+
+    private func almanacYiJiRow(badge: String, items: [String], tint: Color) -> some View {
+        HStack(alignment: .center, spacing: DesignTokens.Spacing.sm) {
+            Text(badge)
+                .font(DesignTokens.Typography.compactKeyCap)
+                .foregroundStyle(tint)
+                .frame(
+                    width: DesignTokens.Size.Calendar.almanacBadge,
+                    height: DesignTokens.Size.Calendar.almanacBadge
+                )
+                .background(
+                    Circle()
+                        .fill(tint.opacity(0.16))
+                )
+
+            HStack(spacing: DesignTokens.Spacing.xs) {
+                ForEach(items, id: \.self) { item in
+                    Text(item)
+                        .font(DesignTokens.Typography.keyCap)
+                        .foregroundStyle(DesignTokens.Colors.textPrimary)
+                        .padding(.horizontal, DesignTokens.Spacing.xs)
+                        .padding(.vertical, DesignTokens.Spacing.xxs)
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap / 2, style: .continuous)
+                                .fill(DesignTokens.Colors.controlSurface)
+                        )
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: - 模式二：月视图（6 行 × 7 列月历网格）
 
     /// 星期表头行（周一至周日，可选周数列）
     private var weekdayHeaderRow: some View {
@@ -235,7 +503,8 @@ struct CalendarView: View {
     private func dayCellView(_ cell: CalendarDayCell) -> some View {
         let isSelected = gregorian.isDate(cell.date, inSameDayAs: selectedDate)
         let isHovered = hoveredCellID == cell.id
-        let dayEvents = events(on: cell.date)
+        let dayEvents = showSystemEvents ? events(on: cell.date) : []
+        let sub = cell.displaySubtitle(showLunar: showLunar, showHolidays: showBuiltInHolidays)
 
         return Button {
             selectDay(cell)
@@ -246,10 +515,18 @@ struct CalendarView: View {
                     .fontWeight(cell.isToday || isSelected ? .semibold : .regular)
                     .foregroundStyle(dayNumberColor(for: cell, isSelected: isSelected))
 
-                Text(cell.subtitle)
-                    .font(DesignTokens.Typography.compactKeyCap)
-                    .foregroundStyle(subtitleColor(for: cell, isSelected: isSelected))
-                    .lineLimit(1)
+                if !sub.text.isEmpty {
+                    Text(sub.text)
+                        .font(DesignTokens.Typography.compactKeyCap)
+                        .foregroundStyle(
+                            subtitleColor(
+                                for: cell,
+                                isSelected: isSelected,
+                                isHighlighted: sub.isHighlighted
+                            )
+                        )
+                        .lineLimit(1)
+                }
 
                 // 系统日历事件指示点（固定占位高度，避免有无事件时文字上下偏移）
                 HStack(spacing: DesignTokens.Spacing.xxs) {
@@ -280,7 +557,7 @@ struct CalendarView: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                if let mark = cell.workdayMark {
+                if showBuiltInHolidays, let mark = cell.workdayMark {
                     workdayBadgeView(mark, isCurrentMonth: cell.isCurrentMonth)
                         .padding(DesignTokens.Spacing.xxs)
                 }
@@ -313,6 +590,123 @@ struct CalendarView: View {
             )
     }
 
+    // MARK: - 模式三：年视图（12 个月迷你概览网格）
+
+    private var yearBoardBody: some View {
+        let columns = Array(
+            repeating: GridItem(.flexible(), spacing: DesignTokens.Spacing.sm),
+            count: 3
+        )
+
+        return ScrollView {
+            LazyVGrid(columns: columns, spacing: DesignTokens.Spacing.sm) {
+                ForEach(yearMiniMonths) { mini in
+                    miniMonthCard(mini)
+                }
+            }
+            .padding(.vertical, DesignTokens.Spacing.xxs)
+        }
+        .scrollIndicators(.never)
+    }
+
+    private func miniMonthCard(_ mini: CalendarMiniMonth) -> some View {
+        let isSelectedMonth =
+            gregorian.component(.year, from: selectedDate) == mini.year
+            && gregorian.component(.month, from: selectedDate) == mini.month
+
+        return VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+            Button {
+                displayedMonth = mini.monthDate
+                boardMode = .month
+            } label: {
+                HStack(spacing: DesignTokens.Spacing.xxs) {
+                    Text(mini.title)
+                        .font(DesignTokens.Typography.sectionHeader)
+                        .foregroundStyle(
+                            isSelectedMonth ? Color.accentColor : DesignTokens.Colors.textPrimary
+                        )
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(DesignTokens.Typography.compactIcon)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 0) {
+                ForEach(Array(CalendarFormatting.weekdayHeaders.enumerated()), id: \.offset) { _, w in
+                    Text(w)
+                        .font(DesignTokens.Typography.compactKeyCap)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            VStack(spacing: DesignTokens.Spacing.xxs) {
+                ForEach(mini.weeks) { row in
+                    HStack(spacing: 0) {
+                        ForEach(row.days) { cell in
+                            miniDayCellView(cell)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(DesignTokens.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                .fill(DesignTokens.Colors.cardFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                .strokeBorder(
+                    isSelectedMonth ? Color.accentColor.opacity(0.45) : DesignTokens.Colors.cardStroke,
+                    lineWidth: DesignTokens.Size.hairline
+                )
+        )
+    }
+
+    private func miniDayCellView(_ cell: CalendarDayCell) -> some View {
+        let isSelected = gregorian.isDate(cell.date, inSameDayAs: selectedDate)
+        let isHoliday = showBuiltInHolidays && cell.workdayMark == .holiday
+
+        return Button {
+            selectDay(cell)
+        } label: {
+            Text(cell.isCurrentMonth ? "\(cell.day)" : "")
+                .font(DesignTokens.Typography.compactKeyCap)
+                .foregroundStyle(
+                    cell.isToday
+                        ? Color.accentColor
+                        : isSelected
+                            ? DesignTokens.Colors.textPrimary
+                            : isHoliday
+                                ? DesignTokens.Colors.success
+                                : cell.isWeekend
+                                    ? DesignTokens.Colors.textTertiary
+                                    : DesignTokens.Colors.textSecondary
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: DesignTokens.Size.Calendar.miniCellHeight)
+                .background(
+                    Circle()
+                        .fill(
+                            isSelected
+                                ? Color.accentColor.opacity(0.25)
+                                : cell.isToday
+                                    ? Color.accentColor.opacity(0.12)
+                                    : Color.clear
+                        )
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!cell.isCurrentMonth)
+    }
+
+    // MARK: - 颜色辅助
+
     private func dayNumberColor(for cell: CalendarDayCell, isSelected: Bool) -> Color {
         if cell.isToday {
             return Color.accentColor
@@ -326,12 +720,16 @@ struct CalendarView: View {
         return DesignTokens.Colors.textPrimary
     }
 
-    private func subtitleColor(for cell: CalendarDayCell, isSelected: Bool) -> Color {
+    private func subtitleColor(
+        for cell: CalendarDayCell,
+        isSelected: Bool,
+        isHighlighted: Bool
+    ) -> Color {
         if !cell.isCurrentMonth {
-            return (cell.isSubtitleHighlighted ? Color.accentColor : DesignTokens.Colors.textTertiary)
+            return (isHighlighted ? Color.accentColor : DesignTokens.Colors.textTertiary)
                 .opacity(0.45)
         }
-        if cell.isSubtitleHighlighted {
+        if isHighlighted {
             return Color.accentColor
         }
         return isSelected ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.textTertiary
@@ -362,13 +760,18 @@ struct CalendarView: View {
                 .fill(DesignTokens.Colors.hairline)
                 .frame(height: DesignTokens.Size.hairline)
 
-            eventsSection
+            if showSystemEvents {
+                eventsSection
+            } else {
+                sidebarAlmanacDetailSection
+            }
         }
     }
 
-    /// 选中日期的公历、农历、节气与节假日详情卡片
+    /// 选中日期的公历、农历、节气、节假日与精简黄历宜忌卡片
     private var selectedDaySummaryCard: some View {
         let cell = selectedDayCell
+        let almanac = selectedAlmanac
         let relativeText = CalendarFormatting.relativeDayDescription(for: cell.date)
         let weekdayText = CalendarFormatting.weekdayTitle(for: cell.date)
 
@@ -399,30 +802,129 @@ struct CalendarView: View {
                     )
             }
 
-            Text(cell.fullLunarDescription)
-                .font(DesignTokens.Typography.rowTrailing)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            if showLunar {
+                Text(cell.fullLunarDescription)
+                    .font(DesignTokens.Typography.rowTrailing)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            }
 
-            if !cell.festivals.isEmpty || cell.solarTerm != nil || cell.workdayMark != nil {
-                HStack(spacing: DesignTokens.Spacing.xs) {
-                    if let mark = cell.workdayMark {
-                        tagChip(
-                            mark == .holiday ? "法定休假" : "调休上班",
-                            tint: mark == .holiday
-                                ? DesignTokens.Colors.success
-                                : DesignTokens.Colors.warning
-                        )
-                    }
-                    if let term = cell.solarTerm {
-                        tagChip("节气 · \(term)", tint: DesignTokens.Colors.progress)
-                    }
-                    ForEach(cell.festivals, id: \.self) { festival in
+            dayBadgesRow(for: cell)
+
+            if showAlmanac && showSystemEvents && boardMode != .day {
+                compactSidebarAlmanacView(almanac)
+                    .padding(.top, DesignTokens.Spacing.xxs)
+            }
+        }
+    }
+
+    /// 节气、内置节假日与调休标签行（受 `showLunar` 与 `showBuiltInHolidays` 控制）
+    @ViewBuilder
+    private func dayBadgesRow(for cell: CalendarDayCell) -> some View {
+        let hasWorkdayMark = showBuiltInHolidays && cell.workdayMark != nil
+        let hasSolarTerm = showLunar && cell.solarTerm != nil
+        let hasFestivals = showBuiltInHolidays && !cell.festivals.isEmpty
+
+        if hasWorkdayMark || hasSolarTerm || hasFestivals {
+            HStack(spacing: DesignTokens.Spacing.xs) {
+                if showBuiltInHolidays, let mark = cell.workdayMark {
+                    tagChip(
+                        mark == .holiday ? "法定休假" : "调休上班",
+                        tint: mark == .holiday
+                            ? DesignTokens.Colors.success
+                            : DesignTokens.Colors.warning
+                    )
+                }
+                if showLunar, let term = cell.solarTerm {
+                    tagChip("节气 · \(term)", tint: DesignTokens.Colors.progress)
+                }
+                if showBuiltInHolidays {
+                    ForEach(cell.festivals.prefix(2), id: \.self) { festival in
                         tagChip(festival, tint: Color.accentColor)
                     }
                 }
-                .padding(.top, DesignTokens.Spacing.xxs)
+            }
+            .padding(.top, DesignTokens.Spacing.xxs)
+        }
+    }
+
+    /// 侧边栏紧凑黄历（干支值神冲煞 + 宜忌简表）
+    private func compactSidebarAlmanacView(_ almanac: CalendarAlmanac) -> some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+            Text("\(almanac.monthStemBranch) \(almanac.dayStemBranch) · \(almanac.dutyTwelveGod) · \(almanac.clashAndSha)")
+                .font(DesignTokens.Typography.compactKeyCap)
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+                .lineLimit(1)
+
+            HStack(spacing: DesignTokens.Spacing.xs) {
+                Text("宜")
+                    .font(DesignTokens.Typography.compactKeyCap)
+                    .foregroundStyle(DesignTokens.Colors.success)
+                    .padding(.horizontal, DesignTokens.Spacing.xxs)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap / 2, style: .continuous)
+                            .fill(DesignTokens.Colors.success.opacity(0.14))
+                    )
+                Text(almanac.yi.prefix(4).joined(separator: " · "))
+                    .font(DesignTokens.Typography.compactKeyCap)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    .lineLimit(1)
+            }
+
+            HStack(spacing: DesignTokens.Spacing.xs) {
+                Text("忌")
+                    .font(DesignTokens.Typography.compactKeyCap)
+                    .foregroundStyle(DesignTokens.Colors.destructive)
+                    .padding(.horizontal, DesignTokens.Spacing.xxs)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap / 2, style: .continuous)
+                            .fill(DesignTokens.Colors.destructive.opacity(0.14))
+                    )
+                Text(almanac.ji.prefix(4).joined(separator: " · "))
+                    .font(DesignTokens.Typography.compactKeyCap)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    .lineLimit(1)
             }
         }
+    }
+
+    /// 当用户在设置中关闭「系统日历日程」时，右侧下方展示完整黄历详情或提示
+    private var sidebarAlmanacDetailSection: some View {
+        let almanac = selectedAlmanac
+        return ScrollView {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                if showAlmanac {
+                    Text("传统黄历")
+                        .font(DesignTokens.Typography.sectionHeader)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+
+                    Text(almanac.pillarSummary)
+                        .font(DesignTokens.Typography.keyCap)
+                        .foregroundStyle(DesignTokens.Colors.textPrimary)
+
+                    HStack(spacing: DesignTokens.Spacing.xs) {
+                        tagChip("值神 · \(almanac.dutyTwelveGod)", tint: DesignTokens.Colors.progress)
+                        tagChip(almanac.clashAndSha, tint: DesignTokens.Colors.warning)
+                    }
+
+                    compactSidebarAlmanacView(almanac)
+
+                    Text(almanac.godDirections)
+                        .font(DesignTokens.Typography.compactKeyCap)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+
+                    Text("彭祖百忌：\(almanac.pengZuTaboo)")
+                        .font(DesignTokens.Typography.compactKeyCap)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                } else {
+                    Text("系统日历日程已在设置中停用")
+                        .font(DesignTokens.Typography.rowTrailing)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                }
+            }
+            .padding(.horizontal, DesignTokens.Spacing.lg)
+            .padding(.vertical, DesignTokens.Spacing.md)
+        }
+        .scrollIndicators(.never)
     }
 
     private func tagChip(_ text: String, tint: Color) -> some View {
@@ -656,12 +1158,22 @@ struct CalendarView: View {
         }
     }
 
+    private func stepBoard(by delta: Int) {
+        switch boardMode {
+        case .day:
+            moveSelectedDay(by: delta)
+        case .month:
+            shiftMonth(by: delta)
+        case .year:
+            shiftYear(by: delta)
+        }
+    }
+
     private func shiftMonth(by delta: Int) {
         guard let nextMonth = gregorian.date(byAdding: .month, value: delta, to: displayedMonth) else {
             return
         }
         displayedMonth = nextMonth
-        // 若切换到新月份，选中该月同一日（或月末）
         let targetComps = gregorian.dateComponents([.year, .month], from: nextMonth)
         let currentDay = gregorian.component(.day, from: selectedDate)
         var newSelectedComps = DateComponents()
@@ -675,6 +1187,16 @@ struct CalendarView: View {
             if let aligned = gregorian.date(from: newSelectedComps) {
                 selectedDate = aligned
             }
+        }
+    }
+
+    private func shiftYear(by delta: Int) {
+        guard let nextYear = gregorian.date(byAdding: .year, value: delta, to: displayedMonth) else {
+            return
+        }
+        displayedMonth = nextYear
+        if let alignedSelected = gregorian.date(byAdding: .year, value: delta, to: selectedDate) {
+            selectedDate = alignedSelected
         }
     }
 
@@ -697,6 +1219,10 @@ struct CalendarView: View {
     }
 
     private func loadGridEvents() async {
+        guard showSystemEvents else {
+            gridEvents = []
+            return
+        }
         let rows = weekRows
         guard let firstDay = rows.first?.days.first?.date,
             let lastDay = rows.last?.days.last?.date,

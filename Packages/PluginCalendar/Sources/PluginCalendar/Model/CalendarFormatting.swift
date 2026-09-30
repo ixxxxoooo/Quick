@@ -4,12 +4,71 @@
 
 import Foundation
 
+/// 日历看板视图模式（日 / 月 / 年）
+enum CalendarBoardMode: String, CaseIterable, Identifiable, Sendable {
+    case day = "日"
+    case month = "月"
+    case year = "年"
+
+    var id: String { rawValue }
+}
+
+/// 日历插件内部偏好键与编解码辅助
+enum CalendarPreferences {
+    static let showLunar = "calendar.showLunar"
+    static let showBuiltInHolidays = "calendar.showBuiltInHolidays"
+    static let showAlmanac = "calendar.showAlmanac"
+    static let showSystemEvents = "calendar.showSystemEvents"
+    static let disabledCalendarIDs = "calendar.disabledCalendarIDs"
+
+    static func disabledIDs(from raw: String) -> Set<String> {
+        Set(
+            raw.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        )
+    }
+
+    static func encodedDisabledIDs(_ ids: Set<String>) -> String {
+        ids.sorted().joined(separator: ",")
+    }
+}
+
 /// 法定节假日调休标记
 enum CalendarWorkdayMark: String, Sendable, Equatable {
     /// 法定放假（「休」）
     case holiday = "休"
     /// 调休补班（「班」）
     case workday = "班"
+}
+
+/// 传统黄历信息（干支、值神、冲煞、吉神方位、彭祖百忌、每日宜忌）
+struct CalendarAlmanac: Sendable, Equatable {
+    /// 年干支（如「丙午年」）
+    let yearStemBranch: String
+    /// 月干支（如「丁酉月」）
+    let monthStemBranch: String
+    /// 日干支（如「戊申日」）
+    let dayStemBranch: String
+    /// 生肖（如「马」）
+    let zodiac: String
+    /// 建除十二值神（如「定日」）
+    let dutyTwelveGod: String
+    /// 六冲与煞向（如「冲虎(壬寅) 煞南」）
+    let clashAndSha: String
+    /// 吉神方位（如「喜神东南 · 财神正北 · 福神东北」）
+    let godDirections: String
+    /// 彭祖百忌（如「戊不受田 · 申不安床」）
+    let pengZuTaboo: String
+    /// 每日「宜」列表
+    let yi: [String]
+    /// 每日「忌」列表
+    let ji: [String]
+
+    /// 四柱干支简写（如「丙午年 · 丁酉月 · 戊申日」）
+    var pillarSummary: String {
+        "\(yearStemBranch) · \(monthStemBranch) · \(dayStemBranch)"
+    }
 }
 
 /// 月历网格中的单日模型
@@ -45,21 +104,27 @@ struct CalendarDayCell: Identifiable, Sendable, Equatable {
 
     /// 单元格底部展示的短标签（优先级：节日 > 二十四节气 > 初一显示农历月 > 农历日）
     var subtitle: String {
-        if let firstFestival = festivals.first {
-            return firstFestival
-        }
-        if let solarTerm {
-            return solarTerm
-        }
-        if lunarDayText == "初一" {
-            return lunarMonthText
-        }
-        return lunarDayText
+        displaySubtitle(showLunar: true, showHolidays: true).text
     }
 
     /// 单元格副标签是否高亮（节日或节气时高亮）
     var isSubtitleHighlighted: Bool {
-        !festivals.isEmpty || solarTerm != nil
+        displaySubtitle(showLunar: true, showHolidays: true).isHighlighted
+    }
+
+    /// 按用户设置动态计算单元格副标签与高亮状态
+    func displaySubtitle(showLunar: Bool, showHolidays: Bool) -> (text: String, isHighlighted: Bool) {
+        if showHolidays, let firstFestival = festivals.first {
+            return (firstFestival, true)
+        }
+        if showLunar, let solarTerm {
+            return (solarTerm, true)
+        }
+        if showLunar {
+            let lunarText = (lunarDayText == "初一") ? lunarMonthText : lunarDayText
+            return (lunarText, false)
+        }
+        return ("", false)
     }
 
     /// 完整农历文案（如「丙午马年 八月二十」）
@@ -80,7 +145,18 @@ struct CalendarWeekRow: Identifiable, Sendable, Equatable {
     var id: Int { index }
 }
 
-/// 日历相关文本格式化与历法计算（纯 Foundation，无 UI 依赖）
+/// 年视图中的单月概览模型
+struct CalendarMiniMonth: Identifiable, Sendable, Equatable {
+    let year: Int
+    let month: Int
+    let monthDate: Date
+    let title: String
+    let weeks: [CalendarWeekRow]
+
+    var id: Int { month }
+}
+
+/// 日历相关文本格式化与历法/黄历计算（纯 Foundation，无 UI 依赖）
 enum CalendarFormatting {
 
     // MARK: - 基础常量表
@@ -98,6 +174,51 @@ enum CalendarFormatting {
         "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十",
         "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十",
         "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"
+    ]
+
+    /// 建除十二值神
+    private static let dutyTwelveGods = [
+        "建", "除", "满", "平", "定", "执", "破", "危", "成", "收", "开", "闭"
+    ]
+
+    /// 彭祖百忌（十天干）
+    private static let pengZuStems = [
+        "甲不开仓", "乙不栽植", "丙不修灶", "丁不剃头", "戊不受田",
+        "己不破券", "庚不经络", "辛不合酱", "壬不泱水", "癸不词讼"
+    ]
+
+    /// 彭祖百忌（十二地支）
+    private static let pengZuBranches = [
+        "子不问卜", "丑不冠带", "寅不祭祀", "卯不穿井", "辰不哭泣", "巳不远行",
+        "午不苫盖", "未不服药", "申不安床", "酉不会客", "戌不吃犬", "亥不嫁娶"
+    ]
+
+    /// 建除十二值神对应的传统宜忌基准表
+    private static let dutyAlmanacTable: [(yi: [String], ji: [String])] = [
+        // 建日
+        (["出行", "会友", "上任", "祈福", "入学"], ["动土", "开仓", "安葬"]),
+        // 除日
+        (["解除", "沐浴", "扫舍", "求医", "祭祀"], ["嫁娶", "远行", "赴任"]),
+        // 满日
+        (["祈福", "祭祀", "开市", "交易", "立券", "纳财"], ["动土", "服药", "栽种"]),
+        // 平日
+        (["修饰", "涂泥", "祭祀", "平治道涂"], ["祈福", "求嗣", "嫁娶", "开市"]),
+        // 定日
+        (["祭祀", "祈福", "嫁娶", "造屋", "装修", "立券"], ["词讼", "出行", "动土"]),
+        // 执日
+        (["祭祀", "修造", "立契", "捕捉", "纳采"], ["开市", "交易", "移徙", "远行"]),
+        // 破日
+        (["求医", "破屋", "坏垣", "治病"], ["嫁娶", "签约", "开市", "动土", "搬迁"]),
+        // 危日
+        (["祭祀", "祈福", "安床", "拆卸"], ["登高", "行船", "出行", "动土"]),
+        // 成日
+        (["开市", "交易", "立券", "纳财", "嫁娶", "入学", "出行"], ["词讼", "争执"]),
+        // 收日
+        (["纳财", "收债", "进人口", "祭祀", "修造"], ["安葬", "出行", "针灸"]),
+        // 开日
+        (["祭祀", "祈福", "开市", "入宅", "移徙", "出行", "修造"], ["安葬", "动土"]),
+        // 闭日
+        (["筑堤", "补垣", "塞穴", "收敛"], ["开市", "出行", "求医", "动土", "嫁娶"])
     ]
 
     /// 周一到周日的表头标题
@@ -158,7 +279,6 @@ enum CalendarFormatting {
         let monthComponents = gregorian.dateComponents([.year, .month], from: monthDate)
         guard let firstOfMonth = gregorian.date(from: monthComponents) else { return [] }
 
-        // 计算当月 1 号距离本周一偏移了多少天（周一 -> 0，周二 -> 1，…，周日 -> 6）
         let weekday = gregorian.component(.weekday, from: firstOfMonth)
         let leadingOffset = (weekday + 5) % 7
         guard let gridStart = gregorian.date(byAdding: .day, value: -leadingOffset, to: firstOfMonth) else {
@@ -200,6 +320,39 @@ enum CalendarFormatting {
         return rows
     }
 
+    /// 生成指定年份全部 12 个月的迷你月历网格（供年视图使用）
+    static func yearMonths(
+        for yearDate: Date,
+        today: Date = Date(),
+        timeZone: TimeZone = .current
+    ) -> [CalendarMiniMonth] {
+        let gregorian = mondayFirstGregorianCalendar(timeZone: timeZone)
+        let year = gregorian.component(.year, from: yearDate)
+
+        var result: [CalendarMiniMonth] = []
+        result.reserveCapacity(12)
+
+        for month in 1...12 {
+            var comps = DateComponents()
+            comps.year = year
+            comps.month = month
+            comps.day = 1
+            comps.hour = 12
+            guard let mDate = gregorian.date(from: comps) else { continue }
+            let weeks = monthGrid(for: mDate, today: today, timeZone: timeZone)
+            result.append(
+                CalendarMiniMonth(
+                    year: year,
+                    month: month,
+                    monthDate: mDate,
+                    title: "\(month)月",
+                    weeks: weeks
+                )
+            )
+        }
+        return result
+    }
+
     /// 构造单日的完整日历信息
     static func dayCell(
         for date: Date,
@@ -220,6 +373,89 @@ enum CalendarFormatting {
             today: today,
             gregorian: gregorian,
             chinese: chinese
+        )
+    }
+
+    /// 计算指定日期的传统老黄历（四柱干支、建除十二值神、冲煞、吉神方位、彭祖百忌、宜忌）
+    static func almanac(
+        for date: Date,
+        timeZone: TimeZone = .current
+    ) -> CalendarAlmanac {
+        let gregorian = mondayFirstGregorianCalendar(timeZone: timeZone)
+        var chinese = Calendar(identifier: .chinese)
+        chinese.timeZone = timeZone
+
+        let dayStart = gregorian.startOfDay(for: date)
+        let lComps = chinese.dateComponents([.year, .month], from: dayStart)
+        let cyclicalYear = max(1, min(60, lComps.year ?? 1))
+        let lMonth = max(1, min(12, lComps.month ?? 1))
+
+        // 1. 年干支与生肖
+        let yearStemIndex = (cyclicalYear - 1) % 10
+        let yearBranchIndex = (cyclicalYear - 1) % 12
+        let yearStemBranch = "\(heavenlyStems[yearStemIndex])\(earthlyBranches[yearBranchIndex])年"
+        let zodiac = zodiacAnimals[yearBranchIndex]
+
+        // 2. 月干支（五虎遁月：甲己之年丙作首，正月建寅）
+        let firstMonthStemIndex = ((yearStemIndex % 5) * 2 + 2) % 10
+        let monthStemIndex = (firstMonthStemIndex + lMonth - 1) % 10
+        let monthBranchIndex = (lMonth + 1) % 12  // 正月寅(2)、二月卯(3)…
+        let monthStemBranch = "\(heavenlyStems[monthStemIndex])\(earthlyBranches[monthBranchIndex])月"
+
+        // 3. 日干支（以公历 2000-01-01 戊午日 [索引 54] 为基准按整日数推算六十甲子）
+        var refComps = DateComponents()
+        refComps.year = 2000
+        refComps.month = 1
+        refComps.day = 1
+        let refDate = gregorian.date(from: refComps) ?? dayStart
+        let daysSinceRef = gregorian.dateComponents([.day], from: refDate, to: dayStart).day ?? 0
+        let dayCycleIndex = ((daysSinceRef + 54) % 60 + 60) % 60
+        let dayStemIndex = dayCycleIndex % 10
+        let dayBranchIndex = dayCycleIndex % 12
+        let dayStemBranch = "\(heavenlyStems[dayStemIndex])\(earthlyBranches[dayBranchIndex])日"
+
+        // 4. 建除十二值神
+        let dutyIndex = (dayBranchIndex - monthBranchIndex + 12) % 12
+        let dutyGod = "\(dutyTwelveGods[dutyIndex])日"
+
+        // 5. 六冲与煞向（申子辰煞南，寅午戌煞北，巳酉丑煞东，亥卯未煞西）
+        let clashBranchIndex = (dayBranchIndex + 6) % 12
+        let clashStemIndex = (dayStemIndex + 4) % 10
+        let clashAnimal = zodiacAnimals[clashBranchIndex]
+        let clashStemBranch = "\(heavenlyStems[clashStemIndex])\(earthlyBranches[clashBranchIndex])"
+        let shaDirection: String
+        switch dayBranchIndex {
+        case 8, 0, 4: shaDirection = "煞南"   // 申子辰
+        case 2, 6, 10: shaDirection = "煞北"  // 寅午戌
+        case 5, 9, 1: shaDirection = "煞东"   // 巳酉丑
+        default: shaDirection = "煞西"        // 亥卯未
+        }
+        let clashAndSha = "冲\(clashAnimal)(\(clashStemBranch)) \(shaDirection)"
+
+        // 6. 吉神方位
+        let xiDirections = ["东北", "西北", "西南", "正南", "东南", "东北", "西北", "西南", "正南", "东南"]
+        let caiDirections = ["东北", "东北", "正西", "正西", "正北", "正北", "正东", "正东", "正南", "正南"]
+        let fuDirections = ["东南", "东南", "正东", "正东", "正北", "正北", "西南", "西南", "西北", "正西"]
+        let godDirections =
+            "喜神\(xiDirections[dayStemIndex]) · 财神\(caiDirections[dayStemIndex]) · 福神\(fuDirections[dayStemIndex])"
+
+        // 7. 彭祖百忌
+        let pengZuTaboo = "\(pengZuStems[dayStemIndex]) · \(pengZuBranches[dayBranchIndex])"
+
+        // 8. 每日宜忌
+        let almanacPair = dutyAlmanacTable[dutyIndex]
+
+        return CalendarAlmanac(
+            yearStemBranch: yearStemBranch,
+            monthStemBranch: monthStemBranch,
+            dayStemBranch: dayStemBranch,
+            zodiac: zodiac,
+            dutyTwelveGod: dutyGod,
+            clashAndSha: clashAndSha,
+            godDirections: godDirections,
+            pengZuTaboo: pengZuTaboo,
+            yi: almanacPair.yi,
+            ji: almanacPair.ji
         )
     }
 
@@ -249,6 +485,20 @@ enum CalendarFormatting {
         let gregorian = mondayFirstGregorianCalendar(timeZone: timeZone)
         let comps = gregorian.dateComponents([.year, .month], from: date)
         return "\(comps.year ?? 2026)年 \(comps.month ?? 1)月"
+    }
+
+    /// 格式化公历年标题（如「2026年」）
+    static func yearTitle(for date: Date, timeZone: TimeZone = .current) -> String {
+        let gregorian = mondayFirstGregorianCalendar(timeZone: timeZone)
+        let year = gregorian.component(.year, from: date)
+        return "\(year)年"
+    }
+
+    /// 格式化公历完整日标题（如「2026年 9月30日」）
+    static func fullDateTitle(for date: Date, timeZone: TimeZone = .current) -> String {
+        let gregorian = mondayFirstGregorianCalendar(timeZone: timeZone)
+        let comps = gregorian.dateComponents([.year, .month, .day], from: date)
+        return "\(comps.year ?? 2026)年 \(comps.month ?? 1)月\(comps.day ?? 1)日"
     }
 
     /// 格式化星期名称（如「星期三」）
@@ -281,7 +531,6 @@ enum CalendarFormatting {
         let isToday = gregorian.isDate(dayStart, inSameDayAs: today)
         let isWeekend = (weekday == 1 || weekday == 7)
 
-        // 农历组件
         let lComps = chinese.dateComponents([.year, .month, .day, .isLeapMonth], from: dayStart)
         let cyclicalYear = max(1, min(60, lComps.year ?? 1))
         let lMonth = max(1, min(12, lComps.month ?? 1))
@@ -297,10 +546,8 @@ enum CalendarFormatting {
         let lunarMonthText = isLeapMonth ? "闰\(baseMonthName)" : baseMonthName
         let lunarDayText = lunarDays[lDay - 1]
 
-        // 二十四节气
         let term = solarTerm(year: year, month: month, day: day)
 
-        // 传统与公历节日
         let dayFestivals = festivals(
             date: dayStart,
             year: year,
@@ -355,20 +602,20 @@ enum CalendarFormatting {
     /// 21 世纪个别年份节气 ±1 日修正表
     private static func solarTermDelta(year: Int, termIndex: Int) -> Int {
         switch (year, termIndex) {
-        case (2019, 0): return -1   // 小寒
+        case (2019, 0): return -1
         case (2082, 0): return 1
-        case (2000, 1): return 1    // 大寒
-        case (2026, 3): return -1   // 雨水
-        case (2084, 5): return 1    // 春分
-        case (2008, 9): return 1    // 小满
-        case (2002, 10): return 1   // 芒种
-        case (2016, 12): return 1   // 小暑
-        case (2022, 14): return 1   // 立秋
-        case (2027, 16): return 1   // 白露
-        case (2042, 17): return 1   // 秋分
-        case (2089, 19): return 1   // 霜降
-        case (2089, 20): return 1   // 立冬
-        case (2021, 23): return -1  // 冬至
+        case (2000, 1): return 1
+        case (2026, 3): return -1
+        case (2084, 5): return 1
+        case (2008, 9): return 1
+        case (2002, 10): return 1
+        case (2016, 12): return 1
+        case (2022, 14): return 1
+        case (2027, 16): return 1
+        case (2042, 17): return 1
+        case (2089, 19): return 1
+        case (2089, 20): return 1
+        case (2021, 23): return -1
         default: return 0
         }
     }
@@ -389,7 +636,6 @@ enum CalendarFormatting {
     ) -> [String] {
         var result: [String] = []
 
-        // 1. 中国农历传统节日（闰月不计入传统正节）
         if !isLeapMonth {
             switch (lunarMonth, lunarDay) {
             case (1, 1): result.append("春节")
@@ -405,7 +651,6 @@ enum CalendarFormatting {
             default: break
             }
 
-            // 除夕：腊月的最后一天（明天是农历正月初一）
             if lunarMonth == 12, (lunarDay == 29 || lunarDay == 30),
                 let tomorrow = gregorian.date(byAdding: .day, value: 1, to: date)
             {
@@ -416,12 +661,10 @@ enum CalendarFormatting {
             }
         }
 
-        // 2. 清明既是节气也是法定传统节日
         if solarTerm == "清明" {
             result.append("清明节")
         }
 
-        // 3. 公历固定节日
         switch (month, day) {
         case (1, 1): result.append("元旦")
         case (2, 14): result.append("情人节")
@@ -440,7 +683,6 @@ enum CalendarFormatting {
         default: break
         }
 
-        // 4. 母亲节（5 月第 2 个周日）与父亲节（6 月第 3 个周日）
         if month == 5, weekday == 1, (8...14).contains(day) {
             result.append("母亲节")
         } else if month == 6, weekday == 1, (15...21).contains(day) {
@@ -464,7 +706,6 @@ enum CalendarFormatting {
         return nil
     }
 
-    /// 国务院法定节假日放假日期（YYYYMMDD）
     private static let statutoryHolidays: Set<Int> = [
         // 2025 年
         20250101,
@@ -483,7 +724,6 @@ enum CalendarFormatting {
         20261001, 20261002, 20261003, 20261004, 20261005, 20261006, 20261007
     ]
 
-    /// 国务院法定节假日调休补班日期（YYYYMMDD）
     private static let makeupWorkdays: Set<Int> = [
         // 2025 年
         20250126, 20250208, 20250427, 20250928, 20251011,
