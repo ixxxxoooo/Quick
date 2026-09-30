@@ -8,14 +8,19 @@ import SwiftUI
 
 /// JSON 格式化面板
 ///
-/// 单栏原地编辑：`格式化` / `压缩` / `反转义` 都把结果写回同一个编辑区，不再分左右两栏。
-/// 顶部可切到**树视图**，把结构渲染成可折叠的节点，方便找某个字段。
+/// 单栏原地编辑：`格式化` / `压缩` / `反转义` 以及粘贴（⌘V / 右键粘贴 / 跨面板带入）
+/// 都把结果写回同一个带实时 JSON 语法高亮与行号的编辑区；顶部可切到**树视图**按路径折叠或搜索字段。
 struct JSONFormatterView: View {
 
     /// 代码视图 / 树视图
     enum Mode: String, CaseIterable {
         case code = "代码"
         case tree = "树"
+    }
+
+    private enum ActionState {
+        case formatted
+        case minified
     }
 
     /// 当前文本（唯一真相：代码视图编辑它，格式化也写回它）
@@ -39,9 +44,12 @@ struct JSONFormatterView: View {
     @State private var selection: String?
 
     @State private var errorMessage: String?
+    @State private var lineCount = 0
+    @State private var lastAction: ActionState?
 
-    /// 缩进风格持久化：设置页里的「JSON 缩进」改的就是它
+    /// 与设置页共用的持久化偏好
     @AppStorage(PluginSettingKey.JSONFormatter.indent) private var indent = 2
+    @AppStorage(PluginSettingKey.JSONFormatter.wrapLines) private var wrapLines = true
 
     /// 粘贴检测跳转时携带的初始文本
     @Environment(\.pluginContext) private var pluginContext
@@ -53,6 +61,10 @@ struct JSONFormatterView: View {
 
     /// 头部是否有真正的搜索框（分离窗口的兜底对象不算）
     private var hasHeaderSearch: Bool { search?.hasHeaderField == true }
+
+    private var hasMeaningfulText: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -85,6 +97,10 @@ struct JSONFormatterView: View {
             }
             refresh()
         }
+        .onChange(of: indent) { _, _ in
+            guard hasMeaningfulText, lastAction != .minified else { return }
+            format()
+        }
         .onChange(of: root) { _, newRoot in
             collapsed = newRoot.map(JSONTreeLayout.defaultCollapsed) ?? []
             selection = nil
@@ -106,11 +122,18 @@ struct JSONFormatterView: View {
     private var content: some View {
         switch mode {
         case .code:
-            TextEditor(text: $buffer.text)
-                .font(DesignTokens.Typography.code)
-                .scrollContentBackground(.hidden)
-                .padding(DesignTokens.Spacing.sm)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            CodeEditorView(
+                text: $buffer.text,
+                language: .json,
+                showsLineNumbers: true,
+                wrapLines: wrapLines,
+                placeholder: "粘贴或输入 JSON，粘贴时自动反转义并原地格式化…",
+                autoFocus: true,
+                onPaste: {
+                    formatOnPaste()
+                }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .tree:
             if let root {
                 JSONTreeView(
@@ -151,6 +174,7 @@ struct JSONFormatterView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
+            .disabled(!hasMeaningfulText)
 
             Button {
                 minimize()
@@ -159,6 +183,7 @@ struct JSONFormatterView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .disabled(!hasMeaningfulText)
 
             Button {
                 unescape()
@@ -168,6 +193,7 @@ struct JSONFormatterView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .help("把 \\n、\\\"、\\uXXXX 等转义还原成正常内容")
+            .disabled(!hasMeaningfulText)
 
             Button {
                 EventBus.shared.post(CopyToClipboardEvent(text: text))
@@ -176,6 +202,7 @@ struct JSONFormatterView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .disabled(!hasMeaningfulText)
 
             Button {
                 clear()
@@ -184,6 +211,7 @@ struct JSONFormatterView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .disabled(text.isEmpty)
 
             Spacer()
 
@@ -207,6 +235,13 @@ struct JSONFormatterView: View {
                 .buttonStyle(.borderless)
                 .controlSize(.small)
                 .help("折叠全部")
+            } else {
+                Toggle(isOn: $wrapLines) {
+                    Label("换行", systemImage: "text.wrap")
+                }
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .help("切换自动折行显示")
             }
 
             Picker("", selection: $mode) {
@@ -245,6 +280,11 @@ struct JSONFormatterView: View {
                     .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
+            if lineCount > 0 {
+                Text("\(lineCount) 行")
+                    .font(DesignTokens.Typography.keyCap)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            }
             if !text.isEmpty {
                 Text(JSONFormatterLogic.byteSize(text))
                     .font(DesignTokens.Typography.keyCap)
@@ -271,28 +311,53 @@ struct JSONFormatterView: View {
     ///
     /// **带了初始文本就覆盖编辑器内容。** 缓冲区是插件级的、会跨次保留；若只在「空」时加载，
     /// 新粘贴进来的内容会被上一次的旧内容挡住。
-    ///
-    /// 只在「刚进来」时格式化：编辑中的每次按键都重排会把光标顶走，所以之后要用户自己点按钮。
     private func loadInitialText() {
-        guard let query = pluginContext["query"], !query.isEmpty else {
+        if let query = pluginContext["query"], !query.isEmpty {
+            var initial = JSONFormatterLogic.autoUnescape(query)
+            if let formatted = try? JSONFormatterLogic.prettyPrint(initial, indent: indent) {
+                initial = formatted.text
+                lastAction = .formatted
+            }
+            text = initial
             refresh()
             return
         }
-        var initial = JSONFormatterLogic.autoUnescape(query)
-        if let formatted = try? JSONFormatterLogic.prettyPrint(initial, indent: indent) {
-            initial = formatted.text
+        // 若缓冲区已有合法 JSON 但还未格式化过，首次进入时顺手美化
+        if hasMeaningfulText, lastAction == nil,
+            let formatted = try? JSONFormatterLogic.prettyPrint(text, indent: indent)
+        {
+            lastAction = .formatted
+            text = formatted.text
         }
-        text = initial
         refresh()
     }
 
-    /// 重新解析当前文本并刷新错误 / 节点数 / 树
+    /// 粘贴后自动反转义并原地格式化（非法 JSON 则保留原文并在状态栏报错）
+    private func formatOnPaste() {
+        guard hasMeaningfulText else { return }
+        let unescaped = JSONFormatterLogic.autoUnescape(text)
+        if let result = try? JSONFormatterLogic.prettyPrint(unescaped, indent: indent) {
+            errorMessage = nil
+            lastAction = .formatted
+            text = result.text
+        } else {
+            if unescaped != text {
+                text = unescaped
+            }
+            refresh()
+        }
+    }
+
+    /// 重新解析当前文本并刷新错误 / 节点数 / 行数 / 树
     private func refresh() {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard hasMeaningfulText else {
             root = nil
+            lineCount = 0
+            lastAction = nil
             errorMessage = nil
             return
         }
+        lineCount = JSONFormatterLogic.lineCount(in: text)
         do {
             root = try JSONFormatterLogic.parseTree(text)
             errorMessage = nil
@@ -308,6 +373,7 @@ struct JSONFormatterView: View {
             return
         }
         errorMessage = nil
+        lastAction = .formatted
         text = result.text
     }
 
@@ -317,6 +383,7 @@ struct JSONFormatterView: View {
             return
         }
         errorMessage = nil
+        lastAction = .minified
         text = compact
     }
 
@@ -326,12 +393,19 @@ struct JSONFormatterView: View {
             return
         }
         errorMessage = nil
-        text = decoded
+        if let formatted = try? JSONFormatterLogic.prettyPrint(decoded, indent: indent) {
+            lastAction = .formatted
+            text = formatted.text
+        } else {
+            text = decoded
+        }
     }
 
     private func clear() {
         text = ""
         root = nil
+        lineCount = 0
+        lastAction = nil
         collapsed = []
         selection = nil
         errorMessage = nil

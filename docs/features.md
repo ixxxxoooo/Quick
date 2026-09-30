@@ -933,17 +933,18 @@
 
 ### JSON 格式化（json-formatter）
 
-格式化与压缩 JSON，单栏原地编辑，另有可折叠树视图。
+格式化与压缩 JSON，单栏原地编辑（内置实时 JSON 语法高亮与行号），支持粘贴即自动反转义与美化，另有可折叠树视图。
 
 #### 不变量
 
-- **单栏原地格式化，不再分输入/输出两栏。** 「格式化」「压缩」「反转义」都把结果写回
-  同一个编辑区（`JSONFormatterView.text`），文本只有这一份真相。
+- **单栏原地格式化，不再分输入/输出两栏。** 「格式化」「压缩」「反转义」以及粘贴（`⌘V` / 右键粘贴 / 跨面板带入）都把结果写回同一个带实时语法高亮与行号的编辑区（`JSONFormatterView.buffer.text`），文本只有这一份真相。
+- **粘贴即格式化，手动打字只高亮不重排。** 代码模式使用 `CodeEditorView(language: .json)`，在粘贴完成后触发 `onPaste` 自动执行 `autoUnescape` + `prettyPrint`；平时手动打字只做实时高亮与合法性校验，不触发布局重排，避免光标跳走。
 - **压缩永远输出单行**，不受缩进设置影响 —— 缩进只作用于「格式化」。
+- **输出保留正斜杠不转义**（`.withoutEscapingSlashes`）：JSON 字符串中的 URL（如 `https://example.com/a/b`）不会被转义成 `\/`。
 - **解析用 `JSONSerialization`**，所以 JSON5、尾逗号、注释都不支持；无效输入返回
   `Failure.invalidJSON`，界面显示「无效的 JSON」而不是原样回显。
 - `Outcome.nodeCount` 与 `byteSize` 都来自同一次解析，不要为了显示再去解析一遍。
-- 缩进设置键是 `jsonFormatter.indent`，与设置页 `JSONFormatterFeatureSection` 共用同一个 `@AppStorage` 键。
+- **设置项与工具栏共用 `@AppStorage` 键**：`jsonFormatter.indent`（2 / 4 空格，切换时非压缩态立即重排）、`jsonFormatter.wrapLines`（自动换行，默认开启）。
 - **反转义分自动与手动两条路，逻辑都在 `JSONFormatterLogic`。**
   - `unescape(_:)` 手动：整段带引号的字符串字面量按 JSON 字符串解码；裸的转义正文
     补一层引号再解码。**只解一层** —— 盲目递归会把本该保留的转义也吃掉。
@@ -969,10 +970,11 @@
 
 | 类型 | 职责 |
 | --- | --- |
-| `Model/JSONFormatterLogic.swift` | 解析 / 美化 / 压缩 / 反转义 / 字节数（Foundation + CoreFoundation） |
+| `Model/JSONFormatterLogic.swift` | 解析 / 美化 / 压缩 / 反转义 / 行数与字节数（Foundation + CoreFoundation） |
 | `Model/JSONTree.swift` | `JSONNode` 节点树、`JSONTreeRow` 可见行、`JSONTreeLayout` 折叠与搜索展开 |
-| `UI/JSONFormatterView.swift` | 工具栏 + 代码视图 + 树视图 + 状态栏 |
+| `UI/JSONFormatterView.swift` | 工具栏 + 代码视图（`CodeEditorView`） + 树视图 + 状态栏 |
 | `UI/JSONTreeView.swift` | 可折叠树渲染与键盘导航 |
+| `Settings/JSONFormatterSettingsView.swift` | 缩进宽度与自动换行设置 |
 
 `Model/` 是 Foundation/CoreFoundation only（仓库红线），视图只负责把结果写进 `@State`。
 

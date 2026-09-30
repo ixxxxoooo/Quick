@@ -135,6 +135,7 @@ public enum PluginSettingKey {
     /// JSON 格式化
     public enum JSONFormatter {
         public static let indent = "jsonFormatter.indent"
+        public static let wrapLines = "jsonFormatter.wrapLines"
     }
 
     /// UUID 生成器

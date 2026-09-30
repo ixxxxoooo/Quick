@@ -8,6 +8,7 @@ import SwiftUI
 
 struct JSONFormatterSettingsView: View {
     @AppStorage(PluginSettingKey.JSONFormatter.indent) private var indent = 2
+    @AppStorage(PluginSettingKey.JSONFormatter.wrapLines) private var wrapLines = true
 
     var body: some View {
         Section {
@@ -21,12 +22,18 @@ struct JSONFormatterSettingsView: View {
                     icon: { SettingsRowIcon(systemImage: "curlybraces") }
                 )
             }
+
+            Toggle(isOn: $wrapLines) {
+                SettingsRow(
+                    title: "自动换行",
+                    subtitle: "在 JSON 代码编辑器中自动折行显示超长内容，关闭时横向滚动。",
+                    icon: { SettingsRowIcon(systemImage: "text.wrap") }
+                )
+            }
         } header: {
             Text("格式化选项")
         } footer: {
-            Text("「压缩」不受此设置影响，它总是输出单行。")
+            Text("「压缩」不受缩进设置影响，它总是输出单行。")
         }
     }
 }
-
-/// UUID 生成器的专属选项

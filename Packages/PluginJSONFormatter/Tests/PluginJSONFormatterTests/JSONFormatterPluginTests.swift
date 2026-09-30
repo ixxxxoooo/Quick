@@ -66,8 +66,22 @@ struct JSONFormatterLogicTests {
         }
     }
 
-    @Test("字节数按 1024 进位格式化")
-    func byteSizeFormatting() {
+    @Test("美化与压缩都不转义 URL 中的正斜杠")
+    func preservesUnescapedSlashes() throws {
+        let input = #"{"url":"https://example.com/a/b"}"#
+        let pretty = try JSONFormatterLogic.prettyPrint(input, indent: 2)
+        let minified = try JSONFormatterLogic.minify(input)
+        #expect(pretty.text.contains("https://example.com/a/b"))
+        #expect(!pretty.text.contains(#"\/"#))
+        #expect(minified == #"{"url":"https://example.com/a/b"}"#)
+    }
+
+    @Test("行数与字节数统计")
+    func byteSizeAndLineCountFormatting() {
+        #expect(JSONFormatterLogic.lineCount(in: "") == 0)
+        #expect(JSONFormatterLogic.lineCount(in: #"{"a":1}"#) == 1)
+        #expect(JSONFormatterLogic.lineCount(in: "{\n  \"a\" : 1\n}") == 3)
+
         #expect(JSONFormatterLogic.byteSize("") == "0 B")
         #expect(JSONFormatterLogic.byteSize("abc") == "3 B")
         #expect(JSONFormatterLogic.byteSize(String(repeating: "a", count: 1023)) == "1023 B")

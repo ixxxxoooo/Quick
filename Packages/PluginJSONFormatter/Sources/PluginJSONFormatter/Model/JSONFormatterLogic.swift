@@ -33,7 +33,9 @@ enum JSONFormatterLogic {
     /// 一定是缩进；绝不能做全局替换，那会改掉字符串值内部的空格。
     static func prettyPrint(_ input: String, indent: Int) throws -> Outcome {
         let json = try parse(input)
-        let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .fragmentsAllowed]
+        let options: JSONSerialization.WritingOptions = [
+            .prettyPrinted, .sortedKeys, .fragmentsAllowed, .withoutEscapingSlashes,
+        ]
         guard let formatted = try? JSONSerialization.data(withJSONObject: json, options: options),
             let text = String(data: formatted, encoding: .utf8)
         else {
@@ -56,15 +58,26 @@ enum JSONFormatterLogic {
 
     /// 压缩输出
     ///
-    /// 与美化共用 `.sortedKeys`，保证同一份 JSON 的两种输出键序一致。
+    /// 与美化共用 `.sortedKeys` 与 `.withoutEscapingSlashes`，保证同一份 JSON 的两种输出键序一致且不污染 URL 斜杠。
     static func minify(_ input: String) throws -> String {
         let json = try parse(input)
-        guard let compacted = try? JSONSerialization.data(withJSONObject: json, options: [.sortedKeys]),
+        let options: JSONSerialization.WritingOptions = [.sortedKeys, .withoutEscapingSlashes]
+        guard let compacted = try? JSONSerialization.data(withJSONObject: json, options: options),
             let text = String(data: compacted, encoding: .utf8)
         else {
             throw Failure.invalidJSON
         }
         return text
+    }
+
+    /// 统计文本行数（空文本为 0）
+    static func lineCount(in input: String) -> Int {
+        guard !input.isEmpty else { return 0 }
+        var count = 1
+        for char in input where char == "\n" {
+            count += 1
+        }
+        return count
     }
 
     /// 人类可读的字节数
