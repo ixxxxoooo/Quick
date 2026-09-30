@@ -15,17 +15,37 @@ enum CalendarAuthorizationState: Sendable, Equatable {
     case denied
 }
 
-/// 系统日历源信息（供设置页按日历启用/停用，避免与内置节假日重复）
+/// 系统日历源信息（供设置页按日历启用/停用，以及新建日程时选择目标日历）
 struct CalendarSource: Identifiable, Sendable, Equatable {
     let id: String
     let title: String
     let colorHex: String
     let isSubscriptionOrHoliday: Bool
+    let allowsModifications: Bool
+    let isDefaultForNewEvents: Bool
+}
+
+/// 创建系统日历事件时的错误
+enum CalendarWriteError: LocalizedError, Sendable, Equatable {
+    case notAuthorized
+    case emptyTitle
+    case noWritableCalendar
+
+    var errorDescription: String? {
+        switch self {
+        case .notAuthorized:
+            return "未获得系统日历完全访问权限"
+        case .emptyTitle:
+            return "日程标题不能为空"
+        case .noWritableCalendar:
+            return "系统中没有可写入的日历源"
+        }
+    }
 }
 
 /// 日历服务
 ///
-/// 封装 EventKit 操作，提供日历权限管理、按日/按区间事件查询与系统日历变更通知。
+/// 封装 EventKit 操作，提供日历权限管理、按日/按区间事件查询、创建系统日历事件与变更通知。
 @MainActor
 @Observable
 final class CalendarService {
@@ -80,6 +100,7 @@ final class CalendarService {
     /// 获取系统中全部可用的事件日历源
     func availableCalendars() -> [CalendarSource] {
         guard hasAccess else { return [] }
+        let defaultID = eventStore.defaultCalendarForNewEvents?.calendarIdentifier
         return eventStore.calendars(for: .event)
             .map { cal in
                 let isSub = cal.type == .subscription
@@ -89,7 +110,9 @@ final class CalendarService {
                     id: cal.calendarIdentifier,
                     title: Self.nonEmpty(cal.title) ?? "未命名日历",
                     colorHex: Self.hexColor(from: cal.cgColor),
-                    isSubscriptionOrHoliday: isSub
+                    isSubscriptionOrHoliday: isSub,
+                    allowsModifications: cal.allowsContentModifications,
+                    isDefaultForNewEvents: cal.calendarIdentifier == defaultID
                 )
             }
             .sorted { lhs, rhs in
@@ -98,6 +121,67 @@ final class CalendarService {
                 }
                 return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
             }
+    }
+
+    /// 获取系统中允许写入（新建事件）的日历源列表（系统默认日历排在首位）
+    func writableCalendars() -> [CalendarSource] {
+        availableCalendars()
+            .filter(\.allowsModifications)
+            .sorted { lhs, rhs in
+                if lhs.isDefaultForNewEvents != rhs.isDefaultForNewEvents {
+                    return lhs.isDefaultForNewEvents && !rhs.isDefaultForNewEvents
+                }
+                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            }
+    }
+
+    /// 直接在 macOS 系统日历中新建并保存一条事件
+    func createEvent(
+        title: String,
+        startDate: Date,
+        endDate: Date,
+        isAllDay: Bool,
+        calendarID: String? = nil,
+        location: String? = nil,
+        notes: String? = nil
+    ) throws {
+        guard hasAccess else {
+            throw CalendarWriteError.notAuthorized
+        }
+        guard let cleanTitle = Self.nonEmpty(title) else {
+            throw CalendarWriteError.emptyTitle
+        }
+
+        let writableEKCalendars = eventStore.calendars(for: .event).filter(\.allowsContentModifications)
+        let targetCalendar: EKCalendar?
+        if let calendarID,
+            let matched = writableEKCalendars.first(where: { $0.calendarIdentifier == calendarID })
+        {
+            targetCalendar = matched
+        } else if let defaultCal = eventStore.defaultCalendarForNewEvents,
+            defaultCal.allowsContentModifications
+        {
+            targetCalendar = defaultCal
+        } else {
+            targetCalendar = writableEKCalendars.first
+        }
+
+        guard let targetCalendar else {
+            throw CalendarWriteError.noWritableCalendar
+        }
+
+        let event = EKEvent(eventStore: eventStore)
+        event.title = cleanTitle
+        event.calendar = targetCalendar
+        event.isAllDay = isAllDay
+        event.startDate = startDate
+        event.endDate = max(startDate, endDate)
+        event.location = Self.nonEmpty(location)
+        event.notes = Self.nonEmpty(notes)
+
+        try eventStore.save(event, span: .thisEvent, commit: true)
+        changeToken &+= 1
+        log.info("已向系统日历[\(targetCalendar.title, privacy: .public)]添加日程: \(cleanTitle, privacy: .public)")
     }
 
     /// 获取今日事件

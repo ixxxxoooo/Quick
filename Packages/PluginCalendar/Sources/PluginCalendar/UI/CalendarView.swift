@@ -7,7 +7,7 @@ import QuickCore
 import QuickUI
 import SwiftUI
 
-/// 日历看板主视图：左侧日/月/年多视图看板 + 右侧选中日详情、传统黄历与系统日程列表
+/// 日历看板主视图：左侧日/月/年多视图看板 + 右侧选中日详情、传统黄历与系统日程管理（支持新建系统日程）
 struct CalendarView: View {
 
     let service: CalendarService
@@ -26,23 +26,39 @@ struct CalendarView: View {
     @State private var displayedMonth: Date = Date()
     /// 当前选中的日期
     @State private var selectedDate: Date = Date()
-    /// 当前月历网格（42 天）范围内的系统日历事件
-    @State private var gridEvents: [CalendarEvent] = []
+    /// 按当天零点时间戳预聚合的系统日历事件字典，O(1) 查询避免网格重绘遍历
+    @State private var eventsByDay: [TimeInterval: [CalendarEvent]] = [:]
     /// 鼠标悬停的单元格 ID
     @State private var hoveredCellID: TimeInterval?
 
+    // MARK: - 新建系统日程表单状态
+
+    @State private var isCreatingEvent = false
+    @State private var writableCalendars: [CalendarSource] = []
+    @State private var draftTitle = ""
+    @State private var draftCalendarID = ""
+    @State private var draftIsAllDay = false
+    @State private var draftStartDate = Date()
+    @State private var draftEndDate = Date()
+    @State private var draftLocation = ""
+    @State private var draftNotes = ""
+    @State private var createErrorMessage: String?
+
     @FocusState private var isFocused: Bool
+    @FocusState private var isTitleFieldFocused: Bool
+
+    private static let gregorianCalendar = CalendarFormatting.mondayFirstGregorianCalendar()
 
     private var gregorian: Calendar {
-        CalendarFormatting.mondayFirstGregorianCalendar()
+        Self.gregorianCalendar
     }
 
-    /// 当前月份的 6 行 × 7 列网格
+    /// 当前月份的 6 行 × 7 列网格（内部带锁缓存，O(1) 命中）
     private var weekRows: [CalendarWeekRow] {
         CalendarFormatting.monthGrid(for: displayedMonth)
     }
 
-    /// 当前年份的 12 个迷你月历
+    /// 当前年份的 12 个迷你月历（内部带锁缓存，O(1) 命中）
     private var yearMiniMonths: [CalendarMiniMonth] {
         CalendarFormatting.yearMonths(for: displayedMonth)
     }
@@ -57,19 +73,17 @@ struct CalendarView: View {
         CalendarFormatting.almanac(for: selectedDate)
     }
 
-    /// 当前选中日期当天的事件列表
+    /// 当前选中日期当天的事件列表（O(1) 字典读取）
     private var selectedDayEvents: [CalendarEvent] {
         guard showSystemEvents else { return [] }
-        let cal = gregorian
-        return CalendarEvent.sortedByStart(
-            gridEvents.filter { $0.occurs(on: selectedDate, calendar: cal) }
-        )
+        let dayKey = gregorian.startOfDay(for: selectedDate).timeIntervalSince1970
+        return eventsByDay[dayKey] ?? []
     }
 
     var body: some View {
         HStack(spacing: 0) {
             leftBoardContainer
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             Rectangle()
                 .fill(DesignTokens.Colors.hairline)
@@ -77,7 +91,7 @@ struct CalendarView: View {
 
             detailSidebar
                 .frame(width: DesignTokens.Size.Calendar.detailSidebarWidth)
-                .frame(maxHeight: .infinity)
+                .frame(maxHeight: .infinity, alignment: .top)
         }
         .focusable()
         .focused($isFocused)
@@ -90,18 +104,22 @@ struct CalendarView: View {
             await loadGridEvents()
         }
         .onKeyPress(.leftArrow, phases: [.down, .repeat]) { _ in
+            guard !isCreatingEvent else { return .ignored }
             moveSelectedDay(by: -1)
             return .handled
         }
         .onKeyPress(.rightArrow, phases: [.down, .repeat]) { _ in
+            guard !isCreatingEvent else { return .ignored }
             moveSelectedDay(by: 1)
             return .handled
         }
         .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in
+            guard !isCreatingEvent else { return .ignored }
             moveSelectedDay(by: -7)
             return .handled
         }
         .onKeyPress(.downArrow, phases: [.down, .repeat]) { _ in
+            guard !isCreatingEvent else { return .ignored }
             moveSelectedDay(by: 7)
             return .handled
         }
@@ -116,7 +134,7 @@ struct CalendarView: View {
     // MARK: - 左侧：多模式日历看板（日 / 月 / 年）
 
     private var leftBoardContainer: some View {
-        VStack(spacing: DesignTokens.Spacing.sm) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             boardHeaderBar
 
             switch boardMode {
@@ -125,6 +143,7 @@ struct CalendarView: View {
             case .month:
                 weekdayHeaderRow
                 monthGridBody
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .year:
                 yearBoardBody
             }
@@ -295,7 +314,6 @@ struct CalendarView: View {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
-                // 顶部台历主卡片
                 HStack(alignment: .center, spacing: DesignTokens.Spacing.xl) {
                     Text("\(cell.day)")
                         .font(DesignTokens.Typography.calendarHeroDay)
@@ -354,7 +372,7 @@ struct CalendarView: View {
         .scrollIndicators(.never)
     }
 
-    /// 完整传统黄历卡片（用于「日」视图或关闭系统日程时的详情展示）
+    /// 完整传统黄历卡片（用于「日」视图）
     private func fullAlmanacCard(_ almanac: CalendarAlmanac) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
             HStack(spacing: DesignTokens.Spacing.sm) {
@@ -372,7 +390,6 @@ struct CalendarView: View {
                 .fill(DesignTokens.Colors.hairline)
                 .frame(height: DesignTokens.Size.hairline)
 
-            // 宜 / 忌 双行
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
                 almanacYiJiRow(
                     badge: "宜",
@@ -453,7 +470,7 @@ struct CalendarView: View {
         }
     }
 
-    // MARK: - 模式二：月视图（6 行 × 7 列月历网格）
+    // MARK: - 模式二：月视图（6 行 × 7 列月历网格，垂直自适应铺满）
 
     /// 星期表头行（周一至周日，可选周数列）
     private var weekdayHeaderRow: some View {
@@ -479,7 +496,7 @@ struct CalendarView: View {
         .padding(.top, DesignTokens.Spacing.xxs)
     }
 
-    /// 6 行 × 7 列月历网格
+    /// 6 行 × 7 列月历网格（自适应填满剩余高度，消除顶部/底部空白）
     private var monthGridBody: some View {
         VStack(spacing: DesignTokens.Spacing.xxs) {
             ForEach(weekRows) { row in
@@ -495,6 +512,7 @@ struct CalendarView: View {
                         dayCellView(cell)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -503,7 +521,7 @@ struct CalendarView: View {
     private func dayCellView(_ cell: CalendarDayCell) -> some View {
         let isSelected = gregorian.isDate(cell.date, inSameDayAs: selectedDate)
         let isHovered = hoveredCellID == cell.id
-        let dayEvents = showSystemEvents ? events(on: cell.date) : []
+        let dayEvents = showSystemEvents ? (eventsByDay[cell.id] ?? []) : []
         let sub = cell.displaySubtitle(showLunar: showLunar, showHolidays: showBuiltInHolidays)
 
         return Button {
@@ -541,8 +559,7 @@ struct CalendarView: View {
                 }
                 .frame(height: DesignTokens.Size.Calendar.eventDot)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: DesignTokens.Size.Calendar.cellHeight)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
                     .fill(cellBackground(for: cell, isSelected: isSelected, isHovered: isHovered))
@@ -590,7 +607,7 @@ struct CalendarView: View {
             )
     }
 
-    // MARK: - 模式三：年视图（12 个月迷你概览网格）
+    // MARK: - 模式三：年视图（12 个月轻量迷你卡片，零按钮嵌套消除卡顿）
 
     private var yearBoardBody: some View {
         let columns = Array(
@@ -614,11 +631,10 @@ struct CalendarView: View {
             gregorian.component(.year, from: selectedDate) == mini.year
             && gregorian.component(.month, from: selectedDate) == mini.month
 
-        return VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-            Button {
-                displayedMonth = mini.monthDate
-                boardMode = .month
-            } label: {
+        return Button {
+            selectMonthFromYearView(mini)
+        } label: {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 HStack(spacing: DesignTokens.Spacing.xxs) {
                     Text(mini.title)
                         .font(DesignTokens.Typography.sectionHeader)
@@ -630,79 +646,72 @@ struct CalendarView: View {
                         .font(DesignTokens.Typography.compactIcon)
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
 
-            HStack(spacing: 0) {
-                ForEach(Array(CalendarFormatting.weekdayHeaders.enumerated()), id: \.offset) { _, w in
-                    Text(w)
-                        .font(DesignTokens.Typography.compactKeyCap)
-                        .foregroundStyle(DesignTokens.Colors.textTertiary)
-                        .frame(maxWidth: .infinity)
+                HStack(spacing: 0) {
+                    ForEach(Array(CalendarFormatting.weekdayHeaders.enumerated()), id: \.offset) { _, w in
+                        Text(w)
+                            .font(DesignTokens.Typography.compactKeyCap)
+                            .foregroundStyle(DesignTokens.Colors.textTertiary)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
-            }
 
-            VStack(spacing: DesignTokens.Spacing.xxs) {
-                ForEach(mini.weeks) { row in
-                    HStack(spacing: 0) {
-                        ForEach(row.days) { cell in
-                            miniDayCellView(cell)
+                VStack(spacing: DesignTokens.Spacing.xxs) {
+                    ForEach(mini.weeks) { row in
+                        HStack(spacing: 0) {
+                            ForEach(row.days) { cell in
+                                miniDayLabel(cell)
+                            }
                         }
                     }
                 }
             }
-        }
-        .padding(DesignTokens.Spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
-                .fill(DesignTokens.Colors.cardFill)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
-                .strokeBorder(
-                    isSelectedMonth ? Color.accentColor.opacity(0.45) : DesignTokens.Colors.cardStroke,
-                    lineWidth: DesignTokens.Size.hairline
-                )
-        )
-    }
-
-    private func miniDayCellView(_ cell: CalendarDayCell) -> some View {
-        let isSelected = gregorian.isDate(cell.date, inSameDayAs: selectedDate)
-        let isHoliday = showBuiltInHolidays && cell.workdayMark == .holiday
-
-        return Button {
-            selectDay(cell)
-        } label: {
-            Text(cell.isCurrentMonth ? "\(cell.day)" : "")
-                .font(DesignTokens.Typography.compactKeyCap)
-                .foregroundStyle(
-                    cell.isToday
-                        ? Color.accentColor
-                        : isSelected
-                            ? DesignTokens.Colors.textPrimary
-                            : isHoliday
-                                ? DesignTokens.Colors.success
-                                : cell.isWeekend
-                                    ? DesignTokens.Colors.textTertiary
-                                    : DesignTokens.Colors.textSecondary
-                )
-                .frame(maxWidth: .infinity)
-                .frame(height: DesignTokens.Size.Calendar.miniCellHeight)
-                .background(
-                    Circle()
-                        .fill(
-                            isSelected
-                                ? Color.accentColor.opacity(0.25)
-                                : cell.isToday
-                                    ? Color.accentColor.opacity(0.12)
-                                    : Color.clear
-                        )
-                )
-                .contentShape(Rectangle())
+            .padding(DesignTokens.Spacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                    .fill(DesignTokens.Colors.cardFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
+                    .strokeBorder(
+                        isSelectedMonth ? Color.accentColor.opacity(0.45) : DesignTokens.Colors.cardStroke,
+                        lineWidth: DesignTokens.Size.hairline
+                    )
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(!cell.isCurrentMonth)
+    }
+
+    private func miniDayLabel(_ cell: CalendarDayCell) -> some View {
+        let isSelected = cell.isCurrentMonth && gregorian.isDate(cell.date, inSameDayAs: selectedDate)
+        let isHoliday = cell.isCurrentMonth && showBuiltInHolidays && cell.workdayMark == .holiday
+
+        return Text(cell.isCurrentMonth ? "\(cell.day)" : "")
+            .font(DesignTokens.Typography.compactKeyCap)
+            .foregroundStyle(
+                cell.isToday && cell.isCurrentMonth
+                    ? Color.accentColor
+                    : isSelected
+                        ? DesignTokens.Colors.textPrimary
+                        : isHoliday
+                            ? DesignTokens.Colors.success
+                            : cell.isWeekend
+                                ? DesignTokens.Colors.textTertiary
+                                : DesignTokens.Colors.textSecondary
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: DesignTokens.Size.Calendar.miniCellHeight)
+            .background(
+                Circle()
+                    .fill(
+                        isSelected
+                            ? Color.accentColor.opacity(0.25)
+                            : (cell.isToday && cell.isCurrentMonth)
+                                ? Color.accentColor.opacity(0.12)
+                                : Color.clear
+                    )
+            )
     }
 
     // MARK: - 颜色辅助
@@ -748,7 +757,7 @@ struct CalendarView: View {
         return .clear
     }
 
-    // MARK: - 右侧：选中日黄历详情 + 当日系统日程列表
+    // MARK: - 右侧：选中日黄历详情 + 当日系统日程列表 / 新建日程表单
 
     private var detailSidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -810,7 +819,7 @@ struct CalendarView: View {
 
             dayBadgesRow(for: cell)
 
-            if showAlmanac && showSystemEvents && boardMode != .day {
+            if showAlmanac && showSystemEvents && boardMode != .day && !isCreatingEvent {
                 compactSidebarAlmanacView(almanac)
                     .padding(.top, DesignTokens.Spacing.xxs)
             }
@@ -939,18 +948,18 @@ struct CalendarView: View {
             )
     }
 
-    // MARK: - 系统日历事件列表区
+    // MARK: - 系统日历事件列表与新建日程区
 
     private var eventsSection: some View {
         let dayEvents = selectedDayEvents
 
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: DesignTokens.Spacing.xs) {
-                Text("日程安排")
+                Text(isCreatingEvent ? "新建系统日程" : "日程安排")
                     .font(DesignTokens.Typography.sectionHeader)
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
 
-                if service.hasAccess && !dayEvents.isEmpty {
+                if !isCreatingEvent && service.hasAccess && !dayEvents.isEmpty {
                     Text("\(dayEvents.count)")
                         .font(DesignTokens.Typography.compactKeyCap)
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
@@ -963,6 +972,29 @@ struct CalendarView: View {
                 }
 
                 Spacer(minLength: 0)
+
+                if service.hasAccess && !isCreatingEvent {
+                    Button {
+                        beginCreateEvent()
+                    } label: {
+                        HStack(spacing: DesignTokens.Spacing.xxs) {
+                            Image(systemName: "plus")
+                                .font(DesignTokens.Typography.compactIcon)
+                            Text("新建")
+                                .font(DesignTokens.Typography.compactKeyCap)
+                        }
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, DesignTokens.Spacing.sm)
+                        .padding(.vertical, DesignTokens.Spacing.xxs)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(Color.accentColor.opacity(0.14))
+                        )
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("向 macOS 系统日历添加日程")
+                }
 
                 Button {
                     service.openSystemCalendarApp()
@@ -986,6 +1018,8 @@ struct CalendarView: View {
 
             if !service.hasAccess {
                 permissionPromptView
+            } else if isCreatingEvent {
+                createEventFormView
             } else if dayEvents.isEmpty {
                 emptyEventsView
             } else {
@@ -1002,6 +1036,149 @@ struct CalendarView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// 内联新建系统日程表单（直接写入 macOS 系统日历）
+    private var createEventFormView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                TextField("日程标题（必填）", text: $draftTitle)
+                    .textFieldStyle(.plain)
+                    .font(DesignTokens.Typography.rowTitle)
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                    .focused($isTitleFieldFocused)
+                    .padding(.horizontal, DesignTokens.Spacing.sm)
+                    .padding(.vertical, DesignTokens.Spacing.xs)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                            .fill(DesignTokens.Colors.controlSurface)
+                    )
+                    .onSubmit {
+                        submitNewEvent()
+                    }
+
+                if !writableCalendars.isEmpty {
+                    HStack(spacing: DesignTokens.Spacing.xs) {
+                        Text("日历")
+                            .font(DesignTokens.Typography.compactKeyCap)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
+
+                        Spacer(minLength: 0)
+
+                        Picker("", selection: $draftCalendarID) {
+                            ForEach(writableCalendars) { cal in
+                                Text(cal.title).tag(cal.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .controlSize(.small)
+                    }
+                }
+
+                Toggle(isOn: $draftIsAllDay) {
+                    Text("全天日程")
+                        .font(DesignTokens.Typography.compactKeyCap)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+
+                DatePicker(
+                    "开始",
+                    selection: $draftStartDate,
+                    displayedComponents: draftIsAllDay ? [.date] : [.date, .hourAndMinute]
+                )
+                .font(DesignTokens.Typography.compactKeyCap)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                .controlSize(.small)
+                .onChange(of: draftStartDate) { _, newStart in
+                    if draftEndDate < newStart {
+                        draftEndDate =
+                            gregorian.date(byAdding: .hour, value: 1, to: newStart) ?? newStart
+                    }
+                }
+
+                DatePicker(
+                    "结束",
+                    selection: $draftEndDate,
+                    in: draftStartDate...,
+                    displayedComponents: draftIsAllDay ? [.date] : [.date, .hourAndMinute]
+                )
+                .font(DesignTokens.Typography.compactKeyCap)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                .controlSize(.small)
+
+                TextField("地点（选填）", text: $draftLocation)
+                    .textFieldStyle(.plain)
+                    .font(DesignTokens.Typography.keyCap)
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                    .padding(.horizontal, DesignTokens.Spacing.sm)
+                    .padding(.vertical, DesignTokens.Spacing.xs)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                            .fill(DesignTokens.Colors.controlSurface)
+                    )
+
+                TextField("备注或会议链接（选填）", text: $draftNotes)
+                    .textFieldStyle(.plain)
+                    .font(DesignTokens.Typography.keyCap)
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                    .padding(.horizontal, DesignTokens.Spacing.sm)
+                    .padding(.vertical, DesignTokens.Spacing.xs)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                            .fill(DesignTokens.Colors.controlSurface)
+                    )
+                    .onSubmit {
+                        submitNewEvent()
+                    }
+
+                if let createErrorMessage {
+                    Text(createErrorMessage)
+                        .font(DesignTokens.Typography.compactKeyCap)
+                        .foregroundStyle(DesignTokens.Colors.destructive)
+                }
+
+                HStack(spacing: DesignTokens.Spacing.sm) {
+                    Button {
+                        cancelCreateEvent()
+                    } label: {
+                        Text("取消")
+                            .font(DesignTokens.Typography.keyCap)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, DesignTokens.Spacing.xs)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                                    .fill(DesignTokens.Colors.controlSurface)
+                            )
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        submitNewEvent()
+                    } label: {
+                        Text("添加到系统日历")
+                            .font(DesignTokens.Typography.keyCap)
+                            .foregroundStyle(Color.accentColor)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, DesignTokens.Spacing.xs)
+                            .background(
+                                RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                                    .fill(Color.accentColor.opacity(0.16))
+                            )
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(draftTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(.top, DesignTokens.Spacing.xxs)
+            }
+            .padding(.horizontal, DesignTokens.Spacing.lg)
+            .padding(.bottom, DesignTokens.Spacing.md)
+        }
+        .scrollIndicators(.never)
     }
 
     /// 单条日程卡片
@@ -1151,11 +1328,83 @@ struct CalendarView: View {
 
     // MARK: - 交互与数据加载
 
+    private func beginCreateEvent() {
+        let writable = service.writableCalendars()
+        writableCalendars = writable
+        if draftCalendarID.isEmpty || !writable.contains(where: { $0.id == draftCalendarID }) {
+            draftCalendarID = writable.first?.id ?? ""
+        }
+        let window = CalendarFormatting.defaultNewEventWindow(on: selectedDate)
+        draftTitle = ""
+        draftIsAllDay = false
+        draftStartDate = window.start
+        draftEndDate = window.end
+        draftLocation = ""
+        draftNotes = ""
+        createErrorMessage = nil
+        isCreatingEvent = true
+        isTitleFieldFocused = true
+    }
+
+    private func cancelCreateEvent() {
+        isCreatingEvent = false
+        createErrorMessage = nil
+        isFocused = true
+    }
+
+    private func submitNewEvent() {
+        do {
+            try service.createEvent(
+                title: draftTitle,
+                startDate: draftStartDate,
+                endDate: draftEndDate,
+                isAllDay: draftIsAllDay,
+                calendarID: draftCalendarID.isEmpty ? nil : draftCalendarID,
+                location: draftLocation,
+                notes: draftNotes
+            )
+            // 若新建日程落在其他日期，自动跳转到该日期以立即展示刚添加的事件
+            selectedDate = gregorian.startOfDay(for: draftStartDate)
+            displayedMonth = draftStartDate
+            isCreatingEvent = false
+            createErrorMessage = nil
+            isFocused = true
+            Task {
+                await loadGridEvents()
+            }
+        } catch {
+            createErrorMessage = error.localizedDescription
+        }
+    }
+
     private func selectDay(_ cell: CalendarDayCell) {
         selectedDate = cell.date
         if !cell.isCurrentMonth {
             displayedMonth = cell.date
         }
+        if isCreatingEvent {
+            let window = CalendarFormatting.defaultNewEventWindow(on: cell.date)
+            draftStartDate = window.start
+            draftEndDate = window.end
+        }
+    }
+
+    private func selectMonthFromYearView(_ mini: CalendarMiniMonth) {
+        displayedMonth = mini.monthDate
+        let currentDay = gregorian.component(.day, from: selectedDate)
+        var newSelectedComps = DateComponents()
+        newSelectedComps.year = mini.year
+        newSelectedComps.month = mini.month
+        newSelectedComps.day = 1
+        if let firstOfTarget = gregorian.date(from: newSelectedComps),
+            let range = gregorian.range(of: .day, in: .month, for: firstOfTarget)
+        {
+            newSelectedComps.day = min(currentDay, range.count)
+            if let aligned = gregorian.date(from: newSelectedComps) {
+                selectedDate = aligned
+            }
+        }
+        boardMode = .month
     }
 
     private func stepBoard(by delta: Int) {
@@ -1220,7 +1469,7 @@ struct CalendarView: View {
 
     private func loadGridEvents() async {
         guard showSystemEvents else {
-            gridEvents = []
+            eventsByDay = [:]
             return
         }
         let rows = weekRows
@@ -1228,15 +1477,21 @@ struct CalendarView: View {
             let lastDay = rows.last?.days.last?.date,
             let rangeEnd = gregorian.date(byAdding: .day, value: 1, to: lastDay)
         else {
-            gridEvents = []
+            eventsByDay = [:]
             return
         }
-        gridEvents = await service.events(from: firstDay, to: rangeEnd)
-    }
-
-    private func events(on date: Date) -> [CalendarEvent] {
+        let fetched = await service.events(from: firstDay, to: rangeEnd)
         let cal = gregorian
-        return gridEvents.filter { $0.occurs(on: date, calendar: cal) }
+        var grouped: [TimeInterval: [CalendarEvent]] = [:]
+        for row in rows {
+            for cell in row.days {
+                let dayMatches = fetched.filter { $0.occurs(on: cell.date, calendar: cal) }
+                if !dayMatches.isEmpty {
+                    grouped[cell.id] = CalendarEvent.sortedByStart(dayMatches)
+                }
+            }
+        }
+        eventsByDay = grouped
     }
 
     /// 解析事件的十六进制颜色（如 `#3B82F6`），缺省退回语义进度色

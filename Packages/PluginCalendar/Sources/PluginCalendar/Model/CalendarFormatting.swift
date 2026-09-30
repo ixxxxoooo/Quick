@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import os
 
 /// 日历看板视图模式（日 / 月 / 年）
 enum CalendarBoardMode: String, CaseIterable, Identifiable, Sendable {
@@ -256,6 +257,13 @@ enum CalendarFormatting {
         return formatter.string(from: date)
     }
 
+    private struct GridCacheState {
+        var monthGrids: [String: [CalendarWeekRow]] = [:]
+        var yearGrids: [String: [CalendarMiniMonth]] = [:]
+    }
+
+    private static let cacheLock = OSAllocatedUnfairLock(initialState: GridCacheState())
+
     /// 构造以周一为首日的公历日历
     static func mondayFirstGregorianCalendar(timeZone: TimeZone = .current) -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -266,27 +274,35 @@ enum CalendarFormatting {
         return calendar
     }
 
-    /// 生成指定月份的 6 行 × 7 列（42 天）月历网格
+    /// 生成指定月份的 6 行 × 7 列（42 天）月历网格（带内存缓存，避免视图切换重复计算历法）
     static func monthGrid(
         for monthDate: Date,
         today: Date = Date(),
         timeZone: TimeZone = .current
     ) -> [CalendarWeekRow] {
         let gregorian = mondayFirstGregorianCalendar(timeZone: timeZone)
+        let monthComponents = gregorian.dateComponents([.year, .month], from: monthDate)
+        let todayComps = gregorian.dateComponents([.year, .month, .day], from: today)
+
+        let targetMonth = monthComponents.month ?? 1
+        let targetYear = monthComponents.year ?? 2026
+        let cacheKey =
+            "\(targetYear)-\(targetMonth)-\(todayComps.year ?? 0)-\(todayComps.month ?? 0)-\(todayComps.day ?? 0)-\(timeZone.identifier)"
+
+        if let cached = cacheLock.withLock({ $0.monthGrids[cacheKey] }) {
+            return cached
+        }
+
+        guard let firstOfMonth = gregorian.date(from: monthComponents) else { return [] }
+
         var chinese = Calendar(identifier: .chinese)
         chinese.timeZone = timeZone
-
-        let monthComponents = gregorian.dateComponents([.year, .month], from: monthDate)
-        guard let firstOfMonth = gregorian.date(from: monthComponents) else { return [] }
 
         let weekday = gregorian.component(.weekday, from: firstOfMonth)
         let leadingOffset = (weekday + 5) % 7
         guard let gridStart = gregorian.date(byAdding: .day, value: -leadingOffset, to: firstOfMonth) else {
             return []
         }
-
-        let targetMonth = monthComponents.month ?? 1
-        let targetYear = monthComponents.year ?? 2026
 
         var rows: [CalendarWeekRow] = []
         rows.reserveCapacity(6)
@@ -317,10 +333,17 @@ enum CalendarFormatting {
             }
         }
 
-        return rows
+        let builtRows = rows
+        cacheLock.withLock { state in
+            if state.monthGrids.count > 48 {
+                state.monthGrids.removeAll(keepingCapacity: true)
+            }
+            state.monthGrids[cacheKey] = builtRows
+        }
+        return builtRows
     }
 
-    /// 生成指定年份全部 12 个月的迷你月历网格（供年视图使用）
+    /// 生成指定年份全部 12 个月的迷你月历网格（供年视图使用，带内存缓存）
     static func yearMonths(
         for yearDate: Date,
         today: Date = Date(),
@@ -328,6 +351,13 @@ enum CalendarFormatting {
     ) -> [CalendarMiniMonth] {
         let gregorian = mondayFirstGregorianCalendar(timeZone: timeZone)
         let year = gregorian.component(.year, from: yearDate)
+        let todayComps = gregorian.dateComponents([.year, .month, .day], from: today)
+        let cacheKey =
+            "\(year)-\(todayComps.year ?? 0)-\(todayComps.month ?? 0)-\(todayComps.day ?? 0)-\(timeZone.identifier)"
+
+        if let cached = cacheLock.withLock({ $0.yearGrids[cacheKey] }) {
+            return cached
+        }
 
         var result: [CalendarMiniMonth] = []
         result.reserveCapacity(12)
@@ -350,7 +380,38 @@ enum CalendarFormatting {
                 )
             )
         }
-        return result
+
+        let builtResult = result
+        cacheLock.withLock { state in
+            if state.yearGrids.count > 8 {
+                state.yearGrids.removeAll(keepingCapacity: true)
+            }
+            state.yearGrids[cacheKey] = builtResult
+        }
+        return builtResult
+    }
+
+    /// 计算在指定日期新建日程时的默认起止时间（选取下一个整点，持续 1 小时）
+    static func defaultNewEventWindow(
+        on selectedDate: Date,
+        now: Date = Date(),
+        timeZone: TimeZone = .current
+    ) -> (start: Date, end: Date) {
+        let gregorian = mondayFirstGregorianCalendar(timeZone: timeZone)
+        let dateComps = gregorian.dateComponents([.year, .month, .day], from: selectedDate)
+        let currentHour = gregorian.component(.hour, from: now)
+        let startHour = min(22, max(9, currentHour + 1))
+
+        var startComps = DateComponents()
+        startComps.year = dateComps.year
+        startComps.month = dateComps.month
+        startComps.day = dateComps.day
+        startComps.hour = startHour
+        startComps.minute = 0
+
+        let start = gregorian.date(from: startComps) ?? selectedDate
+        let end = gregorian.date(byAdding: .hour, value: 1, to: start) ?? start.addingTimeInterval(3600)
+        return (start, end)
     }
 
     /// 构造单日的完整日历信息

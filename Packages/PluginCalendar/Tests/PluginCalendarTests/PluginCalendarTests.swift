@@ -259,6 +259,13 @@ struct CalendarFormattingTests {
         let encoded = CalendarPreferences.encodedDisabledIDs(["cal-b", "cal-a"])
         #expect(encoded == "cal-a,cal-b")
         #expect(CalendarPreferences.disabledIDs(from: encoded) == ["cal-a", "cal-b"])
+
+        // 新建事件默认时间窗口：在选中日期上下一个整点开始、持续 1 小时
+        let now = gregorianDate(year: 2026, month: 9, day: 30, hour: 14, minute: 20)
+        let targetDate = gregorianDate(year: 2026, month: 10, day: 1, hour: 0, minute: 0)
+        let window = CalendarFormatting.defaultNewEventWindow(on: targetDate, now: now)
+        #expect(window.start == gregorianDate(year: 2026, month: 10, day: 1, hour: 15, minute: 0))
+        #expect(window.end == gregorianDate(year: 2026, month: 10, day: 1, hour: 16, minute: 0))
     }
 }
 
@@ -267,11 +274,21 @@ struct CalendarFormattingTests {
 struct CalendarServiceTests {
 
     /// 没申请过权限时必须直接返回空，绝不隐式读取或触发系统弹窗
-    @Test("未获授权时不读取任何事件")
-    func noAccessReturnsEmpty() async {
+    @Test("未获授权时不读取或写入任何事件")
+    func noAccessReturnsEmptyAndRejectsWrite() async {
         let service = CalendarService()
         #expect(await service.todayEvents().isEmpty)
         #expect(service.availableCalendars().isEmpty)
+        #expect(service.writableCalendars().isEmpty)
+
+        #expect(throws: CalendarWriteError.notAuthorized) {
+            try service.createEvent(
+                title: "测试日程",
+                startDate: Date(),
+                endDate: Date().addingTimeInterval(3600),
+                isAllDay: false
+            )
+        }
     }
 
     @Test("农历信息非空")
