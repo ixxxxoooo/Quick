@@ -91,11 +91,22 @@ public enum TimestampConverterLogic {
         return Conversion(inputType: .empty, rows: [])
     }
 
-    /// 当前时刻的秒级时间戳文本（「填入当前」按钮用）
+    /// 时间戳精度单位
+    public enum Unit: String, Sendable {
+        case seconds
+        case milliseconds
+    }
+
+    /// 当前时刻的时间戳文本（默认打开与「填入当前」按钮用）
     ///
     /// `now` 由调用方注入 —— 模型层直接读系统时钟就没法测了。
-    public static func currentTimestamp(now: Date) -> String {
-        "\(Int(now.timeIntervalSince1970))"
+    public static func currentTimestamp(now: Date, unit: Unit = .seconds) -> String {
+        switch unit {
+        case .seconds:
+            "\(Int(now.timeIntervalSince1970))"
+        case .milliseconds:
+            "\(Int(now.timeIntervalSince1970 * 1000))"
+        }
     }
 
     // MARK: - 结果行的构造

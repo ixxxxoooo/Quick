@@ -159,10 +159,12 @@ struct TimestampConverterLogicTests {
 
     // MARK: - 当前时间戳
 
-    @Test("填入当前使用注入的时刻")
+    @Test("填入当前使用注入的时刻并按单位输出")
     func currentTimestampUsesInjectedDate() {
-        let fixed = Date(timeIntervalSince1970: 1_700_000_000)
+        let fixed = Date(timeIntervalSince1970: 1_700_000_000.123)
         #expect(TimestampConverterLogic.currentTimestamp(now: fixed) == "1700000000")
+        #expect(TimestampConverterLogic.currentTimestamp(now: fixed, unit: .seconds) == "1700000000")
+        #expect(TimestampConverterLogic.currentTimestamp(now: fixed, unit: .milliseconds) == "1700000000123")
     }
 }
 

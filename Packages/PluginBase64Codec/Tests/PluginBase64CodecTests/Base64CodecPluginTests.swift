@@ -87,13 +87,14 @@ struct Base64CodecLogicTests {
         #expect(encoded.replacingOccurrences(of: "\n", with: "") == (try Base64CodecLogic.encode(input)))
     }
 
-    @Test("折行输出能原样粘回来解码")
+    @Test("折行输出在标准模式下也能原样粘回来解码")
     func wrappedOutputDecodes() throws {
         let options = Base64CodecLogic.Options(wrapsLines: true)
         let original = String(repeating: "你好", count: 50)
         let encoded = try Base64CodecLogic.encode(original, options: options)
         #expect(encoded.contains("\n"))
         #expect(try Base64CodecLogic.decode(encoded, options: options) == original)
+        #expect(try Base64CodecLogic.decode("  \(encoded)\n ") == original)
     }
 
     @Test("模式原始值是中文标签且覆盖编解码")

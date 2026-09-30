@@ -64,12 +64,9 @@ enum Base64CodecLogic {
     ///
     /// 两步都可能失败：Base64 本身非法，或者解出来是二进制而非文本 ——
     /// 两种对用户来说都是「无效的 Base64」，所以合成同一个错误。
+    /// 空白与换行一律先剥掉：从终端、邮件或折行输出粘贴来的 Base64 常带换行或尾随空格。
     static func decode(_ input: String, options: Options = .standard) throws -> String {
-        var text = input
-        if options != .standard {
-            // 自己产出的折行文本会被原样粘回来，空白先剥掉；URL-Safe 再归一化回标准字母表
-            text = text.filter { !$0.isWhitespace }
-        }
+        var text = input.filter { !$0.isWhitespace }
         if options.isURLSafe {
             text = text.replacingOccurrences(of: "-", with: "+")
                 .replacingOccurrences(of: "_", with: "/")

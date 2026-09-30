@@ -23,7 +23,7 @@ struct Base64CodecSettingsView: View {
             Toggle(isOn: $wrapLines) {
                 SettingsRow(
                     title: "自动换行",
-                    subtitle: "编码长数据时每 76 个字符自动插入换行符。",
+                    subtitle: "编码长数据时每 64 个字符自动插入换行符。",
                     icon: { SettingsRowIcon(systemImage: "text.alignleft") }
                 )
             }

@@ -19,6 +19,20 @@ struct TimestampConverterView: View {
     @State private var now = Date()
     @State private var copiedKey: String?
 
+    @AppStorage(PluginSettingKey.TimestampConverter.defaultUnit) private var defaultUnit = "seconds"
+    @AppStorage(PluginSettingKey.TimestampConverter.timeZone) private var preferredTimeZone = "local"
+
+    private var currentUnit: TimestampConverterLogic.Unit {
+        TimestampConverterLogic.Unit(rawValue: defaultUnit) ?? .seconds
+    }
+
+    private var activeTimeZone: TimeZone {
+        if preferredTimeZone == "utc", let utc = TimeZone(identifier: "UTC") {
+            return utc
+        }
+        return .current
+    }
+
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -124,7 +138,7 @@ struct TimestampConverterView: View {
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 Spacer()
                 Button {
-                    input = TimestampConverterLogic.currentTimestamp(now: Date())
+                    input = TimestampConverterLogic.currentTimestamp(now: Date(), unit: currentUnit)
                 } label: {
                     Label("填入当前", systemImage: "arrow.down.to.line")
                 }.buttonStyle(.bordered).controlSize(.mini)
@@ -132,7 +146,14 @@ struct TimestampConverterView: View {
             .padding(.horizontal, DesignTokens.Spacing.lg)
             .padding(.vertical, DesignTokens.Spacing.sm)
         }
+        .onAppear {
+            if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                input = TimestampConverterLogic.currentTimestamp(now: Date(), unit: currentUnit)
+            }
+            convert(input)
+        }
         .onChange(of: input) { _, newVal in convert(newVal) }
+        .onChange(of: preferredTimeZone) { _, _ in convert(input) }
         .task {
             // 底部「当前时间」每秒走一格。用 `Task` 而不是 `Timer.publish`：视图消失时
             // 自动取消，不必再挂一个 onDisappear 去炸掉订阅
@@ -148,7 +169,7 @@ struct TimestampConverterView: View {
 
     /// 转换逻辑整体在模型层，视图只把结果搬进 `@State`
     private func convert(_ text: String) {
-        let conversion = TimestampConverterLogic.convert(text, timeZone: .current)
+        let conversion = TimestampConverterLogic.convert(text, timeZone: activeTimeZone)
         results = conversion.rows
         inputType = conversion.inputType
     }
