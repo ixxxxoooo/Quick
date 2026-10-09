@@ -97,6 +97,45 @@ struct ClipboardPluginTests {
         #expect(store.entries.first?.id == second.id)
     }
 
+    @Test("去重后仍保留旧条目的收藏与置顶")
+    func deduplicationPreservesFavoriteAndPinned() throws {
+        let database = try makeDatabase()
+        let store = try makeStore(database: database)
+
+        let original = ClipboardEntry(text: "收藏后再复制")
+        store.add(original)
+        store.toggleFavorite(original.id)
+        store.togglePinned(original.id)
+
+        // 模拟：从历史回车写回剪贴板 → 监听器再 add 一条同内容、默认未收藏的新条目
+        store.add(ClipboardEntry(text: "收藏后再复制"))
+
+        #expect(store.entries.count == 1)
+        #expect(store.entries.first?.isFavorite == true)
+        #expect(store.entries.first?.isPinned == true)
+        #expect(store.favorites.count == 1)
+
+        let row = try database.query("SELECT is_favorite, is_pinned FROM clipboard_history").first
+        #expect(row?.bool("is_favorite") == true)
+        #expect(row?.bool("is_pinned") == true)
+    }
+
+    @Test("图片去重后仍保留旧条目的收藏")
+    func imageDeduplicationPreservesFavorite() throws {
+        let store = try makeStore()
+        let data = Data(repeating: 0x42, count: 128)
+
+        let original = ClipboardEntry(imageData: data, sizeDescription: "8×8")
+        store.add(original)
+        store.toggleFavorite(original.id)
+
+        store.add(ClipboardEntry(imageData: data, sizeDescription: "8×8"))
+
+        #expect(store.entries.count == 1)
+        #expect(store.entries.first?.isFavorite == true)
+        #expect(store.favorites.count == 1)
+    }
+
     @Test("图片按数据内容去重")
     func addDeduplicatesImagesByData() throws {
         let store = try makeStore()

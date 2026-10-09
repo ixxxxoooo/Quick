@@ -105,17 +105,28 @@ final class ClipboardStore {
     ///
     /// 去重、插入、剪枝在同一次事务里完成：任何一步失败都不会留下「超限的历史」
     /// 或「插了一半」的状态。
+    ///
+    /// 去重时会继承旧条目的收藏 / 置顶：从历史里再复制一次（回车粘贴也一样）会写回剪贴板，
+    /// 监听器当成新内容入库；若把带收藏标记的旧行整行删掉再插入默认未收藏的新行，
+    /// 「收藏」标签里就会空掉 —— 用户以为回车把收藏弄丢了。
     /// - Parameter entry: 剪贴板条目
     func add(_ entry: ClipboardEntry) {
         let deduplicates = PluginDefaults.isEnabled(PluginSettingKey.Clipboard.deduplication, default: true)
+        var entry = entry
 
         // 去重：相同内容不重复记录（图片按数据内容，文本按文本）
         if deduplicates {
+            let duplicates: [ClipboardEntry]
             if entry.type == .image {
+                duplicates = entries.filter { $0.type == .image && $0.imageData == entry.imageData }
                 entries.removeAll { $0.type == .image && $0.imageData == entry.imageData }
             } else {
+                duplicates = entries.filter { $0.text == entry.text }
                 entries.removeAll { $0.text == entry.text }
             }
+            // 任一旧副本曾被收藏 / 置顶，新行必须带上 —— 标志是用户意图，不是内容属性
+            if duplicates.contains(where: \.isFavorite) { entry.isFavorite = true }
+            if duplicates.contains(where: \.isPinned) { entry.isPinned = true }
         }
         entries.insert(entry, at: 0)
 
