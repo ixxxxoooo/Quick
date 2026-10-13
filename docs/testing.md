@@ -54,9 +54,9 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 
 | 包 | 测试文件 | 状态 |
 | --- | --- | --- |
-| `QuickCore` | `EventBus`、模糊匹配与拼音匹配、SQLite 封装、`PluginStorage`、设置键、最近使用 | 有覆盖 |
-| `QuickUI` | 面板显隐与模式、分离窗口控制器、悬浮胶囊几何与位置持久化、面板自动行为与设置读取、首屏按最近使用重排 | 有覆盖 |
-| `QuickPlatform` | 热键注册、应用扫描与条目的匹配形态、键盘布局服务 | 有覆盖 |
+| `QuickCore` | `EventBus`、模糊匹配与拼音匹配、SQLite 封装、`PluginStorage`、设置键、最近使用；AI 服务商与预设、默认模型回落、Key 隔离；会话分组 / 淘汰 / 上下文裁剪 / 中断恢复 | 有覆盖 |
+| `QuickUI` | 面板显隐与模式、分离窗口控制器、悬浮胶囊几何与位置持久化、面板自动行为与设置读取、首屏按最近使用重排；AI 对话控制器状态机（发送 / 失败 / 重新生成 / 删除撤销 / 重命名 / 置顶 / 草稿 / 落盘往返）、Markdown 块解析、对话键位 | 有覆盖 |
+| `QuickPlatform` | 热键注册、应用扫描与条目的匹配形态、键盘布局服务；AI 请求构造与 SSE 解析、模型列表解析、会话文件存储 | 有覆盖 |
 | `PluginLauncher` | 使用频率与收藏的持久化往返 | 有覆盖 |
 | `PluginClipboard` | 去重/排序/剪枝、条数与图片预算、坏行降级 | 有覆盖 |
 | `PluginSystemMonitor` | 时长/字节/`ps` 解析、内存/磁盘/电源/CPU tick、温度聚合、偏好映射 | 有覆盖 |

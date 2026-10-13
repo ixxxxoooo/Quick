@@ -54,6 +54,9 @@ final class AppCore {
     /// 面板协调器
     let paletteCoordinator = PaletteCoordinator()
 
+    /// AI 对话（宿主级：面板里按 Tab 进入；会话与流式生成都归它）
+    let aiChat = AIChatController()
+
     /// 超级面板（宿主级浮层，不是插件）
     let superPanelController = SuperPanelController()
 
@@ -237,9 +240,6 @@ final class AppCore {
             pluginRegistrations.first { $0.type.id == pluginID }?.type.name ?? pluginID
         }
 
-        // 0. API Key：UserDefaults 明文 → Keychain（失败保留旧值，下次再试）
-        AIConfig.migrateAPIKeyIfNeeded()
-
         // 1. 打开数据库并应用宿主自己的 schema
         //    必须在注册插件之前：需要真表的插件在构造时就要拿到存储句柄
         migrateHostStorage()
@@ -273,6 +273,7 @@ final class AppCore {
                 onPanelDidHide: { [weak self] in
                     self?.restoreKeyboardLayout()
                 },
+                aiChat: aiChat,
                 usageHistory: history,
                 hostSearchSource: fileSearchSource
             ))
@@ -350,7 +351,7 @@ final class AppCore {
     /// 解析开发启动参数并执行对应动作
     ///
     /// 优先级：`-showPlugin` > `-showSettingsTab` > `-showSettings` > `-showPalette` /
-    /// `-showSuperPanel` / `-showTranslator`（后三者可并存在不同路径上，但设置类互斥）。
+    /// `-showSuperPanel` / `-showAIChat` / `-showTranslator`（后三者可并存在不同路径上，但设置类互斥）。
     func applyLaunchArguments(_ arguments: [String]) {
         if let index = arguments.firstIndex(of: "-showPlugin"),
             index + 1 < arguments.count
@@ -381,6 +382,11 @@ final class AppCore {
         if arguments.contains("-showPalette") {
             log.notice("命中启动参数 -showPalette，立即显示面板")
             paletteCoordinator.show()
+        }
+
+        if arguments.contains("-showAIChat") {
+            log.notice("命中启动参数 -showAIChat，立即进入 AI 对话")
+            paletteCoordinator.showAIChat()
         }
 
         if arguments.contains("-showSuperPanel") {
@@ -436,6 +442,7 @@ final class AppCore {
     /// 准备退出（释放系统资源）
     func prepareForTermination() {
         log.notice("开始退出清理")
+        aiChat.flushPendingSaves()
         hotKeyService.stop()
         mouseTriggerMonitor.stop()
         statusItemController.remove()

@@ -77,7 +77,9 @@ extension AppCore {
             bus.on(ShowPaletteSettingsEvent.self) { [weak self] event in
                 Task { @MainActor in
                     self?.paletteCoordinator.hide(restoreFocus: false)
-                    if let pluginID = event.pluginID,
+                    if let raw = event.hostTab, let tab = SettingsTab(rawValue: raw) {
+                        self?.settingsWindowController.show(tab: tab)
+                    } else if let pluginID = event.pluginID,
                         let tab = SettingsTab.tab(forPluginID: pluginID)
                     {
                         self?.settingsWindowController.show(tab: tab)

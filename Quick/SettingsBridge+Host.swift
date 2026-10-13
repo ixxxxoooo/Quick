@@ -43,25 +43,6 @@ extension SettingsBridge {
         log.notice("最近使用记录已清空")
     }
 
-    // MARK: - AI 基座
-
-    func makeAISettingsView() -> AnyView {
-        AnyView(AISettingsPane(dataSource: self))
-    }
-
-    func testAIConnection() async -> SettingsAITestResult {
-        do {
-            let reply = try await AIService.testConnection()
-            let snippet = reply.isEmpty ? "OK" : String(reply.prefix(40))
-            log.notice("AI 连接测试成功")
-            return SettingsAITestResult(isSuccess: true, message: "连接成功：\(snippet)")
-        } catch {
-            log.warning("AI 连接测试失败：\(error.localizedDescription, privacy: .public)")
-            return SettingsAITestResult(
-                isSuccess: false, message: error.localizedDescription)
-        }
-    }
-
     // MARK: - 权限
 
     /// 权限状态

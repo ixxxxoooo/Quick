@@ -47,7 +47,7 @@ struct SettingsDetailView: View {
             case .superPanel:
                 dataSource.makeSuperPanelSettingsView()
             case .aiService:
-                dataSource.makeAISettingsView()
+                AISettingsPane()
             case .about:
                 AboutPane(dataSource: dataSource)
             default:

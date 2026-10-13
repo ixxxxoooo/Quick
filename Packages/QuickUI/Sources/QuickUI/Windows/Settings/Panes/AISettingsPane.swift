@@ -3,193 +3,191 @@
 // @author ygw
 
 import QuickCore
+import QuickPlatform
 import SwiftUI
 
 /// 宿主级 AI 服务设置
 ///
-/// 一份配置、所有插件共用：翻译、摘要、改写这类能力都通过 `AIService` 读这里，
-/// 不需要各自填 Key。参考业界做法，字段是「服务商 / API Key / Base URL / 模型 /
-/// 生成参数 / 连接测试」。
+/// 一份配置、所有 AI 能力共用（主面板里 Tab 进入的 AI 对话等）。
+/// 可以添加多个服务商：常见的一键预设，其余自定义名称与地址；
+/// 每个服务商各自维护 Key 与模型列表，模型可手动输入、从常见模型选或自动拉取后勾选。
 public struct AISettingsPane: View {
 
-    let dataSource: any HostSettingsDataSource
-
-    @AppStorage(SettingsKey.AI.enabled) private var enabled = false
-    @AppStorage(SettingsKey.AI.provider) private var providerRaw = AIProviderKind.deepseek.rawValue
-    @AppStorage(SettingsKey.AI.baseURL) private var baseURL = ""
-    @AppStorage(SettingsKey.AI.model) private var model = ""
     @AppStorage(SettingsKey.AI.maxTokens) private var maxTokens = AIConfig.defaultMaxTokens
     @AppStorage(SettingsKey.AI.temperature) private var temperature = AIConfig.defaultTemperature
 
-    /// API Key 只走 Keychain，不用 @AppStorage
-    @State private var apiKey = ""
-    @State private var showKey = false
-    @State private var isTesting = false
-    @State private var testResult: SettingsAITestResult?
+    @State private var providers: [AIProvider] = []
+    @State private var keyedProviderIDs: Set<String> = []
+    @State private var defaultModel: AIModelRef?
+    @State private var editing: EditingTarget?
+    @State private var confirmClearHistory = false
 
-    private var provider: AIProviderKind {
-        AIProviderKind(rawValue: providerRaw) ?? .deepseek
+    /// 正在编辑的服务商；新建时 `isNew` 为真，保存才真正加入列表
+    private struct EditingTarget: Identifiable {
+        let provider: AIProvider
+        let isNew: Bool
+        var id: String { provider.id }
     }
 
-    public init(dataSource: any HostSettingsDataSource) {
-        self.dataSource = dataSource
+    public init() {}
+
+    private var choices: [AIModelChoice] {
+        AIProviderStore.choices(providers: providers) { keyedProviderIDs.contains($0.id) }
     }
 
     public var body: some View {
         Form {
-            overviewSection
-            providerSection
-            advancedSection
+            providersSection
+            defaultModelSection
+            generationSection
+            historySection
         }
         .formStyle(.grouped)
-        .onAppear {
-            apiKey = AIConfig.load().apiKey
+        .onAppear(perform: reload)
+        .sheet(item: $editing) { target in
+            AIProviderEditorSheet(
+                provider: target.provider,
+                isNew: target.isNew,
+                onSave: { save($0) },
+                onDelete: { delete(target.provider) }
+            )
         }
-        .onChange(of: apiKey) { _, newValue in
-            persistAPIKey(newValue)
-        }
-        .onChange(of: providerRaw) { _, _ in
-            // 换服务商就把覆盖值清空，回到新服务商的默认 Base URL / 模型
-            baseURL = ""
-            model = ""
-            testResult = nil
-        }
-    }
-
-    // MARK: - 总览
-
-    private var overviewSection: some View {
-        Section {
-            Toggle(isOn: $enabled) {
-                SettingsRow(
-                    title: "启用 AI 能力",
-                    subtitle: "开启后，翻译、摘要等插件可以调用这里配置的模型。",
-                    icon: { SettingsRowIcon(systemImage: "brain") }
-                )
-            }
-        } header: {
-            Text("总览")
-        } footer: {
-            Text("AI 由宿主统一配置，插件通过这套基座访问 —— 换服务商、换 Key 只改一处。")
+        .confirmationDialog(
+            "清除全部 AI 对话历史？", isPresented: $confirmClearHistory, titleVisibility: .visible
+        ) {
+            Button("清除", role: .destructive, action: clearHistory)
+        } message: {
+            Text("所有会话与消息都会被删除，无法恢复。")
         }
     }
 
     // MARK: - 服务商
 
-    private var providerSection: some View {
+    private var providersSection: some View {
         Section {
-            Picker(selection: $providerRaw) {
-                ForEach(AIProviderKind.allCases) { kind in
-                    Text(kind.title).tag(kind.rawValue)
+            ForEach(providers) { provider in
+                providerRow(provider)
+            }
+
+            Menu {
+                Section("常见服务商") {
+                    ForEach(AIProviderPresets.all) { preset in
+                        Button {
+                            editing = EditingTarget(provider: AIProvider(preset: preset), isNew: true)
+                        } label: {
+                            Label(preset.name, systemImage: preset.symbol)
+                        }
+                    }
+                }
+                Divider()
+                Button {
+                    editing = EditingTarget(provider: .custom(), isNew: true)
+                } label: {
+                    Label("自定义服务商…", systemImage: "plus.square.dashed")
+                }
+            } label: {
+                Label("添加服务商", systemImage: "plus")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        } header: {
+            Text("服务商")
+        } footer: {
+            Text(
+                providers.isEmpty
+                    ? "还没有服务商。添加一个，填上 API Key，就能在主面板按 Tab 与它对话。"
+                    : "点一行编辑 Key 与模型。除 Anthropic 外都走 OpenAI 兼容协议。")
+        }
+    }
+
+    private func providerRow(_ provider: AIProvider) -> some View {
+        HStack(spacing: DesignTokens.Spacing.lg) {
+            Button {
+                editing = EditingTarget(provider: provider, isNew: false)
+            } label: {
+                SettingsRow(
+                    title: provider.displayName,
+                    subtitle: summary(of: provider),
+                    icon: {
+                        SettingsRowIcon(
+                            systemImage: provider.preset?.symbol ?? "server.rack",
+                            isEnabled: provider.isEnabled)
+                    }
+                ) {
+                    Image(systemName: "chevron.right")
+                        .font(DesignTokens.Typography.compactIcon)
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { provider.isEnabled },
+                    set: { isOn in
+                        guard let index = providers.firstIndex(where: { $0.id == provider.id }) else {
+                            return
+                        }
+                        providers[index].isEnabled = isOn
+                        persist()
+                    })
+            )
+            .labelsHidden()
+            .accessibilityLabel("启用 \(provider.displayName)")
+        }
+    }
+
+    /// 第二行：模型数 + Key 状态
+    private func summary(of provider: AIProvider) -> String {
+        let models = provider.models.isEmpty ? "未添加模型" : "\(provider.models.count) 个模型"
+        let key: String
+        if !provider.requiresAPIKey {
+            key = "无需 Key"
+        } else {
+            key = keyedProviderIDs.contains(provider.id) ? "Key 已填" : "未填 Key"
+        }
+        return "\(models) · \(key)"
+    }
+
+    // MARK: - 默认模型
+
+    private var defaultModelSection: some View {
+        Section {
+            let current = AIProviderStore.resolve(preferred: defaultModel, default: nil, choices: choices)
+            Picker(
+                selection: Binding(
+                    get: { current?.ref },
+                    set: { ref in
+                        defaultModel = ref
+                        AIProviderStore.setDefaultModel(ref)
+                    })
+            ) {
+                if choices.isEmpty {
+                    Text("暂无可用模型").tag(AIModelRef?.none)
+                }
+                ForEach(choices) { choice in
+                    Text(choice.label).tag(Optional(choice.ref))
                 }
             } label: {
                 SettingsRow(
-                    title: "服务商",
-                    subtitle: "切换服务商会重置下面两项的默认值。",
-                    icon: { SettingsRowIcon(systemImage: "server.rack") }
+                    title: "默认模型",
+                    subtitle: choices.isEmpty
+                        ? "添加服务商、填好 Key 并至少添加一个模型后可选。"
+                        : "新对话默认使用；对话里随时可以切换。",
+                    icon: { SettingsRowIcon(systemImage: "cpu") }
                 )
             }
-
-            SettingsRow(
-                title: "API Key",
-                subtitle: provider.requiresAPIKey
-                    ? "只存在本机 Keychain，不会进偏好 plist，也不会上传。"
-                    : "本地 Ollama 无需填写。",
-                icon: { SettingsRowIcon(systemImage: "key") }
-            ) {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Group {
-                        if showKey {
-                            TextField("", text: $apiKey, prompt: Text("sk-…"))
-                        } else {
-                            SecureField("", text: $apiKey, prompt: Text("sk-…"))
-                        }
-                    }
-                    .textFieldStyle(.roundedBorder)
-                    .labelsHidden()
-                    .frame(width: DesignTokens.Size.settingsFieldMedium)
-
-                    Button {
-                        showKey.toggle()
-                    } label: {
-                        Image(systemName: showKey ? "eye.slash" : "eye")
-                            .font(DesignTokens.Typography.compactIcon)
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel(showKey ? "隐藏密钥" : "显示密钥")
-                    .help(showKey ? "隐藏" : "显示")
-                }
-            }
-
-            SettingsRow(
-                title: "Base URL",
-                subtitle: defaultDescription(provider.defaultBaseURL, emptyHint: "自定义服务商需填写"),
-                icon: { SettingsRowIcon(systemImage: "link") }
-            ) {
-                TextField("", text: $baseURL, prompt: Text(provider.defaultBaseURL))
-                    .textFieldStyle(.roundedBorder)
-                    .labelsHidden()
-                    .frame(width: DesignTokens.Size.settingsFieldLarge)
-            }
-
-            SettingsRow(
-                title: "模型",
-                subtitle: defaultDescription(provider.defaultModel, emptyHint: "自定义服务商需填写"),
-                icon: { SettingsRowIcon(systemImage: "cpu") }
-            ) {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    TextField("", text: $model, prompt: Text(provider.defaultModel))
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: DesignTokens.Size.settingsFieldWide)
-
-                    if !provider.suggestedModels.isEmpty {
-                        Menu {
-                            ForEach(provider.suggestedModels, id: \.self) { name in
-                                Button(name) { model = name }
-                            }
-                        } label: {
-                            Image(systemName: "chevron.down")
-                                .font(DesignTokens.Typography.compactIcon)
-                        }
-                        .menuStyle(.borderlessButton)
-                        .frame(width: DesignTokens.Size.settingsGlyphColumn)
-                        .help("选择常见模型")
-                    }
-                }
-            }
-
-            SettingsRow(
-                title: "连接测试",
-                subtitle: testResult?.message ?? "填好配置后点一下，确认能通。",
-                icon: { SettingsRowIcon(systemImage: "bolt.horizontal") }
-            ) {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Button("测试") { runTest() }
-                        .disabled(isTesting)
-                    if isTesting {
-                        ProgressView().controlSize(.small)
-                    } else if let result = testResult {
-                        Image(
-                            systemName: result.isSuccess
-                                ? "checkmark.circle.fill" : "xmark.circle.fill"
-                        )
-                        .foregroundStyle(
-                            result.isSuccess ? DesignTokens.Colors.success : DesignTokens.Colors.destructive
-                        )
-                    }
-                }
-            }
+            .disabled(choices.isEmpty)
         } header: {
-            Text("服务商与密钥")
-        } footer: {
-            Text("除 Anthropic 外都走 OpenAI 兼容协议（`/chat/completions`）；Anthropic 走 `/messages`。")
+            Text("对话")
         }
     }
 
     // MARK: - 生成参数
 
-    private var advancedSection: some View {
+    private var generationSection: some View {
         Section {
             SettingsRow(
                 title: "最大生成长度",
@@ -207,11 +205,11 @@ public struct AISettingsPane: View {
 
             SettingsRow(
                 title: "采样温度",
-                subtitle: "越低越稳定，越高越发散（0–2）。",
+                subtitle: "越低越稳定，越高越发散（0–2）。Anthropic 上限为 1。",
                 icon: { SettingsRowIcon(systemImage: "thermometer.medium") }
             ) {
                 HStack(spacing: DesignTokens.Spacing.sm) {
-                    Slider(value: $temperature, in: 0...2, step: 0.1)
+                    Slider(value: $temperature, in: 0...AIConfig.maxTemperature, step: 0.1)
                         .frame(width: DesignTokens.Size.settingsFieldSmall)
                     Text(String(format: "%.1f", temperature))
                         .font(DesignTokens.Typography.rowTrailing)
@@ -224,28 +222,66 @@ public struct AISettingsPane: View {
         }
     }
 
+    // MARK: - 历史
+
+    private var historySection: some View {
+        Section {
+            SettingsRow(
+                title: "清除对话历史",
+                subtitle: "删除 AI 对话里的全部会话。置顶的也会被删除。",
+                icon: { SettingsRowIcon(systemImage: "trash") }
+            ) {
+                Button("清除…", role: .destructive) { confirmClearHistory = true }
+            }
+        } header: {
+            Text("历史")
+        }
+    }
+
     // MARK: - 行为
 
-    private func defaultDescription(_ value: String, emptyHint: String) -> String {
-        value.isEmpty ? emptyHint : "留空使用默认：\(value)"
+    private func reload() {
+        providers = AIProviderStore.loadProviders()
+        keyedProviderIDs = Set(providers.filter { !AIProviderStore.apiKey(for: $0).isEmpty }.map(\.id))
+        defaultModel = AIProviderStore.defaultModel()
     }
 
-    private func persistAPIKey(_ key: String) {
-        do {
-            try AIConfig.saveAPIKey(key)
-        } catch {
-            QuickLog.persistence.error(
-                "写入 API Key 到 Keychain 失败：\(error.localizedDescription, privacy: .public)")
+    private func persist() {
+        AIProviderStore.saveProviders(providers)
+    }
+
+    private func save(_ provider: AIProvider) {
+        if let index = providers.firstIndex(where: { $0.id == provider.id }) {
+            providers[index] = provider
+        } else {
+            providers.append(provider)
+        }
+        persist()
+        keyedProviderIDs =
+            Set(providers.filter { !AIProviderStore.apiKey(for: $0).isEmpty }.map(\.id))
+        // 第一个能用的模型自动成为默认，省得用户去二次选择
+        let defaultStillValid = choices.contains { $0.ref == defaultModel }
+        if !defaultStillValid, let first = choices.first {
+            defaultModel = first.ref
+            AIProviderStore.setDefaultModel(first.ref)
+        }
+        QuickLog.persistence.notice("AI 服务商已保存：\(provider.displayName, privacy: .private)")
+    }
+
+    private func delete(_ provider: AIProvider) {
+        AIProviderStore.deleteAPIKey(for: provider)
+        providers.removeAll { $0.id == provider.id }
+        persist()
+        keyedProviderIDs.remove(provider.id)
+        if defaultModel?.providerID == provider.id {
+            defaultModel = choices.first?.ref
+            AIProviderStore.setDefaultModel(defaultModel)
         }
     }
 
-    private func runTest() {
-        isTesting = true
-        testResult = nil
-        Task {
-            let result = await dataSource.testAIConnection()
-            isTesting = false
-            testResult = result
-        }
+    private func clearHistory() {
+        ChatSessionFileStore().deleteAll()
+        EventBus.shared.post(AIChatHistoryClearedEvent())
+        QuickLog.persistence.notice("AI 对话历史已清除")
     }
 }

@@ -227,6 +227,26 @@ public enum DesignTokens {
         public static let settingsFieldWide: CGFloat = 200
         public static let settingsGlyphColumn: CGFloat = 24
         public static let settingsDialogWidth: CGFloat = 420
+        /// AI 服务商编辑弹窗：表单较长，比普通弹窗宽、高
+        public static let aiEditorWidth: CGFloat = 520
+        public static let aiEditorHeight: CGFloat = 560
+        /// 拉取到的模型列表弹窗
+        public static let aiModelPickerHeight: CGFloat = 440
+        /// AI 对话：会话侧栏宽度
+        public static let aiChatSidebarWidth: CGFloat = 200
+        /// AI 对话：输入框的最小 / 最大高度（超过最大高度后内部滚动）
+        public static let aiChatComposerMinHeight: CGFloat = 22
+        public static let aiChatComposerMaxHeight: CGFloat = 140
+        /// AI 对话：用户气泡的最大宽度
+        public static let aiChatBubbleMaxWidth: CGFloat = 460
+        /// AI 对话：消息列的最大宽度（宽面板里保持可读的行长）
+        public static let aiChatColumnMaxWidth: CGFloat = 640
+        /// AI 对话：侧栏会话行高与置顶图钉
+        public static let aiChatRowHeight: CGFloat = 30
+        /// AI 对话：侧栏行内与输入框下方的小图标按钮
+        public static let aiChatIconButton: CGFloat = 20
+        /// AI 对话：「正在生成」的小圆点
+        public static let aiChatTypingDot: CGFloat = 6
         public static let settingsRowGlyph: CGFloat = 18
         /// 快捷键录制框内的小图标 / 圆角
         public static let recorderGlyph: CGFloat = 18

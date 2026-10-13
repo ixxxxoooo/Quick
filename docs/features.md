@@ -831,6 +831,55 @@
 
 快捷键存在宿主热键服务里，命令 id 为 `core.superPanel`（不进主搜索命令目录）。
 
+### AI 对话与服务商（宿主，主搜索按 Tab 进入）
+
+宿主级功能，不是插件：主搜索里输入后按 **Tab**，把输入框里的文字带进一个对话输入框
+（不自动发送），左侧是会话栏。服务商与模型在「设置 › AI 服务」里配置。
+
+## 不变量
+
+- **对话是面板的一种模式，不是插件。** 它借用插件内容区的渲染路径，模式 id 是
+  `AIChatController.modeID`（`quick.ai-chat`），由协调器特判：名称 / 图标、视图、Esc、
+  快捷键、Tab、禁用分离。不要把它塞进 `plugins` 表，也不要给 `PaletteCoordinator` 加 `@Observable`。
+- **Tab 只在主搜索生效。** 输入法组字中的 Tab 是切换候选，`PalettePanel` 检测到
+  `hasMarkedText()` 时不拦截。插件里的 Tab 属于插件。
+- **Esc 优先级：取消重命名 → 停止生成 → 退出对话。** 退出对话**不会**停止后台生成，
+  回来时回复已经写完。
+- **多服务商，Key 按服务商分存。** `AIProvider.id` 是随机 UUID，Key 的 Keychain 账号是
+  `ai.apiKey.<id>`。预设（`AIProviderPresets`）只是「一键填好 Base URL 与协议」的模板，
+  添加后与自定义服务商无区别；预设只预添加第一个模型，其余让用户挑或自动拉取。
+  只有「已启用、有模型、需要 Key 时已填 Key」的服务商才会出现在对话的模型选择里。
+- **协议只有两种。** OpenAI 兼容（`/chat/completions`）与 Anthropic（`/messages`）。
+  请求构造与流式解析都是纯函数（`AIService.makeChatRequest` / `parseStreamLine`），不起网络可测。
+- **非本机的 `http://` 一律拒绝**：Key 会随请求头明文出网。
+- **没有旧版单服务商迁移。** 旧的 `ai.apiKey` 钥匙串项不再被读取，需要在设置里重新添加服务商。
+- **会话一个会话一个 JSON 文件**（`Application Support/<bundle id>/AIChats`）。写盘是防抖的
+  （改动后 300ms、后台线程），退出与隐藏面板时同步落盘。上限 200 个，超出淘汰最久没动过的
+  未置顶会话。磁盘上空内容、无失败标记的助手消息视为「被中断」，加载时标成失败可重试。
+- **流畅靠这几条：** 会话列表常驻内存、切换不读盘；流式文本每 ~40ms 才合并写入一次；
+  每个会话各有自己的生成任务（A 在生成时可以切到 B）；消息与侧栏行都是 `Equatable`，
+  流式时只有最后一条重算；删除立刻消失、6 秒内可撤销，到期才删文件；
+  空会话不落盘、切走时清掉。
+- **输入框是自绘的 `NSTextView`**（回车发送、⇧/⌥↵ 换行、自动增高、占位文字）。
+  回车在 `PalettePanel` 里对对话模式放行（`routeSubmit` 返回 false），由输入框自己处理。
+- **⌘⌫ 在输入框有字时不吞键**（那是「删到行首」），只有输入框为空才删除会话。
+
+快捷键：`⌘N` 新对话、`⌘[` / `⌘]` 切换会话、`⌘⌫` 删除、`⌘B` 显示 / 隐藏会话栏、`⌘F` 搜索会话、
+`⌘E` 重命名、`⌘⇧P` 置顶、`⌘R` 重新生成、`⌘⇧C` 复制最后一条回复。键位表是
+`AIChatShortcut.resolve` 一个纯函数。
+
+| 文件 | 职责 |
+| --- | --- |
+| `QuickCore/Models/AIProvider*.swift` | 服务商、预设、模型引用、Key 存取、默认模型解析 |
+| `QuickCore/Models/AIChat.swift` | 会话与消息模型、分组 / 淘汰 / 上下文裁剪（纯函数） |
+| `QuickPlatform/AI/AIService.swift` | 流式对话、拉取模型、连接自检；请求与解析纯函数 |
+| `QuickPlatform/AI/ChatSessionFileStore.swift` | 会话文件存储 |
+| `QuickUI/AIChat/AIChatController.swift` | 会话状态机与生成任务（由 `AppCore` 持有，经 `PaletteDependencies` 注入） |
+| `QuickUI/AIChat/Model/` | `ChatMarkdown` 块解析（容忍流式截断）、`AIChatShortcut` 键位 |
+| `QuickUI/AIChat/*View.swift` | 会话栏、消息、Markdown 渲染、输入框 |
+
+开发验收：启动参数 `-showAIChat` 直接进入对话。
+
 ### AI 聚合（ai）
 
 把 8 个 AI 官网（DeepSeek / ChatGPT / Gemini / Claude / 豆包 / Kimi / 智谱 / 通义千问）

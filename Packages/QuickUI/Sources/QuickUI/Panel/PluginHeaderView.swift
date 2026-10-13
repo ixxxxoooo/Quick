@@ -27,6 +27,9 @@ struct PluginHeaderView: View {
     /// 返回按钮回调
     let onBack: () -> Void
 
+    /// 是否显示分离按钮
+    var showsDetach = true
+
     /// 分离按钮回调
     let onDetach: () -> Void
 
@@ -56,7 +59,9 @@ struct PluginHeaderView: View {
                     .background(WindowDragArea())
             }
 
-            detachButton
+            if showsDetach {
+                detachButton
+            }
         }
         .padding(.leading, DesignTokens.Spacing.md + DesignTokens.Spacing.lg)
         .padding(.trailing, DesignTokens.Spacing.xl)

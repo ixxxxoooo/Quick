@@ -31,6 +31,9 @@ public final class PaletteMode {
     /// 为真时头部用搜索框替换插件名，文本走 `PluginSearchQuery`。
     public var activePluginSupportsSearch = false
 
+    /// 当前内容能否分离成独立窗口（AI 对话不能：它依赖面板内的会话状态）
+    public var activePluginSupportsDetach = true
+
     /// 是否处于插件模式
     public var isPluginMode: Bool { activePluginID != nil }
 
@@ -49,12 +52,14 @@ public final class PaletteMode {
         name: String,
         icon: String,
         context: [String: String] = [:],
-        supportsSearch: Bool = false
+        supportsSearch: Bool = false,
+        supportsDetach: Bool = true
     ) {
         self.activePluginID = pluginID
         self.activePluginName = name
         self.activePluginIcon = icon
         self.activePluginSupportsSearch = supportsSearch
+        self.activePluginSupportsDetach = supportsDetach
         self.context = context
     }
 
@@ -64,6 +69,7 @@ public final class PaletteMode {
         activePluginName = nil
         activePluginIcon = nil
         activePluginSupportsSearch = false
+        activePluginSupportsDetach = true
         context = [:]
     }
 }

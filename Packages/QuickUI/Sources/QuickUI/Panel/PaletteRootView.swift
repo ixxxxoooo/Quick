@@ -356,6 +356,7 @@ struct PaletteRootView: View {
                 pluginIcon: paletteMode.activePluginIcon ?? "questionmark",
                 search: paletteMode.activePluginSupportsSearch ? pluginSearch : nil,
                 onBack: onReturnToSearch,
+                showsDetach: paletteMode.activePluginSupportsDetach,
                 onDetach: {
                     guard let pluginID = paletteMode.activePluginID else { return }
                     EventBus.shared.post(DetachPanelEvent(pluginID: pluginID))

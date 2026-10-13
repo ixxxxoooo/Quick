@@ -217,17 +217,6 @@ public struct SettingsSearchSource: Identifiable, Sendable {
     }
 }
 
-/// AI 连接自检结果
-public struct SettingsAITestResult: Sendable {
-    public let isSuccess: Bool
-    public let message: String
-
-    public init(isSuccess: Bool, message: String) {
-        self.isSuccess = isSuccess
-        self.message = message
-    }
-}
-
 /// 设置窗口的数据源与动作
 ///
 /// **按职责拆成四个子协议再组合**：这个协议有约 50 个成员，而实际用得最多的视图
@@ -358,12 +347,6 @@ public protocol HostSettingsDataSource: AnyObject {
     func clearSuperPanelShortcut()
     /// 清空「最近使用」记录
     func clearRecentUsage()
-
-    // MARK: - AI 基座
-    /// 宿主级 AI 服务设置页
-    func makeAISettingsView() -> AnyView
-    /// 连接自检（发一条最短消息）
-    func testAIConnection() async -> SettingsAITestResult
 
     // MARK: - 权限
     func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState
