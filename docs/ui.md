@@ -432,6 +432,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | --- | --- |
 | `SearchFieldView` | 统一搜索输入框（图标固定槽位 + 20pt 输入） |
 | `ResultListView` | 统一结果列表（键盘导航 + 悬停 + 滚动跟随）。`ResultRowView` 是它的行 |
+| `CodecWorkbench` | 编解码类工具（Base64 / URL）的共用界面：模式切换、互换、复制、清空、双栏与状态栏 |
 | `MatchHighlighter` | 标题命中高亮的区间计算（子串 / 词首缩写，纯函数） |
 | `ListScrollFollow` | 列表滚动跟随的锚点决策：只有选中项碰到视口边缘才滚（纯函数） |
 

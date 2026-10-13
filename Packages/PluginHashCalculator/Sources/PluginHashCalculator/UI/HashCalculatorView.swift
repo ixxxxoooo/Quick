@@ -15,6 +15,8 @@ struct HashCalculatorView: View {
         nonmutating set { buffer.text = newValue }
     }
     @State private var results: [(algorithm: HashCalculatorLogic.Algorithm, value: String)] = []
+    /// HMAC 密钥：非空即改算 HMAC。仅存内存，不落盘、不进剪贴板历史
+    @State private var hmacKey = ""
     @State private var copiedAlgorithm: HashCalculatorLogic.Algorithm?
     /// 大输入走防抖 + 后台计算，小输入同步算（见 `Debouncer`）
     @State private var debouncer = Debouncer()
@@ -39,12 +41,30 @@ struct HashCalculatorView: View {
                     }
                 }
 
+            // HMAC 密钥
+            HStack(spacing: DesignTokens.Spacing.md) {
+                Text("HMAC 密钥")
+                    .font(DesignTokens.Typography.keyCap)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                SecureField("留空则计算普通哈希", text: $hmacKey)
+                    .textFieldStyle(.plain)
+                    .font(DesignTokens.Typography.code)
+                    .padding(DesignTokens.Spacing.sm)
+                    .background(DesignTokens.Colors.cardFill)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.row))
+                    .frame(width: DesignTokens.Size.hmacKeyFieldWidth)
+                    .accessibilityLabel("HMAC 密钥")
+                Spacer()
+            }
+            .padding(.horizontal, DesignTokens.Spacing.lg)
+            .padding(.vertical, DesignTokens.Spacing.sm)
+
             Divider().opacity(DesignTokens.Opacity.divider).padding(.horizontal, DesignTokens.Spacing.lg)
 
             // 结果列表
             if !results.isEmpty {
                 HStack {
-                    Text("计算结果")
+                    Text(hmacKey.isEmpty ? "计算结果" : "HMAC 结果")
                         .font(DesignTokens.Typography.sectionHeader)
                         .foregroundStyle(DesignTokens.Colors.textSecondary)
                     Spacer()
@@ -112,14 +132,16 @@ struct HashCalculatorView: View {
             }
         }
         .onChange(of: input) { _, _ in calculate() }
+        .onChange(of: hmacKey) { _, _ in calculate() }
         .onDisappear { debouncer.cancel() }
     }
 
     private func calculate() {
         let text = input
+        let key = hmacKey
         debouncer.schedule(
             weight: text.utf8.count,
-            work: { HashCalculatorLogic.digests(of: text) },
+            work: { HashCalculatorLogic.digests(of: text, hmacKey: key) },
             apply: { results = $0 })
     }
 

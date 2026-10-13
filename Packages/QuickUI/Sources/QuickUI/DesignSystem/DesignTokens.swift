@@ -210,6 +210,10 @@ public enum DesignTokens {
         public static let hashLabelWidth: CGFloat = 55
         /// UUID：选项控件宽度与序号列宽
         public static let uuidOptionWidth: CGFloat = 130
+        /// UUID 版本分段控件宽度
+        public static let uuidVersionPickerWidth: CGFloat = 90
+        /// HMAC 密钥输入框宽度
+        public static let hmacKeyFieldWidth: CGFloat = 220
         public static let indexColumnWidth: CGFloat = 20
         /// 截图设置里的预览框
         public static let screenshotPreview = CGSize(width: 120, height: 80)

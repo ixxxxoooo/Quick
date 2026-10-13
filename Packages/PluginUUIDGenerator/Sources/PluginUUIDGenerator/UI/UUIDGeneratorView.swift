@@ -12,6 +12,7 @@ struct UUIDGeneratorView: View {
     /// 大小写与连字符持久化：设置页里的开关改的就是它们
     @AppStorage(PluginSettingKey.UUIDGenerator.uppercase) private var uppercase = true
     @AppStorage(PluginSettingKey.UUIDGenerator.removeDashes) private var removeDashes = false
+    @State private var version: UUIDGeneratorLogic.Version = .v4
     @State private var copiedIndex: Int?
 
     var body: some View {
@@ -20,6 +21,14 @@ struct UUIDGeneratorView: View {
             HStack(spacing: DesignTokens.Spacing.md) {
                 Stepper("数量: \(count)", value: $count, in: 1...100)
                     .frame(width: DesignTokens.Size.uuidOptionWidth)
+
+                Picker("版本", selection: $version) {
+                    ForEach(UUIDGeneratorLogic.Version.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: DesignTokens.Size.uuidVersionPickerWidth)
+                .accessibilityLabel("UUID 版本")
 
                 Toggle("大写", isOn: $uppercase)
                 Toggle("去连字符", isOn: $removeDashes)
@@ -92,7 +101,7 @@ struct UUIDGeneratorView: View {
 
             // 状态栏
             HStack {
-                Text("已生成 \(uuids.count) 个 UUID")
+                Text("已生成 \(uuids.count) 个 UUID \(version.rawValue)")
                     .font(DesignTokens.Typography.keyCap).foregroundStyle(DesignTokens.Colors.textTertiary)
                 Spacer()
             }
@@ -102,13 +111,15 @@ struct UUIDGeneratorView: View {
         .onAppear { generate() }
         .onChange(of: uppercase) { _, _ in generate() }
         .onChange(of: removeDashes) { _, _ in generate() }
+        .onChange(of: version) { _, _ in generate() }
     }
 
     private func generate() {
         uuids = UUIDGeneratorLogic.generate(
             count: count,
             uppercase: uppercase,
-            removeDashes: removeDashes
+            removeDashes: removeDashes,
+            version: version
         )
     }
 

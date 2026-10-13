@@ -39,98 +39,14 @@ struct URLCodecView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 工具栏
-            HStack(spacing: DesignTokens.Spacing.sm) {
-                Picker("模式", selection: $mode) {
-                    ForEach(Mode.allCases, id: \.self) { m in
-                        Text(m.rawValue).tag(m)
-                    }
-                }.pickerStyle(.segmented).frame(width: DesignTokens.Size.segmentedControl)
-
-                Button {
-                    transform()
-                } label: {
-                    Label(mode.rawValue, systemImage: "arrow.right")
-                }.buttonStyle(.borderedProminent).controlSize(.small)
-
-                Button {
-                    swap()
-                } label: {
-                    Label("互换", systemImage: "arrow.left.arrow.right")
-                }.buttonStyle(.bordered).controlSize(.small)
-
-                Button {
-                    EventBus.shared.post(CopyToClipboardEvent(text: output))
-                } label: {
-                    Label("复制", systemImage: "doc.on.doc")
-                }.buttonStyle(.bordered).controlSize(.small)
-
-                Button {
-                    input = ""
-                    output = ""
-                    error = nil
-                } label: {
-                    Label("清空", systemImage: "trash")
-                }.buttonStyle(.bordered).controlSize(.small)
-
-                Spacer()
-            }
-            .padding(.horizontal, DesignTokens.Spacing.lg)
-            .padding(.vertical, DesignTokens.Spacing.sm)
-
-            Divider().opacity(DesignTokens.Opacity.divider)
-
-            // 编辑区
-            HSplitView {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(mode == .encode ? "原文" : "已编码")
-                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
-                            DesignTokens.Colors.textTertiary
-                        )
-                        .padding(.horizontal, DesignTokens.Spacing.md)
-                        .padding(.top, DesignTokens.Spacing.xs)
-                    TextEditor(text: $buffer.text)
-                        .font(DesignTokens.Typography.code)
-                        .scrollContentBackground(.hidden)
-                }
-                .frame(minWidth: DesignTokens.Size.editorMinWidth)
-
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(mode == .encode ? "已编码" : "原文")
-                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
-                            DesignTokens.Colors.textTertiary
-                        )
-                        .padding(.horizontal, DesignTokens.Spacing.md)
-                        .padding(.top, DesignTokens.Spacing.xs)
-                    TextEditor(text: .constant(output))
-                        .font(DesignTokens.Typography.code)
-                        .scrollContentBackground(.hidden)
-                }
-                .frame(minWidth: DesignTokens.Size.editorMinWidth)
-            }
-
-            Divider().opacity(DesignTokens.Opacity.divider)
-
-            // 状态栏
-            HStack(spacing: DesignTokens.Spacing.lg) {
-                if !input.isEmpty {
-                    Text("\(input.utf8.count) B")
-                        .font(DesignTokens.Typography.keyCap).foregroundStyle(
-                            DesignTokens.Colors.textTertiary)
-                }
-                if let error {
-                    Text(error)
-                        .font(DesignTokens.Typography.keyCap).foregroundStyle(DesignTokens.Colors.destructive)
-                } else if !output.isEmpty {
-                    Text("已\(mode.rawValue)")
-                        .font(DesignTokens.Typography.keyCap).foregroundStyle(DesignTokens.Colors.success)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, DesignTokens.Spacing.lg)
-            .padding(.vertical, DesignTokens.Spacing.xs)
-        }
+        CodecWorkbench(
+            isEncode: Binding(get: { mode == .encode }, set: { mode = $0 ? .encode : .decode }),
+            input: $buffer.text,
+            output: $output,
+            error: $error,
+            encodedTitle: "已编码",
+            onTransform: transform
+        )
         .onChange(of: input) { _, _ in transform() }
         .onChange(of: spacesAsPluses) { _, _ in transform() }
         .onChange(of: encodeFullUrl) { _, _ in transform() }
@@ -168,12 +84,5 @@ struct URLCodecView: View {
                     error = "解码失败：存在非法的百分号序列"
                 }
             })
-    }
-
-    private func swap() {
-        let temp = input
-        input = output
-        output = temp
-        mode = mode == .encode ? .decode : .encode
     }
 }

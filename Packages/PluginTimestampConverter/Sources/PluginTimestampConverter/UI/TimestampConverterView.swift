@@ -148,7 +148,7 @@ struct TimestampConverterView: View {
 
     /// 转换逻辑整体在模型层，视图只把结果搬进 `@State`
     private func convert(_ text: String) {
-        let conversion = TimestampConverterLogic.convert(text, timeZone: .current)
+        let conversion = TimestampConverterLogic.convert(text, timeZone: .current, now: Date())
         results = conversion.rows
         inputType = conversion.inputType
     }

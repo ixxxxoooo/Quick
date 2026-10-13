@@ -159,3 +159,38 @@ struct HashPerformanceTests {
         #expect(elapsed < .seconds(3), "耗时 \(elapsed)")
     }
 }
+
+@Suite("HMAC")
+struct HashHMACTests {
+
+    /// Wikipedia 上公开的标准向量：key = "key"，message = "The quick brown fox jumps over the lazy dog"
+    private let message = "The quick brown fox jumps over the lazy dog"
+
+    @Test("四种算法的 HMAC 与公开标准向量一致")
+    func matchesKnownVectors() {
+        let expected: [HashCalculatorLogic.Algorithm: String] = [
+            .md5: "80070713463e7749b90c2dc24911e275",
+            .sha1: "de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9",
+            .sha256: "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+            .sha512: "b42af09057bac1e2d41708e48a902e09b5ff7f12ab428a4fe86653c73dd248fb"
+                + "82f948a549f7b791a5b41915ee4d1ec3935357e4e2317250d0372afa2ebeeb3a"
+        ]
+        for (algorithm, value) in expected {
+            #expect(HashCalculatorLogic.hmac(message, key: "key", algorithm: algorithm) == value)
+        }
+    }
+
+    @Test("密钥为空走普通摘要，非空走 HMAC，且列表顺序不变")
+    func emptyKeyFallsBackToPlainDigest() {
+        let plain = HashCalculatorLogic.digests(of: message)
+        let keyed = HashCalculatorLogic.digests(of: message, hmacKey: "key")
+        #expect(HashCalculatorLogic.digests(of: message, hmacKey: "").map(\.value) == plain.map(\.value))
+        #expect(keyed.map(\.algorithm) == plain.map(\.algorithm))
+        #expect(keyed.map(\.value) != plain.map(\.value))
+    }
+
+    @Test("输入为空时即使有密钥也返回空列表")
+    func emptyInputStaysEmpty() {
+        #expect(HashCalculatorLogic.digests(of: "", hmacKey: "key").isEmpty)
+    }
+}

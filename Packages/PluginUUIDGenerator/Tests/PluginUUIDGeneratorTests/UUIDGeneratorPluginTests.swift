@@ -121,3 +121,50 @@ struct UUIDGeneratorPluginTests {
         #expect(await plugin.dynamicSearch(query: "uuid").isEmpty)
     }
 }
+
+@Suite("UUID v7")
+struct UUIDv7Tests {
+
+    @Test("版本位是 7，变体位是 10，高 48 位是毫秒时间戳")
+    func layoutFollowsRFC9562() {
+        let uuid = UUIDGeneratorLogic.makeV7(
+            milliseconds: 0x0123_4567_89AB, random: [UInt8](repeating: 0xFF, count: 10))
+        let text = uuid.uuidString
+        // 形如 01234567-89AB-7FFF-BFFF-FFFFFFFFFFFF
+        #expect(text.hasPrefix("01234567-89AB-7"))
+        let variant = text.split(separator: "-")[3].first
+        #expect(variant == "B")
+    }
+
+    @Test("随机字节全 0 时版本位与变体位依然正确")
+    func versionBitsSurviveZeroRandom() {
+        let text = UUIDGeneratorLogic.makeV7(milliseconds: 0, random: []).uuidString
+        #expect(text == "00000000-0000-7000-8000-000000000000")
+    }
+
+    @Test("同一毫秒内生成的一批 UUID 严格递增，字符串排序即生成顺序")
+    func batchIsStrictlyIncreasing() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let batch = UUIDGeneratorLogic.generateV7(count: 50, now: now).map { $0.uuidString }
+        #expect(batch.count == 50)
+        #expect(batch == batch.sorted())
+        #expect(Set(batch).count == 50)
+    }
+
+    @Test("generate 选 v7 时输出合法 UUID，且大小写开关依然生效")
+    func generateHonorsVersionAndCase() {
+        let lower = UUIDGeneratorLogic.generate(
+            count: 3, uppercase: false, removeDashes: true, version: .v7)
+        #expect(lower.count == 3)
+        for text in lower {
+            #expect(text.count == 32)
+            #expect(text == text.lowercased())
+            #expect(text[text.index(text.startIndex, offsetBy: 12)] == "7")
+        }
+    }
+
+    @Test("负数数量按 0 处理，不会崩")
+    func negativeCountIsEmpty() {
+        #expect(UUIDGeneratorLogic.generateV7(count: -3).isEmpty)
+    }
+}

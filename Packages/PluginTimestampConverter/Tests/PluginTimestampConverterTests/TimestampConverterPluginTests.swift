@@ -80,6 +80,39 @@ struct TimestampConverterLogicTests {
         #expect(value("unixms", in: conversion) == "-1700000000000")
     }
 
+    // MARK: - 微秒 / 纳秒 / ISO 8601 / 追加行
+
+    @Test("微秒与纳秒时间戳按数量级归一成同一时刻")
+    func microAndNanosecondTimestamps() {
+        for text in ["1700000000", "1700000000000", "1700000000000000", "1700000000000000000"] {
+            let conversion = TimestampConverterLogic.convert(text, timeZone: utc)
+            #expect(value("unix", in: conversion) == "1700000000", "输入 \(text)")
+            #expect(value("iso", in: conversion) == "2023-11-14T22:13:20Z", "输入 \(text)")
+        }
+    }
+
+    @Test("ISO 8601 输入：Z、偏移与小数秒都能解析")
+    func iso8601Input() {
+        for text in ["2023-11-14T22:13:20Z", "2023-11-14T22:13:20.000Z", "2023-11-15T06:13:20+08:00"] {
+            let conversion = TimestampConverterLogic.convert(text, timeZone: utc)
+            #expect(conversion.inputType == .date, "输入 \(text)")
+            #expect(value("unix", in: conversion) == "1700000000", "输入 \(text)")
+        }
+    }
+
+    @Test("传入 now 才追加 UTC 与相对时间两行，原有四行不变")
+    func extraRowsAreOptIn() {
+        let plain = TimestampConverterLogic.convert("1700000000", timeZone: shanghai)
+        #expect(plain.rows.map(\.key) == ["local", "iso", "unix", "unixms"])
+
+        let now = Date(timeIntervalSince1970: 1_700_000_000 + 3 * 86_400)
+        let extra = TimestampConverterLogic.convert("1700000000", timeZone: shanghai, now: now)
+        #expect(extra.rows.map(\.key) == ["local", "iso", "unix", "unixms", "utc", "relative"])
+        #expect(value("utc", in: extra) == "2023-11-14 22:13:20")
+        #expect(value("local", in: extra) == "2023-11-15 06:13:20")
+        #expect(value("relative", in: extra)?.contains("3") == true)
+    }
+
     @Test("非有限输入不当作时间戳，也不会崩")
     func nonFiniteInputIsRejected() {
         // Double("inf") / Double("nan") 都能解析成功，若直接交给 Int() 会崩掉进程
