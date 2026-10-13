@@ -22,7 +22,7 @@ struct SettingsSearchField: View {
                 .font(DesignTokens.Typography.inlineIcon)
                 .foregroundStyle(.secondary)
 
-            TextField("", text: $query, prompt: Text("Search"))
+            TextField("", text: $query, prompt: Text("搜索设置"))
                 .textFieldStyle(.plain)
                 .labelsHidden()
                 .focused($isFocused)
@@ -36,7 +36,7 @@ struct SettingsSearchField: View {
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
+                .accessibilityLabel("清除搜索")
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
@@ -50,6 +50,6 @@ struct SettingsSearchField: View {
         }
         .contentShape(.rect)
         .onTapGesture { isFocused = true }
-        .accessibilityLabel("Search")
+        .accessibilityLabel("搜索设置")
     }
 }

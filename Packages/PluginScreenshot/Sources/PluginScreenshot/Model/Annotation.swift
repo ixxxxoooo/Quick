@@ -44,7 +44,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Sendable {
         case .arrow: "arrow.up.right"
         case .pen: "pencil"
         case .highlight: "highlighter"
-        case .text: "textformat"
+        case .text: "character.cursor.ibeam"
         case .mosaic: "squareshape.split.3x3"
         case .counter: "1.circle"
         }

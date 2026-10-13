@@ -50,7 +50,8 @@ struct SystemMonitorSettingsView: View {
             } label: {
                 SettingsRow(
                     title: "内存显示模式",
-                    subtitle: "侧栏与详情里的内存百分比按已用或空闲展示。"
+                    subtitle: "侧栏与详情里的内存百分比按已用或空闲展示。",
+                    icon: { SettingsRowIcon(systemImage: "memorychip") }
                 )
             }
 
@@ -60,7 +61,8 @@ struct SystemMonitorSettingsView: View {
             } label: {
                 SettingsRow(
                     title: "磁盘显示模式",
-                    subtitle: "侧栏与详情里的磁盘百分比按已用或空闲展示。"
+                    subtitle: "侧栏与详情里的磁盘百分比按已用或空闲展示。",
+                    icon: { SettingsRowIcon(systemImage: "internaldrive") }
                 )
             }
 
@@ -70,7 +72,8 @@ struct SystemMonitorSettingsView: View {
             } label: {
                 SettingsRow(
                     title: "电池显示模式",
-                    subtitle: "有内置电池时，按剩余或已用展示电量。"
+                    subtitle: "有内置电池时，按剩余或已用展示电量。",
+                    icon: { SettingsRowIcon(systemImage: "battery.100") }
                 )
             }
 
@@ -90,7 +93,8 @@ struct SystemMonitorSettingsView: View {
             Toggle(isOn: $showMenuBar) {
                 SettingsRow(
                     title: "菜单栏显示 CPU/内存",
-                    subtitle: "在菜单栏图标旁实时展示 CPU 与内存占用，至少每 2 秒刷新一次；需要开着「显示菜单栏图标」。"
+                    subtitle: "在菜单栏图标旁实时展示 CPU 与内存占用，至少每 2 秒刷新一次；需要开着「显示菜单栏图标」。",
+                    icon: { SettingsRowIcon(systemImage: "menubar.rectangle") }
                 )
             }
         } header: {

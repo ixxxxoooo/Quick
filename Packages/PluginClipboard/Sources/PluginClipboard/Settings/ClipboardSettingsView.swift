@@ -63,14 +63,16 @@ struct ClipboardSettingsView: View {
             Toggle(isOn: $deduplication) {
                 SettingsRow(
                     title: "自动去重",
-                    subtitle: "连续复制相同内容时只保留一条记录。"
+                    subtitle: "连续复制相同内容时只保留一条记录。",
+                    icon: { SettingsRowIcon(systemImage: "square.on.square") }
                 )
             }
 
             Toggle(isOn: $showPreview) {
                 SettingsRow(
                     title: "显示内容预览",
-                    subtitle: "在搜索结果中展示剪贴板内容的前几行。"
+                    subtitle: "在搜索结果中展示剪贴板内容的前几行。",
+                    icon: { SettingsRowIcon(systemImage: "text.alignleft") }
                 )
             }
         } header: {

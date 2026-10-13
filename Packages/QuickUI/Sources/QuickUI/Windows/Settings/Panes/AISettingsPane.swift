@@ -100,12 +100,13 @@ public struct AISettingsPane: View {
                 HStack(spacing: DesignTokens.Spacing.sm) {
                     Group {
                         if showKey {
-                            TextField("sk-…", text: $apiKey)
+                            TextField("", text: $apiKey, prompt: Text("sk-…"))
                         } else {
-                            SecureField("sk-…", text: $apiKey)
+                            SecureField("", text: $apiKey, prompt: Text("sk-…"))
                         }
                     }
                     .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
                     .frame(width: DesignTokens.Size.settingsFieldMedium)
 
                     Button {
@@ -125,8 +126,9 @@ public struct AISettingsPane: View {
                 subtitle: defaultDescription(provider.defaultBaseURL, emptyHint: "自定义服务商需填写"),
                 icon: { SettingsRowIcon(systemImage: "link") }
             ) {
-                TextField(provider.defaultBaseURL, text: $baseURL)
+                TextField("", text: $baseURL, prompt: Text(provider.defaultBaseURL))
                     .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
                     .frame(width: DesignTokens.Size.settingsFieldLarge)
             }
 
@@ -136,8 +138,9 @@ public struct AISettingsPane: View {
                 icon: { SettingsRowIcon(systemImage: "cpu") }
             ) {
                 HStack(spacing: DesignTokens.Spacing.sm) {
-                    TextField(provider.defaultModel, text: $model)
+                    TextField("", text: $model, prompt: Text(provider.defaultModel))
                         .textFieldStyle(.roundedBorder)
+                        .labelsHidden()
                         .frame(width: DesignTokens.Size.settingsFieldWide)
 
                     if !provider.suggestedModels.isEmpty {

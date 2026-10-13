@@ -78,16 +78,6 @@ extension SettingsBridge {
         case .screenCapture:
             let granted = core.permissionService.isScreenCaptureGranted()
             return SettingsPermissionState(isGranted: granted, canRequest: !granted)
-
-        case .location:
-            switch core.permissionService.locationStatus() {
-            case .granted:
-                return SettingsPermissionState(isGranted: true, canRequest: false)
-            case .notDetermined:
-                return SettingsPermissionState(isGranted: false, canRequest: true)
-            case .denied:
-                return SettingsPermissionState(isGranted: false, canRequest: false)
-            }
         }
     }
 
@@ -98,10 +88,6 @@ extension SettingsBridge {
             core.permissionService.requestAccessibility()
         case .screenCapture:
             core.permissionService.requestScreenCapture()
-        case .location:
-            // 定位的申请入口只有天气插件那一处（用户主动查看天气时），
-            // 设置页只负责把状态显示出来、把人带到系统设置。
-            core.permissionService.openLocationSettings()
         }
     }
 
@@ -111,8 +97,6 @@ extension SettingsBridge {
             core.permissionService.openAccessibilitySettings()
         case .screenCapture:
             core.permissionService.openScreenCaptureSettings()
-        case .location:
-            core.permissionService.openLocationSettings()
         }
     }
 

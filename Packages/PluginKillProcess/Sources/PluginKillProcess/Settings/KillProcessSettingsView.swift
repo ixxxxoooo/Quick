@@ -44,28 +44,32 @@ struct KillProcessSettingsView: View {
             Toggle(isOn: $showPID) {
                 SettingsRow(
                     title: "显示 PID",
-                    subtitle: "在进程名下方显示进程号。"
+                    subtitle: "在进程名下方显示进程号。",
+                    icon: { SettingsRowIcon(systemImage: "number") }
                 )
             }
 
             Toggle(isOn: $searchInPath) {
                 SettingsRow(
                     title: "搜索可执行路径",
-                    subtitle: "标题栏搜索时同时匹配完整路径。"
+                    subtitle: "标题栏搜索时同时匹配完整路径。",
+                    icon: { SettingsRowIcon(systemImage: "folder") }
                 )
             }
 
             Toggle(isOn: $searchInPID) {
                 SettingsRow(
                     title: "搜索 PID",
-                    subtitle: "标题栏搜索时同时匹配进程号。"
+                    subtitle: "标题栏搜索时同时匹配进程号。",
+                    icon: { SettingsRowIcon(systemImage: "magnifyingglass") }
                 )
             }
 
             Toggle(isOn: $confirmForceKill) {
                 SettingsRow(
                     title: "强制结束前确认",
-                    subtitle: "强制结束不会让进程保存数据。系统核心进程无论此项如何都会确认。"
+                    subtitle: "强制结束不会让进程保存数据。系统核心进程无论此项如何都会确认。",
+                    icon: { SettingsRowIcon(systemImage: "exclamationmark.triangle") }
                 )
             }
         } header: {

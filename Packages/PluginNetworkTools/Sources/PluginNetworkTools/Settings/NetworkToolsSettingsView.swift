@@ -32,14 +32,16 @@ struct NetworkToolsSettingsView: View {
             } label: {
                 SettingsRow(
                     title: "超时时间",
-                    subtitle: "Ping 每个包的等待上限，同时是查询公网 IP 的请求超时。"
+                    subtitle: "Ping 每个包的等待上限，同时是查询公网 IP 的请求超时。",
+                    icon: { SettingsRowIcon(systemImage: "timer") }
                 )
             }
 
             Toggle(isOn: $showExternalIP) {
                 SettingsRow(
                     title: "显示公网 IP",
-                    subtitle: "打开网络工具时展示当前公网 IP；关闭后不会向第三方接口发请求。"
+                    subtitle: "打开网络工具时展示当前公网 IP；关闭后不会向第三方接口发请求。",
+                    icon: { SettingsRowIcon(systemImage: "globe") }
                 )
             }
         } header: {

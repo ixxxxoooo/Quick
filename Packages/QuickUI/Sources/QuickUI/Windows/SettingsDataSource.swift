@@ -125,13 +125,11 @@ public struct SettingsCustomCommandItem: Identifiable, Sendable {
 public enum SettingsPermission: String, CaseIterable, Sendable {
     case accessibility
     case screenCapture
-    case location
 
     public var title: String {
         switch self {
         case .accessibility: "辅助功能"
         case .screenCapture: "屏幕录制"
-        case .location: "定位服务"
         }
     }
 
@@ -139,7 +137,6 @@ public enum SettingsPermission: String, CaseIterable, Sendable {
         switch self {
         case .accessibility: "accessibility"
         case .screenCapture: "rectangle.dashed.badge.record"
-        case .location: "location"
         }
     }
 
@@ -149,8 +146,6 @@ public enum SettingsPermission: String, CaseIterable, Sendable {
             "用于需要辅助功能的插件操作。系统只允许已授权的应用控制其他界面。"
         case .screenCapture:
             "用于截图与窗口捕获。macOS 只允许已授权的应用读取屏幕内容。"
-        case .location:
-            "用于天气插件。只在你主动查看天气时申请，不会在启动时弹出。"
         }
     }
 }

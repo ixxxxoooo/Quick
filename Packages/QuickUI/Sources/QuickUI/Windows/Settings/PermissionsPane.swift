@@ -90,12 +90,11 @@ struct PermissionsPane: View {
         }
     }
 
-    /// 辅助功能和屏幕录制走拖拽授权。定位仍由系统对话框申请
+    /// 辅助功能和屏幕录制都走拖拽授权
     private func dragTarget(for permission: SettingsPermission) -> PermissionDragTarget? {
         switch permission {
         case .accessibility: .accessibility
         case .screenCapture: .screenCapture
-        case .location: nil
         }
     }
 

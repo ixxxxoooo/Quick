@@ -162,7 +162,7 @@ private struct AppItemRow: View {
 
             // 别名输入框（Tinycast 风格）
             AliasField(
-                placeholder: "Add Alias",
+                placeholder: "添加别名",
                 text: $alias,
                 onChange: { newValue in
                     dataSource.setAppAlias(newValue, for: app.bundleID)

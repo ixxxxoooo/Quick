@@ -16,14 +16,15 @@ struct UUIDGeneratorSettingsView: View {
                 SettingsRow(
                     title: "大写字母",
                     subtitle: "生成 A-F 而不是 a-f。",
-                    icon: { SettingsRowIcon(systemImage: "textformat") }
+                    icon: { SettingsRowIcon(systemImage: "capslock") }
                 )
             }
 
             Toggle(isOn: $removeDashes) {
                 SettingsRow(
                     title: "去掉连字符",
-                    subtitle: "输出 32 位连续字符串，适合直接当数据库主键。"
+                    subtitle: "输出 32 位连续字符串，适合直接当数据库主键。",
+                    icon: { SettingsRowIcon(systemImage: "minus") }
                 )
             }
         } header: {

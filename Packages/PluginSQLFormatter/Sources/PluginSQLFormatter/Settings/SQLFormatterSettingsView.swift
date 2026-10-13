@@ -20,7 +20,7 @@ struct SQLFormatterSettingsView: View {
                 SettingsRow(
                     title: "关键字大小写",
                     subtitle: "格式化时 SELECT、FROM 等换行关键字的大小写风格。",
-                    icon: { SettingsRowIcon(systemImage: "textformat") }
+                    icon: { SettingsRowIcon(systemImage: "capslock") }
                 )
             }
 

@@ -23,8 +23,8 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
 
     init(navigationState: SettingsNavigationState) {
         self.navigationState = navigationState
-        self.backButton = Self.makeButton("chevron.backward", "Back")
-        self.forwardButton = Self.makeButton("chevron.forward", "Forward")
+        self.backButton = Self.makeButton("chevron.backward", "后退")
+        self.forwardButton = Self.makeButton("chevron.forward", "前进")
         super.init()
         backButton.target = self
         backButton.action = #selector(goBack)
@@ -69,10 +69,10 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
         switch identifier {
         case Self.back:
             item.view = backButton
-            item.label = "Back"
+            item.label = "后退"
         case Self.forward:
             item.view = forwardButton
-            item.label = "Forward"
+            item.label = "前进"
         default:
             return nil
         }

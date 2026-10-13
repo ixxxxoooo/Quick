@@ -79,11 +79,11 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 
 ### 系统依赖的部分怎么测
 
-EventKit、Vision、Spotlight、CoreLocation、Accessibility、`screencapture` 这类东西在测试里
+EventKit、Vision、Spotlight、Accessibility、`screencapture` 这类东西在测试里
 要么要授权、要么很慢、要么直接挂。规矩是：**把系统调用挤到边缘，把纯计算剥出来测**。
 
 - 窗口布局的坐标计算、`ps` 输出的解析、`resolv.conf` 的解析、`screencapture` 的参数拼装、
-  天气授权状态的映射 —— 这些都是这样从系统调用里剥出来的，
+  截图工具栏的摆放 —— 这些都是这样从系统调用里剥出来的，
   落在 `Sources/<Pkg>/Model/`（Foundation-only，可脱离 App 独立编译）。
 - 真正的系统调用不测；测的是**我们对返回值的处理**。
 - 剥不出来（例如「向 EventKit 取事件」这一步本身）就明确写进报告，

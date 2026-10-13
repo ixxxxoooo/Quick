@@ -16,22 +16,28 @@ struct SettingsSearchEntry: Identifiable, Hashable {
 enum SettingsSearchCatalog {
 
     /// 静态条目
-    private static let staticEntries: [SettingsSearchEntry] = [
+    static let staticEntries: [SettingsSearchEntry] = [
         .init(
-            id: "general.launchAtLogin", tab: .general, title: "Launch at Login / 开机启动", subtitle: "General"),
+            id: "general.launchAtLogin", tab: .general, title: "Launch at Login / 开机启动", subtitle: "通用"),
         .init(
             id: "general.appearance", tab: .appearance, title: "Appearance & Theme / 外观与主题",
-            subtitle: "General"),
+            subtitle: "通用"),
         .init(
             id: "general.shortcuts", tab: .shortcuts, title: "Shortcuts & Hotkeys / 全局快捷键与命令唤醒",
-            subtitle: "General"),
+            subtitle: "通用"),
         .init(
             id: "general.paletteBehavior", tab: .general, title: "Panel Behaviour / 面板行为",
-            subtitle: "General"),
+            subtitle: "通用"),
         .init(
             id: "general.keyboardLayout", tab: .general, title: "Keyboard Layout / 强制键盘布局",
-            subtitle: "General"),
-        .init(id: "permissions", tab: .permissions, title: "Permissions / 系统权限", subtitle: "General"),
+            subtitle: "通用"),
+        .init(
+            id: "general.backup", tab: .general, title: "Backup & Restore / 设置备份与恢复",
+            subtitle: "通用"),
+        .init(
+            id: "appearance.panelSize", tab: .appearance, title: "Panel Size / 面板尺寸与显示屏幕",
+            subtitle: "外观"),
+        .init(id: "permissions", tab: .permissions, title: "Permissions / 系统权限", subtitle: "通用"),
         .init(id: "search.sources", tab: .search, title: "Search Sources / 搜索来源", subtitle: "搜索"),
         .init(id: "launcher.scopes", tab: .search, title: "Search Scopes / 搜索范围", subtitle: "搜索"),
         .init(id: "plugins.launcher", tab: .applications, title: "应用启动器", subtitle: "插件"),
@@ -39,6 +45,9 @@ enum SettingsSearchCatalog {
         .init(id: "features.calculator", tab: .calculator, title: "Calculator / 计算器", subtitle: "插件"),
         .init(id: "features.filesearch", tab: .search, title: "File Search / 文件搜索", subtitle: "搜索来源"),
         .init(id: "features.calendar", tab: .calendar, title: "Calendar / 日历日程", subtitle: "插件"),
+        .init(
+            id: "features.calendar.holidays", tab: .calendar,
+            title: "Holidays & Almanac / 节假日与黄历", subtitle: "日历"),
         .init(id: "features.ai", tab: .ai, title: "AI Assistant / AI 助手", subtitle: "插件"),
         .init(id: "features.translator", tab: .translator, title: "Translator / 划词翻译", subtitle: "插件"),
         .init(
@@ -99,7 +108,7 @@ enum SettingsSearchCatalog {
         .init(
             id: "ai.model", tab: .aiService, title: "AI Model / 模型与生成参数",
             subtitle: "AI 服务"),
-        .init(id: "about.version", tab: .about, title: "About / 关于 Quick", subtitle: "Advanced")
+        .init(id: "about.version", tab: .about, title: "About / 关于 Quick", subtitle: "高级")
     ]
 
     /// 按关键词搜索

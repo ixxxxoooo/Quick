@@ -25,7 +25,8 @@ struct SystemActionsSettingsPane: View {
                 Toggle(isOn: $confirmDestructive) {
                     SettingsRow(
                         title: "危险操作前确认",
-                        subtitle: "重新启动、关机、退出登录、清空废纸篓执行前先弹出确认框；热键触发时同样生效。"
+                        subtitle: "重新启动、关机、退出登录、清空废纸篓执行前先弹出确认框；热键触发时同样生效。",
+                        icon: { SettingsRowIcon(systemImage: "exclamationmark.triangle") }
                     )
                 }
             }
@@ -83,7 +84,7 @@ private struct SystemActionRow: View {
             Spacer(minLength: DesignTokens.Spacing.md)
 
             AliasField(
-                placeholder: "Add Alias",
+                placeholder: "添加别名",
                 text: $alias,
                 onChange: { newValue in
                     dataSource.setSystemActionAlias(newValue, for: action.id)

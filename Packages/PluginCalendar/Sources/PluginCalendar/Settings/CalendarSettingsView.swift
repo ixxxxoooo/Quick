@@ -45,14 +45,16 @@ struct CalendarSettingsView: View {
             Toggle(isOn: $autoLinks) {
                 SettingsRow(
                     title: "提取会议链接",
-                    subtitle: "识别腾讯会议、Zoom、Google Meet、Teams、飞书等链接，并在日程旁显示「加入会议」。"
+                    subtitle: "识别腾讯会议、Zoom、Google Meet、Teams、飞书等链接，并在日程旁显示「加入会议」。",
+                    icon: { SettingsRowIcon(systemImage: "video") }
                 )
             }
 
             Toggle(isOn: $showWeekNumber) {
                 SettingsRow(
                     title: "显示周数",
-                    subtitle: "在月历左侧显示每行的周数，并在日期标题里标注第几周。"
+                    subtitle: "在月历左侧显示每行的周数，并在日期标题里标注第几周。",
+                    icon: { SettingsRowIcon(systemImage: "calendar.badge.clock") }
                 )
             }
         } header: {

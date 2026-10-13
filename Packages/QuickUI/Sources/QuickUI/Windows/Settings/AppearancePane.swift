@@ -130,8 +130,8 @@ struct AppearancePane: View {
     private var transparencySection: some View {
         Section {
             SettingsRow(
-                title: "面板背景不透明度",
-                subtitle: "调节毛玻璃底层遮罩浓度，数值越高背景越实。",
+                title: "面板背景浓度",
+                subtitle: "毛玻璃底层遮罩相对默认的增减：0% 是默认，负数更透，正数更实。",
                 icon: { SettingsRowIcon(systemImage: "slider.horizontal.below.rectangle") }
             ) {
                 HStack(spacing: DesignTokens.Spacing.sm) {

@@ -64,7 +64,7 @@ enum ResultActionCatalog {
                     Self.copy(path, hud: "已复制路径")
                 }
             case .copyTitle:
-                return ResultAction(id: "copyTitle", title: "复制名称", icon: "textformat") {
+                return ResultAction(id: "copyTitle", title: "复制名称", icon: "character.cursor.ibeam") {
                     Self.copy(item.title, hud: "已复制名称")
                 }
             }

@@ -16,7 +16,7 @@ struct HashCalculatorSettingsView: View {
                 SettingsRow(
                     title: "十六进制大写显示",
                     subtitle: "输出 A-F 而非默认的小写 a-f 散列值。",
-                    icon: { SettingsRowIcon(systemImage: "textformat") }
+                    icon: { SettingsRowIcon(systemImage: "capslock") }
                 )
             }
 

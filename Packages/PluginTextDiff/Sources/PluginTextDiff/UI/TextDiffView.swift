@@ -106,7 +106,7 @@ struct TextDiffView: View {
             .help("忽略行首尾空白，行内连续空白视为一个")
 
             Toggle(isOn: $ignoreCase) {
-                Label("忽略大小写", systemImage: "textformat")
+                Label("忽略大小写", systemImage: "capslock")
             }
             .toggleStyle(.button)
             .controlSize(.small)
