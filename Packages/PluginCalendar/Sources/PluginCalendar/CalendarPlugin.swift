@@ -2,7 +2,6 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
-import EventKit
 import QuickCore
 import QuickUI
 import SwiftUI
@@ -24,14 +23,16 @@ public final class CalendarPlugin: QuickPlugin, PluginViewProviding, PluginSetti
 
     private let log = QuickLog.plugin(CalendarPlugin.id)
 
-    /// EventKit 事件存储
-    private let eventStore = EKEventStore()
-
     /// 日历服务
     private let calendarService: CalendarService
 
     public init() {
         calendarService = CalendarService()
+    }
+
+    /// 测试用：注入固定权限状态的服务
+    init(service: CalendarService) {
+        calendarService = service
     }
 
     // MARK: - QuickPlugin 协议
@@ -43,6 +44,24 @@ public final class CalendarPlugin: QuickPlugin, PluginViewProviding, PluginSetti
     public nonisolated func dynamicSearch(query: String) async -> [SearchableItem] {
         guard !Task.isCancelled else { return [] }
         guard query.matchesAnyTrigger(Self.triggerWords) else { return [] }
+
+        // 未授权时「今日无日程」会误导：给出能点进去授权的入口
+        let state = await calendarService.accessState
+        if state != .authorized {
+            return [
+                SearchableItem(
+                    id: "calendar.permission",
+                    pluginID: Self.id,
+                    title: "需要日历访问权限",
+                    subtitle: state == .denied ? "在系统设置里允许 Quick 访问日历" : "打开日历插件完成授权",
+                    icon: "calendar.badge.exclamationmark",
+                    relevance: 0.5,
+                    action: {
+                        EventBus.shared.post(NavigateEvent(pluginID: Self.id))
+                    }
+                )
+            ]
+        }
 
         let todayEvents = await calendarService.todayEvents()
         if todayEvents.isEmpty {
@@ -85,12 +104,14 @@ public final class CalendarPlugin: QuickPlugin, PluginViewProviding, PluginSetti
         AnyView(CalendarSettingsView())
     }
 
+    /// 不在启动时弹权限框：已授权的用户直接开始提醒，未授权的由日历视图里的按钮触发申请
     public func activate() {
-        calendarService.requestAccess()
-        log.notice("插件已激活，已发起日历权限申请")
+        calendarService.startReminders()
+        log.notice("插件已激活，日历权限：\(String(describing: self.calendarService.accessState), privacy: .public)")
     }
 
     public func deactivate() {
+        calendarService.stopReminders()
         log.notice("插件已停用")
     }
 }

@@ -201,3 +201,58 @@ struct TextDiffPluginTests {
         #expect(await plugin.dynamicSearch(query: "zzzz").isEmpty)
     }
 }
+
+@Suite("文本对比选项")
+struct TextDiffOptionsTests {
+
+    @Test("忽略空白：行首尾与行内空白差异不算改动")
+    func ignoreWhitespaceTreatsSpacingDifferencesAsSame() {
+        let a = "let x  =  1\n  return x"
+        let b = "let x = 1\nreturn x   "
+        let strict = TextDiffLogic.diff(a, against: b)
+        let relaxed = TextDiffLogic.diff(a, against: b, options: .init(ignoreWhitespace: true))
+
+        #expect(strict.addedCount == 2 && strict.removedCount == 2)
+        #expect(relaxed.addedCount == 0 && relaxed.removedCount == 0)
+        // 展示的仍是原文，不是规整后的形式
+        #expect(relaxed.lines.map(\.text) == ["let x  =  1", "  return x"])
+    }
+
+    @Test("忽略大小写")
+    func ignoreCaseTreatsLetterCaseAsSame() {
+        let relaxed = TextDiffLogic.diff("Hello", against: "hELLO", options: .init(ignoreCase: true))
+        let strict = TextDiffLogic.diff("Hello", against: "hELLO")
+        #expect(relaxed.addedCount == 0)
+        #expect(strict.addedCount == 1)
+    }
+
+    @Test("两个选项互相独立：只开空白时大小写仍算差异")
+    func optionsAreIndependent() {
+        let result = TextDiffLogic.diff("A b", against: "a  b", options: .init(ignoreWhitespace: true))
+        #expect(result.addedCount == 1, "大小写不同，只忽略空白时仍是改动")
+    }
+
+    @Test("逐行状态与一维流使用同一套判定")
+    func sideStatesFollowTheSameOptions() {
+        let states = TextDiffLogic.sideLineStates(
+            "foo\nBar", against: "foo\nbar", options: .init(ignoreCase: true))
+        #expect(states.left == [.same, .same])
+        #expect(states.right == [.same, .same])
+    }
+
+    @Test("一侧缺行不会被规整成相同：空行与「没有这一行」是两回事")
+    func missingLineIsNeverEqualToBlankLine() {
+        let result = TextDiffLogic.diff("a\n", against: "a", options: .init(ignoreWhitespace: true))
+        // 左边多一个空行（"a\n" 拆出 ["a", ""]），右边没有这一行
+        #expect(result.removedCount == 1)
+        #expect(result.addedCount == 0)
+    }
+
+    @Test("空输入与超长输入不崩溃")
+    func degenerateInputs() {
+        #expect(TextDiffLogic.diff("", against: "", options: .init(ignoreWhitespace: true, ignoreCase: true)).lines.count == 1)
+        let big = (0..<20_000).map { "line \($0)" }.joined(separator: "\n")
+        let result = TextDiffLogic.diff(big, against: big.uppercased(), options: .init(ignoreCase: true))
+        #expect(result.addedCount == 0)
+    }
+}

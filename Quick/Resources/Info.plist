@@ -36,6 +36,12 @@
          触发点：切换深色模式、睡眠 / 重启 / 关机 / 退出登录、清空废纸篓、推出磁盘。 -->
     <key>NSAppleEventsUsageDescription</key>
     <string>Quick 用 AppleScript 执行你主动选择的系统操作：切换深色模式、睡眠、重启、关机、退出登录、清空废纸篓、推出磁盘。</string>
+    <!-- 日历用途说明。macOS 14+ 申请完整日历访问必须有这条，缺了系统会直接拒绝申请。
+         NSCalendarsUsageDescription 是旧键名，一并写上保持两套系统接口都能读到。 -->
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Quick 只读取你的日程，用于在日历面板展示、识别会议链接和开始前提醒，不会修改或上传。</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Quick 只读取你的日程，用于在日历面板展示、识别会议链接和开始前提醒，不会修改或上传。</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Quick 只在你主动查看天气时使用你的大致位置（公里级），不会在启动时申请，也不会记录或上传。</string>
 </dict>

@@ -552,36 +552,49 @@
 
 #### 不变量
 
-- **EventKit 权限**：`activate()` 调用 `requestFullAccessToEvents()`；**未授权时
-  `todayEvents()` 返回空数组**，不伪造日程。
+- **EventKit 权限**：**不在启动时弹框**。授权由日历视图里的「授权访问日历」按钮触发
+  （`requestFullAccessToEvents()`）；已授权的用户启动后自动开始提醒。**未授权时查询返回空数组**，
+  不伪造日程；主搜索此时给「需要日历访问权限」入口而不是「今日无日程」。被拒绝时视图给出
+  「打开系统设置」并轮询，用户改完回来自动恢复。`Info.plist` 必须有
+  `NSCalendarsFullAccessUsageDescription`，缺了系统直接拒绝申请。
 - **事件模型为纯值类型 `CalendarEvent`**：排序与时间展示在 Model 层可测；`EKEvent` 只在
   `CalendarService` 翻译一次。
 - **动态搜索**：命中触发词后拉取今日事件；无事件时仍返回一条「今日无日程」占位项；有事件时
   **最多 5 条**；选中任一条结果 `action` 发布 `NavigateEvent`（事件项可带 `eventID` 上下文）。
-- **农历文案**由 `CalendarFormatting.lunar`（中国历 + `zh_CN` 长日期）生成。
+- **农历文案**由 `CalendarFormatting.lunar`（中国历 + `zh_CN` 长日期）生成；月历格子的小字由
+  `lunarCellLabel` 给出（初一显示月份，闰月带「闰」）。
+- **视图 = 月历 + 当天日程**：月份切换、点选日期、「今天」；有事件的日子画小圆点；周数列由
+  `calendar.showWeekNumber` 控制，周的算法跟随系统区域设置（`weekOfYear`）。
+- **会议链接**（`MeetingLinkExtractor`）只认 Zoom / 腾讯会议 / Google Meet / Teams / 飞书 / 钉钉 /
+  Webex 等已知域名（后缀匹配，防 `evilzoom.us`），在日程旁显示「加入会议」；设置
+  `calendar.autoExtractMeetingLinks` 关掉后不识别。
+- **开始前提醒**（`ReminderPlanner` + `UNUserNotificationCenter`）：向前排 24 小时内的通知；全天事件、
+  已开始、提醒时刻已过的不提醒；`calendar.reminderMinutes` = 0 表示关闭。系统日历变化
+  （`EKEventStoreChanged`）、偏好变化、每 30 分钟都会重排；**只在确有提醒要发时才申请通知权限**。
 - **`Model/` 禁止 AppKit / SwiftUI**。
 
 #### 内部结构
 
 | 文件 | 职责 |
 | --- | --- |
-| `Model/CalendarEvent.swift` | 事件值类型、时间范围、排序 |
-| `Model/CalendarFormatting.swift` | 农历格式化 |
-| `Service/CalendarService.swift` | 权限、今日事件查询 |
-| `UI/CalendarView.swift` | 公历 + 农历头、今日列表 |
+| `Model/CalendarEvent.swift` | 事件值类型、排序、会议链接识别、提醒计划 |
+| `Model/CalendarFormatting.swift` | 农历、周数、月历网格 |
+| `Model/CalendarPreferences.swift` | 三项偏好的读取与夹取 |
+| `Service/CalendarService.swift` | 权限、按天 / 按月查询、提醒排程 |
+| `UI/CalendarView.swift` | 月历 + 当天日程 + 授权引导 |
 | `CalendarPlugin.swift` | 搜索、命令声明 |
 
 #### 持久化
 
 | 键 | 含义 | 默认 |
 | --- | --- | --- |
-| `calendar.reminderMinutes` | 设置页：提醒提前分钟 | 10（尚未接入 Service） |
-| `calendar.autoExtractMeetingLinks` | 设置页：自动提取会议链接 | true（尚未接入） |
-| `calendar.showWeekNumber` | 设置页：显示周数 | false（尚未接入） |
+| `calendar.reminderMinutes` | 提醒提前分钟，0 = 不提醒 | 10 |
+| `calendar.autoExtractMeetingLinks` | 识别会议链接并显示「加入会议」 | true |
+| `calendar.showWeekNumber` | 月历显示周数列 | false |
 
 #### 已知限制
 
-- 设置页三项偏好尚未接入 `CalendarService` / `CalendarView`。
+- 只读：不创建 / 修改日程；点击日程不会跳转到系统日历。
 - 功能命令默认 `perform` 仅打开插件面板。
 - 描述中的「节假日安排」暂无独立数据源，仅农历字符串。
 
@@ -599,13 +612,19 @@
 - **本机 IP**：遍历 `getifaddrs`，仅 IPv4，接口名 **`en0` 或 `en1`**，取第一个命中。
 - **DNS**：读 `/etc/resolv.conf` 全文，由纯函数 `ResolvConf.dnsServers` 解析行首 `nameserver`。
 - **公网 IP 查询可注入**（`NetworkService.init(fetchPublicIP:)`）供测试替换网络。
-- **`Model/ResolvConf.swift` 禁止 AppKit / SwiftUI**。
+- **Ping**：`/sbin/ping`（路径写死、参数走数组、不经 shell）。目标须过 `PingTarget.validated`
+  （只放行主机名 / IP 字符，拒绝 `-` 开头的选项）；包数取 `networkTools.pingCount`，超时取
+  `networkTools.timeout`（读时夹到 1–20 / 1–30）；任务取消会终止子进程；输出由 `PingParser` 解析汇总。
+- **`refresh()` 可重入**：用代数丢弃较早一轮的结果；公网 IP 请求超时取设置、只接受 IP 字面量，失败写日志。
+- **`Model/` 禁止 AppKit / SwiftUI**。
 
 #### 内部结构
 
 | 文件 | 职责 |
 | --- | --- |
 | `Model/ResolvConf.swift` | resolv.conf 文本 → DNS 列表 |
+| `Model/PingModels.swift` | 偏好夹取、目标校验、ping 输出解析 |
+| `Service/PingRunner.swift` | 调用 `/sbin/ping`，可取消 |
 | `Service/NetworkService.swift` | IP/DNS 采集、加载状态 |
 | `UI/NetworkToolsView.swift` | 刷新按钮、信息行、复制 |
 | `NetworkToolsPlugin.swift` | 触发词与单面板导航 |
@@ -615,13 +634,12 @@
 | 键 | 含义 | 默认 |
 | --- | --- | --- |
 | `networkTools.showExternalIP` | 查询并展示公网 IP | true（未写过） |
-| `networkTools.pingCount` | 设置页：Ping 次数 | 4（**未接入**） |
-| `networkTools.timeout` | 设置页：超时秒数 | 5（**未接入**） |
+| `networkTools.pingCount` | Ping 次数 | 4 |
+| `networkTools.timeout` | 超时秒数（Ping 每包 / 公网 IP 请求） | 5 |
 
 #### 已知限制
 
-- **网络测速**、**Ping**、**DNS 切换** 仅在触发词与设置页文案中出现，**无**
-  独立动作与 UI。
+- **网络测速**、**DNS 切换** 仅在触发词中出现，**无**独立动作与 UI。
 - 公网 IP 依赖第三方 HTTPS 服务，离线或被封时显示「无法获取」。
 - 本机 IP 只反映以太网/Wi‑Fi 常见接口，VPN / 桥接 / 其它接口可能看不到。
 
@@ -1004,6 +1022,10 @@
 #### 不变量
 
 - **是按行位置对齐，不是 LCS 最长公共子序列**：中间插入一行会让其后所有行都被标成「删一行 + 加一行」。改算法等于改可见行为，需同步改测试。
+- **「忽略空白 / 忽略大小写」真的生效**（`TextDiffLogic.Options`）：只影响「两行算不算相同」，
+  展示的仍是原文。忽略空白 = 裁掉行首尾空白并把行内连续空白当一个；「没有这一行」永远不等于空行。
+  工具栏开关与设置页共用同一个键（`textDiff.ignoreWhitespace` / `textDiff.ignoreCase`）。
+- **左右栏底色在文本或选项变化时算一次**，缓存在 `@State`，不在 `body` 里每次重算。
 - **空串等价于一行空行**：`diff("", "")` 会给出 1 行 `.same`（空行）而不是 0 行；`diff("", "x")` 是 1 删 1 加。
 - `DiffLine.LineType` 嵌在 `DiffLine` 里，视图按原拼写使用它。
 - **对比长在编辑器里，不是另起一段结果列表。** 左右各一个 `CodeEditorView`（AppKit 原生 `NSTextView`）：可编辑、语法高亮、行号槽、逐行红绿底。旧实现把差异单独铺在输入框下面，用户明确否掉了 —— 那样看不出「哪一行变成了哪一行」。

@@ -20,7 +20,7 @@ struct NetworkToolsSettingsView: View {
             } label: {
                 SettingsRow(
                     title: "Ping 测试次数",
-                    subtitle: "每次 Ping 测试发送的数据包数量。",
+                    subtitle: "在网络工具里点「开始」时发送的数据包数量。",
                     icon: { SettingsRowIcon(systemImage: "antenna.radiowaves.left.and.right") }
                 )
             }
@@ -32,20 +32,18 @@ struct NetworkToolsSettingsView: View {
             } label: {
                 SettingsRow(
                     title: "超时时间",
-                    subtitle: "网络请求超时的等待秒数。"
+                    subtitle: "Ping 每个包的等待上限，同时是查询公网 IP 的请求超时。"
                 )
             }
 
             Toggle(isOn: $showExternalIP) {
                 SettingsRow(
                     title: "显示公网 IP",
-                    subtitle: "搜索网络工具时自动展示当前公网 IP。"
+                    subtitle: "打开网络工具时展示当前公网 IP；关闭后不会向第三方接口发请求。"
                 )
             }
         } header: {
             Text("网络诊断")
-        } footer: {
-            PendingFeatureNote(detail: "Ping 测试次数与超时还没有实现：这个插件目前只做本机地址、DNS 和公网 IP，没有 ping 功能。")
         }
     }
 }
