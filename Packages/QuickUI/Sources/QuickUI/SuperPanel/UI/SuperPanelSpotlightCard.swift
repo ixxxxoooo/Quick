@@ -224,12 +224,16 @@ struct SuperPanelSpotlightCard: View {
         isFromDateString: Bool
     ) -> some View {
         HStack(spacing: DesignTokens.Spacing.xs) {
-            infoChip(relative)
-            if let local = localTime {
-                infoChip("本地: \(local)")
+            // 标题已经给出格式化时间、副标题已经给出相对时间与原文，
+            // 这里只放「标题里没有」的信息：日期文本给本地时间，数字时间戳给秒值，
+            // 再补一个毫秒值 —— 重复同一串数字三遍只会挤出换行。
+            if isFromDateString, let local = localTime {
+                infoChip(local)
+            } else if let sec = unixSeconds, sec != original {
+                infoChip("秒 \(sec)")
             }
-            if let sec = unixSeconds {
-                infoChip("时间戳: \(sec)")
+            if let ms = unixMilliseconds, ms != original {
+                infoChip("毫秒 \(ms)")
             }
         }
     }

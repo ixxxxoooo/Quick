@@ -134,5 +134,6 @@ struct SuperPanelHeaderView: View {
         .buttonStyle(.plain)
         .focusable(false)
         .help(help)
+        .accessibilityLabel(help)
     }
 }
