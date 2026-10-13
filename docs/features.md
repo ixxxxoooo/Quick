@@ -656,6 +656,25 @@
 - 公网 IP 依赖第三方 HTTPS 服务，离线或被封时显示「无法获取」。
 - 本机 IP 只反映以太网/Wi‑Fi 常见接口，VPN / 桥接 / 其它接口可能看不到。
 
+### 设置备份与恢复（宿主，设置 → 通用）
+
+把偏好域导出成 `.quicksettings`（XML plist），换机或重装后导入。逻辑在
+`QuickPlatform/Settings/SettingsBackup.swift`（纯函数，可独立测）；文件面板与结果提示在
+`GeneralPane`；读写 `UserDefaults` 与重启在 `Quick/SettingsBridge+Backup.swift`。
+
+#### 不变量
+
+- **只带 Quick 自己的键**：`NS*` / `Apple*` / `com.apple.*` 等系统与框架键（窗口位置、语言）
+  导出与导入都过滤。导入**不信任文件**，同样过滤并计数，被篡改的备份改不了系统键。
+- **用 plist 而不是 JSON**：`Bool` / `Int` / `Double` / `Data` / `Date` 往返不丢类型。
+  `Bool` 必须先按 `CFBoolean` 区分，否则 `true` 会被写回成整数 1。
+- **先解析、后写入**：解析失败一个键都不写。写入前先把当前设置另存为
+  `Application Support/<bundle id>/settings-before-import.plist`；这份保险写不出来就中止导入。
+- 版本号高于 `currentVersion` 的备份明确拒绝，不猜着解析；超过 5 MB 直接拒绝（读入内存前先看文件大小）。
+- **不在备份里**：数据库内容（剪贴板历史等）与钥匙串里的 API Key。
+- 导入后提示重启：部分设置（热键、插件启用、外观监听）只在启动时读取，重启才整体生效。
+- 结果在页面内展示，**不弹 `NSAlert`**。
+
 ### 超级面板（Super Panel）
 
 对齐 Fasty 的双态超级面板：在**鼠标处**弹出一块独立浮层，识别选区 / 剪贴板内容给出

@@ -123,6 +123,11 @@ final class StatusItemController {
     /// AppKit 没有「等我退出之后再启动我」的 API，所以起一个脱离的 shell 等本进程
     /// 消失后再重新打开。这是少数几个非用 shell 不可的地方。
     @objc private func restart() {
+        restartApplication()
+    }
+
+    /// 重启应用（菜单项与设置页「导入后重启」共用）
+    func restartApplication() {
         let pid = ProcessInfo.processInfo.processIdentifier
         let bundlePath = Bundle.main.bundlePath
 

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		03D030042B8C230428E13BF8 /* QuickPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = EB1FAFFF92FB2D709E88377F /* QuickPlatform */; };
+		1E203069C97521F37041068D /* SettingsBridge+Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03183AE996907FD3383E5F67 /* SettingsBridge+Backup.swift */; };
 		277B92A1F7D8BA105B19055E /* PluginCalculator in Frameworks */ = {isa = PBXBuildFile; productRef = 892814393E695508914504C9 /* PluginCalculator */; };
 		3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7873A36EB616CB4FE27F295 /* AppCore.swift */; };
 		39BF304AD2D01B87D3F7834C /* PluginTranslator in Frameworks */ = {isa = PBXBuildFile; productRef = CA41B567971AB8CE0445F5C7 /* PluginTranslator */; };
@@ -41,6 +42,7 @@
 
 /* Begin PBXFileReference section */
 		00A1B58BBD8B3D2B436F3C38 /* PluginCalculator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginCalculator; path = Packages/PluginCalculator; sourceTree = SOURCE_ROOT; };
+		03183AE996907FD3383E5F67 /* SettingsBridge+Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsBridge+Backup.swift"; sourceTree = "<group>"; };
 		09526C0009FCB6C64F053D41 /* QuickCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickCore; path = Packages/QuickCore; sourceTree = SOURCE_ROOT; };
 		1701F76E22B29388E212E6DA /* QuickApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickApp.swift; sourceTree = "<group>"; };
 		1CDBE955E3F9746443CAE91B /* PluginTimestampConverter */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginTimestampConverter; path = Packages/PluginTimestampConverter; sourceTree = SOURCE_ROOT; };
@@ -128,6 +130,7 @@
 				29D3223EB25304FC1C719BA9 /* Quick.entitlements */,
 				1701F76E22B29388E212E6DA /* QuickApp.swift */,
 				A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */,
+				03183AE996907FD3383E5F67 /* SettingsBridge+Backup.swift */,
 				E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */,
 				7BB92E5F9C0104DB071DFF81 /* Resources */,
 			);
@@ -302,6 +305,7 @@
 				F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */,
 				3F28736FE058C441506AB7F0 /* FileSearchSource.swift in Sources */,
 				9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */,
+				1E203069C97521F37041068D /* SettingsBridge+Backup.swift in Sources */,
 				524D1EC52B497EBF1E980A28 /* SettingsBridge.swift in Sources */,
 				A5F5BA05FBA565DA840A590D /* StatusItemController.swift in Sources */,
 			);

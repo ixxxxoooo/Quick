@@ -321,6 +321,19 @@ public protocol PluginSettingsDataSource: AnyObject {
     func setForcedKeyboardLayout(_ layoutID: String?)
 }
 
+/// 一次设置导入的结果
+public struct SettingsImportSummary: Sendable, Equatable {
+    /// 已写入的设置项数
+    public let applied: Int
+    /// 因键不合规被丢弃的条目数
+    public let skipped: Int
+
+    public init(applied: Int, skipped: Int) {
+        self.applied = applied
+        self.skipped = skipped
+    }
+}
+
 /// 宿主级：通用、超级面板、AI、权限、关于
 @MainActor
 public protocol HostSettingsDataSource: AnyObject {
@@ -329,6 +342,14 @@ public protocol HostSettingsDataSource: AnyObject {
     var isLaunchAtLoginEnabled: Bool { get }
     func setLaunchAtLogin(_ enabled: Bool)
     var hotKeyDescription: String { get }
+
+    // MARK: - 备份与恢复
+    /// 把当前设置序列化成备份文件内容
+    func exportSettings() throws -> Data
+    /// 解析备份并写入设置；导入前会自动把现有设置另存一份，导入失败时原设置不动
+    func importSettings(_ data: Data) throws -> SettingsImportSummary
+    /// 重启应用（导入后让新设置整体生效）
+    func restartApplication()
 
     // MARK: - 超级面板（宿主级）
     /// 超级面板的设置页
