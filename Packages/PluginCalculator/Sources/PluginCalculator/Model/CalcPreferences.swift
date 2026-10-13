@@ -70,6 +70,13 @@ nonisolated enum CalcPreferences {
         )
     }
 
+    /// 是否允许联网更新货币汇率（默认开）
+    ///
+    /// 关掉后只用本机缓存的汇率；从没拉过则货币换算不可用，不会发任何请求。
+    static func onlineCurrencyRates(defaults: UserDefaults = .standard) -> Bool {
+        boolValue(forKey: PluginSettingKey.Calculator.onlineCurrencyRates, fallback: true, defaults: defaults)
+    }
+
     /// 读布尔值，未设置过（`object` 为 nil）时返回 `fallback`
     private static func boolValue(
         forKey key: String,

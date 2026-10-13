@@ -10,6 +10,7 @@ struct CalculatorSettingsView: View {
     @AppStorage(PluginSettingKey.Calculator.precision) private var precision = 4
     @AppStorage(PluginSettingKey.Calculator.useGroupingSeparator) private var useGrouping = true
     @AppStorage(PluginSettingKey.Calculator.autoCopy) private var autoCopy = false
+    @AppStorage(PluginSettingKey.Calculator.onlineCurrencyRates) private var onlineRates = true
 
     var body: some View {
         Section {
@@ -37,6 +38,13 @@ struct CalculatorSettingsView: View {
                 SettingsRow(
                     title: "回车后自动复制结果",
                     subtitle: "按回车确认后将计算结果自动复制到剪贴板。"
+                )
+            }
+
+            Toggle(isOn: $onlineRates) {
+                SettingsRow(
+                    title: "在线更新货币汇率",
+                    subtitle: "支持「100 usd to cny」「50 美元转人民币」。每 12 小时最多从 open.er-api.com 拉取一次；关闭后只用本机缓存。"
                 )
             }
         } header: {
