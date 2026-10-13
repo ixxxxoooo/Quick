@@ -15,10 +15,20 @@ struct SystemActionsSettingsPane: View {
 
     let dataSource: any LauncherSettingsDataSource & CommandSettingsDataSource & PluginSettingsDataSource
 
+    @AppStorage(PluginSettingKey.SystemControl.confirmDestructive) private var confirmDestructive = true
+
     var body: some View {
         let actions = dataSource.systemActions
         return Form {
             PluginIntroSection(dataSource: dataSource, pluginID: "systemcontrol")
+            Section {
+                Toggle(isOn: $confirmDestructive) {
+                    SettingsRow(
+                        title: "危险操作前确认",
+                        subtitle: "重新启动、关机、退出登录、清空废纸篓执行前先弹出确认框；热键触发时同样生效。"
+                    )
+                }
+            }
             Section {
                 if actions.isEmpty {
                     Text("暂无系统操作")

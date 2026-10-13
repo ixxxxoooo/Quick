@@ -8,7 +8,8 @@ import QuickCore
 ///
 /// 用来承接**不属于任何插件**的搜索结果。文件搜索是第一个：它由 `QuickPlatform`
 /// 提供能力，装配在 `AppCore` 里，没有插件身份 —— 因此不出现在插件列表、
-/// 不能被单独禁用，也没有自己的面板。
+/// 也没有自己的面板。它可以在「设置 → 搜索范围」里像插件一样被单独关掉：
+/// 引擎会用 `sourceID` 去问 `isSearchSourceEnabled`，关掉后连 `accepts` 都不会调用。
 ///
 /// 之所以做成协议而不是让引擎直接认识文件搜索：`QuickUI` 不该 import
 /// `QuickPlatform`，更不该认识 Spotlight。引擎只认「一个能按查询给结果的来源」。

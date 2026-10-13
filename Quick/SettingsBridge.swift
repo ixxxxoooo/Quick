@@ -280,7 +280,7 @@ final class SettingsBridge: SettingsDataSource {
     }
 
     var searchSources: [SettingsSearchSource] {
-        pluginEntries.map { plugin in
+        let plugins = pluginEntries.map { plugin in
             SettingsSearchSource(
                 id: plugin.id,
                 title: plugin.name,
@@ -289,6 +289,15 @@ final class SettingsBridge: SettingsDataSource {
                 isEnabled: core.settingsStore.isSearchSourceEnabled(plugin.id)
             )
         }
+        // 文件搜索是宿主自己的来源，不在插件列表里，但同样允许单独关闭
+        let files = SettingsSearchSource(
+            id: FileSearchSource.sourceIdentifier,
+            title: "文件搜索",
+            subtitle: "关闭后，输入 f / file / 文件 前缀不再查找本机文件。",
+            icon: "folder",
+            isEnabled: core.settingsStore.isSearchSourceEnabled(FileSearchSource.sourceIdentifier)
+        )
+        return plugins + [files]
     }
 
     func setSearchSourceEnabled(_ pluginID: String, enabled: Bool) {

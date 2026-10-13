@@ -12,6 +12,7 @@ struct KillProcessSettingsView: View {
     @AppStorage(PluginSettingKey.KillProcess.showPID) private var showPID = false
     @AppStorage(PluginSettingKey.KillProcess.searchInPath) private var searchInPath = false
     @AppStorage(PluginSettingKey.KillProcess.searchInPID) private var searchInPID = false
+    @AppStorage(PluginSettingKey.KillProcess.confirmForceKill) private var confirmForceKill = true
 
     var body: some View {
         Section {
@@ -58,6 +59,13 @@ struct KillProcessSettingsView: View {
                 SettingsRow(
                     title: "搜索 PID",
                     subtitle: "标题栏搜索时同时匹配进程号。"
+                )
+            }
+
+            Toggle(isOn: $confirmForceKill) {
+                SettingsRow(
+                    title: "强制结束前确认",
+                    subtitle: "强制结束不会让进程保存数据。系统核心进程无论此项如何都会确认。"
                 )
             }
         } header: {

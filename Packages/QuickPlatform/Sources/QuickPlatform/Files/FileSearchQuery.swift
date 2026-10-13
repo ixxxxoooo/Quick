@@ -56,4 +56,24 @@ public enum FileSearchQuery {
             arguments: [keyword, keyword]
         )
     }
+
+    // MARK: - 结果条目 id
+
+    /// 文件结果在主搜索里的条目 id 前缀
+    ///
+    /// 条目 id 会被写进「最近使用」，之后超级面板要靠它反解出文件路径，所以编码与解码
+    /// 必须放在同一处，不能各自拼字符串。
+    public static let itemIDPrefix = "filesearch."
+
+    /// 路径 → 条目 id
+    public static func itemID(forPath path: String) -> String {
+        itemIDPrefix + path
+    }
+
+    /// 条目 id → 路径；不是文件条目（或路径为空）时返回 nil
+    public static func path(fromItemID id: String) -> String? {
+        guard id.hasPrefix(itemIDPrefix) else { return nil }
+        let path = String(id.dropFirst(itemIDPrefix.count))
+        return path.isEmpty ? nil : path
+    }
 }

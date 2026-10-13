@@ -198,3 +198,54 @@ struct KillProcessPluginContractTests {
         #expect(await plugin.dynamicSearch(query: "weather").isEmpty)
     }
 }
+
+@Suite("结束进程的二次确认策略")
+struct KillConfirmPolicyTests {
+
+    @Test("普通进程的普通结束不确认")
+    func plainTerminateOfOrdinaryProcessSkipsConfirmation() {
+        #expect(
+            !KillConfirmPolicy.needsConfirmation(
+                force: false, processName: "Cursor", confirmForceKill: true))
+    }
+
+    @Test("强制结束按设置决定是否确认")
+    func forceKillFollowsTheSetting() {
+        #expect(
+            KillConfirmPolicy.needsConfirmation(
+                force: true, processName: "Cursor", confirmForceKill: true))
+        #expect(
+            !KillConfirmPolicy.needsConfirmation(
+                force: true, processName: "Cursor", confirmForceKill: false))
+    }
+
+    @Test("系统核心进程无论设置如何都要确认")
+    func protectedProcessesAlwaysAsk() {
+        for name in KillConfirmPolicy.protectedNames {
+            #expect(
+                KillConfirmPolicy.needsConfirmation(
+                    force: false, processName: name, confirmForceKill: false),
+                "\(name) 是核心进程，普通结束也必须确认")
+        }
+    }
+
+    @Test("Finder 与 Dock 被杀会自动重启，不算核心进程")
+    func finderAndDockAreNotProtected() {
+        #expect(!KillConfirmPolicy.protectedNames.contains("Finder"))
+        #expect(!KillConfirmPolicy.protectedNames.contains("Dock"))
+    }
+
+    @Test("设置缺省时强制确认为开")
+    func confirmForceKillDefaultsToOn() {
+        let suite = UserDefaults(suiteName: "killprocess.confirm.\(UUID().uuidString)")!
+        #expect(KillProcessPreferences.confirmForceKill(defaults: suite))
+        suite.set(false, forKey: PluginSettingKey.KillProcess.confirmForceKill)
+        #expect(!KillProcessPreferences.confirmForceKill(defaults: suite))
+    }
+
+    @Test("确认文案点名目标进程")
+    func messageNamesTheProcess() {
+        #expect(KillConfirmPolicy.message(force: true, processName: "Cursor").contains("Cursor"))
+        #expect(KillConfirmPolicy.message(force: false, processName: "WindowServer").contains("核心"))
+    }
+}

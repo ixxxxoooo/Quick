@@ -50,6 +50,7 @@ public enum PluginSettingKey {
         public static let precision = "calculator.precision"
         public static let useGroupingSeparator = "calculator.useGroupingSeparator"
         public static let autoCopy = "calculator.autoCopy"
+        public static let onlineCurrencyRates = "calculator.onlineCurrencyRates"
     }
 
     /// 日历
@@ -99,6 +100,14 @@ public enum PluginSettingKey {
         public static let showPID = "killprocess.showPID"
         public static let searchInPath = "killprocess.searchInPath"
         public static let searchInPID = "killprocess.searchInPID"
+        /// 强制结束前二次确认（默认开）
+        public static let confirmForceKill = "killprocess.confirmForceKill"
+    }
+
+    /// 系统控制
+    public enum SystemControl {
+        /// 重启、关机、退出登录、清空废纸篓前二次确认（默认开）
+        public static let confirmDestructive = "systemControl.confirmDestructive"
     }
 
     /// 网络工具

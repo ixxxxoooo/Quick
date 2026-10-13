@@ -22,6 +22,9 @@ public final class SystemControlPlugin: QuickPlugin, PluginViewProviding {
         "屏保", "废纸篓", "弹出", "深色", "注销"
     ]
 
+    /// 标题栏搜索：按输入筛选操作，并让 ↑↓ / ↵ 在列表里可用
+    public static var supportsPanelSearch: Bool { true }
+
     public var isEnabled = true
 
     private let log = QuickLog.plugin(SystemControlPlugin.id)
@@ -54,6 +57,9 @@ public final class SystemControlPlugin: QuickPlugin, PluginViewProviding {
     }
 
     /// 热键和搜索走同一个入口。命令关闭时直接拒绝
+    ///
+    /// 破坏性操作（重启、关机、退出登录、清空废纸篓）不在这里直接执行：先把面板带到插件视图，
+    /// 由视图弹出确认框。热键与主搜索因此和在列表里点选走同一道门，没有「绕过确认」的入口。
     public func perform(commandID: String) {
         let prefix = "systemcontrol."
         guard commandID.hasPrefix(prefix) else { return }
@@ -61,6 +67,12 @@ public final class SystemControlPlugin: QuickPlugin, PluginViewProviding {
         guard let action = SystemAction(rawValue: raw) else { return }
         if let settingsStore, !settingsStore.isCommandEnabled(commandID) {
             log.notice("命令已关闭，拒绝执行 \(commandID, privacy: .public)")
+            return
+        }
+        if SystemControlPreferences.shouldConfirm(action) {
+            log.notice("系统命令需要确认，转到确认框 \(commandID, privacy: .public)")
+            EventBus.shared.post(
+                NavigateEvent(pluginID: Self.id, context: [SystemControlView.confirmContextKey: raw]))
             return
         }
         log.notice("执行系统命令 \(commandID, privacy: .public)")
@@ -74,7 +86,13 @@ public final class SystemControlPlugin: QuickPlugin, PluginViewProviding {
     }
 
     public func makeView() -> AnyView {
-        AnyView(SystemControlView(runner: runner))
+        let store = settingsStore
+        return AnyView(
+            SystemControlView(
+                runner: runner,
+                isActionEnabled: { action in
+                    store?.isCommandEnabled(CommandID.systemAction(action.rawValue)) ?? true
+                }))
     }
 
     public func activate() {

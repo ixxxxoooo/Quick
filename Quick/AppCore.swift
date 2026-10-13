@@ -105,7 +105,7 @@ final class AppCore {
     ///
     /// 全应用一个库，插件的批量数据与插件键值都在里面。`lazy` 是因为打开可能失败，
     /// 而失败的兜底需要写日志（`log` 是实例属性）。
-    private(set) lazy var database: SQLiteDatabase = Self.openDatabase()
+    private(set) lazy var database: SQLiteDatabase = openDatabase()
 
     /// 设置窗口的数据源桥接
     private(set) lazy var settingsBridge = SettingsBridge(core: self)
@@ -125,19 +125,29 @@ final class AppCore {
     /// 不出现在插件列表、也不能被单独禁用。
     private let fileSearchSource = FileSearchSource()
 
+    /// 数据库健康状况；`start()` 末尾据此提示用户
+    private(set) var databaseNotice: String?
+
     /// 打开数据库
     ///
-    /// 打不开文件时退到内存库继续运行：剪贴板、笔记这些功能不该因为存储问题整个用不了，
-    /// 代价是本次运行不落盘 —— 所以这条日志是 error 级，不静默。
-    private static func openDatabase() -> SQLiteDatabase {        do {
-            return try SQLiteDatabase(path: AppPaths.database())
-        } catch {
-            QuickLog.app.error("数据库打不开，本次运行改用内存库，数据不会保存：\(error)")
-            guard let fallback = try? SQLiteDatabase() else {
-                // 连内存库都开不起来，说明进程已经没有可用的存储了
-                fatalError("无法创建内存数据库：\(error)")
+    /// 走 `ResilientDatabase` 的三级降级：正常 → 隔离坏库后重建 → 内存库。
+    /// 不静默：重建与内存库都会留下 `databaseNotice`，由 `start()` 弹 HUD。
+    private func openDatabase() -> SQLiteDatabase {
+        do {
+            let outcome = try ResilientDatabase.open(at: AppPaths.database())
+            switch outcome {
+            case .opened:
+                break
+            case .recovered(_, let quarantined):
+                databaseNotice = "数据库已损坏，已备份为 \(quarantined.lastPathComponent) 并重新创建"
+            case .inMemory(_, let reason):
+                QuickLog.app.error("数据库不可用，本次运行改用内存库，数据不会保存：\(reason, privacy: .public)")
+                databaseNotice = "数据库不可用，本次运行的数据不会保存"
             }
-            return fallback
+            return outcome.database
+        } catch {
+            // 连内存库都开不起来，说明进程已经没有可用的存储了
+            fatalError("无法创建内存数据库：\(error)")
         }
     }
 
@@ -293,6 +303,11 @@ final class AppCore {
 
         // 9–13. 开发启动参数（验收用）：统一在这里处理，AppDelegate 不再重复解析
         applyLaunchArguments(ProcessInfo.processInfo.arguments)
+
+        // 存储出过问题就明说：用户看到的症状是「历史记不住」，根因只在日志里
+        if let notice = databaseNotice {
+            hudController.show(message: notice, tone: .warning)
+        }
 
         log.notice("AppCore 启动完成")
     }
@@ -534,8 +549,9 @@ final class AppCore {
             try database.migrate([.corePluginData, .coreUsageHistory])
         } catch {
             // 迁移失败不能静默：继续跑下去会以「表不存在」的形式在插件里炸开，
-            // 那时已经看不出根因了
+            // 那时已经看不出根因了。日志之外还要让用户知道，否则只会看到「历史记不住」
             log.error("宿主存储迁移失败：\(error)")
+            databaseNotice = databaseNotice ?? "数据存储初始化失败，部分功能（最近使用、历史记录）可能无法保存"
         }
     }
 
@@ -552,6 +568,7 @@ final class AppCore {
             log.notice("插件 schema 已就绪，共 \(migrations.count, privacy: .public) 个迁移")
         } catch {
             log.error("插件存储迁移失败：\(error)")
+            databaseNotice = databaseNotice ?? "插件数据初始化失败，部分插件的数据可能无法保存"
         }
     }
 
@@ -818,6 +835,15 @@ final class AppCore {
                 id: id, title: app.name, subtitle: app.path, icon: "app",
                 kind: .app, launchPath: app.path)
         }
+        // 文件搜索结果：条目 id 里编码了路径，文件还在才算有效「最近」
+        if let path = FileSearchQuery.path(fromItemID: id) {
+            guard FileManager.default.fileExists(atPath: path) else { return nil }
+            let url = URL(fileURLWithPath: path)
+            return SuperPanelRecentItem(
+                id: id, title: url.lastPathComponent, subtitle: path,
+                icon: FileIconMapper.icon(forFileName: url.lastPathComponent),
+                kind: .file, launchPath: path)
+        }
         if let pluginID = CommandID.openedPluginID(in: id),
             let plugin = pluginsByID[pluginID]
         {
@@ -921,18 +947,31 @@ final class AppCore {
     // MARK: - 自定义命令存储辅助
 
     func loadCustomCommands() -> [CustomCommand] {
-        guard let data = settingsStore.customCommandsData,
-            let list = try? JSONDecoder().decode([CustomCommand].self, from: data)
-        else {
+        guard let data = settingsStore.customCommandsData else { return [] }
+        do {
+            return try JSONDecoder().decode([CustomCommand].self, from: data)
+        } catch {
+            // 解码失败时返回空数组，下一次保存会把坏数据覆盖掉 —— 所以必须留下证据
+            log.error("自定义命令数据无法解析，按空列表处理：\(error)")
             return []
         }
-        return list
     }
 
-    func saveCustomCommands(_ commands: [CustomCommand]) {
-        let data = try? JSONEncoder().encode(commands)
-        settingsStore.setCustomCommandsData(data)
-        cachedCustomCommands = nil
+    /// 保存自定义命令
+    ///
+    /// - Returns: 是否写入成功；失败时已记日志并弹 HUD，调用方不必再提示
+    @discardableResult
+    func saveCustomCommands(_ commands: [CustomCommand]) -> Bool {
+        do {
+            let data = try JSONEncoder().encode(commands)
+            settingsStore.setCustomCommandsData(data)
+            cachedCustomCommands = nil
+            return true
+        } catch {
+            log.error("自定义命令编码失败，未保存：\(error)")
+            hudController.show(message: "自定义命令保存失败", tone: .danger)
+            return false
+        }
     }
 
     // MARK: - 快捷键恢复
@@ -1031,7 +1070,10 @@ final class AppCore {
         // 动态命令（如 `launcher.app.*`、`launcher.shell.*`）不在静态 `commands` 里，
         // 没有映射条目，只能按插件 id 前缀回退。前缀匹配天然只能遍历，但这类命令
         // 只在执行时问一次，不在按键热路径上。
-        return plugins.first { commandID.hasPrefix(type(of: $0).id + ".") }
+        // 命令 id 的约定是 `<插件 id>.<后缀>`，插件 id 本身不含「.」，所以取第一段直接查字典，
+        // 不必再扫描全部插件
+        let prefix = commandID.prefix { $0 != "." }
+        return pluginsByID[String(prefix)]
     }
 
     /// 用当前插件声明和开关重建静态命令快照，并按开关注册热键

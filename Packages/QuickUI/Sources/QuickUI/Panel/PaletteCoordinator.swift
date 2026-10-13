@@ -646,6 +646,8 @@ public final class PaletteCoordinator {
 
         newPanel.onEscape = { [weak self] in
             guard let self else { return false }
+            // 插件正显示模态确认框：Esc 只关框，不退插件
+            if self.routeCancel() { return true }
             self.handleEscape()
             return true
         }
@@ -716,6 +718,13 @@ public final class PaletteCoordinator {
             return true
         }
         return selection.activateSelection()
+    }
+
+    /// Esc：插件正显示模态确认框（`wantsCancel`）时转成 `.cancel` 请求，否则不消费
+    func routeCancel() -> Bool {
+        guard activePluginID != nil, pluginSearch.wantsCancel else { return false }
+        pluginSearch.request(.cancel)
+        return true
     }
 
     /// 左右键：只有插件内搜索需要（主搜索的左右键属于搜索框光标）

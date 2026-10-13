@@ -334,6 +334,14 @@ Debug（`.dev`）与 Release 互不污染。
 记**使用次数**（与时间无关，用于给搜索结果加权），`UsageHistory` 记**最后一次是什么时候**
 （昨天启动过 20 次的东西，不该排在刚刚用过的翻译前面）。
 
+#### 宿主库损坏时自愈，不让用户一直面对空白
+
+宿主库由 [`ResilientDatabase`](../Packages/QuickCore/Sources/QuickCore/Storage/ResilientDatabase.swift)
+打开：先 `PRAGMA integrity_check`；打不开或检查不过时，把坏文件（连同 `-wal` / `-shm`）改名为
+`<name>.corrupt-<时间戳>` 留作证据，再建一个新库继续跑；连新库都建不了就退到内存库。
+三种结果（`opened` / `recovered` / `inMemory`）由 `AppCore.databaseNotice` 转成启动后的 HUD
+提示 —— 用户看到的症状是「历史记不住」，根因必须说出来，而不是只写日志。
+
 #### 迁移按 id 记账，不用递增版本号
 
 迁移是一个 `(id, [SQL])`。id 形如 `clipboard.history`、`notes.items`，写在

@@ -446,6 +446,10 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 - **不要用 `NSAlert`。** 系统弹窗和面板的视觉语言完全冲突（面板是无边框玻璃，
   `NSAlert` 是标题栏窗口）。需要确认时用应用内的自定义对话框面板，
   复用 `Radius.dialog`(20) + `Size.dialogWidth`(420) + 材质背景。
+- **模态确认用 `.confirmDialog(_:search:onConfirm:)`**（`QuickUI/Components/ConfirmDialog.swift`）：
+  给一个 `ConfirmRequest`（标题、说明后果、确认按钮文案、是否危险）即可。**↵ 确认 / Esc 取消**，
+  Esc 优先关对话框而不是退出插件（`PluginSearchQuery.Navigation.cancel` +
+  `PaletteCoordinator.routeCancel()`）。危险操作（结束进程、重启、关机、清空废纸篓）一律走它。
 - **轻量反馈走 `HUDController`**（底部胶囊提示），用 `HUDTone` 表达语义：
   `.success` / `.info` / `.warning` / `.danger`。
 - 需要提示或错误文案时，文案规则：**说清发生了什么 + 下一步能做什么**，

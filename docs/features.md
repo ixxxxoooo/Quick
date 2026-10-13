@@ -413,6 +413,9 @@
 - **永不列出 / 结束宿主自身 PID**（`ProcessInfo.processIdentifier`）。
 - **采样只在面板打开时跑**；间隔读 `killprocess.refreshInterval`，非法值回落 3 秒。
 - **结束成功或失败都必须走 `ShowHUDEvent`**，并打 `QuickLog`（成功 `.notice`，失败 `.error`）。
+- **危险结束要二次确认**（`KillConfirmPolicy`）：强制结束（SIGKILL）默认总是确认
+  （设置 `killprocess.confirmForceKill`，默认开）；`WindowServer`、`loginwindow`、`launchd`、
+  `kernel_task`、`SystemUIServer` 这类受保护系统进程**无论设置如何都确认**。确认框 ↵ 确认 / Esc 取消。
 - Model 层禁止 AppKit / SwiftUI。
 
 #### 内部结构
@@ -455,6 +458,12 @@
   每条系统操作都是一条静态命令（`functionCommands`），由 `CommandIndex` 按关键词
   与用户别名统一打分 —— 别名解析在 `rebuildCommandCatalog()` 里做，不在插件的搜索里。
 - **执行后关闭主面板**（`HidePaletteEvent`），与面板内点击一致。
+- **破坏性操作先确认**（`SystemAction.requiresConfirmation`：重启、关机、退出登录、清空废纸篓）。
+  热键与主搜索触发时 `perform` 不直接执行，而是 `NavigateEvent(context: ["confirm": rawValue])`
+  把面板带到插件视图弹确认框 —— 没有「绕过确认」的入口。设置 `systemcontrol.confirmDestructive`
+  （默认开）可关闭；锁屏、睡眠、屏保、弹出磁盘、切换外观不需要确认。
+- **插件视图支持标题栏搜索与键盘**（`supportsPanelSearch == true`）：输入筛选、↑↓ 移动、↵ 执行；
+  在设置里被关掉的命令不出现在列表里。
 - **反馈必须如实**：走 AppleScript 的操作失败时 HUD 提示需「自动化」权限；成功且机器即将
   休眠/重启/注销时**不**伪造成功 HUD。锁屏走 `/usr/bin/pmset displaysleepnow`。
 - **不提供没有实现的操作。** 勿扰 / 专注模式在 macOS 上没有公开的切换 API，
@@ -502,7 +511,14 @@
 - **结果上限以设置为准**（20 / 50 / 100 / 200，非法值回落 50）；**禁止**二次写死
   `prefix(10)`。
 - **忽略隐藏文件**：路径任一段以 `.` 开头的目录或文件名视为隐藏。
-- **新搜索会取消上一次查询**；**2 秒超时**后返回已收集结果。
+- **新搜索会取消上一次查询**；**2 秒超时**后返回已收集结果。查询生命周期由
+  `SearchSessionGate`（令牌）管理：每次搜索开始先结束上一个会话（返回空）、领新令牌；
+  观察者、超时任务、`NSMetadataQuery` 都在会话结束时一并清理，迟到的完成通知拿旧令牌被忽略。
+  任务被取消（`Task.cancel`）同样会立即结束会话。
+- **可在设置「搜索范围」里整体关掉**：`PaletteSearchEngine` 先查 `isSearchSourceEnabled("filesearch")`，
+  关掉后连 `accepts` 都不问。
+- **文件结果的 id 形如 `filesearch.<路径>`**（`FileSearchQuery.itemID(forPath:)`）：最近使用里
+  能据此还原成文件项；文件已不存在时不再显示。
 - **回车打开文件**（`NSWorkspace.open`）并关面板。
 - **`Model/` 禁止 AppKit / SwiftUI**；图标映射只返回 SF Symbol 名。
 

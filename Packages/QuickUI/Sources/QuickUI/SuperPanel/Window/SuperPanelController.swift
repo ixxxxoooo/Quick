@@ -351,6 +351,11 @@ public final class SuperPanelController {
             if let pluginID = item.pluginID { navigate(to: pluginID) }
         case .command:
             hide()
+        case .file:
+            hide()
+            if let path = item.launchPath {
+                NSWorkspace.shared.open(URL(fileURLWithPath: path))
+            }
         }
     }
 

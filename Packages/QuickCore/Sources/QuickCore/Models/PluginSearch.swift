@@ -35,6 +35,13 @@ public final class PluginSearchQuery {
     /// 编辑器的光标与换行）。面板据此决定是消费按键还是放行走响应链。
     public var wantsNavigation = false
 
+    /// 插件当前是否要自己处理 Esc
+    ///
+    /// 默认 Esc 的含义是「退回主搜索」。插件正显示一个模态确认框时，Esc 应当只关掉
+    /// 确认框而不是把整个插件退掉 —— 此时插件把它置真，面板把 Esc 变成 `.cancel` 请求
+    /// 交给插件；确认框收起后必须置回假，否则 Esc 会再也退不出插件。
+    public var wantsCancel = false
+
     /// 导航请求类型
     public enum Navigation: Sendable, Equatable {
         /// 上下移动（`-1` 上、`+1` 下）
@@ -43,6 +50,8 @@ public final class PluginSearchQuery {
         case tab(Int)
         /// 回车
         case submit
+        /// Esc：只有插件声明了 `wantsCancel`（正显示模态确认框）时才会收到
+        case cancel
     }
 
     /// 最近一次导航请求
@@ -98,6 +107,7 @@ public final class PluginSearchQuery {
     public func reset() {
         text = ""
         wantsNavigation = false
+        wantsCancel = false
         lastCommand = nil
     }
 }

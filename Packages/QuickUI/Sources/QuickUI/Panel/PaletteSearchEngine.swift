@@ -73,7 +73,8 @@ public enum PaletteSearchEngine {
     ///   - log: 面板分类日志
     ///   - pluginTimeout: 单个插件的超时；测试会传一个很短的值
     ///   - hostSource: 宿主自己的搜索来源（文件搜索）。它不是插件，
-    ///     所以既不出现在插件列表里、也不能被单独禁用
+    ///     所以不出现在插件列表里；但它的 `sourceID` 同样受
+    ///     `isSearchSourceEnabled` 管，设置里关掉后连 `accepts` 都不会被调用
     /// - Returns: 去重、排序、限流之后的结果，附带超时的插件 id
     public static func search(
         query: String,
@@ -134,7 +135,9 @@ public enum PaletteSearchEngine {
         let dynamicItems = await withTaskGroup(of: PluginSearchResult.self) { group in
             // 宿主来源与插件走同一个任务组：超时、取消、结果汇总都是同一套规则，
             // 不给它开第二条路径。标识在任务外取好 —— 它们是主 actor 上的属性。
-            if let hostSource, hostSource.accepts(query: trimmed) {
+            if let hostSource, isSearchSourceEnabled(hostSource.sourceID),
+                hostSource.accepts(query: trimmed)
+            {
                 let sourceID = hostSource.sourceID
                 let displayName = hostSource.displayName
                 group.addTask {

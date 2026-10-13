@@ -135,6 +135,9 @@ struct ClipboardListView: View {
                 switchTab(direction: delta)
             case .submit:
                 confirmSelection()
+            case .cancel:
+                // 只有声明了 `wantsCancel` 的视图才会收到；这里没有模态层，忽略即可
+                break
             }
         }
         // 过滤词一变，结果集就换了一批，选中项回到第一条

@@ -172,6 +172,16 @@ public enum DesignTokens {
         public static let hairline: CGFloat = 1
         /// 空状态 / 英雄位图标尺寸
         public static let emptyStateIcon = scaled(32)
+        /// 月历单元格的高度
+        public static let calendarCellHeight = scaled(42)
+        /// 月历左侧面板宽度
+        public static let calendarPanelWidth = scaled(320)
+        /// 月历周数列宽度
+        public static let calendarWeekColumn = scaled(26)
+        /// 事件 / 日期小圆点直径
+        public static let calendarDot = scaled(6)
+        /// 空状态占位区的最小高度（滚动容器里没有 `maxHeight: .infinity` 可用）
+        public static let emptyStateMinHeight = scaled(120)
         /// 列表顶部 / 底部渐隐带的高度
         ///
         /// 内容从 header 与底栏下面穿过，靠这条渐隐带淡出，而不是被硬切。
@@ -337,6 +347,13 @@ public enum DesignTokens {
     // 形状取自窗口的 alpha 通道，所以圆角就是圆角。若改成 SwiftUI `.shadow`，
     // 阴影会被窗口边界裁切，在圆角外侧留下不透明的方形暗块。
     // 详见 PaletteBackground 的说明。
+
+    // MARK: - 不透明度（语义）
+
+    public enum Opacity {
+        /// 破坏性按钮的底色浓度
+        public static let destructiveFill: Double = 0.16
+    }
 
     // MARK: - 动画时长
 
@@ -554,6 +571,8 @@ public enum DesignTokens {
 
         /// 进度色
         public static let progress = Color.blue
+        /// 压在强调色填充上的前景（选中日期的数字）
+        public static let onAccent = Color.white
 
         /// 设置侧栏图标色块配色（对齐系统设置多彩瓷砖，深浅模式各一套）
         public enum SettingsIcon {
