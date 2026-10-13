@@ -39,6 +39,9 @@ public final class SystemMonitorPlugin: QuickPlugin, PluginViewProviding, Plugin
     /// 面板显隐订阅；不保存会被 ARC 立刻取消
     private var visibilitySubscription: EventSubscription?
 
+    /// 菜单栏摘要的常驻采样（受 `showMenuBarStats` 设置控制）
+    private let menuBarStats = MenuBarStatsRunner()
+
     public init() {}
 
     public func makeView() -> AnyView {
@@ -54,13 +57,15 @@ public final class SystemMonitorPlugin: QuickPlugin, PluginViewProviding, Plugin
             [weak self] event in
             self?.scanner.notePanelVisibility(event.isVisible)
         }
-        log.notice("插件已激活，采样跟随面板显隐")
+        menuBarStats.start()
+        log.notice("插件已激活，面板采样跟随面板显隐")
     }
 
     public func deactivate() {
         visibilitySubscription?.cancel()
         visibilitySubscription = nil
         scanner.noteViewDisappeared()
+        menuBarStats.stop()
         log.notice("插件已停用")
     }
 }

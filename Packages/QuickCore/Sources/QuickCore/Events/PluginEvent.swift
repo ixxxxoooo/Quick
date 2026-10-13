@@ -55,6 +55,23 @@ public struct CopyToClipboardEvent: PluginEvent {
     }
 }
 
+// MARK: - 菜单栏文字事件
+
+/// 请求菜单栏图标旁显示（或清除）一段文字
+///
+/// 系统监控把 CPU / 内存摘要发布到这里，宿主的 `StatusItemController` 订阅并落到 `NSStatusItem` 上 ——
+/// 插件不认识状态栏，宿主不认识监控，两边只通过事件说话。
+public struct MenuBarTextEvent: PluginEvent {
+    public static let name = "quick.menubar.text"
+
+    /// 要显示的文字；`nil` 表示清除
+    public let text: String?
+
+    public init(text: String?) {
+        self.text = text
+    }
+}
+
 // MARK: - HUD 消息事件
 
 /// 显示轻量 HUD 消息

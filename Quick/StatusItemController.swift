@@ -15,6 +15,11 @@ final class StatusItemController {
 
     private var statusItem: NSStatusItem?
 
+    /// 订阅菜单栏文字事件；不保存会随返回值一起销毁
+    private var textSubscription: EventSubscription?
+    /// 最近一次的摘要文字：图标被隐藏又装回时要能立刻恢复
+    private var currentText: String?
+
     private let log = QuickLog.app
 
     /// 安装菜单栏图标与菜单
@@ -34,6 +39,15 @@ final class StatusItemController {
             }
             button.toolTip = "Quick"
         }
+        applyText(to: item)
+
+        // 插件（系统监控）通过事件请求显示 / 清除文字；宿主不认识具体插件
+        if textSubscription == nil {
+            textSubscription = EventBus.shared.on(MenuBarTextEvent.self) { [weak self] event in
+                self?.currentText = event.text
+                if let item = self?.statusItem { self?.applyText(to: item) }
+            }
+        }
 
         let menu = NSMenu()
         menu.addItem(makeItem(title: "显示 Quick", action: #selector(showPalette)))
@@ -45,6 +59,22 @@ final class StatusItemController {
 
         item.menu = menu
         statusItem = item
+    }
+
+    /// 把摘要文字落到状态项上
+    ///
+    /// 等宽数字字体：百分比位数变化时整段宽度不抖。文字为空时恢复成纯图标。
+    private func applyText(to item: NSStatusItem) {
+        guard let button = item.button else { return }
+        if let text = currentText, !text.isEmpty {
+            button.imagePosition = .imageLeading
+            button.attributedTitle = NSAttributedString(
+                string: " " + text,
+                attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)])
+        } else {
+            button.attributedTitle = NSAttributedString(string: "")
+            button.imagePosition = .imageOnly
+        }
     }
 
     /// 按「显示菜单栏图标」收起或装回

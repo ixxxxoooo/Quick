@@ -367,6 +367,11 @@
 - **序列号会出现在系统信息页**；复制系统报告前应提醒用户（与 Raycast 隐私说明一致）。
 - **侧栏不提供搜索框**；六个（含温度共七个）分类直接列出。
 
+- **菜单栏摘要走事件**：`MenuBarStatsRunner` 常驻轻量采样（只读 Mach CPU tick 与 `host_statistics64`，
+  **不起子进程、不扫进程**），按 `MenuBarStats.title` 格式化后发布 `MenuBarTextEvent`；宿主的
+  `StatusItemController` 订阅并落到 `NSStatusItem`。刷新不低于 2 秒；开关关着时只剩 3 秒一次的
+  设置轮询，并发布一次清除。首轮没有 CPU 基线不发，避免闪出 0%。
+
 #### 内部结构
 
 | 文件 | 职责 |
@@ -392,11 +397,11 @@
 | `sysmonitor.displayModeMemory` | 内存已用/空闲 | `used` |
 | `sysmonitor.displayModeDisk` | 磁盘已用/空闲 | `free` |
 | `sysmonitor.displayModeBattery` | 电池已用/空闲 | `free` |
-| `sysmonitor.showMenuBarStats` | 菜单栏文案（未接线） | false |
+| `sysmonitor.showMenuBarStats` | 菜单栏图标旁显示 CPU / 内存摘要 | false |
 
 #### 已知限制
 
-- 菜单栏 CPU/内存文案开关仍是占位，未接到 `NSStatusItem`。
+- 菜单栏摘要需要「显示菜单栏图标」开着；宿主图标被隐藏时文字也不显示（重新显示时立即恢复）。
 - 未移植风扇转速（Raycast 依赖私有 SMC 工具）。
 - 部分机型 IOHID 温度传感器为空时，仅能看到系统热压力等级。
 - 网络吞吐需要至少两帧采样才有速率；首轮侧栏显示 `—`。

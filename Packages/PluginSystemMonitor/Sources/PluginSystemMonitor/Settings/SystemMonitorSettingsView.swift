@@ -90,14 +90,11 @@ struct SystemMonitorSettingsView: View {
             Toggle(isOn: $showMenuBar) {
                 SettingsRow(
                     title: "菜单栏显示 CPU/内存",
-                    subtitle: "在菜单栏图标旁实时展示系统负载。"
+                    subtitle: "在菜单栏图标旁实时展示 CPU 与内存占用，至少每 2 秒刷新一次；需要开着「显示菜单栏图标」。"
                 )
             }
-            .disabled(true)
         } header: {
             Text("配置")
-        } footer: {
-            PendingFeatureNote(detail: "「菜单栏显示 CPU/内存」还没有实现：面板内采样已就绪，菜单栏文案尚未接线。")
         }
     }
 }
