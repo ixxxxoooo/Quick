@@ -123,6 +123,8 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
   不要把它加回行里。
 - 选中/悬停用 `Colors.selection` / `Colors.rowHover` 填充，悬停更淡，
   两者视觉上必须可区分。
+- **标题里命中的字加粗**（`MatchHighlighter`）：子串优先，单个词不是子串时按「词首优先的
+  有序字符」匹配（缩写 `vsc`）。前 9 行右侧标 `⌘1…⌘9`，底栏左侧显示结果总数。
 
 ### 尚未对齐基准的两处（有意为之，不是漏掉）
 
@@ -205,6 +207,26 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 有头部搜索框时，插件视图仍然照常取焦点（方向键归它），但要声明 `wantsNavigation`
 并消费 `commandToken`，这样即使焦点后来被 ⌘F 挪进搜索框，方向键也还到得了列表。
 参见剪贴板与 JSON 树视图。
+
+### 主搜索的导航键位
+
+全部在 `PalettePanel.sendEvent` 里拦（原因同上），翻译集中在 `PaletteKeyMap`（纯函数，可单测）：
+
+| 键 | 动作 | 备注 |
+| --- | --- | --- |
+| ↑ ↓ / ⌃P ⌃N | 上下移动 | 夹边界，不环绕 |
+| PageUp / PageDown | 翻页（7 行） | 任何时候生效 |
+| Home / End | 首项 / 末项 | **仅输入框为空时**，否则是文本光标键 |
+| ⌘↑ / ⌘↓ | 首项 / 末项 | 任何时候生效 |
+| ⌘1…⌘9 | 直达第 n 个结果 | 超出结果数时不消费 |
+| ⌘K | 打开 / 关闭操作菜单 | 见下 |
+
+这些键**只属于主搜索列表**；插件模式一律放行给插件（`PaletteCoordinator.routeNavigation`）。
+
+**⌘K 操作菜单**：`ResultActionCatalog` 按结果形状给出可做的事 —— 第一项永远是「执行」
+（走 `selection.activate`，保证「最近使用」照常记录），应用结果另有「在访达中显示」「复制路径」，
+所有结果都有「复制名称」。菜单打开时 ↑↓ ↵ 属于菜单、Esc 只关菜单，导航键被吞掉不动背后的列表；
+查询变化或面板隐藏都会关闭它（结果换了，菜单指向的结果就失效了）。
 
 ### 列表的滚动跟随与悬停高亮
 
@@ -405,6 +427,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | --- | --- |
 | `SearchFieldView` | 统一搜索输入框（图标固定槽位 + 20pt 输入） |
 | `ResultListView` | 统一结果列表（键盘导航 + 悬停 + 滚动跟随）。`ResultRowView` 是它的行 |
+| `MatchHighlighter` | 标题命中高亮的区间计算（子串 / 词首缩写，纯函数） |
 | `ListScrollFollow` | 列表滚动跟随的锚点决策：只有选中项碰到视口边缘才滚（纯函数） |
 
 ### Panel/
@@ -415,6 +438,8 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | `PaletteCoordinator` | 面板生命周期、定位、聚合搜索。**不要加 `@Observable`** |
 | `PaletteMode` | 面板模式状态桥接（`@Observable`）：搜索模式 vs 插件模式。不持有 NSPanel，安全观察 |
 | `PaletteRootView` | 面板外壳：搜索模式（header / content / bottom bar 三段）或插件模式（插件头部 + makeView） |
+| `PaletteKeyMap` | 主搜索导航键位表（翻页 / 跳首尾 / ⌘数字），纯函数 |
+| `ActionMenuState` / `ActionMenuView` | ⌘K 操作菜单的状态与浮层；`ResultActionCatalog` 决定每条结果的操作 |
 | `PluginHeaderView` | 插件模式头部：返回按钮 + 插件图标/名称 + 分离按钮（⌘D） |
 
 ### Windows/

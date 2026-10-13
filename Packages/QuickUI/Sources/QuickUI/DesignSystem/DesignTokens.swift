@@ -99,6 +99,10 @@ public enum DesignTokens {
         public static let bottomBarHeight = scaled(52)
         /// 底栏按钮高度
         public static let barButtonHeight = scaled(28)
+        /// ⌘K 操作菜单宽度
+        public static let actionMenuWidth = scaled(220)
+        /// 操作菜单行首图标槽位宽度
+        public static let menuIconSlot = scaled(20)
         /// 窗口控制按钮尺寸（分离窗口标题栏右上角的置顶 / 关闭）
         ///
         /// 比 `barButtonHeight` 小一档：标题栏本身只有 `detachedTitleBarHeight` 高，
@@ -383,6 +387,8 @@ public enum DesignTokens {
         public static let headerIcon = Font.system(size: scaled(18), weight: .medium)
         /// 列表行标题
         public static let rowTitle = scaledStyle(.body)
+        /// 列表行里 SF Symbol 图标的字体
+        public static let rowSymbol = Font.system(size: scaled(13), weight: .medium)
         /// 列表行右侧文本
         public static let rowTrailing = scaledStyle(.callout)
         /// 分组标题
@@ -518,6 +524,8 @@ public enum DesignTokens {
 
         /// 选中行背景
         public static let selection = ramp(dark: 0.10, light: 0.09)
+        /// 结果行 SF Symbol 图标的底块（比选中高亮淡，免得与选中态混淆）
+        public static let iconTile = ramp(dark: 0.08, light: 0.06)
 
         /// 设置侧栏选中高亮（中性浅灰，对齐 Raycast；不用系统强调蓝）
         public static let settingsSidebarSelection = ramp(dark: 0.16, light: 0.08)

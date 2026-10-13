@@ -37,6 +37,9 @@ struct PaletteRootView: View {
     /// 焦点在搜索框里，SwiftUI 这一层收不到方向键。
     var selection: PaletteSelection
 
+    /// ⌘K 操作菜单状态（由协调器提供，键盘路由在 AppKit 层）
+    var actionMenu: ActionMenuState
+
     /// 搜索框文本（协调器与视图共用的唯一状态）
     ///
     /// 用桥接对象而不是 `@State`：协调器需要在面板外面改写它（自动粘贴、自动清空、
@@ -130,6 +133,9 @@ struct PaletteRootView: View {
             // json-formatter/sql-formatter，导致快捷键切换逻辑失效。
             guard !paletteMode.isPluginMode else { return }
 
+            // 结果马上要换一批，菜单里指向的结果会失效
+            actionMenu.close()
+
             // 粘贴检测：一次性增量超过阈值时检测内容类型
             let delta = newValue.count - oldValue.count
             if delta >= PasteContentDetector.pasteThreshold {
@@ -166,6 +172,14 @@ struct PaletteRootView: View {
         searchResultsArea
             .safeAreaInset(edge: .top, spacing: 0) { searchHeader }
             .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+            .overlay(alignment: .bottomTrailing) {
+                if actionMenu.isOpen {
+                    ActionMenuView(menu: actionMenu)
+                        .padding(.trailing, DesignTokens.Spacing.md)
+                        .padding(.bottom, DesignTokens.Size.bottomBarHeight)
+                        .transition(.opacity)
+                }
+            }
     }
 
     /// 搜索栏
@@ -243,7 +257,9 @@ struct PaletteRootView: View {
                     items: results,
                     selectedIndex: selectionBinding,
                     selection: selection,
-                    showsIcons: showResultIcons
+                    showsIcons: showResultIcons,
+                    query: paletteQuery.text,
+                    showsQuickNumbers: true
                 )
                 if timedOutPluginCount > 0 {
                     timedOutNotice
@@ -279,10 +295,20 @@ struct PaletteRootView: View {
     /// 底栏
     private var bottomBar: some View {
         HStack(spacing: 0) {
+            if !results.isEmpty {
+                // 总数放左侧：让人知道列表滚下去还有多少，而不是只看到当前一屏
+                Text("\(results.count) 个结果")
+                    .font(DesignTokens.Typography.bar)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .padding(.leading, DesignTokens.Spacing.md)
+                    .accessibilityLabel("共 \(results.count) 个结果")
+            }
+
             Spacer(minLength: DesignTokens.Spacing.md)
 
             if showBottomBarHints && !results.isEmpty {
                 primaryActionPill
+                actionsPill
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
@@ -301,6 +327,40 @@ struct PaletteRootView: View {
         .padding(.horizontal, DesignTokens.Spacing.md)
         .frame(height: DesignTokens.Size.barButtonHeight)
         .frosted(in: Capsule())
+    }
+
+    /// 「操作」胶囊：提示 ⌘K 可以打开更多操作，也可以直接点
+    private var actionsPill: some View {
+        Button {
+            if actionMenu.isOpen {
+                actionMenu.close()
+            } else {
+                openActionMenuFromPill()
+            }
+        } label: {
+            HStack(spacing: DesignTokens.Spacing.xs) {
+                Text("操作")
+                    .font(DesignTokens.Typography.bar)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                KeyCapChip(text: "⌘K", style: .outline, scale: .compact)
+            }
+            .padding(.horizontal, DesignTokens.Spacing.md)
+            .frame(height: DesignTokens.Size.barButtonHeight)
+            .frosted(in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, DesignTokens.Spacing.sm)
+        .accessibilityLabel("打开操作菜单")
+    }
+
+    /// 从胶囊点开菜单：与 ⌘K 同一条路径（选中项 + 执行回调）
+    private func openActionMenuFromPill() {
+        guard let item = selection.selectedItem else { return }
+        let index = selection.index
+        actionMenu.open(
+            actions: ResultActionCatalog.makeActions(for: item) {
+                selection.activate?(index)
+            })
     }
 
     // MARK: - 插件模式
@@ -377,6 +437,7 @@ struct PaletteRootView: View {
             guard !Task.isCancelled else { return }
 
             results = outcome.items
+            selection.items = outcome.items
             timedOutPluginCount = outcome.timedOutPluginIDs.count
             isSearching = false
             selection.update(count: outcome.items.count) { index in

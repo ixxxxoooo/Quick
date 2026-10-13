@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import QuickCore
 
 /// 面板里被键盘驱动的选择状态
 ///
@@ -24,6 +25,14 @@ public final class PaletteSelection {
 
     /// 当前选中下标（由视图与键盘共同读写）
     public var index = 0
+
+    /// 当前这批结果（由视图写入；⌘K 操作菜单据此知道「选中的是哪一条」）
+    public var items: [SearchableItem] = []
+
+    /// 当前选中的结果
+    public var selectedItem: SearchableItem? {
+        items.indices.contains(index) ? items[index] : nil
+    }
 
     /// 执行第 `index` 项（由视图写入：只有视图知道每一项的动作）
     public var activate: ((Int) -> Void)?
@@ -87,6 +96,52 @@ public final class PaletteSelection {
         index = min(max(index + delta, 0), count - 1)
         keyboardScrollToken = UUID()
         return true
+    }
+
+    /// 跳到首项 / 末项
+    ///
+    /// - Returns: 是否消费了这次按键（没有结果时不消费）
+    public func jump(to target: JumpTarget) -> Bool {
+        guard count > 0 else { return false }
+        index = target == .first ? 0 : count - 1
+        keyboardScrollToken = UUID()
+        return true
+    }
+
+    /// 翻页：一次移动 `pageSize` 行，夹在边界内
+    ///
+    /// - Parameters:
+    ///   - direction: `-1` 上翻、`+1` 下翻
+    ///   - pageSize: 一页行数（一般取面板一屏能看到的条数）
+    public func page(_ direction: Int, pageSize: Int = PaletteSelection.defaultPageSize) -> Bool {
+        move(direction * max(pageSize, 1))
+    }
+
+    /// 执行「第 n 个」结果（⌘1…⌘9，n 从 1 开始）
+    ///
+    /// 同时把选中项挪到那一行：执行后若面板还在（例如进了插件），高亮与实际动作一致。
+    ///
+    /// - Returns: 是否消费了这次按键（n 超出结果数时不消费，避免吞掉别处的 ⌘数字）
+    public func activateNumbered(_ number: Int) -> Bool {
+        let target = number - 1
+        guard number >= 1, number <= Self.quickSelectLimit, target < count, let activate else {
+            return false
+        }
+        index = target
+        activate(target)
+        return true
+    }
+
+    /// 一页的默认行数
+    public nonisolated static let defaultPageSize = 7
+
+    /// ⌘数字直达的上限（⌘1…⌘9）
+    public nonisolated static let quickSelectLimit = 9
+
+    /// 跳转目标
+    public enum JumpTarget: Sendable {
+        case first
+        case last
     }
 
     /// 执行当前选中项

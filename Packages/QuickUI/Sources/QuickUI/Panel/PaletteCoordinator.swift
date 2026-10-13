@@ -74,6 +74,9 @@ public final class PaletteCoordinator {
     /// 所以被 SwiftUI 观察是安全的 —— 会死循环的是协调器本身。
     public let selection = PaletteSelection()
 
+    /// ⌘K 操作菜单状态（独立观察对象，不持有窗口，可被视图安全观察）
+    let actionMenu = ActionMenuState()
+
     /// 剪贴板最后一次变化的时刻（由剪贴板事件更新）
     ///
     /// 自动粘贴只关心「刚刚复制过」，而这个时间点只有剪贴板插件知道（它在轮询变化），
@@ -404,6 +407,7 @@ public final class PaletteCoordinator {
     /// - Returns: 被恢复焦点的上一应用（如果有）
     @discardableResult
     public func hide(restoreFocus: Bool = true) -> NSRunningApplication? {
+        actionMenu.close()
         let started = ContinuousClock.now
         let wasVisible = isVisible
         // 隐藏前是不是 key window、第一响应者是谁：拆输入会话的代价与它们直接相关，
@@ -624,6 +628,7 @@ public final class PaletteCoordinator {
         log.debug("首次创建面板实例")
         let rootView = PaletteRootView(
             selection: selection,
+            actionMenu: actionMenu,
             paletteQuery: paletteQuery,
             paletteMode: paletteMode,
             pluginSearch: pluginSearch,
@@ -667,10 +672,12 @@ public final class PaletteCoordinator {
         // 头部搜索框默认不聚焦（焦点留在插件视图上，方向键才好用），主动要搜索时才按 ⌘F。
         // 只对声明了插件内搜索的插件生效，其余插件把 ⌘F 放行给它们自己。
         newPanel.onCommandShortcut = { [weak self] event in
-            guard let self, event.charactersIgnoringModifiers?.lowercased() == "f" else {
-                return false
+            guard let self else { return false }
+            switch event.charactersIgnoringModifiers?.lowercased() {
+            case "f": return self.requestPluginSearchFocus()
+            case "k": return self.toggleActionMenu()
+            default: return false
             }
-            return self.requestPluginSearchFocus()
         }
 
         // 上下键与回车在 AppKit 层转给选中状态，见 PalettePanel.sendEvent 的说明。
@@ -683,6 +690,9 @@ public final class PaletteCoordinator {
         }
         newPanel.onSubmit = { [weak self] in
             self?.routeSubmit() ?? false
+        }
+        newPanel.onNavigate = { [weak self] navigation in
+            self?.routeNavigation(navigation) ?? false
         }
         newPanel.onTab = { [weak self] delta in
             self?.routeTab(delta) ?? false
@@ -702,6 +712,10 @@ public final class PaletteCoordinator {
 
     /// 上下键：插件模式转给插件内搜索（仅当插件声明要吃），否则给主搜索列表
     func routeMove(_ delta: Int) -> Bool {
+        if actionMenu.isOpen {
+            actionMenu.move(delta)
+            return true
+        }
         if activePluginID != nil {
             guard pluginSearch.wantsNavigation else { return false }
             pluginSearch.request(.move(delta))
@@ -712,6 +726,9 @@ public final class PaletteCoordinator {
 
     /// 回车：插件模式下转给插件内搜索，否则激活主搜索选中项
     func routeSubmit() -> Bool {
+        if actionMenu.isOpen {
+            return actionMenu.runSelected()
+        }
         if activePluginID != nil {
             guard pluginSearch.wantsNavigation else { return false }
             pluginSearch.request(.submit)
@@ -720,8 +737,45 @@ public final class PaletteCoordinator {
         return selection.activateSelection()
     }
 
+    /// ⌘K：打开 / 关闭当前选中结果的操作菜单
+    ///
+    /// 只属于主搜索列表；插件模式把 ⌘K 放行给插件。
+    func toggleActionMenu() -> Bool {
+        guard activePluginID == nil else { return false }
+        if actionMenu.isOpen {
+            actionMenu.close()
+            return true
+        }
+        guard let item = selection.selectedItem else { return false }
+        let index = selection.index
+        actionMenu.open(
+            actions: ResultActionCatalog.makeActions(for: item) { [weak self] in
+                // 走协调器已有的激活路径，保证「最近使用」照常记录
+                self?.selection.activate?(index)
+            })
+        return actionMenu.isOpen
+    }
+
+    /// 翻页 / 跳首尾 / ⌘数字直达：只属于主搜索列表，插件模式一律放行给插件自己
+    func routeNavigation(_ navigation: PaletteKeyMap.Navigation) -> Bool {
+        guard activePluginID == nil, !actionMenu.isOpen else { return actionMenu.isOpen }
+        switch navigation {
+        case .page(let direction):
+            return selection.page(direction)
+        case .jump(let target, let requiresEmptyField):
+            if requiresEmptyField, !paletteQuery.text.isEmpty { return false }
+            return selection.jump(to: target)
+        case .quickSelect(let number):
+            return selection.activateNumbered(number)
+        }
+    }
+
     /// Esc：插件正显示模态确认框（`wantsCancel`）时转成 `.cancel` 请求，否则不消费
     func routeCancel() -> Bool {
+        if actionMenu.isOpen {
+            actionMenu.close()
+            return true
+        }
         guard activePluginID != nil, pluginSearch.wantsCancel else { return false }
         pluginSearch.request(.cancel)
         return true

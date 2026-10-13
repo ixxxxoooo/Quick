@@ -28,6 +28,12 @@ public struct ResultListView: View {
     /// 关掉后结果行不画图标
     public var showsIcons: Bool
 
+    /// 当前查询：用来在标题里高亮命中的字
+    public var query: String
+
+    /// 前 9 行是否标出 ⌘1…⌘9（主搜索列表开，其余场景关）
+    public var showsQuickNumbers: Bool
+
     /// 悬停的结果 ID
     @State private var hoveredID: String?
 
@@ -40,12 +46,16 @@ public struct ResultListView: View {
         items: [SearchableItem],
         selectedIndex: Binding<Int>,
         selection: PaletteSelection? = nil,
-        showsIcons: Bool = true
+        showsIcons: Bool = true,
+        query: String = "",
+        showsQuickNumbers: Bool = false
     ) {
         self.items = items
         self._selectedIndex = selectedIndex
         self.selection = selection
         self.showsIcons = showsIcons
+        self.query = query
+        self.showsQuickNumbers = showsQuickNumbers
     }
 
     /// 结果集的指纹
@@ -66,7 +76,10 @@ public struct ResultListView: View {
                             item: item,
                             isSelected: index == selectedIndex,
                             isHovered: hoveredID == item.id,
-                            showsIcon: showsIcons
+                            showsIcon: showsIcons,
+                            query: query,
+                            quickNumber: showsQuickNumbers && index < PaletteSelection.quickSelectLimit
+                                ? index + 1 : nil
                         )
                         .id(item.id)
                         .onHover { hovering in
@@ -139,6 +152,10 @@ struct ResultRowView: View {
     let isSelected: Bool
     let isHovered: Bool
     var showsIcon = true
+    /// 用来高亮标题命中字的查询
+    var query = ""
+    /// ⌘数字直达的序号（1…9）；`nil` 不显示
+    var quickNumber: Int?
 
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.lg) {
@@ -147,7 +164,7 @@ struct ResultRowView: View {
                     .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
             }
 
-            Text(item.title)
+            Text(MatchHighlighter.attributed(title: item.title, query: query))
                 .font(DesignTokens.Typography.rowTitle)
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
                 .lineLimit(1)
@@ -178,6 +195,14 @@ struct ResultRowView: View {
                     .frame(maxWidth: DesignTokens.Size.SourceBadge.maxWidth, alignment: .trailing)
                     .help("来自插件：\(name)")
             }
+
+            if let quickNumber {
+                Text("⌘\(quickNumber)")
+                    .font(DesignTokens.Typography.rowTrailing)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .monospacedDigit()
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .padding(.vertical, DesignTokens.Spacing.md)
@@ -198,10 +223,10 @@ struct ResultRowView: View {
         switch item.iconType {
         case .symbol:
             ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.primary.opacity(0.08))
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.thumbnail, style: .continuous)
+                    .fill(DesignTokens.Colors.iconTile)
                 Image(systemName: item.icon)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(DesignTokens.Typography.rowSymbol)
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
             }
             .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
@@ -238,7 +263,7 @@ private struct AppIconImage: View {
                     .scaledToFit()
             } else {
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.thumbnail, style: .continuous)
-                    .fill(DesignTokens.Colors.selection)
+                    .fill(DesignTokens.Colors.iconTile)
             }
         }
         .onAppear {
