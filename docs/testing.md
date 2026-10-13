@@ -59,15 +59,13 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 | `QuickPlatform` | 热键注册、应用扫描与条目的匹配形态、键盘布局服务 | 有覆盖 |
 | `PluginLauncher` | 使用频率与收藏的持久化往返 | 有覆盖 |
 | `PluginClipboard` | 去重/排序/剪枝、条数与图片预算、坏行降级 | 有覆盖 |
-| `PluginNotes` · `PluginSnippets` | 表读写往返、排序 | 有覆盖 |
 | `PluginSystemMonitor` | 时长/字节/`ps` 解析、内存/磁盘/电源/CPU tick、温度聚合、偏好映射 | 有覆盖 |
 | `PluginKillProcess` | `ps` 解析与过滤、偏好回落、触发词入口 | 有覆盖 |
 | `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式 | 有覆盖 |
 | `PluginTranslator` | 词典方向、触发词前缀、语言判定 | 有覆盖 |
-| `PluginOCR` · `PluginFileSearch` | 触发词匹配、文本拼接、查询前缀解析、图标映射 | 有覆盖 |
 | `PluginCalendar` | 时间区间格式、排序、农历文本 | 有覆盖 |
 | `PluginAI` | Provider 注册表完整性、搜索排序与触发闸门 | 有覆盖 |
-| 11 个开发者工具 | 各自的纯逻辑（编解码、格式化、diff、字数统计…） | 有覆盖 |
+| 8 个开发者工具 | 各自的纯逻辑（编解码、格式化、diff、字数统计…） | 有覆盖 |
 | 其余插件 | 插件契约 + 从服务里抽出来的纯逻辑 | 有覆盖 |
 
 **28 个包全部有测试目标，由 `Scripts/run-tests.sh` 强制**：少一个包就红。
@@ -109,6 +107,10 @@ EventKit、Vision、Spotlight、CoreLocation、Accessibility、`screencapture` �
   `SearchableItem.id` 在同一插件内不重复。
 - **触发词唯一性由 `Scripts/check-trigger-words.py` 统一守**（已接入 `run-tests.sh`），
   插件测试里不必重复实现跨插件扫描。
+- **插件声明与注册表一致性由 `Scripts/check-plugin-references.py` 守**（同样接入 `run-tests.sh`）：
+  `Packages/Plugin*`、`project.yml`、`AppCore.registerPlugins`、超级面板工作台目录
+  （`SuperPanelQuickTool.swift`）与上下文动作里的 `navigate("…")` 目标必须互相对得上。
+  下线一个插件时，字符串引用最容易漏，这条检查把它变成提交门禁。
 
 **不测（除非另有理由）**
 - SwiftUI 视图的像素级外观 —— 那靠人工验收与 `docs/ui.md` 的规范约束。

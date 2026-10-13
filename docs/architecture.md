@@ -17,7 +17,7 @@
         ┌───────────────┼───────────────┐
         ▼               ▼               ▼
   ┌──────────┐   ┌───────────┐   ┌──────────────┐
-  │ Plugin*  │   │  QuickUI  │   │ QuickPlatform│   （25 个 / 1 个 / 1 个）
+  │ Plugin*  │   │  QuickUI  │   │ QuickPlatform│   （19 个 / 1 个 / 1 个）
   └────┬─────┘   └─────┬─────┘   └──────┬───────┘
        │               │                │
        └───────────────┴────────────────┘
@@ -36,7 +36,7 @@
   **插件之间永不互相依赖。**
 - `Quick/` 依赖全部。只有它能 import 各插件。
 
-**为什么插件间不能互相依赖：** 25 个插件两两依赖会变成一张网，任何改动都会波及全仓，
+**为什么插件间不能互相依赖：** 19 个插件两两依赖会变成一张网，任何改动都会波及全仓，
 且没法单独测试。需要协作时走 `EventBus`。
 
 ---
@@ -63,7 +63,7 @@
 | `pluginPanelController` | `PluginPanelController` | 分离窗口管理（创建、单例、尺寸记忆） |
 | `launchAtLogin` | `LaunchAtLogin` | 登录项（`SMAppService`） |
 | `statusItemController` | `StatusItemController` | 菜单栏图标与菜单 |
-| `plugins` | `[any QuickPlugin]` | 全部 25 个插件实例 |
+| `plugins` | `[any QuickPlugin]` | 全部 19 个插件实例 |
 | `subscriptions` | `[EventSubscription]` | 事件订阅句柄（不持有就会被释放） |
 
 ### `start()` 的固定顺序
@@ -213,7 +213,7 @@ public protocol PluginSettingsProviding { func makeSettingsView() -> AnyView? }
   以及去改这份文档里的自注册禁令 —— 那是一次架构变更，不要顺手做。
 
 一个插件应该大到什么程度才值得单独存在？`parse`/`format` 这类纯逻辑抽到 `Model/` 里
-能独立测，就够一格了 —— 10 个开发者工具就是这么从 `devtools` 容器里拆出来的。
+能独立测，就够一格了 —— 8 个开发者工具就是这么从 `devtools` 容器里拆出来的。
 
 ---
 

@@ -33,32 +33,26 @@ public enum SuperPanelQuickTools {
         SuperPanelQuickTool(
             id: "translator", title: "翻译", icon: "character.book.closed", pluginID: "translator"),
         SuperPanelQuickTool(id: "ai", title: "AI", icon: "sparkles", pluginID: "ai"),
-        SuperPanelQuickTool(id: "notes", title: "备忘", icon: "text.page", pluginID: "notes"),
         SuperPanelQuickTool(
             id: "calculator", title: "计算", icon: "plus.forwardslash.minus", pluginID: "calculator"),
         SuperPanelQuickTool(id: "sysmonitor", title: "监控", icon: "cpu", pluginID: "sysmonitor"),
         SuperPanelQuickTool(id: "json", title: "JSON", icon: "curlybraces", pluginID: "json-formatter"),
         SuperPanelQuickTool(id: "calendar", title: "日历", icon: "calendar", pluginID: "calendar"),
-        SuperPanelQuickTool(id: "filesearch", title: "文件", icon: "folder", pluginID: "filesearch"),
         SuperPanelQuickTool(id: "killprocess", title: "进程", icon: "xmark.app", pluginID: "killprocess"),
         SuperPanelQuickTool(id: "networktools", title: "网络", icon: "wifi", pluginID: "networktools"),
-        SuperPanelQuickTool(id: "ocr", title: "识字", icon: "text.viewfinder", pluginID: "ocr"),
         SuperPanelQuickTool(id: "timestamp", title: "时间戳", icon: "clock", pluginID: "timestamp-converter"),
         SuperPanelQuickTool(id: "base64", title: "Base64", icon: "lock.doc", pluginID: "base64-codec"),
         SuperPanelQuickTool(id: "urlcodec", title: "URL", icon: "link", pluginID: "url-codec"),
         SuperPanelQuickTool(id: "uuid", title: "UUID", icon: "number", pluginID: "uuid-generator"),
         SuperPanelQuickTool(id: "hash", title: "Hash", icon: "number.square", pluginID: "hash-calculator"),
-        SuperPanelQuickTool(id: "color", title: "颜色", icon: "paintpalette", pluginID: "color-compare"),
         SuperPanelQuickTool(
             id: "textdiff", title: "对比", icon: "arrow.left.arrow.right", pluginID: "text-diff"),
-        SuperPanelQuickTool(
-            id: "markdown", title: "Markdown", icon: "text.alignleft", pluginID: "markdown-preview"),
         SuperPanelQuickTool(id: "sql", title: "SQL", icon: "cylinder", pluginID: "sql-formatter")
     ]
 
     /// 默认常用工具（对齐 Fasty 的八宫格）
     public static let defaults: [SuperPanelQuickTool] = catalog.filter {
-        ["screenshot", "clipboard", "translator", "ai", "notes", "calculator", "sysmonitor", "json"]
+        ["screenshot", "clipboard", "translator", "ai", "calendar", "calculator", "sysmonitor", "json"]
             .contains($0.id)
     }
 

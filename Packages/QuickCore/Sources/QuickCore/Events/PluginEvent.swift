@@ -38,7 +38,7 @@ public struct NavigateEvent: PluginEvent {
 
 /// 请求复制文本到剪贴板
 ///
-/// 插件（如 OCR、计算器）产出结果后发布此事件，
+/// 插件（如计算器）产出结果后发布此事件，
 /// 由 AppCore 路由到 PasteboardService 执行实际复制。
 public struct CopyToClipboardEvent: PluginEvent {
     public static let name = "quick.clipboard.copy"

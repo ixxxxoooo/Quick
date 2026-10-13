@@ -52,18 +52,6 @@ public enum PluginSettingKey {
         public static let autoCopy = "calculator.autoCopy"
     }
 
-    /// 文本片段
-    public enum Snippets {
-        public static let autoExpand = "snippets.autoExpand"
-        public static let showSnippetHint = "snippets.showSnippetHint"
-    }
-
-    /// 笔记
-    public enum Notes {
-        public static let autoSave = "notes.autoSave"
-        public static let defaultFormat = "notes.defaultFormat"
-    }
-
     /// 日历
     public enum Calendar {
         public static let reminderMinutes = "calendar.reminderMinutes"
@@ -120,12 +108,6 @@ public enum PluginSettingKey {
         public static let showExternalIP = "networkTools.showExternalIP"
     }
 
-    /// 文字识别
-    public enum OCR {
-        public static let autoCopy = "ocr.autoCopy"
-        public static let language = "ocr.language"
-    }
-
     /// 截图
     public enum Screenshot {
         public static let format = "screenshot.format"
@@ -178,18 +160,6 @@ public enum PluginSettingKey {
         public static let ignoreWhitespace = "textDiff.ignoreWhitespace"
         public static let ignoreCase = "textDiff.ignoreCase"
         public static let wrapLines = "textDiff.wrapLines"
-    }
-
-    /// Markdown 预览
-    public enum MarkdownPreview {
-        public static let showLineNumbers = "markdownPreview.showLineNumbers"
-        public static let enableMathJax = "markdownPreview.enableMathJax"
-    }
-
-    /// 颜色工具
-    public enum ColorCompare {
-        public static let defaultFormat = "colorCompare.defaultFormat"
-        public static let uppercaseHex = "colorCompare.uppercaseHex"
     }
 
     /// 终端

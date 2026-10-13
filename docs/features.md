@@ -485,37 +485,36 @@
 - 「锁屏」实为立即关闭显示器睡眠，是否需密码取决于系统「锁屏」设置。
 - 不支持勿扰 / 专注模式切换：macOS 没有公开 API。
 
-### 文件搜索（filesearch）
+### 文件搜索（宿主搜索来源 `filesearch`）
 
-在主搜索用 `f ` / `file ` / `文件 ` 前缀按文件名（可选内容）查 Spotlight；插件面板内可持续输入关键词并打开文件。
+**它不是插件**：能力在 `QuickPlatform/Files/`，装配在 `Quick/FileSearchSource.swift`，
+结果直接进主搜索列表。主搜索用 `f ` / `file ` / `文件 ` 前缀按文件名（可选内容）查 Spotlight。
+没有自己的面板、没有 `Packages/PluginFileSearch`，也不会出现在插件列表里。
 
 #### 不变量
 
 - **主搜索触发词必须带尾随空格**（`f `、`file `、`文件 `）；去掉前缀后关键词不能为空，
-  否则不查 Spotlight、不占用结果位。
-- **动态插件**：实现 `accepts` + `dynamicSearch`，只有前缀合法时才参与聚合搜索。
+  否则不查 Spotlight、不占用结果位（`FileSearchSource.accepts`）。
 - **查询引擎为 `NSMetadataQuery`**，范围 `NSMetadataQueryLocalComputerScope`；谓词由
   `FileSearchQuery.predicate` 纯逻辑构造。
 - **每次搜索开始时读一遍设置**（`FileSearchPreferences.current`）：谓词、隐藏过滤、上限
   必须同一次查询内一致。
-- **结果上限以设置为准**（20 / 50 / 100 / 200，非法值回落 50）；**禁止**在插件里二次写死
+- **结果上限以设置为准**（20 / 50 / 100 / 200，非法值回落 50）；**禁止**二次写死
   `prefix(10)`。
 - **忽略隐藏文件**：路径任一段以 `.` 开头的目录或文件名视为隐藏。
 - **新搜索会取消上一次查询**；**2 秒超时**后返回已收集结果。
-- **主搜索回车打开文件**（`NSWorkspace.open`）并关面板；插件视图内点击结果同样行为。
-- **面板内搜索与主搜索分离**：插件视图不要求 `f ` 前缀，输入变化即触发搜索。
+- **回车打开文件**（`NSWorkspace.open`）并关面板。
 - **`Model/` 禁止 AppKit / SwiftUI**；图标映射只返回 SF Symbol 名。
 
 #### 内部结构
 
 | 文件 | 职责 |
 | --- | --- |
-| `Model/FileSearchQuery.swift` | 前缀解析、Spotlight 谓词描述 |
-| `Model/FileSearchPreferences.swift` | 设置映射、过滤规则 |
-| `Model/FileIconMapper.swift` | 扩展名 → 图标名 |
-| `Service/FileSearchSession.swift` | `NSMetadataQuery` 生命周期与结果映射 |
-| `UI/FileSearchView.swift` | 内嵌搜索框 + 结果列表 |
-| `FileSearchPlugin.swift` | 动态搜索、命令 `filesearch.content` |
+| `QuickPlatform/Files/FileSearchQuery.swift` | 前缀解析、Spotlight 谓词描述 |
+| `QuickPlatform/Files/FileSearchPreferences.swift` | 设置映射、过滤规则 |
+| `QuickPlatform/Files/FileIconMapper.swift` | 扩展名 → 图标名 |
+| `QuickPlatform/Files/FileSearchService.swift` | `NSMetadataQuery` 生命周期与结果映射 |
+| `Quick/FileSearchSource.swift` | 实现 `PaletteHostSearchSource`，把结果映射成面板条目 |
 
 #### 持久化
 
