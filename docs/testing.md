@@ -63,6 +63,7 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 | `PluginKillProcess` | `ps` 解析与过滤、偏好回落、触发词入口 | 有覆盖 |
 | `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式、工具栏摆放（上 / 下 / 内部 / 夹边）、标注默认值一致性 | 有覆盖 |
 | `PluginTranslator` | 词典方向、触发词前缀、语言判定 | 有覆盖 |
+| `PluginSQLFormatter` / `PluginHashCalculator` / `PluginTimestampConverter` | 设置真正生效：关键字大小写与缩进、大写与自动复制取值、默认单位与时区、未知设置值回落默认 | 有覆盖 |
 | `PluginCalendar` | 时间区间格式、排序；农历 / 干支 / 节气对照权威表；节日规则；放假与补班查询；`HolidayStore` 刷新节流与坏数据拒收；内置数据对照国务院公告 | 有覆盖 |
 | `PluginAI` | Provider 注册表完整性、搜索排序与触发闸门 | 有覆盖 |
 | 8 个开发者工具 | 各自的纯逻辑（编解码、格式化、diff、字数统计…） | 有覆盖 |
@@ -115,6 +116,9 @@ EventKit、Vision、Spotlight、CoreLocation、Accessibility、`screencapture` �
   `.padding(8)`、`.frame(width: 120)`、`cornerRadius: 6`、`.opacity(0.12)`、`.font(.system(size: 14))` 这类
   一律改用 `DesignTokens`。值为 0 的不算；确有理由的行尾写 `// ui-literal-ok: 理由`。
   `Model/` 目录与 `DesignTokens.swift` 本身不扫。
+- **死设置键由 `Scripts/check-setting-keys.py` 守**（同样接入 `run-tests.sh`）：`PluginSettingKey` /
+  `SettingsKey` 里每个键，除设置页（路径含 `/Settings/`）之外必须至少有一处引用。
+  键只被设置页写、没有人读，开关就是死的（docs/ui.md §11）。
 
 **不测（除非另有理由）**
 - SwiftUI 视图的像素级外观 —— 那靠人工验收与 `docs/ui.md` 的规范约束。

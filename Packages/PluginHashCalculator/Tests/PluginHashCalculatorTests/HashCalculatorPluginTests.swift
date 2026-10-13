@@ -194,3 +194,30 @@ struct HashHMACTests {
         #expect(HashCalculatorLogic.digests(of: "", hmacKey: "key").isEmpty)
     }
 }
+
+@Suite("Hash 展示与自动复制")
+struct HashDisplayTests {
+
+    @Test("大写设置只改展示，不改计算结果")
+    func uppercaseIsDisplayOnly() {
+        let value = HashCalculatorLogic.digest("abc", algorithm: .md5)
+        #expect(value == "900150983cd24fb0d6963f7d28e17f72")
+        #expect(HashCalculatorLogic.display(value, uppercase: true) == "900150983CD24FB0D6963F7D28E17F72")
+        #expect(HashCalculatorLogic.display(value, uppercase: false) == value)
+    }
+
+    @Test("自动复制取 SHA256，并遵循大小写设置")
+    func autoCopyPicksSHA256() {
+        let results = HashCalculatorLogic.digests(of: "abc")
+        let plain = HashCalculatorLogic.autoCopyValue(in: results, uppercase: false)
+        #expect(plain == HashCalculatorLogic.digest("abc", algorithm: .sha256))
+        #expect(
+            HashCalculatorLogic.autoCopyValue(in: results, uppercase: true)
+                == plain?.uppercased())
+    }
+
+    @Test("没有结果时没有可复制的内容")
+    func autoCopyIsNilWithoutResults() {
+        #expect(HashCalculatorLogic.autoCopyValue(in: [], uppercase: false) == nil)
+    }
+}

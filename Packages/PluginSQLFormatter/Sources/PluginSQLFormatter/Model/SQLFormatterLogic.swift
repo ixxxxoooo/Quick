@@ -4,6 +4,32 @@
 
 import Foundation
 
+/// 关键字大小写风格；`rawValue` 就是设置里存的字符串
+enum SQLKeywordCase: String, Sendable {
+    case uppercase
+    case lowercase
+
+    /// 设置里的值不认识时回落到默认，而不是崩溃或静默变成另一档
+    init(setting: String) {
+        self = SQLKeywordCase(rawValue: setting) ?? SQLFormatterDefaults.keywordCase
+    }
+
+    func apply(_ word: String) -> String {
+        switch self {
+        case .uppercase: word.uppercased()
+        case .lowercase: word.lowercased()
+        }
+    }
+}
+
+/// 设置项的默认值：**设置页与插件视图共用这一处**，两边各写一份迟早对不上
+enum SQLFormatterDefaults {
+    static let keywordCase: SQLKeywordCase = .uppercase
+    /// 缩进空格数的可选档位
+    static let indentChoices = [2, 4]
+    static let indent = 2
+}
+
 /// SQL 格式化的纯逻辑
 ///
 /// 从视图里抽出来是为了能脱离 SwiftUI 单独测试 —— `Model/` 不允许 import
@@ -29,21 +55,34 @@ enum SQLFormatterLogic {
         "CASE", "WHEN", "THEN", "ELSE", "END", "AS"
     ]
 
-    /// 格式化：关键字独占一行并统一大写
+    /// 缩进的子句：挂在上一条主子句之下，再深一层
+    private static let subClauseStarters: Set<String> = ["AND", "OR", "ON", "WHEN", "THEN", "ELSE"]
+
+    /// 格式化：关键字独占一行，并按 `keywordCase` 统一大小写
     ///
     /// 先做词法分析，字符串字面量、引号标识符、注释整体透传 —— 绝不能像旧的
     /// 正则写法那样把换行插进 `'FROM'` 这类字符串值里。
     ///
     /// 顺带把每行前导空格清掉，否则双击格式化的结果会一层层往外漂。
-    /// `indent` 当前不产生实际缩进（保持与旧行为一致）。
-    static func format(_ input: String, indent: Int) -> String {
+    /// **缩进**：括号里的内容每深一层缩进一档；`AND` / `OR` / `ON` / `WHEN` / `THEN` / `ELSE`
+    /// 在所属子句之下再缩一档。主子句（`SELECT` / `FROM` …）与分行结果不受 `indent` 影响。
+    static func format(
+        _ input: String, indent: Int, keywordCase: SQLKeywordCase = SQLFormatterDefaults.keywordCase
+    ) -> String {
         let tokens = tokenize(input).filter {
             if case .whitespace = $0 { return false }
             return true
         }
 
-        var lines: [String] = []
+        var lines: [(text: String, level: Int)] = []
         var builder = LineBuilder()
+        /// 括号嵌套深度，以及正在拼的这一行该缩进几层
+        var depth = 0
+        var lineLevel = 0
+        func flush(nextLevel: Int) {
+            lines.append((builder.finish(), lineLevel))
+            lineLevel = nextLevel
+        }
         // 上一个产出的 token 是否「像标识符」—— 决定 `(` 是函数调用还是子查询开头
         var identLike = false
 
@@ -56,13 +95,13 @@ enum SQLFormatterLogic {
                     case .word(let nextWord) = tokens[index + 1],
                     twoWordClauses.contains([upper, nextWord.uppercased()])
                 {
-                    lines.append(builder.finish())
-                    builder.token("\(upper) \(nextWord.uppercased())")
+                    flush(nextLevel: depth)
+                    builder.token("\(keywordCase.apply(upper)) \(keywordCase.apply(nextWord))")
                     identLike = false
                     index += 2
                 } else if clauseStarters.contains(upper) {
-                    lines.append(builder.finish())
-                    builder.token(upper)
+                    flush(nextLevel: depth + (subClauseStarters.contains(upper) ? 1 : 0))
+                    builder.token(keywordCase.apply(upper))
                     identLike = false
                     index += 1
                 } else {
@@ -78,7 +117,7 @@ enum SQLFormatterLogic {
 
             case .lineComment:
                 builder.token(tokens[index].literal)
-                lines.append(builder.finish())
+                flush(nextLevel: depth)
                 identLike = false
                 index += 1
 
@@ -95,16 +134,18 @@ enum SQLFormatterLogic {
                         builder.token(punctuation)
                         builder.glueNextToken()
                     }
+                    depth += 1
                     identLike = false
                 case ")":
                     builder.tight(punctuation)
+                    depth = max(0, depth - 1)
                     identLike = true
                 case ",":
                     builder.tight(punctuation)
                     identLike = false
                 case ";":
                     builder.tight(punctuation)
-                    lines.append(builder.finish())
+                    flush(nextLevel: depth)
                     identLike = false
                 default:
                     builder.token(punctuation)
@@ -116,11 +157,13 @@ enum SQLFormatterLogic {
                 index += 1
             }
         }
-        lines.append(builder.finish())
+        flush(nextLevel: 0)
 
+        let unit = String(repeating: " ", count: max(0, indent))
         return lines
-            .map { $0.trimmingCharacters(in: .init(charactersIn: " ")) }
-            .filter { !$0.isEmpty }
+            .map { (text: $0.text.trimmingCharacters(in: .init(charactersIn: " ")), level: $0.level) }
+            .filter { !$0.text.isEmpty }
+            .map { String(repeating: unit, count: $0.level) + $0.text }
             .joined(separator: "\n")
     }
 

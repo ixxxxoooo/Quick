@@ -19,12 +19,21 @@ struct TimestampConverterView: View {
     @State private var now = Date()
     @State private var copiedKey: String?
 
-    private let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        f.timeZone = .current
-        return f
-    }()
+    @AppStorage(PluginSettingKey.TimestampConverter.defaultUnit)
+    private var unitSetting = TimestampConverterDefaults.unit.rawValue
+    @AppStorage(PluginSettingKey.TimestampConverter.timeZone)
+    private var zoneSetting = TimestampConverterDefaults.zone.rawValue
+
+    private var zonePreference: TimestampZonePreference { TimestampZonePreference(setting: zoneSetting) }
+
+    /// 底部「当前时间」的格式器：时区跟随设置（每次现建，设置变了立刻生效；一秒才一次，开销可忽略）
+    private var clockText: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = zonePreference.timeZone(local: .current)
+        let text = formatter.string(from: now)
+        return zonePreference == .utc ? "\(text) UTC" : text
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -119,12 +128,13 @@ struct TimestampConverterView: View {
                 Text("当前时间")
                     .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
-                Text(dateFormatter.string(from: now))
+                Text(clockText)
                     .font(DesignTokens.Typography.code)
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 Spacer()
                 Button {
-                    input = TimestampConverterLogic.currentTimestamp(now: Date())
+                    input = TimestampConverterLogic.currentTimestamp(
+                        now: Date(), unit: TimestampUnit(setting: unitSetting))
                 } label: {
                     Label("填入当前", systemImage: "arrow.down.to.line")
                 }.buttonStyle(.bordered).controlSize(.mini)
@@ -133,6 +143,7 @@ struct TimestampConverterView: View {
             .padding(.vertical, DesignTokens.Spacing.sm)
         }
         .onChange(of: input) { _, newVal in convert(newVal) }
+        .onChange(of: zoneSetting) { _, _ in convert(input) }
         .task {
             // 底部「当前时间」每秒走一格。用 `Task` 而不是 `Timer.publish`：视图消失时
             // 自动取消，不必再挂一个 onDisappear 去炸掉订阅
@@ -148,7 +159,10 @@ struct TimestampConverterView: View {
 
     /// 转换逻辑整体在模型层，视图只把结果搬进 `@State`
     private func convert(_ text: String) {
-        let conversion = TimestampConverterLogic.convert(text, timeZone: .current, now: Date())
+        let preference = zonePreference
+        let conversion = TimestampConverterLogic.convert(
+            text, timeZone: preference.timeZone(local: .current), now: Date(),
+            zoneLabel: preference.rowLabel)
         results = conversion.rows
         inputType = conversion.inputType
     }

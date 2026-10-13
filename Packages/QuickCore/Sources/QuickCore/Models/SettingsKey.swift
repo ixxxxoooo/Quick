@@ -12,9 +12,6 @@ public enum SettingsKey {
 
     // MARK: - 通用设置
 
-    /// 是否开机自启
-    public static let launchAtLogin = "quick.global.launchAtLogin"
-
     /// 外观模式（跟随系统 / 深色 / 浅色）
     public static let appearance = "quick.global.appearance"
 

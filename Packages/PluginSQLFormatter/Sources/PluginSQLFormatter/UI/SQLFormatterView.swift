@@ -19,7 +19,10 @@ struct SQLFormatterView: View {
         nonmutating set { buffer.text = newValue }
     }
     @State private var output = ""
-    @State private var indent = 2
+    /// 与设置页是**同一个键**：工具栏上改缩进就是改偏好，不再各存一份
+    @AppStorage(PluginSettingKey.SQLFormatter.indent) private var indent = SQLFormatterDefaults.indent
+    @AppStorage(PluginSettingKey.SQLFormatter.keywordCase)
+    private var keywordCaseSetting = SQLFormatterDefaults.keywordCase.rawValue
     @State private var statementCount = 0
     /// 大输入走防抖 + 后台计算，小输入同步算（见 `Debouncer`）
     @State private var debouncer = Debouncer()
@@ -53,6 +56,7 @@ struct SQLFormatterView: View {
         .onChange(of: input) { _, _ in autoFormat() }
         // 缩进档位改了要立刻按新缩进重排：以前只有改文本才会重排，切换后输出纹丝不动
         .onChange(of: indent) { _, _ in if !input.isEmpty { formatSQL() } }
+        .onChange(of: keywordCaseSetting) { _, _ in if !input.isEmpty { formatSQL() } }
         .onDisappear { debouncer.cancel() }
         .onAppear {
             // 从导航上下文读取初始输入（粘贴检测自动跳转场景）。
@@ -109,8 +113,9 @@ struct SQLFormatterView: View {
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
 
             Picker("", selection: $indent) {
-                Text("2 空格").tag(2)
-                Text("4 空格").tag(4)
+                ForEach(SQLFormatterDefaults.indentChoices, id: \.self) { width in
+                    Text("\(width) 空格").tag(width)
+                }
             }
             .labelsHidden()
             .pickerStyle(.segmented)
@@ -180,10 +185,14 @@ struct SQLFormatterView: View {
     private func formatSQL() {
         let text = input
         let width = indent
+        let keywordCase = SQLKeywordCase(setting: keywordCaseSetting)
         debouncer.schedule(
             weight: text.utf8.count,
             work: {
-                (SQLFormatterLogic.format(text, indent: width), SQLFormatterLogic.statementCount(in: text))
+                (
+                    SQLFormatterLogic.format(text, indent: width, keywordCase: keywordCase),
+                    SQLFormatterLogic.statementCount(in: text)
+                )
             },
             apply: { formatted, count in
                 output = formatted

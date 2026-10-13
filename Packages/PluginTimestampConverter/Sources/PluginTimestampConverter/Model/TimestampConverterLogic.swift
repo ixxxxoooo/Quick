@@ -4,6 +4,49 @@
 
 import Foundation
 
+/// 「填入当前」与默认单位：`rawValue` 就是设置里存的字符串
+public enum TimestampUnit: String, Sendable, CaseIterable {
+    case seconds
+    case milliseconds
+
+    /// 设置里的值不认识时回落到默认
+    public init(setting: String) {
+        self = TimestampUnit(rawValue: setting) ?? TimestampConverterDefaults.unit
+    }
+}
+
+/// 结果展示用的时区偏好：`rawValue` 就是设置里存的字符串
+public enum TimestampZonePreference: String, Sendable, CaseIterable {
+    case local
+    case utc
+
+    public init(setting: String) {
+        self = TimestampZonePreference(rawValue: setting) ?? TimestampConverterDefaults.zone
+    }
+
+    /// 结果卡片里这一行的标签
+    public var rowLabel: String {
+        switch self {
+        case .local: "本地时间"
+        case .utc: "UTC 时间"
+        }
+    }
+
+    /// 解析成具体时区；「本地」的环境事实由调用方注入，模型层不读 `TimeZone.current`
+    public func timeZone(local: TimeZone) -> TimeZone {
+        switch self {
+        case .local: local
+        case .utc: TimeZone(identifier: "UTC") ?? local
+        }
+    }
+}
+
+/// 设置项默认值：设置页与插件视图共用这一处
+public enum TimestampConverterDefaults {
+    public static let unit: TimestampUnit = .seconds
+    public static let zone: TimestampZonePreference = .local
+}
+
 /// 时间戳与日期互转的纯逻辑
 ///
 /// 时区必须由调用方注入。模型层不许读 `TimeZone.current` —— 环境事实一律参数化，
@@ -70,10 +113,11 @@ public enum TimestampConverterLogic {
     ///   - text: 用户输入
     ///   - timeZone: 本地时间的显示时区，同时也是无时区日期的解析时区
     ///   - now: 传入时在结果末尾追加「UTC 时间」与「相对现在」两行；不传则只给原有四行。
-    ///     时钟由调用方注入，模型层不读系统时间
+    ///     时钟由调用方注入，模型层不读系统时间。时区本身就是 UTC 时不再重复追加 UTC 行
+    ///   - zoneLabel: 「本地时间」那一行的标签；选了 UTC 时改成「UTC 时间」，免得名不副实
     /// - Returns: 识别出的输入类型与结果行；无法识别时 `rows` 为空
     public static func convert(
-        _ text: String, timeZone: TimeZone, now: Date? = nil
+        _ text: String, timeZone: TimeZone, now: Date? = nil, zoneLabel: String = "本地时间"
     ) -> Conversion {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -88,7 +132,8 @@ public enum TimestampConverterLogic {
             let date = Date(timeIntervalSince1970: interval(fromTimestamp: seconds))
             return Conversion(
                 inputType: .timestamp,
-                rows: rows(forTimestamp: date, timeZone: timeZone) + extraRows(for: date, now: now)
+                rows: rows(forTimestamp: date, timeZone: timeZone, zoneLabel: zoneLabel)
+                    + extraRows(for: date, now: now, timeZone: timeZone)
             )
         }
 
@@ -96,7 +141,8 @@ public enum TimestampConverterLogic {
         if let date = parseISO8601(trimmed) {
             return Conversion(
                 inputType: .date,
-                rows: rows(forDate: date, timeZone: timeZone) + extraRows(for: date, now: now)
+                rows: rows(forDate: date, timeZone: timeZone, zoneLabel: zoneLabel)
+                    + extraRows(for: date, now: now, timeZone: timeZone)
             )
         }
 
@@ -108,7 +154,8 @@ public enum TimestampConverterLogic {
             if let date = formatter.date(from: trimmed) {
                 return Conversion(
                     inputType: .date,
-                    rows: rows(forDate: date, timeZone: timeZone) + extraRows(for: date, now: now)
+                    rows: rows(forDate: date, timeZone: timeZone, zoneLabel: zoneLabel)
+                    + extraRows(for: date, now: now, timeZone: timeZone)
                 )
             }
         }
@@ -119,8 +166,13 @@ public enum TimestampConverterLogic {
     /// 当前时刻的秒级时间戳文本（「填入当前」按钮用）
     ///
     /// `now` 由调用方注入 —— 模型层直接读系统时钟就没法测了。
-    public static func currentTimestamp(now: Date) -> String {
-        "\(Int(now.timeIntervalSince1970))"
+    ///
+    /// - Parameter unit: 默认单位设置：秒（10 位）或毫秒（13 位）
+    public static func currentTimestamp(now: Date, unit: TimestampUnit = .seconds) -> String {
+        switch unit {
+        case .seconds: "\(Int(now.timeIntervalSince1970))"
+        case .milliseconds: "\(Int(now.timeIntervalSince1970 * 1000))"
+        }
     }
 
     // MARK: - 结果行的构造
@@ -145,7 +197,7 @@ public enum TimestampConverterLogic {
     }
 
     /// 追加行：UTC 时间与相对现在。`now` 为空时不追加
-    private static func extraRows(for date: Date, now: Date?) -> [Row] {
+    private static func extraRows(for date: Date, now: Date?, timeZone: TimeZone) -> [Row] {
         guard let now else { return [] }
         let utc = DateFormatter()
         utc.dateFormat = displayFormat
@@ -153,19 +205,18 @@ public enum TimestampConverterLogic {
         let relative = RelativeDateTimeFormatter()
         relative.locale = relativeLocale
         relative.unitsStyle = .full
-        return [
-            Row(key: "utc", label: "UTC 时间", value: utc.string(from: date)),
-            Row(
-                key: "relative", label: "相对现在",
-                value: relative.localizedString(for: date, relativeTo: now)
-            )
-        ]
+        let relativeRow = Row(
+            key: "relative", label: "相对现在",
+            value: relative.localizedString(for: date, relativeTo: now))
+        // 展示时区本身就是 UTC：「UTC 时间」那一行与主行完全重复，不再追加
+        if ["UTC", "GMT"].contains(timeZone.identifier) { return [relativeRow] }
+        return [Row(key: "utc", label: "UTC 时间", value: utc.string(from: date)), relativeRow]
     }
 
     /// 时间戳 → 四条结果，秒/毫秒在前因为输入本来就是数字
-    private static func rows(forTimestamp date: Date, timeZone: TimeZone) -> [Row] {
+    private static func rows(forTimestamp date: Date, timeZone: TimeZone, zoneLabel: String) -> [Row] {
         [
-            Row(key: "local", label: "本地时间", value: localString(from: date, timeZone: timeZone)),
+            Row(key: "local", label: zoneLabel, value: localString(from: date, timeZone: timeZone)),
             Row(key: "iso", label: "ISO 8601", value: ISO8601DateFormatter().string(from: date)),
             Row(key: "unix", label: "Unix 时间戳（秒）", value: "\(Int(date.timeIntervalSince1970))"),
             Row(
@@ -176,14 +227,14 @@ public enum TimestampConverterLogic {
     }
 
     /// 日期 → 四条结果，顺序与原工具一致
-    private static func rows(forDate date: Date, timeZone: TimeZone) -> [Row] {
+    private static func rows(forDate date: Date, timeZone: TimeZone, zoneLabel: String) -> [Row] {
         [
             Row(key: "unix", label: "Unix 时间戳（秒）", value: "\(Int(date.timeIntervalSince1970))"),
             Row(
                 key: "unixms", label: "Unix 时间戳（毫秒）",
                 value: "\(Int(date.timeIntervalSince1970 * 1000))"
             ),
-            Row(key: "local", label: "本地时间", value: localString(from: date, timeZone: timeZone)),
+            Row(key: "local", label: zoneLabel, value: localString(from: date, timeZone: timeZone)),
             Row(key: "iso", label: "ISO 8601", value: ISO8601DateFormatter().string(from: date))
         ]
     }

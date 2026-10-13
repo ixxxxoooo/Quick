@@ -24,13 +24,53 @@ struct SQLFormatterLogicTests {
         #expect(!result.lowercased().contains("select id from"))
     }
 
-    /// 缩进值是视图暴露的可调项，无论选 2 还是 4 都必须产出一致的分行结果
-    @Test("缩进参数不影响分行结果")
+    /// 缩进值是视图暴露的可调项：主子句不缩进，所以只有主子句的语句无论 2 还是 4 结果一致
+    @Test("缩进参数不影响分行，只影响子句的缩进")
     func indentDoesNotChangeLineBreaks() {
         let two = SQLFormatterLogic.format("select a from t", indent: 2)
         let four = SQLFormatterLogic.format("select a from t", indent: 4)
         #expect(two == four)
         #expect(two.components(separatedBy: "\n").count == 2)
+
+        let sql = "select a from t where x = 1 and y = 2"
+        let narrow = SQLFormatterLogic.format(sql, indent: 2)
+        let wide = SQLFormatterLogic.format(sql, indent: 4)
+        #expect(narrow.components(separatedBy: "\n").count == wide.components(separatedBy: "\n").count)
+    }
+
+    @Test("AND / OR / ON 按设置的缩进宽度挂在子句之下")
+    func subClausesAreIndented() {
+        let sql = "select * from a join b on a.id = b.id where x = 1 and y = 2 or z = 3"
+        #expect(
+            SQLFormatterLogic.format(sql, indent: 2)
+                == "SELECT *\nFROM a\nJOIN b\n  ON a.id = b.id\nWHERE x = 1\n  AND y = 2\n  OR z = 3")
+        #expect(SQLFormatterLogic.format(sql, indent: 4).contains("\n    AND y = 2"))
+    }
+
+    @Test("括号里的子查询每深一层缩进一档")
+    func nestedSubqueriesAreIndented() {
+        let result = SQLFormatterLogic.format(
+            "select * from t where id in (select id from u where a = 1 and b = 2)", indent: 2)
+        let lines = result.components(separatedBy: "\n")
+        #expect(lines.contains("  SELECT id"))
+        #expect(lines.contains("  FROM u"))
+        #expect(lines.contains("  WHERE a = 1"))
+        #expect(lines.contains("    AND b = 2)"))
+    }
+
+    @Test("关键字小写时换行关键字全部小写，字面量不动")
+    func lowercaseKeywords() {
+        let result = SQLFormatterLogic.format(
+            "SELECT a FROM t LEFT JOIN u ON t.id = u.id WHERE n = 'FROM' ORDER BY a",
+            indent: 2, keywordCase: .lowercase)
+        #expect(result == "select a\nfrom t\nleft join u\n  on t.id = u.id\nwhere n = 'FROM'\norder by a")
+    }
+
+    @Test("设置里不认识的大小写值回落到默认")
+    func unknownCaseSettingFallsBack() {
+        #expect(SQLKeywordCase(setting: "lowercase") == .lowercase)
+        #expect(SQLKeywordCase(setting: "garbage") == SQLFormatterDefaults.keywordCase)
+        #expect(SQLFormatterDefaults.indentChoices.contains(SQLFormatterDefaults.indent))
     }
 
     @Test("格式化清掉多余空行")

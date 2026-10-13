@@ -199,6 +199,65 @@ struct TimestampConverterLogicTests {
     }
 }
 
+@Suite("时间戳转换设置")
+struct TimestampSettingsTests {
+    private let utc = TimeZone(identifier: "UTC")!
+    private let shanghai = TimeZone(identifier: "Asia/Shanghai")!
+    private let fixed = Date(timeIntervalSince1970: 1_700_000_000)
+
+    @Test("默认单位为毫秒时填入 13 位时间戳")
+    func currentTimestampHonoursUnit() {
+        #expect(TimestampConverterLogic.currentTimestamp(now: fixed, unit: .seconds) == "1700000000")
+        #expect(TimestampConverterLogic.currentTimestamp(now: fixed, unit: .milliseconds) == "1700000000000")
+    }
+
+    @Test("设置里不认识的值回落到默认")
+    func unknownSettingsFallBack() {
+        #expect(TimestampUnit(setting: "milliseconds") == .milliseconds)
+        #expect(TimestampUnit(setting: "garbage") == TimestampConverterDefaults.unit)
+        #expect(TimestampZonePreference(setting: "utc") == .utc)
+        #expect(TimestampZonePreference(setting: "garbage") == TimestampConverterDefaults.zone)
+    }
+
+    @Test("时区偏好解析：本地用注入的时区，UTC 固定为 UTC")
+    func zoneResolution() {
+        #expect(TimestampZonePreference.local.timeZone(local: shanghai) == shanghai)
+        #expect(TimestampZonePreference.utc.timeZone(local: shanghai).secondsFromGMT() == 0)
+    }
+
+    @Test("选 UTC：主行改名且不再重复追加 UTC 行")
+    func utcPreferenceRelabelsAndDeduplicates() {
+        let preference = TimestampZonePreference.utc
+        let conversion = TimestampConverterLogic.convert(
+            "1700000000", timeZone: preference.timeZone(local: shanghai), now: fixed,
+            zoneLabel: preference.rowLabel)
+        #expect(conversion.rows.first { $0.key == "local" }?.label == "UTC 时间")
+        #expect(conversion.rows.first { $0.key == "local" }?.value == "2023-11-14 22:13:20")
+        #expect(!conversion.rows.contains { $0.key == "utc" })
+        #expect(conversion.rows.contains { $0.key == "relative" })
+    }
+
+    @Test("选本地：沿用本地时间标签并追加 UTC 行")
+    func localPreferenceKeepsExtraUTCRow() {
+        let preference = TimestampZonePreference.local
+        let conversion = TimestampConverterLogic.convert(
+            "1700000000", timeZone: preference.timeZone(local: shanghai), now: fixed,
+            zoneLabel: preference.rowLabel)
+        #expect(conversion.rows.first { $0.key == "local" }?.label == "本地时间")
+        #expect(conversion.rows.contains { $0.key == "utc" })
+    }
+
+    @Test("无时区日期按所选时区解析")
+    func dateParsingFollowsPreference() {
+        let inUTC = TimestampConverterLogic.convert("1970-01-02", timeZone: utc)
+        let inShanghai = TimestampConverterLogic.convert("1970-01-02", timeZone: shanghai)
+        let utcSeconds = inUTC.rows.first { $0.key == "unix" }?.value
+        let shSeconds = inShanghai.rows.first { $0.key == "unix" }?.value
+        #expect(utcSeconds == "86400")
+        #expect(shSeconds == "57600")
+    }
+}
+
 @Suite("时间戳转换插件契约")
 @MainActor
 struct TimestampConverterPluginTests {

@@ -79,4 +79,21 @@ enum HashCalculatorLogic {
                 : (algorithm, hmac(input, key: hmacKey, algorithm: algorithm))
         }
     }
+    // MARK: - 展示与自动复制
+
+    /// 按设置的大小写返回十六进制：存储与计算始终是小写，只在展示 / 复制那一刻转换，
+    /// 这样切换设置不需要重新算一遍
+    static func display(_ value: String, uppercase: Bool) -> String {
+        uppercase ? value.uppercased() : value
+    }
+
+    /// 「计算后自动复制」复制哪一条：SHA256（最通用的校验值），没有结果时为空
+    static func autoCopyValue(
+        in results: [(algorithm: Algorithm, value: String)], uppercase: Bool
+    ) -> String? {
+        results.first { $0.algorithm == .sha256 }.map { display($0.value, uppercase: uppercase) }
+    }
+
+    /// 输入停手多久之后才自动复制：边打边复制会把每个中间状态的哈希都灌进剪贴板历史
+    static let autoCopyDelay: Duration = .milliseconds(800)
 }

@@ -552,6 +552,9 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 - **默认值只能有一份，放在读取方那一侧的常量上，设置页引用它。** 设置页再自己写一遍
   字面量，两处迟早漂移，表现同样是「设置页写着 5 秒内、实际行为是关闭」。枚举型的偏好
   也照此办理（见 `PaletteAutoBehavior.defaultPasteWindow` / `defaultClearIdle`）。
+- **这条由 `Scripts/check-setting-keys.py` 机械检查**（接入 `run-tests.sh` 与提交钩子）：键只在
+  设置页（路径含 `/Settings/`）里出现就算死键，门禁失败。同一个键可以由插件视图的 `@AppStorage`
+  直接读写（如 SQL 格式化的缩进，工具栏与设置页共用一个键、一份默认值）。
 - 功能还没实现的控件：**禁用并标注**（`PendingFeatureNote`），不要让它看起来能用。
   保留控件是为了让路线图可见，但那必须写在界面上。
 - 控件对应的功能如果根本不存在（不是「没接上」而是「没做」），把控件和键一起删掉 ——

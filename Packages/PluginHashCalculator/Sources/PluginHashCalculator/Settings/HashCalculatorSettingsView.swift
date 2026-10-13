@@ -23,7 +23,7 @@ struct HashCalculatorSettingsView: View {
             Toggle(isOn: $autoCopy) {
                 SettingsRow(
                     title: "计算后自动复制",
-                    subtitle: "输入文本后自动把首选 SHA-256 散列结果复制到剪贴板。",
+                    subtitle: "停止输入约 1 秒后，把 SHA256 结果复制到剪贴板（只在结果稳定后复制一次）。",
                     icon: { SettingsRowIcon(systemImage: "doc.on.clipboard") }
                 )
             }
