@@ -61,7 +61,7 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 ```
 
 `QuickCore` 不认识任何插件，`QuickUI` / `QuickPlatform` 也不认识任何插件。只有 `Quick/`
-目标（`AppCore.swift` 注册插件、`SettingsBridge.swift` 提供命令目录桥接）能 `import Plugin*`。
+目标（`AppCore+Plugins.swift` 注册插件、`SettingsBridge.swift` 提供命令目录桥接）能 `import Plugin*`。
 这条按 **target 边界**理解：插件类型不得渗入 `QuickCore` / `QuickUI` / `QuickPlatform` 或其他插件。
 
 ---
@@ -156,7 +156,7 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
    `Model/ Service/ UI/ Settings/` 目录与一个占位测试）。
 2. 实现 `PluginFooPlugin.swift`，遵循 `QuickPlugin`。`static var id` 必须全局唯一 ——
    它是事件路由和设置存储的主键，一旦发布就不能再改。
-3. 在 `Quick/AppCore.swift#registerPlugins()` 里注册。**这是唯一实例化插件的地方。**
+3. 在 `Quick/AppCore+Plugins.swift#registerPlugins()` 里注册。**这是唯一实例化插件的地方。**
 4. 在 `project.yml` 里加两处（`packages:` 与 `Quick` target 的 `dependencies:`），
    然后 `xcodegen generate`。
 5. 加测试，`./Scripts/run-tests.sh` 必须全绿。

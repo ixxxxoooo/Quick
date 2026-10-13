@@ -44,7 +44,7 @@ final class AppCore {
     /// 全局单例
     static let shared = AppCore()
 
-    private let log = QuickLog.app
+    let log = QuickLog.app
 
     // MARK: - 基础设施（不是 Plugin）
 
@@ -94,12 +94,12 @@ final class AppCore {
     let keyboardLayoutService = KeyboardLayoutService()
 
     /// 面板打开前的键盘布局，用于关闭时还原
-    private var layoutBeforePanel: String?
+    var layoutBeforePanel: String?
 
     /// 粘贴回上一应用的待执行任务
     ///
     /// 用户在 settle 窗口内再次唤出面板时必须取消，否则 ⌘V 会打进刚打开的面板。
-    private var pendingPasteTask: Task<Void, Never>?
+    var pendingPasteTask: Task<Void, Never>?
 
     /// 数据库
     ///
@@ -117,34 +117,35 @@ final class AppCore {
     private(set) lazy var settingsWindowController = SettingsWindowController(dataSource: settingsBridge)
 
     /// 第一次启动的引导
-    private let onboardingController = OnboardingWindowController()
+    let onboardingController = OnboardingWindowController()
 
     /// 文件搜索来源
     ///
     /// **不是插件**：它由宿主直接持有并注入给面板协调器，因此不进 `registerPlugins()`、
     /// 不出现在插件列表、也不能被单独禁用。
-    private let fileSearchSource = FileSearchSource()
+    let fileSearchSource = FileSearchSource()
 
     /// 数据库健康状况；`start()` 末尾据此提示用户
-    private(set) var databaseNotice: String?
+    /// 由 `AppCore+Plugins` 的数据库打开流程写入，其余文件只读
+    var databaseNotice: String?
 
     /// 崩溃自愈：记录上次是否异常退出，以及死在哪个插件的启动里
     ///
     /// 状态文件独立于数据库 —— 数据库本身就可能是崩溃的原因，不能把它放在同一个地方。
-    private let launchGuard = LaunchGuard(
+    let launchGuard = LaunchGuard(
         fileURL: AppPaths.applicationSupport().appendingPathComponent("launch-state.json"))
 
     /// 本次启动因反复崩溃而被自动停用的插件名；`start()` 末尾据此提示用户
-    private var quarantinedPluginNames: [String] = []
+    var quarantinedPluginNames: [String] = []
 
     /// 是否处于崩溃循环（连续多次异常退出）
-    private var isCrashLoop = false
+    var isCrashLoop = false
 
     /// 打开数据库
     ///
     /// 走 `ResilientDatabase` 的三级降级：正常 → 隔离坏库后重建 → 内存库。
     /// 不静默：重建与内存库都会留下 `databaseNotice`，由 `start()` 弹 HUD。
-    private func openDatabase() -> SQLiteDatabase {
+    func openDatabase() -> SQLiteDatabase {
         do {
             let outcome = try ResilientDatabase.open(at: AppPaths.database())
             switch outcome {
@@ -173,46 +174,47 @@ final class AppCore {
     // MARK: - Feature Plugins
 
     /// 所有已注册插件
-    private(set) var plugins: [any QuickPlugin] = []
+    /// 已注册的插件。**只有 `AppCore+Plugins.swift` 的 `registerPlugins()` 允许写入**（跨文件无法再用 `private(set)` 表达，靠约定与 `check-plugin-references.py` 守住）
+    var plugins: [any QuickPlugin] = []
 
     /// 插件 id → 实例
     ///
     /// 与 `plugins` 同时维护，由 `rebuildCommandCatalog()` 重建。视图工厂、导航、
     /// 命令归属都问它，避免每次都遍历数组。
-    private(set) var pluginsByID: [String: any QuickPlugin] = [:]
+    var pluginsByID: [String: any QuickPlugin] = [:]
 
     /// 命令 id → 负责执行的插件 id
     ///
     /// 静态命令与动态命令的前缀回退是两条不同的路：这里只登记静态 `commands`，
     /// 动态命令（`launcher.app.*`）仍走前缀回退。
-    private var commandOwners: [String: String] = [:]
+    var commandOwners: [String: String] = [:]
 
     /// 事件订阅凭证（防止被释放）
-    private var subscriptions: [EventSubscription] = []
+    var subscriptions: [EventSubscription] = []
 
     /// 单实例唤醒通知观察者（必须强引用）
-    private var wakeUpObserver: NSObjectProtocol?
+    var wakeUpObserver: NSObjectProtocol?
 
     /// 调试唤醒通知观察者（必须强引用，否则立即失效）
-    private var debugWakeObserver: NSObjectProtocol?
+    var debugWakeObserver: NSObjectProtocol?
 
     /// 外观设置变化的观察者（必须强引用）
-    private var appearanceSettingObserver: NSObjectProtocol?
+    var appearanceSettingObserver: NSObjectProtocol?
 
     /// 超级面板鼠标偏好变化的观察者（必须强引用）
-    private var superPanelDefaultsObserver: NSObjectProtocol?
+    var superPanelDefaultsObserver: NSObjectProtocol?
 
     /// 最近使用（与协调器共用同一份，设置页清空时也动它）
     var usageHistory: UsageHistory?
 
     /// 实际生效外观的观察者（必须强引用）
-    private var effectiveAppearanceObserver: NSKeyValueObservation?
+    var effectiveAppearanceObserver: NSKeyValueObservation?
 
     /// 设置数据源缓存（避免设置面板切换时重复全量计算与反序列化）
     var cachedIndexedApps: [SettingsAppItem]?
     var cachedCustomCommands: [SettingsCustomCommandItem]?
 
-    private init() {}
+    init() {}
 
     // MARK: - 启动
 
@@ -349,7 +351,7 @@ final class AppCore {
     ///
     /// 优先级：`-showPlugin` > `-showSettingsTab` > `-showSettings` > `-showPalette` /
     /// `-showSuperPanel` / `-showTranslator`（后三者可并存在不同路径上，但设置类互斥）。
-    private func applyLaunchArguments(_ arguments: [String]) {
+    func applyLaunchArguments(_ arguments: [String]) {
         if let index = arguments.firstIndex(of: "-showPlugin"),
             index + 1 < arguments.count
         {
@@ -401,7 +403,7 @@ final class AppCore {
     }
 
     /// 监听开发调试唤醒信号（分布式通知）与单实例重复启动协同
-    private func observeDebugWakeSignals() {
+    func observeDebugWakeSignals() {
         // 1. 监听单实例重复启动唤醒
         wakeUpObserver = DistributedNotificationCenter.default().addObserver(
             forName: SingleInstanceGuard.wakeUpNotificationName,
@@ -455,715 +457,11 @@ final class AppCore {
         log.notice("退出清理完成")
     }
 
-    // MARK: - 插件分离
-
-    /// 将指定插件分离为独立窗口
-    ///
-    /// 查找插件实例 → 获取视图 → 创建独立窗口 → 主面板返回搜索模式。
-    private func detachPlugin(_ pluginID: String) {
-        guard let plugin = pluginsByID[pluginID],
-            plugin.isEnabled
-        else {
-            log.warning("分离失败：找不到插件 \(pluginID, privacy: .public) 或插件已禁用")
-            return
-        }
-
-        // 视图能力是运行时查询。`PluginPanelController` 的契约是非可选视图，所以失败时
-        // 退化成空视图 —— 代价是窗口空白，所以这里必须留一条 error 说明根因。
-        let viewProvider = { () -> AnyView in
-            guard let provider = plugin as? PluginViewProviding else {
-                QuickLog.app.error(
-                    "插件 \(pluginID, privacy: .public) 未实现 PluginViewProviding，分离窗口无法显示")
-                return AnyView(EmptyView())
-            }
-            return provider.makeView()
-        }
-        let name = type(of: plugin).name
-        let icon = type(of: plugin).icon
-        let supportsSearch = type(of: plugin).supportsPanelSearch
-
-        pluginPanelController.detach(
-            pluginID: pluginID,
-            pluginName: name,
-            icon: icon,
-            supportsSearch: supportsSearch,
-            viewProvider: viewProvider,
-            sourceWindow: nil
-        )
-
-        paletteCoordinator.popToRoot()
-        paletteCoordinator.hide(restoreFocus: false)
-    }
-
-    // MARK: - 键盘布局
-
-    /// 面板打开时切到用户指定的键盘布局
-    ///
-    /// 中文输入法用户按 ⌥Space 时往往还停在拼音状态，输入的其实是拼音串 ——
-    /// 强制切到 ABC 才能直接打命令。关闭面板时还原（见 restoreKeyboardLayout）。
-    private func applyForcedKeyboardLayout() {
-        let configured = UserDefaults.standard.string(forKey: SettingsKey.paletteForceKeyboardLayout) ?? ""
-        guard !configured.isEmpty else { return }
-
-        let current = keyboardLayoutService.currentLayoutID()
-        // 已经在目标布局上就不动：既省一次切换，也保证「还原」不会记错原值
-        guard current != configured else { return }
-
-        layoutBeforePanel = current
-        if keyboardLayoutService.select(layoutID: configured) {
-            log.notice("面板打开，键盘布局已切到 \(configured, privacy: .public)")
-        } else {
-            // 用户可能已经删掉了那个布局：留个 warning，不要静默
-            log.warning("指定的键盘布局不存在，未切换：\(configured, privacy: .public)")
-            layoutBeforePanel = nil
-        }
-    }
-
-    /// 面板关闭时还原原来的键盘布局
-    private func restoreKeyboardLayout() {
-        guard let previous = layoutBeforePanel else { return }
-        layoutBeforePanel = nil
-        if keyboardLayoutService.select(layoutID: previous) {
-            log.debug("面板关闭，键盘布局已还原：\(previous, privacy: .public)")
-        }
-    }
-
-    // MARK: - 外观
-
-    /// 应用外观设置
-    ///
-    /// **全仓只有这一处给 `NSApp.appearance` 赋值。** 它是应用级的，所以面板、设置窗口、
-    /// 分离窗口一起跟着变 —— 逐个窗口设置迟早会漏掉一个（HUD、分离窗口、设置窗口各一份），
-    /// 而 `.system` 映射成 `nil` 之后，系统切换外观由 AppKit 自己跟进，不需要我们监听什么。
-    private func applyAppearance() {
-        let appearance = AppAppearance.stored()
-        // 相同外观不重复赋值：这个函数挂在 `UserDefaults.didChangeNotification` 上，
-        // 任何一处偏好改动都会触发它（包括设置页里拖动滑块时的连续写入）。
-        // 重复赋同一个 `NSAppearance` 会让所有窗口重排，足以打断正在进行的拖动手势。
-        let target = appearance.nsAppearance
-        guard NSApp.appearance !== target else { return }
-        NSApp.appearance = target
-        log.debug("外观已应用：\(appearance.rawValue, privacy: .public)")
-    }
-
-    /// 外观设置改了要立刻生效：不该为了换个主题重启应用
-    ///
-    /// 用 `UserDefaults.didChangeNotification` 而不是 `@AppStorage`：设置页写在
-    /// `QuickUI` 里，这里只该知道「偏好变了」，不该认识那个视图。
-    private func observeAppearance() {
-        if appearanceSettingObserver == nil {
-            appearanceSettingObserver = NotificationCenter.default.addObserver(
-                forName: UserDefaults.didChangeNotification,
-                object: UserDefaults.standard,
-                queue: .main
-            ) { [weak self] _ in
-                Task { @MainActor in
-                    self?.applyAppearance()
-                    self?.statusItemController.applyVisibility()
-                    self?.paletteCoordinator.applyPaletteMetrics()
-                }
-            }
-        }
-
-        guard effectiveAppearanceObserver == nil else { return }
-        // 图标缓存是按外观出的位图，翻了面要让它重来。
-        // 挂在 `NSApp.effectiveAppearance` 上而不是 `applyAppearance()` 里：
-        // 「跟随系统」时我们从不赋值，那条路只有这里能收到。
-        effectiveAppearanceObserver = NSApp.observe(\.effectiveAppearance, options: [.initial]) { app, _ in
-            MainActor.assumeIsolated {
-                IconCache.setDarkSurface(app.effectiveAppearance.isDark)
-            }
-        }
-    }
-
-    // MARK: - 存储迁移
-
-    /// 应用宿主自己的 schema
-    private func migrateHostStorage() {
-        do {
-            try database.migrate([.corePluginData, .coreUsageHistory])
-        } catch {
-            // 迁移失败不能静默：继续跑下去会以「表不存在」的形式在插件里炸开，
-            // 那时已经看不出根因了。日志之外还要让用户知道，否则只会看到「历史记不住」
-            log.error("宿主存储迁移失败：\(error)")
-            databaseNotice = databaseNotice ?? "数据存储初始化失败，部分功能（最近使用、历史记录）可能无法保存"
-        }
-    }
-
-    /// 应用各插件声明的 schema
-    ///
-    /// 表结构归插件所有，宿主只负责按注册顺序把它们跑一遍。顺序固定（注册顺序），
-    /// 所以同一个库在两台机器上的建表顺序一致。
-    /// - Parameter types: 插件类型列表；`storageMigrations` 是静态的，所以不需要实例
-    private func migratePluginStorage(_ types: [any QuickPlugin.Type]) {
-        let migrations = types.flatMap { $0.storageMigrations }
-        guard !migrations.isEmpty else { return }
-        do {
-            try database.migrate(migrations)
-            log.notice("插件 schema 已就绪，共 \(migrations.count, privacy: .public) 个迁移")
-        } catch {
-            log.error("插件存储迁移失败：\(error)")
-            databaseNotice = databaseNotice ?? "插件数据初始化失败，部分插件的数据可能无法保存"
-        }
-    }
-
-    // MARK: - 插件注册
-
-    /// 注册所有 Feature Plugin
-    ///
-    /// 这是唯一创建插件实例的地方。
-    /// 新增插件只需在此处添加一行注册。
-    /// 插件的注册清单
-    ///
-    /// 每一项是「类型 + 工厂」而不是直接给实例：**schema 必须在实例化之前建好**。
-    /// 需要真表的插件在 `init` 里就会查自己的表（store 同步加载），如果先构造再迁移，
-    /// 首次启动时表还不存在，插件会以「读取失败，按空数据继续」启动 —— 数据看起来
-    /// 像是丢了，而且只在第一次运行时出现。
-    ///
-    /// 类型与工厂成对列出，是为了让迁移能从类型上取（`storageMigrations` 是静态的），
-    /// 而依赖注入留在工厂里。
-    private var pluginRegistrations: [(type: any QuickPlugin.Type, make: () -> any QuickPlugin)] {
-        [
-            // Phase 2: 核心插件
-            (
-                LauncherPlugin.self,
-                {
-                    LauncherPlugin(
-                        appIndex: self.appIndex,
-                        settingsStore: self.settingsStore,
-                        storage: self.storage(for: LauncherPlugin.id))
-                }
-            ),
-            (ClipboardPlugin.self, { ClipboardPlugin(storage: self.storage(for: ClipboardPlugin.id)) }),
-            (CalculatorPlugin.self, { CalculatorPlugin(storage: self.storage(for: CalculatorPlugin.id)) }),
-            (SystemControlPlugin.self, { SystemControlPlugin(settingsStore: self.settingsStore) }),
-
-            // Phase 3: 效率与工具插件
-            (TranslatorPlugin.self, { TranslatorPlugin(storage: self.storage(for: TranslatorPlugin.id)) }),
-
-            // Phase 3.5: 开发者工具插件（原先是一个 devtools 容器，现在每个工具都是独立插件）
-            (JSONFormatterPlugin.self, { JSONFormatterPlugin() }),
-            (SQLFormatterPlugin.self, { SQLFormatterPlugin() }),
-            (Base64CodecPlugin.self, { Base64CodecPlugin() }),
-            (URLCodecPlugin.self, { URLCodecPlugin() }),
-            (UUIDGeneratorPlugin.self, { UUIDGeneratorPlugin() }),
-            (HashCalculatorPlugin.self, { HashCalculatorPlugin() }),
-            (TimestampConverterPlugin.self, { TimestampConverterPlugin() }),
-            (TextDiffPlugin.self, { TextDiffPlugin() }),
-
-            // Phase 4: 扩展插件
-            (CalendarPlugin.self, { CalendarPlugin() }),
-            (AIPlugin.self, { AIPlugin() }),
-            (SystemMonitorPlugin.self, { SystemMonitorPlugin() }),
-            (KillProcessPlugin.self, { KillProcessPlugin() }),
-            (NetworkToolsPlugin.self, { NetworkToolsPlugin() }),
-            (ScreenshotPlugin.self, { ScreenshotPlugin() })
-        ]
-    }
-
-    /// 建表并实例化全部插件
-    ///
-    /// 这是全仓唯一 `plugins.append(...)` 的地方。
-    private func registerPlugins() {
-        let registrations = pluginRegistrations
-
-        // 先建 schema：插件的 store 在 init 里就会读表
-        migratePluginStorage(registrations.map(\.type))
-
-        // 再实例化
-        for registration in registrations {
-            // 构造也算「启动」：init 里崩溃同样要能指认到这个插件
-            let plugin = launchGuard.guardStart(registration.type.id) { registration.make() }
-            plugin.isEnabled = settingsStore.isPluginEnabled(type(of: plugin).id)
-            plugins.append(plugin)
-        }
-    }
-
-    // MARK: - 事件总线连接
-
-    /// 连接 EventBus 订阅
-    ///
-    /// 所有插件间的通信都在这里统一接线。
-    /// 插件发布事件 → EventBus → AppCore 路由到目标。
-    private func wireEventBus() {
-        let bus = EventBus.shared
-
-        // 导航事件 → 面板协调器
-        subscriptions.append(
-            bus.on(NavigateEvent.self) { [weak self] event in
-                self?.paletteCoordinator.navigate(to: event.pluginID, context: event.context)
-            }
-        )
-
-        // 复制到剪贴板事件 → 粘贴板服务
-        subscriptions.append(
-            bus.on(CopyToClipboardEvent.self) { [weak self] event in
-                self?.pasteboardService.copyText(event.text)
-                if event.showHUD {
-                    self?.hudController.show(message: "已复制", tone: .success)
-                }
-            }
-        )
-
-        // HUD 消息事件 → HUD 控制器
-        subscriptions.append(
-            bus.on(ShowHUDEvent.self) { [weak self] event in
-                self?.hudController.show(message: event.message, tone: event.tone)
-            }
-        )
-
-        // 隐藏面板事件
-        subscriptions.append(
-            bus.on(HidePaletteEvent.self) { [weak self] event in
-                self?.paletteCoordinator.hide(restoreFocus: event.restoreFocus)
-            }
-        )
-
-        // 粘贴回上一个应用：内容已经写好，这里只负责隐藏面板、交还焦点、再合成 ⌘V
-        subscriptions.append(
-            bus.on(PasteIntoPreviousAppEvent.self) { [weak self] _ in
-                guard let self else { return }
-                let requestedAt = ContinuousClock.now
-                let targetApp = self.paletteCoordinator.hide(restoreFocus: true)
-                self.schedulePasteIntoPreviousApp(targetApp: targetApp, requestedAt: requestedAt)
-            }
-        )
-
-        // 显示面板事件
-        subscriptions.append(
-            bus.on(ShowPaletteEvent.self) { [weak self] event in
-                self?.paletteCoordinator.show(pluginID: event.pluginID, query: event.query)
-            }
-        )
-
-        // 打开设置窗口事件（支持跳转到指定插件）
-        subscriptions.append(
-            bus.on(ShowPaletteSettingsEvent.self) { [weak self] event in
-                Task { @MainActor in
-                    self?.paletteCoordinator.hide(restoreFocus: false)
-                    if let pluginID = event.pluginID,
-                        let tab = SettingsTab.tab(forPluginID: pluginID)
-                    {
-                        self?.settingsWindowController.show(tab: tab)
-                    } else {
-                        self?.settingsWindowController.show()
-                    }
-                }
-            }
-        )
-
-        // 分离面板事件 → 创建独立插件窗口
-        subscriptions.append(
-            bus.on(DetachPanelEvent.self) { [weak self] event in
-                guard let self else { return }
-                self.detachPlugin(event.pluginID)
-            }
-        )
-
-        // 应用索引刷新事件（清除设置应用缓存）
-        subscriptions.append(
-            bus.on(AppIndexRefreshedEvent.self) { [weak self] _ in
-                self?.cachedIndexedApps = nil
-            }
-        )
-
-        // 面板唤出时轻量级校验应用目录 mtime，有变动则自动重扫应用
-        subscriptions.append(
-            bus.on(PaletteVisibilityChangedEvent.self) { [weak self] event in
-                guard event.isVisible else { return }
-                Task { [weak self] in
-                    await self?.appIndex.checkAndRefreshIfNeeded()
-                }
-            }
-        )
-
-        subscriptions.append(
-            bus.on(CommandCatalogChangedEvent.self) { [weak self] _ in
-                self?.rebuildCommandCatalog()
-            }
-        )
-    }
-
-    // MARK: - 超级面板
-
-    /// 接线超级面板：系统能力注入 + 鼠标唤出 + 默认快捷键
-    ///
-    /// 超级面板不认识 `QuickPlatform`（依赖方向），所以抓选区、合成粘贴、解析最近使用
-    /// 都由这里注入进去。鼠标监听也归宿主：它是一项系统能力，不该跟着某个插件生死。
-    private func wireSuperPanel() {
-        let controller = superPanelController
-        controller.captureSelection = { await SelectionCapture.captureText() }
-        controller.canPaste = { [weak self] in self?.pasteService.canSynthesize ?? false }
-        controller.paste = { [weak self] in _ = self?.pasteService.paste() }
-        controller.recentItems = { [weak self] in self?.resolveRecentItems() ?? [] }
-        controller.openSettings = { [weak self] in
-            self?.settingsWindowController.show(tab: .superPanel)
-        }
-        controller.translate = { [weak self] text in
-            guard let self, let translator = self.plugin(withID: TranslatorPlugin.id) as? TranslatorPlugin else {
-                return nil
-            }
-            return await translator.translateOrLookup(text)
-        }
-
-        mouseTriggerMonitor.onTrigger = { [weak self] kind in
-            Task { @MainActor in
-                QuickLog.app.notice(
-                    "鼠标触发超级面板：\(String(describing: kind), privacy: .public)")
-                self?.paletteCoordinator.hide(restoreFocus: false)
-                self?.superPanelController.toggle()
-            }
-        }
-        syncMouseTriggerConfiguration()
-
-        if superPanelDefaultsObserver == nil {
-            superPanelDefaultsObserver = NotificationCenter.default.addObserver(
-                forName: UserDefaults.didChangeNotification,
-                object: UserDefaults.standard,
-                queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.syncMouseTriggerConfiguration()
-                }
-            }
-        }
-
-        // 默认 ⌥C（对齐 Fasty）。用户清空后不再自动补回。
-        if hotKeyService.binding(for: CommandID.superPanel) == nil {
-            let shortcut = KeyShortcut(carbonKeyCode: kVK_ANSI_C, carbonModifiers: optionKey)
-            _ = hotKeyService.setBinding(shortcut, for: CommandID.superPanel, registerNow: true)
-        }
-        controller.prewarm()
-        log.notice("超级面板已接线")
-    }
-
-    /// 把鼠标偏好同步到监听器
-    private func syncMouseTriggerConfiguration() {
-        let config = SuperPanelPreferences.mouseConfiguration()
-        mouseTriggerMonitor.apply(
-            MouseTriggerMonitor.Configuration(
-                rightLongPressEnabled: config.rightLongPressEnabled,
-                middleClickEnabled: config.middleClickEnabled,
-                thresholdMilliseconds: UInt64(config.thresholdMilliseconds)
-            )
-        )
-    }
-
-    /// 把「最近使用」的条目 id 解析成可展示的行（最多 4 条，对齐 Fasty）
-    private func resolveRecentItems() -> [SuperPanelRecentItem] {
-        guard let ids = usageHistory?.recentItemIDs(limit: 12) else { return [] }
-        var items: [SuperPanelRecentItem] = []
-        for id in ids {
-            if let item = resolveRecentItem(id) {
-                items.append(item)
-            }
-            if items.count >= 4 { break }
-        }
-        return items
-    }
-
-    /// 单个 id 的解析：应用、插件入口、插件命令
-    private func resolveRecentItem(_ id: String) -> SuperPanelRecentItem? {
-        if id.hasPrefix(CommandID.launchAppPrefix) {
-            let bundleID = String(id.dropFirst(CommandID.launchAppPrefix.count))
-            guard let app = appIndex.apps.first(where: { $0.bundleID == bundleID }) else { return nil }
-            return SuperPanelRecentItem(
-                id: id, title: app.name, subtitle: app.path, icon: "app",
-                kind: .app, launchPath: app.path)
-        }
-        // 文件搜索结果：条目 id 里编码了路径，文件还在才算有效「最近」
-        if let path = FileSearchQuery.path(fromItemID: id) {
-            guard FileManager.default.fileExists(atPath: path) else { return nil }
-            let url = URL(fileURLWithPath: path)
-            return SuperPanelRecentItem(
-                id: id, title: url.lastPathComponent, subtitle: path,
-                icon: FileIconMapper.icon(forFileName: url.lastPathComponent),
-                kind: .file, launchPath: path)
-        }
-        if let pluginID = CommandID.openedPluginID(in: id),
-            let plugin = pluginsByID[pluginID]
-        {
-            return SuperPanelRecentItem(
-                id: id, title: type(of: plugin).name, icon: type(of: plugin).icon,
-                kind: .plugin, pluginID: pluginID)
-        }
-        // 功能命令：走命令归属表，与执行路径用的是同一份索引
-        if let ownerID = commandOwners[id], let plugin = pluginsByID[ownerID] {
-            return SuperPanelRecentItem(
-                id: id, title: type(of: plugin).name, icon: type(of: plugin).icon,
-                kind: .plugin, pluginID: ownerID)
-        }
-        return nil
-    }
-
-    // MARK: - 粘贴回上一个应用
-
-    /// 最大等待前台应用激活时长（兜底）
-    private static let maxPasteSettleDelay = Duration.milliseconds(120)
-
-    /// 目标应用成为前台后再等一小段，才合成 ⌘V
-    ///
-    /// 目标应用刚被激活时它的 key window 可能还没就绪，⌘V 会丢，所以要留一点缓冲。
-    /// 但这一段是**「目标已经在前台」之后**的纯附加延迟：原来固定 25 ms，实测占粘贴总延迟
-    /// 三分之一以上，而它换来的只是「事件队列排空」，8 ms 足够。
-    private static let pasteSettleBuffer = Duration.milliseconds(8)
-
-    /// 等前一个应用回到前台，再合成一次 ⌘V；没有辅助功能权限就只提示
-    ///
-    /// `NSRunningApplication.activate()` 是异步的：立刻发 ⌘V 会打在被切走的面板或还没回到
-    /// 前台的旧应用上。所以这里轮询 `frontmostApplication`（系统没有「应用成为前台」的通知式
-    /// 并发 API），**目标一成为前台就只剩 `pasteSettleBuffer` 那 8 ms**；目标始终没响应时由
-    /// `maxPasteSettleDelay` 兜底，避免一直不发。
-    private func schedulePasteIntoPreviousApp(
-        targetApp: NSRunningApplication? = nil,
-        requestedAt: ContinuousClock.Instant = .now
-    ) {
-        let canPaste = pasteService.canSynthesize
-        pendingPasteTask?.cancel()
-        pendingPasteTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            guard canPaste else {
-                // 面板已隐藏，剪贴板里已经有内容了 —— 告诉用户为什么没自动粘贴
-                self.hudController.show(
-                    message: "已复制，开启辅助功能权限后可自动粘贴",
-                    tone: .warning
-                )
-                return
-            }
-
-            let start = ContinuousClock.now
-            // 任务体真正开始执行时已经过去了多久。这一段是主线程在收尾上一轮事件
-            // （键盘事件派发、面板隐藏后的 SwiftUI 更新），必须单独打出来 ——
-            // 否则它会被算进「等待目标应用」，让人以为是在等别的应用。
-            let schedulingMS = requestedAt.duration(to: start).invokeMS
-
-            var activationMS = 0.0
-            if let targetApp, !targetApp.isTerminated {
-                let targetPID = targetApp.processIdentifier
-
-                // 快速轮询等待目标应用成为 frontmostApplication
-                if NSWorkspace.shared.frontmostApplication?.processIdentifier != targetPID {
-                    let deadline = start + Self.maxPasteSettleDelay
-                    while ContinuousClock.now < deadline {
-                        if NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID {
-                            break
-                        }
-                        try? await Task.sleep(for: .milliseconds(8))
-                    }
-                }
-                activationMS = start.duration(to: .now).invokeMS
-
-                // 已成为前台，再留一点让目标窗口拿到 key window
-                try? await Task.sleep(for: Self.pasteSettleBuffer)
-            } else {
-                // 没有明确目标应用时（例如上一应用已退出或未知），使用短固定延时
-                try? await Task.sleep(for: .milliseconds(40))
-            }
-
-            guard !Task.isCancelled else { return }
-            let total = requestedAt.duration(to: .now).invokeMS
-            self.log.notice(
-                """
-                准备合成 ⌘V：自收到粘贴请求起 \(total, format: .fixed(precision: 1)) ms\
-                [等主线程收尾 \(schedulingMS, format: .fixed(precision: 1))，\
-                等目标应用成为前台 \(activationMS, format: .fixed(precision: 1))，\
-                就绪缓冲 \(Self.pasteSettleBuffer.invokeMS, format: .fixed(precision: 1))]，\
-                目标应用=\(targetApp.map { "\($0.localizedName ?? "?")" } ?? "无", privacy: .public)
-                """)
-            self.pasteService.paste()
-        }
-    }
-
-    /// 取消尚未发出的合成粘贴（再次唤出面板时调用）
-    private func cancelPendingPaste() {
-        pendingPasteTask?.cancel()
-        pendingPasteTask = nil
-    }
-
-    // MARK: - 自定义命令存储辅助
-
-    func loadCustomCommands() -> [CustomCommand] {
-        guard let data = settingsStore.customCommandsData else { return [] }
-        do {
-            return try JSONDecoder().decode([CustomCommand].self, from: data)
-        } catch {
-            // 解码失败时返回空数组，下一次保存会把坏数据覆盖掉 —— 所以必须留下证据
-            log.error("自定义命令数据无法解析，按空列表处理：\(error)")
-            return []
-        }
-    }
-
-    /// 保存自定义命令
-    ///
-    /// - Returns: 是否写入成功；失败时已记日志并弹 HUD，调用方不必再提示
-    @discardableResult
-    func saveCustomCommands(_ commands: [CustomCommand]) -> Bool {
-        do {
-            let data = try JSONEncoder().encode(commands)
-            settingsStore.setCustomCommandsData(data)
-            cachedCustomCommands = nil
-            return true
-        } catch {
-            log.error("自定义命令编码失败，未保存：\(error)")
-            hudController.show(message: "自定义命令保存失败", tone: .danger)
-            return false
-        }
-    }
-
-    // MARK: - 快捷键恢复
-
-    /// 执行一条命令。热键和搜索共用这一条路径
-    private func invoke(commandID: String) {
-        let invokeStart = ContinuousClock.now
-        // 再次唤出时取消尚未发出的 ⌘V，避免打进面板自己的搜索框
-        cancelPendingPaste()
-        log.notice("执行命令 \(commandID, privacy: .public)")
-        // 超级面板不是插件命令，也不在命令目录里，单独认领
-        if commandID == CommandID.superPanel {
-            paletteCoordinator.hide(restoreFocus: false)
-            superPanelController.toggle()
-            return
-        }
-        if commandID != CommandID.togglePalette, !settingsStore.isCommandEnabled(commandID) {
-            log.notice("命令已关闭，拒绝调用 \(commandID, privacy: .public)")
-            return
-        }
-        if commandID == CommandID.togglePalette {
-            paletteCoordinator.toggle()
-            let ms = invokeStart.duration(to: .now).invokeMS
-            log.notice("invoke 完成（togglePalette）：\(ms, format: .fixed(precision: 1)) ms")
-            return
-        }
-        if let pluginID = CommandID.openedPluginID(in: commandID) {
-            // 与 togglePalette 同语义：面板正开着这个插件时再按一次就关掉，
-            // 否则（关着 / 停在别的插件 / 主搜索）打开或切过去
-            if paletteCoordinator.isVisible, paletteCoordinator.activePluginID == pluginID {
-                paletteCoordinator.hide()
-            } else {
-                paletteCoordinator.show(pluginID: pluginID)
-            }
-            let ms = invokeStart.duration(to: .now).invokeMS
-            log.notice("invoke 完成（openPlugin \(pluginID, privacy: .public)）：\(ms, format: .fixed(precision: 1)) ms")
-            return
-        }
-        guard let plugin = plugin(forCommand: commandID) else {
-            log.warning("没有插件认领命令 \(commandID, privacy: .public)")
-            return
-        }
-        // 功能命令也做切换：面板正在显示该插件时再按同一个插件的快捷键就关掉。
-        // plugin.open.* 已在上面处理，这里兜住 clipboard.clear 这类「只会 Navigate 回本插件」的热键。
-        // AI Provider（ai.<id>）与聚合窗口（ai.mergedWindow）除外：它们开的是窗口，切换语义在 perform 的 toggle 里；
-        // 若在这里按「面板正显示 ai」直接 hide，快捷键在门户开着时只会关面板、打不开窗口。
-        let ownerPluginID = type(of: plugin).id
-        let isAIWindowCommand =
-            AIPlugin.providerID(fromCommandID: commandID) != nil || commandID == AIPlugin.mergedWindowCommandID
-        if paletteCoordinator.isVisible,
-            paletteCoordinator.activePluginID == ownerPluginID,
-            !isAIWindowCommand
-        {
-            paletteCoordinator.hide()
-            let ms = invokeStart.duration(to: .now).invokeMS
-            log.notice("invoke 完成（功能命令切换关闭 \(ownerPluginID, privacy: .public)）：\(ms, format: .fixed(precision: 1)) ms")
-            return
-        }
-        plugin.perform(commandID: commandID)
-        let ms = invokeStart.duration(to: .now).invokeMS
-        log.notice("invoke 完成（perform \(commandID, privacy: .public)）：\(ms, format: .fixed(precision: 1)) ms")
-    }
-
-    /// 按插件 id 取实例
-    ///
-    /// 设置页与事件路由用它；`plugins` 数组仍保留给需要遍历的路径（注册、启停、退出）。
-    func plugin(withID pluginID: String) -> (any QuickPlugin)? {
-        pluginsByID[pluginID]
-    }
-
-    /// 某条命令归哪个插件
-    ///
-    /// 只查静态 `commands` 的登记表；动态命令（`launcher.app.*`）没有归属条目，
-    /// 调用方需要自己认前缀。
-    func pluginID(owningCommand commandID: String) -> String? {
-        commandOwners[commandID]
-    }
-
-    /// 取某条命令的声明
-    ///
-    /// 设置页要用它的标题、关键词与图标来渲染一行 —— 这些信息只在声明里，
-    /// 从执行路径拿不到。
-    func commandDescriptor(of commandID: String, in pluginID: String) -> CommandDescriptor? {
-        guard let plugin = pluginsByID[pluginID] else { return nil }
-        return type(of: plugin).commands.first { $0.id == commandID }
-    }
-
-    /// 按命令 id 找到负责执行的插件
-    ///
-    /// 走 `commandOwners` 字典而不是遍历插件数组：设置页、热键、搜索结果都会问
-    /// 「这条命令归谁」，线性扫描会随插件数与命令数一起增长。
-    private func plugin(forCommand commandID: String) -> (any QuickPlugin)? {
-        if let ownerID = commandOwners[commandID] {
-            return pluginsByID[ownerID]
-        }
-        // 动态命令（如 `launcher.app.*`、`launcher.shell.*`）不在静态 `commands` 里，
-        // 没有映射条目，只能按插件 id 前缀回退。前缀匹配天然只能遍历，但这类命令
-        // 只在执行时问一次，不在按键热路径上。
-        // 命令 id 的约定是 `<插件 id>.<后缀>`，插件 id 本身不含「.」，所以取第一段直接查字典，
-        // 不必再扫描全部插件
-        let prefix = commandID.prefix { $0 != "." }
-        return pluginsByID[String(prefix)]
-    }
-
-    /// 用当前插件声明和开关重建静态命令快照，并按开关注册热键
-    ///
-    /// 顺带重建两个查找表（`pluginsByID`、`commandOwners`）—— 它们和命令快照
-    /// 来自同一份数据，分开重建迟早会出现「快照里有的命令索引里没有」。
-    func rebuildCommandCatalog() {
-        var indexed: [IndexedCommand] = []
-        var owners: [String: String] = [:]
-        var byID: [String: any QuickPlugin] = [:]
-
-        for plugin in plugins {
-            let meta = type(of: plugin)
-            byID[meta.id] = plugin
-
-            // 命令归属与「是否启用」无关：禁用的插件也可能收到热键（用户先绑了键、
-            // 后关掉插件），那时要能找到它并打日志说明它为什么没执行。
-            for command in meta.commands {
-                owners[command.id] = meta.id
-            }
-
-            guard plugin.isEnabled, settingsStore.isSearchSourceEnabled(meta.id) else { continue }
-            for command in meta.commands {
-                guard settingsStore.isCommandEnabled(command.id) else { continue }
-                var keywords = command.keywords
-                if let aliasKey = command.aliasKey,
-                    let alias = settingsStore.alias(for: aliasKey),
-                    !alias.isEmpty
-                {
-                    keywords.append(alias)
-                }
-                indexed.append(IndexedCommand(command.replacingKeywords(keywords)))
-            }
-        }
-
-        pluginsByID = byID
-        commandOwners = owners
-        paletteCoordinator.staticCommands = indexed
-        hotKeyService.syncRegistrations { [settingsStore] commandID in
-            commandID == CommandID.togglePalette
-                || commandID == CommandID.superPanel
-                || settingsStore.isCommandEnabled(commandID)
-        }
-        log.notice(
-            """
-            命令目录已更新：静态命令 \(indexed.count, privacy: .public) 条，\
-            登记归属 \(owners.count, privacy: .public) 条
-            """)
-    }
 }
 
 extension Duration {
     /// 转换为毫秒数（双精度），给 invoke 链路计时用
-    fileprivate var invokeMS: Double {
+    var invokeMS: Double {
         let (seconds, attoseconds) = components
         return Double(seconds) * 1000 + Double(attoseconds) / 1_000_000_000_000_000
     }

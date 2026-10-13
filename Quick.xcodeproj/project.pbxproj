@@ -9,9 +9,11 @@
 /* Begin PBXBuildFile section */
 		03D030042B8C230428E13BF8 /* QuickPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = EB1FAFFF92FB2D709E88377F /* QuickPlatform */; };
 		1E203069C97521F37041068D /* SettingsBridge+Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03183AE996907FD3383E5F67 /* SettingsBridge+Backup.swift */; };
+		207C2F645E49747DE60E70B2 /* AppCore+SuperPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FD78ABDEE32718F0DD5C77 /* AppCore+SuperPanel.swift */; };
 		277B92A1F7D8BA105B19055E /* PluginCalculator in Frameworks */ = {isa = PBXBuildFile; productRef = 892814393E695508914504C9 /* PluginCalculator */; };
 		3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7873A36EB616CB4FE27F295 /* AppCore.swift */; };
 		39BF304AD2D01B87D3F7834C /* PluginTranslator in Frameworks */ = {isa = PBXBuildFile; productRef = CA41B567971AB8CE0445F5C7 /* PluginTranslator */; };
+		3CB229B5C88D6EBC7F8608E3 /* AppCore+EventBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AB3C46ABBDFCCD2666F1E5C /* AppCore+EventBus.swift */; };
 		3F28736FE058C441506AB7F0 /* FileSearchSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8883DA61F27C8CB9CBC70E58 /* FileSearchSource.swift */; };
 		417799EEF90D61AF8F7AF754 /* PluginSQLFormatter in Frameworks */ = {isa = PBXBuildFile; productRef = 1FFF450730B0758258EE887F /* PluginSQLFormatter */; };
 		43E6D248378B141C8E7591D4 /* PluginBase64Codec in Frameworks */ = {isa = PBXBuildFile; productRef = 8EBC8865C1DE63B00ECE5D14 /* PluginBase64Codec */; };
@@ -20,12 +22,16 @@
 		52363DE2F513149A6038375A /* QuickUI in Frameworks */ = {isa = PBXBuildFile; productRef = 783AEBF3F1FAE829DCAFC004 /* QuickUI */; };
 		524D1EC52B497EBF1E980A28 /* SettingsBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */; };
 		53A985DAB5B69501293E3EC9 /* PluginLauncher in Frameworks */ = {isa = PBXBuildFile; productRef = 101707495A6AF30BDD48497F /* PluginLauncher */; };
+		5481404B45BDAA995A3EBAC4 /* SettingsBridge+Plugins.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49517AC0FE36382584AF015C /* SettingsBridge+Plugins.swift */; };
 		5BD9CB4EF1094389D50EC0AB /* PluginTextDiff in Frameworks */ = {isa = PBXBuildFile; productRef = D67A514737047D5B9925EA48 /* PluginTextDiff */; };
+		7353FCB0C2CC60CC432BCC0A /* SettingsBridge+Launcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83A252D07DFE08C39BB858A /* SettingsBridge+Launcher.swift */; };
 		76B868B658D790B18C10FC2C /* PluginHashCalculator in Frameworks */ = {isa = PBXBuildFile; productRef = 0F74B10CDA2C6AF373813DB4 /* PluginHashCalculator */; };
 		86A89A47B2880D49A08EBBBC /* PluginSystemMonitor in Frameworks */ = {isa = PBXBuildFile; productRef = 730276E735A178193257030B /* PluginSystemMonitor */; };
 		947ED1B4A3109AF5B63E3E83 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5894ED469482915CE3F1ED6A /* AppIcon.icon */; };
 		95C2CAFCA62640B6BB7D9474 /* PluginScreenshot in Frameworks */ = {isa = PBXBuildFile; productRef = 94AAA82063614DB0D0F9D16A /* PluginScreenshot */; };
 		99C17420548B0EF4F181ECCA /* QuickCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DB0A80DC50B7C3B8F6D1DAF /* QuickCore */; };
+		99EA435C5965E7D17CD10BDC /* AppCore+KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF595C6E26B518F689A658CD /* AppCore+KeyboardLayout.swift */; };
+		9BF1F6A47BB0F0A3BC8890FD /* AppCore+Paste.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0586541AE55DC6D407B3500 /* AppCore+Paste.swift */; };
 		9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1701F76E22B29388E212E6DA /* QuickApp.swift */; };
 		A3F5185C4E5024554087DADF /* PluginAI in Frameworks */ = {isa = PBXBuildFile; productRef = A55EC642F7A5A977D30FB60D /* PluginAI */; };
 		A5F5BA05FBA565DA840A590D /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */; };
@@ -33,11 +39,15 @@
 		C168ED1A3E5CA36E9E363842 /* PluginUUIDGenerator in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF1D69FA23DA7FFF37FAA7E /* PluginUUIDGenerator */; };
 		C38D384C5CD7A8F76F831F71 /* PluginTimestampConverter in Frameworks */ = {isa = PBXBuildFile; productRef = 48089A1880F9BC5977EFE119 /* PluginTimestampConverter */; };
 		CDCBFE06CE05C92920350DC7 /* PluginNetworkTools in Frameworks */ = {isa = PBXBuildFile; productRef = 7E26B93AF39A58B145948CCE /* PluginNetworkTools */; };
+		CE415F47DA927CCDF6B41B9A /* AppCore+Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3C69F2CF2FDCDA7FF44B86 /* AppCore+Appearance.swift */; };
 		D94821D4837449038E038DB6 /* PluginJSONFormatter in Frameworks */ = {isa = PBXBuildFile; productRef = 2E35DDAF3712336ED4C40854 /* PluginJSONFormatter */; };
+		D9AB6705AB2671F4BAC48E5A /* SettingsBridge+Host.swift in Sources */ = {isa = PBXBuildFile; fileRef = F80035CC02035430AAB61318 /* SettingsBridge+Host.swift */; };
 		DB8A9B8692F4BE8F23B18966 /* PluginCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 14C604C793BB19FA72FF5B6D /* PluginCalendar */; };
 		DE7F122FCEC7A48CA773BCBD /* PluginKillProcess in Frameworks */ = {isa = PBXBuildFile; productRef = 6265A8A2D1FC70626C2DACA6 /* PluginKillProcess */; };
 		F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6253BE55917823E5C48BF0A6 /* AppDelegate.swift */; };
 		F1453649AD3331E4B9612090 /* PluginSystemControl in Frameworks */ = {isa = PBXBuildFile; productRef = F6EF76EEC6647C0CF9D9325A /* PluginSystemControl */; };
+		F74277107934274302D0D963 /* AppCore+Plugins.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C0E4F33E6AF0E9F120F21E /* AppCore+Plugins.swift */; };
+		FE225E073DE1AA483F97D798 /* AppCore+Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20A1E09B597CC9F2729085B /* AppCore+Commands.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,18 +56,23 @@
 		09526C0009FCB6C64F053D41 /* QuickCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickCore; path = Packages/QuickCore; sourceTree = SOURCE_ROOT; };
 		1701F76E22B29388E212E6DA /* QuickApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickApp.swift; sourceTree = "<group>"; };
 		1CDBE955E3F9746443CAE91B /* PluginTimestampConverter */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginTimestampConverter; path = Packages/PluginTimestampConverter; sourceTree = SOURCE_ROOT; };
+		21FD78ABDEE32718F0DD5C77 /* AppCore+SuperPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppCore+SuperPanel.swift"; sourceTree = "<group>"; };
 		29D3223EB25304FC1C719BA9 /* Quick.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Quick.entitlements; sourceTree = "<group>"; };
 		341B7D52174464D3E6F210BA /* PluginScreenshot */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginScreenshot; path = Packages/PluginScreenshot; sourceTree = SOURCE_ROOT; };
 		3A0528521CC2D2EE454DB2B2 /* PluginJSONFormatter */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginJSONFormatter; path = Packages/PluginJSONFormatter; sourceTree = SOURCE_ROOT; };
 		3A1E8D41A9C09C7D9E73CCCD /* PluginSystemControl */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginSystemControl; path = Packages/PluginSystemControl; sourceTree = SOURCE_ROOT; };
 		411482A21BFC85FD3CC7696C /* PluginAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginAI; path = Packages/PluginAI; sourceTree = SOURCE_ROOT; };
+		49517AC0FE36382584AF015C /* SettingsBridge+Plugins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsBridge+Plugins.swift"; sourceTree = "<group>"; };
 		4AD2A44C727483F56A0A316D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4F7A9C41ED7ADB3B1DE26A45 /* PluginLauncher */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginLauncher; path = Packages/PluginLauncher; sourceTree = SOURCE_ROOT; };
 		55801C1D7B74B8E7FC29368A /* PluginCalendar */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginCalendar; path = Packages/PluginCalendar; sourceTree = SOURCE_ROOT; };
 		5894ED469482915CE3F1ED6A /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		5D3C69F2CF2FDCDA7FF44B86 /* AppCore+Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppCore+Appearance.swift"; sourceTree = "<group>"; };
 		6253BE55917823E5C48BF0A6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		676A3B0A6598E5EE41B88946 /* PluginKillProcess */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginKillProcess; path = Packages/PluginKillProcess; sourceTree = SOURCE_ROOT; };
+		6AB3C46ABBDFCCD2666F1E5C /* AppCore+EventBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppCore+EventBus.swift"; sourceTree = "<group>"; };
 		6D26A8E50B14854E2636B3B6 /* PluginTextDiff */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginTextDiff; path = Packages/PluginTextDiff; sourceTree = SOURCE_ROOT; };
+		74C0E4F33E6AF0E9F120F21E /* AppCore+Plugins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppCore+Plugins.swift"; sourceTree = "<group>"; };
 		79275F0D51498BD4793203D7 /* PluginSystemMonitor */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginSystemMonitor; path = Packages/PluginSystemMonitor; sourceTree = SOURCE_ROOT; };
 		7F354F9D3878CF7F2A0B8F68 /* PluginTranslator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginTranslator; path = Packages/PluginTranslator; sourceTree = SOURCE_ROOT; };
 		815E7C080A517F26BC34F2F7 /* QuickUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QuickUI; path = Packages/QuickUI; sourceTree = SOURCE_ROOT; };
@@ -69,10 +84,15 @@
 		A336738EEED8ECCEAF064C6D /* PluginHashCalculator */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginHashCalculator; path = Packages/PluginHashCalculator; sourceTree = SOURCE_ROOT; };
 		A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsBridge.swift; sourceTree = "<group>"; };
 		A7873A36EB616CB4FE27F295 /* AppCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCore.swift; sourceTree = "<group>"; };
+		B83A252D07DFE08C39BB858A /* SettingsBridge+Launcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsBridge+Launcher.swift"; sourceTree = "<group>"; };
+		C20A1E09B597CC9F2729085B /* AppCore+Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppCore+Commands.swift"; sourceTree = "<group>"; };
 		C756B0BA63E770C910A9E89B /* PluginBase64Codec */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginBase64Codec; path = Packages/PluginBase64Codec; sourceTree = SOURCE_ROOT; };
+		D0586541AE55DC6D407B3500 /* AppCore+Paste.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppCore+Paste.swift"; sourceTree = "<group>"; };
 		D60904D89F651A9B0D05FF07 /* PluginURLCodec */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginURLCodec; path = Packages/PluginURLCodec; sourceTree = SOURCE_ROOT; };
 		DAE083F8C32E921D91600BCF /* PluginNetworkTools */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginNetworkTools; path = Packages/PluginNetworkTools; sourceTree = SOURCE_ROOT; };
 		E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
+		EF595C6E26B518F689A658CD /* AppCore+KeyboardLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppCore+KeyboardLayout.swift"; sourceTree = "<group>"; };
+		F80035CC02035430AAB61318 /* SettingsBridge+Host.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsBridge+Host.swift"; sourceTree = "<group>"; };
 		FA9D9302DC1D059B78C0F406 /* PluginSQLFormatter */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PluginSQLFormatter; path = Packages/PluginSQLFormatter; sourceTree = SOURCE_ROOT; };
 		FE2289C2B74C6E51D568A553 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -123,6 +143,13 @@
 			isa = PBXGroup;
 			children = (
 				A7873A36EB616CB4FE27F295 /* AppCore.swift */,
+				5D3C69F2CF2FDCDA7FF44B86 /* AppCore+Appearance.swift */,
+				C20A1E09B597CC9F2729085B /* AppCore+Commands.swift */,
+				6AB3C46ABBDFCCD2666F1E5C /* AppCore+EventBus.swift */,
+				EF595C6E26B518F689A658CD /* AppCore+KeyboardLayout.swift */,
+				D0586541AE55DC6D407B3500 /* AppCore+Paste.swift */,
+				74C0E4F33E6AF0E9F120F21E /* AppCore+Plugins.swift */,
+				21FD78ABDEE32718F0DD5C77 /* AppCore+SuperPanel.swift */,
 				6253BE55917823E5C48BF0A6 /* AppDelegate.swift */,
 				5894ED469482915CE3F1ED6A /* AppIcon.icon */,
 				4AD2A44C727483F56A0A316D /* Assets.xcassets */,
@@ -131,6 +158,9 @@
 				1701F76E22B29388E212E6DA /* QuickApp.swift */,
 				A4BCD59506082F5AF371AAB5 /* SettingsBridge.swift */,
 				03183AE996907FD3383E5F67 /* SettingsBridge+Backup.swift */,
+				F80035CC02035430AAB61318 /* SettingsBridge+Host.swift */,
+				B83A252D07DFE08C39BB858A /* SettingsBridge+Launcher.swift */,
+				49517AC0FE36382584AF015C /* SettingsBridge+Plugins.swift */,
 				E484AF5FA72820B4FC0B5D35 /* StatusItemController.swift */,
 				7BB92E5F9C0104DB071DFF81 /* Resources */,
 			);
@@ -301,11 +331,21 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CE415F47DA927CCDF6B41B9A /* AppCore+Appearance.swift in Sources */,
+				FE225E073DE1AA483F97D798 /* AppCore+Commands.swift in Sources */,
+				3CB229B5C88D6EBC7F8608E3 /* AppCore+EventBus.swift in Sources */,
+				99EA435C5965E7D17CD10BDC /* AppCore+KeyboardLayout.swift in Sources */,
+				9BF1F6A47BB0F0A3BC8890FD /* AppCore+Paste.swift in Sources */,
+				F74277107934274302D0D963 /* AppCore+Plugins.swift in Sources */,
+				207C2F645E49747DE60E70B2 /* AppCore+SuperPanel.swift in Sources */,
 				3676FE53B9F956034A0220F9 /* AppCore.swift in Sources */,
 				F0B2B20789BECF98048405E3 /* AppDelegate.swift in Sources */,
 				3F28736FE058C441506AB7F0 /* FileSearchSource.swift in Sources */,
 				9CDA49E78015385EA9615AE5 /* QuickApp.swift in Sources */,
 				1E203069C97521F37041068D /* SettingsBridge+Backup.swift in Sources */,
+				D9AB6705AB2671F4BAC48E5A /* SettingsBridge+Host.swift in Sources */,
+				7353FCB0C2CC60CC432BCC0A /* SettingsBridge+Launcher.swift in Sources */,
+				5481404B45BDAA995A3EBAC4 /* SettingsBridge+Plugins.swift in Sources */,
 				524D1EC52B497EBF1E980A28 /* SettingsBridge.swift in Sources */,
 				A5F5BA05FBA565DA840A590D /* StatusItemController.swift in Sources */,
 			);

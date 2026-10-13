@@ -7,7 +7,7 @@
 #   ./Scripts/new-plugin.sh PluginFoo --with-platform   需要 QuickPlatform
 #
 # 生成的内容遵循 AGENTS.md 的插件契约。生成后仍需手动做三件事（脚本会打印提醒）：
-#   1. 在 Quick/AppCore.swift#registerPlugins() 注册
+#   1. 在 Quick/AppCore+Plugins.swift#registerPlugins() 注册
 #   2. 在 project.yml 加 packages + dependencies 两处，然后 xcodegen generate
 #   3. 在 docs/features.md 写下这个插件的不变量
 #
@@ -303,7 +303,7 @@ echo "    ✓ 已生成"
 echo
 echo "==> 还需要手动做三件事："
 echo
-echo "  1) 在 Quick/AppCore.swift 的 registerPlugins() 里注册"
+echo "  1) 在 Quick/AppCore+Plugins.swift 的 registerPlugins() 里注册"
 echo "     plugins.append(${prefix}Plugin())"
 echo
 echo "  2) 在 project.yml 里加两处，然后 xcodegen generate"

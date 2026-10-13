@@ -46,6 +46,22 @@
 [`Quick/AppCore.swift`](../Quick/AppCore.swift) 是 `@MainActor final class`，
 `static let shared`。整个应用只有它在持有长生命周期对象。
 
+**文件拆分是按职责切文件，不是拆所有者。** 状态（存储属性）与 `start()` / 退出清理留在
+`AppCore.swift`；行为按职责放进同名扩展文件，每个文件能一次读完：
+
+| 文件 | 内容 |
+| --- | --- |
+| `AppCore+Plugins.swift` | 插件分离、存储迁移、注册（**唯一 `plugins.append` 处**） |
+| `AppCore+EventBus.swift` | 事件总线接线 |
+| `AppCore+SuperPanel.swift` | 超级面板系统能力注入与鼠标触发 |
+| `AppCore+Commands.swift` | 自定义命令存储、快捷键恢复、命令目录 |
+| `AppCore+Paste.swift` | 粘贴回上一个应用 |
+| `AppCore+KeyboardLayout.swift` / `AppCore+Appearance.swift` | 键盘布局、外观 |
+
+跨文件的扩展访问不到 `private`，所以这些成员是 internal。`plugins` 因此无法再写成
+`private(set)` —— 「只有 `registerPlugins()` 写它」靠约定与 `Scripts/check-plugin-references.py` 守住。
+`SettingsBridge` 同理拆成 `+Launcher` / `+Plugins` / `+Host` / `+Backup`，协议一致性仍声明在主类上。
+
 ### 它拥有什么
 
 | 属性 | 类型 | 职责 |
@@ -211,7 +227,7 @@ public protocol PluginSettingsProviding { func makeSettingsView() -> AnyView? }
 插件**不自注册**。加一个插件要做四件事：
 
 1. 写 `<Name>Plugin.swift` 实现协议。
-2. 在 `AppCore.registerPlugins()` 里 `plugins.append(...)`。
+2. 在 `AppCore+Plugins.swift` 的 `registerPlugins()` 里 `plugins.append(...)`。
 3. 在 `project.yml` 的 `packages:` 加路径、在 `Quick` target 的 `dependencies:` 加
    `- package: Plugin<Name>`，然后 `xcodegen generate`。
 4. 在 `docs/features.md` 写下这个插件的不变量。

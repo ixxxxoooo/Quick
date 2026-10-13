@@ -6,7 +6,7 @@
 # 引用都可能被遗忘 —— 编译器看不见这些字符串，运行时表现为「点了没反应 / 面板空白」。
 # 这条检查把以下三件事变成提交门禁：
 #
-#   1. Packages/Plugin* 目录、project.yml 的 packages 声明、AppCore 的注册表三者完全一致；
+#   1. Packages/Plugin* 目录、project.yml 的 packages 声明、AppCore+Plugins 的注册表三者完全一致；
 #   2. 超级面板「工作台」目录（SuperPanelQuickTool.swift）里每个 pluginID 都真实存在；
 #   3. 超级面板上下文动作里的 `navigate("...")` 目标都真实存在。
 #
@@ -49,7 +49,7 @@ def main() -> int:
     # 1. 三方一致
     project_yml = (ROOT / "project.yml").read_text()
     declared = set(re.findall(r"^\s*-\s*package:\s*(Plugin\w+)\s*$", project_yml, re.M))
-    app_core = (ROOT / "Quick" / "AppCore.swift").read_text()
+    app_core = (ROOT / "Quick" / "AppCore+Plugins.swift").read_text()
     registered_types = set(re.findall(r"\(\s*(\w+Plugin)\.self", app_core))
 
     for name, plugin_id in packages.items():
