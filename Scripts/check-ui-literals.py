@@ -27,6 +27,7 @@ PATTERNS = [
     (re.compile(rf"(?:VStack|HStack|ZStack|LazyVStack|LazyHStack|LazyVGrid|LazyHGrid|safeAreaInset)\([^()\n]*?spacing:\s*{NUM}"), "栈间距字面量"),
     (re.compile(rf"\.offset\((?:x|y):\s*-?{NUM}"), "偏移字面量"),
     (re.compile(rf"lineWidth:\s*{NUM}"), "线宽字面量"),
+    (re.compile(rf"\.(?:easeIn|easeOut|easeInOut|linear)\(duration:\s*{NUM}"), "动画时长字面量"),
     (re.compile(rf"\.shadow\([^\n]*?radius:\s*{NUM}"), "阴影字面量"),
 ]
 

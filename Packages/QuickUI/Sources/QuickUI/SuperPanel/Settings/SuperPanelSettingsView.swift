@@ -243,6 +243,7 @@ public struct SuperPanelSettingsView: View {
                             Image(systemName: "arrow.up")
                         }
                         .buttonStyle(.borderless)
+                        .accessibilityLabel("上移")
                         .disabled(index == 0)
 
                         Button {
@@ -251,6 +252,7 @@ public struct SuperPanelSettingsView: View {
                             Image(systemName: "arrow.down")
                         }
                         .buttonStyle(.borderless)
+                        .accessibilityLabel("下移")
                         .disabled(index == tools.count - 1)
 
                         Button {
@@ -259,6 +261,7 @@ public struct SuperPanelSettingsView: View {
                             Image(systemName: "xmark")
                         }
                         .buttonStyle(.borderless)
+                        .accessibilityLabel("移除")
                         .disabled(tools.count <= 1)
                     }
                 }

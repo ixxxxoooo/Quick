@@ -167,6 +167,7 @@ private struct CustomCommandRow: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("编辑")
             .help("编辑")
 
             Button(role: .destructive) {
@@ -177,6 +178,7 @@ private struct CustomCommandRow: View {
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("删除")
             .help("删除")
         }
         .padding(.vertical, DesignTokens.Spacing.xxs)

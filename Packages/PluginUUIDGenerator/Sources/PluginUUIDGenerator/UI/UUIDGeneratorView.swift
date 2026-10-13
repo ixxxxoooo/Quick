@@ -76,6 +76,7 @@ struct UUIDGeneratorView: View {
                                             : DesignTokens.Colors.textTertiary)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(copiedIndex == index ? "已复制" : "复制 UUID")
                         }
                         .padding(.horizontal, DesignTokens.Spacing.lg)
                         .padding(.vertical, DesignTokens.Spacing.sm)

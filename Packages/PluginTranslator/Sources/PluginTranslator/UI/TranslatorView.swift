@@ -78,6 +78,7 @@ struct TranslatorView: View {
                     .font(DesignTokens.Typography.inlineIcon)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("交换源语言与目标语言")
             .foregroundStyle(DesignTokens.Colors.textSecondary)
             .help("交换源语言与目标语言")
 
@@ -104,6 +105,7 @@ struct TranslatorView: View {
                     .font(DesignTokens.Typography.inlineIcon)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("翻译历史")
             .foregroundStyle(DesignTokens.Colors.textSecondary)
             .help("翻译历史")
         }

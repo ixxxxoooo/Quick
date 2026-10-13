@@ -199,6 +199,7 @@ struct ClipboardListView: View {
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("清空历史")
             .help("清空历史（保留收藏）")
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)

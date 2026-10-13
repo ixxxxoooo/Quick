@@ -97,7 +97,7 @@ private struct ConfirmDialogModifier: ViewModifier {
                     .transition(.opacity)
                 }
             }
-            .animation(.easeOut(duration: DesignTokens.Duration.hover), value: request?.id)
+            .animation(Motion.animation(.easeOut(duration: DesignTokens.Duration.hover)), value: request?.id)
             .onChange(of: request?.id) { _, newValue in
                 search?.wantsCancel = newValue != nil
             }

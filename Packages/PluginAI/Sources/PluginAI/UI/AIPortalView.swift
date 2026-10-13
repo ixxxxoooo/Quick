@@ -216,12 +216,15 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.inlineIcon)
                         .rotationEffect(reloadingID == provider.id ? .degrees(360) : .zero)
                         .animation(
-                            reloadingID == provider.id
-                                ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default,
+                            Motion.animation(
+                                reloadingID == provider.id
+                                    ? .linear(duration: DesignTokens.Duration.spin).repeatForever(
+                                        autoreverses: false) : .default),
                             value: reloadingID
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("刷新 \(provider.name)")
                 .frame(width: DesignTokens.Size.controlSquare, height: DesignTokens.Size.controlSquare)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .disabled(!isActive)
@@ -235,6 +238,7 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.inlineIcon)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("在浏览器中打开 \(provider.name)")
                 .frame(width: DesignTokens.Size.controlSquare, height: DesignTokens.Size.controlSquare)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .help("在浏览器中打开 \(provider.name)")
@@ -248,6 +252,7 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.inlineIcon)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("关闭 \(provider.name)")
                 .frame(width: DesignTokens.Size.controlSquare, height: DesignTokens.Size.controlSquare)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .disabled(!isActive)
@@ -305,12 +310,12 @@ struct AIPortalView: View {
     }
 
     private func showFeedback(_ message: String) {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        Motion.withAnimation(.easeInOut(duration: DesignTokens.Duration.feedbackFade)) {
             feedbackMessage = message
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.8))
-            withAnimation(.easeInOut(duration: 0.2)) {
+            try? await Task.sleep(for: .seconds(DesignTokens.Duration.feedbackHold))
+            Motion.withAnimation(.easeInOut(duration: DesignTokens.Duration.feedbackFade)) {
                 feedbackMessage = nil
             }
         }

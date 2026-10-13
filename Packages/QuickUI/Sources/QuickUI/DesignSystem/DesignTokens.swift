@@ -450,6 +450,12 @@ public enum DesignTokens {
         public static let hover: TimeInterval = 0.12
         /// 复制反馈
         public static let copyFeedback: TimeInterval = 1.2
+        /// 行内提示的淡入淡出
+        public static let feedbackFade: TimeInterval = 0.2
+        /// 行内提示停留时长
+        public static let feedbackHold: TimeInterval = 1.8
+        /// 刷新图标转一圈
+        public static let spin: TimeInterval = 0.8
     }
 
     // MARK: - 字体
@@ -566,11 +572,28 @@ public enum DesignTokens {
         }
 
         /// 透明度渐变（深色用白墨、浅色用黑墨）
+        ///
+        /// 开启「增强对比度」时系统会换成高对比外观（`accessibilityHighContrast*`），
+        /// 这里据此把不透明度整体抬高 —— 半透明的描边、分隔线、选中底色在默认下很淡，
+        /// 对低视力用户几乎看不见。见 `ContrastBoost`。
         public static func ramp(dark: Double, light: Double) -> Color {
-            adaptive(
-                dark: .srgbInk(1, alpha: dark),
-                light: .srgbInk(0, alpha: light)
-            )
+            Color(
+                nsColor: NSColor(name: nil) { appearance in
+                    resolveRamp(dark: dark, light: light, appearance: appearance)
+                })
+        }
+
+        /// `ramp` 在某个外观下的取值（单独拎出来，测试可以直接喂外观与系统开关）
+        ///
+        /// 高对比只认系统「增强对比度」开关。**不能靠外观名判断**：`bestMatch` 与 `NSAppearance.name`
+        /// 都会把高对比变体归并回基础外观（实测 `.accessibilityHighContrastAqua.name == .aqua`），永远认不出来。
+        static func resolveRamp(
+            dark: Double, light: Double, appearance: NSAppearance,
+            systemIncreaseContrast: Bool = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        ) -> NSColor {
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let alpha = ContrastBoost.alpha(isDark ? dark : light, highContrast: systemIncreaseContrast)
+            return .srgbInk(isDark ? 1 : 0, alpha: alpha)
         }
 
         /// 面板背景遮罩

@@ -80,7 +80,7 @@ struct SuperPanelRootView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: DesignTokens.Duration.enter), value: model.toast)
+        .animation(Motion.animation(.easeOut(duration: DesignTokens.Duration.enter)), value: model.toast)
         .onPreferenceChange(SuperPanelContentHeightKey.self) { height in
             onContentHeightChange(height)
         }

@@ -81,6 +81,7 @@ struct SuperPanelSpotlightCard: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("复制")
                 .focusable(false)
                 .help("复制")
 

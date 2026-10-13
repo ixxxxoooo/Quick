@@ -70,6 +70,7 @@ struct ApplicationsSettingsPane: View {
                                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("清空搜索")
                     }
                 }
                 .padding(.vertical, DesignTokens.Spacing.xs)

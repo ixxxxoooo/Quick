@@ -497,6 +497,16 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
   （位置、图标、字重）。
 - 文本对比度：`textTertiary` 是允许的最淡文本，不要再用更淡的颜色做正文。
 - 键盘可达：面板内所有主要操作都要能用键盘完成，这也是底栏要展示快捷键的原因。
+- **读屏（VoiceOver）**：结果列表每行是一个按钮，念「标题，来源插件」，选中行带 `.isSelected`，
+  `accessibilityAction` 等同回车；⌘数字提示对读屏隐藏（它是视觉提示）。
+- **减弱动态效果**：所有动画一律走 `Motion`（`Motion.animation` / `Motion.withAnimation` /
+  `Motion.duration`），系统开关打开时变成瞬时。不要在视图里直接写 `withAnimation(...)`，
+  AppKit 里的 `NSAnimationContext` 也要 `context.duration = Motion.duration(...)`。
+  动画时长同样不许写字面量（`check-ui-literals.py` 会拦）。
+- **增强对比度**：`DesignTokens.Colors.ramp` 在系统开关打开时把不透明度抬高（`ContrastBoost`，×1.8，
+  最低 0.12）。描边、分隔线、选中底色都是 `ramp`，所以不用逐处适配 —— **新增半透明颜色也走 `ramp`**，
+  别在视图里手写 `.opacity(...)`。注意：`bestMatch` / `NSAppearance.name` 认不出高对比变体，只能读系统开关。
+- 不做动态字体缩放：macOS 没有 iOS 那种全局 Dynamic Type，字号由 `DesignTokens.Typography` 统一给出。
 
 ---
 

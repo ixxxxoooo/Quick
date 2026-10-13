@@ -56,6 +56,7 @@ public struct AliasField: View {
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("清除别名")
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.sm)

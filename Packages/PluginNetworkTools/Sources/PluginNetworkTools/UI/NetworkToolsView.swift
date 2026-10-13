@@ -136,6 +136,7 @@ struct NetworkToolsView: View {
                 Image(systemName: "doc.on.doc")
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("复制")
         }
         .padding(DesignTokens.Spacing.md)
         .background(DesignTokens.Colors.cardFill)

@@ -287,7 +287,7 @@ struct FuzzyKeywordField: View {
                     isEditing ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairline)
             )
             .clipShape(shape)
-            .animation(.easeOut(duration: DesignTokens.Duration.hover), value: isEditing)
+            .animation(Motion.animation(.easeOut(duration: DesignTokens.Duration.hover)), value: isEditing)
             .onChange(of: text) { _, newValue in
                 if !isEditing { draft = newValue }
             }

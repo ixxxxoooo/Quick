@@ -73,7 +73,7 @@ public struct BarButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel(title)
         .onHover { hovering in
-            withAnimation(.easeOut(duration: DesignTokens.Duration.hover)) {
+            Motion.withAnimation(.easeOut(duration: DesignTokens.Duration.hover)) {
                 isHovered = hovering
             }
         }

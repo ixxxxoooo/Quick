@@ -292,7 +292,7 @@ public final class FloatingCapsuleView: NSView {
             return
         }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = DesignTokens.Size.Capsule.animationDuration
+            context.duration = Motion.duration(DesignTokens.Size.Capsule.animationDuration)
             context.allowsImplicitAnimation = true
             self.animator().frame = newFrame
         }

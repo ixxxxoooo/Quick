@@ -82,6 +82,16 @@ public struct ResultListView: View {
                                 ? index + 1 : nil
                         )
                         .id(item.id)
+                        // 读屏：一行一个按钮，念「标题，来源插件」，选中态要让 VoiceOver 知道
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(
+                            item.pluginName.map { "\(item.title)，\($0)" } ?? item.title
+                        )
+                        .accessibilityAddTraits(index == selectedIndex ? [.isButton, .isSelected] : .isButton)
+                        .accessibilityAction {
+                            selectedIndex = index
+                            item.action()
+                        }
                         .onHover { hovering in
                             if hovering {
                                 if let sel = selection {

@@ -70,6 +70,7 @@ public struct ShortcutRecorder: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("清除快捷键")
                 .help("清除快捷键")
                 .padding(.trailing, DesignTokens.Spacing.xs)
             }

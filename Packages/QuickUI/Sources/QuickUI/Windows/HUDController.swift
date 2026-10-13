@@ -80,7 +80,7 @@ public final class HUDController {
         panel.orderFront(nil)
 
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = DesignTokens.Duration.enter
+            context.duration = Motion.duration(DesignTokens.Duration.enter)
             panel.animator().alphaValue = 1
         }
 
@@ -104,7 +104,7 @@ public final class HUDController {
         hudWindow = nil
 
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = DesignTokens.Duration.exit
+            context.duration = Motion.duration(DesignTokens.Duration.exit)
             panel.animator().alphaValue = 0
         } completionHandler: {
             // 完成回调不在主 actor 上，收窗口必须显式跳回去。

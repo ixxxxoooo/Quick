@@ -862,7 +862,7 @@ final class AITitleBarIconButton: NSButton {
 
     private func refreshAppearance() {
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = DesignTokens.Duration.hover
+            context.duration = Motion.duration(DesignTokens.Duration.hover)
             context.allowsImplicitAnimation = true
             if isActive {
                 let baseColor = NSColor(DesignTokens.Colors.capsuleToggleFill)

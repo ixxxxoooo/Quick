@@ -115,6 +115,7 @@ public struct AISettingsPane: View {
                             .font(DesignTokens.Typography.compactIcon)
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityLabel(showKey ? "隐藏密钥" : "显示密钥")
                     .help(showKey ? "隐藏" : "显示")
                 }
             }
