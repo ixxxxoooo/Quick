@@ -293,6 +293,10 @@
 
 #### 不变量
 
+- **`OverlayCoordinator.begin` 用 `ReentryGate` 防重入。** `begin` 里有多处 `await`，挂起期间
+  `isPresenting` 仍为 false；连按快捷键会叠出两层遮罩、各持整屏位图。遮罩关闭时必须
+  `contentView = nil` 并清空 `controllers`，位图随之释放。
+
 - **抓屏走 ScreenCaptureKit**（`CaptureEngine`），不再起 `screencapture` 进程。因此需要
   「屏幕录制」权限，且授权只对授权之后启动的进程生效（授权后要重启 Quick）。
 - **遮罩用 `NSPanel + .nonactivatingPanel`，级别 `.screenSaver`**：全局热键触发时前台是别的
@@ -763,6 +767,12 @@
 
 #### 不变量
 
+- **每个 WebView 必须挂 `AIWebViewCoordinator`（导航 + UI 代理）。** 没有它：网页进程崩溃后
+  白屏不恢复；断网只有空白；`target=_blank` 的登录跳转点了没反应；网页的「上传文件」不弹面板。
+  代理只被 WebKit 弱引用，所以由 `AIWebViewWindowManager` 持有。加载失败展示 `AIErrorPage`
+  （用户取消的 `NSURLErrorCancelled` 不算失败），页内「重试」走 `quick-retry://` 由代理拦截。
+- **切走 / 隐藏的页面要 `pauseAllMediaPlayback()`**，别让看不见的标签继续出声。
+
 - **窗口是普通窗口，不是非激活面板。** 这一条决定「切走之后还能不能找回来」：非激活面板
   不进 ⌘Tab / Mission Control，用户一旦从 AI 窗口切到别的应用，就只剩「再从面板点一次」
   这一条路。所以 `AIWebViewPanel` 的 styleMask **不含** `.nonactivatingPanel`，并且
@@ -963,6 +973,9 @@
 - **解析用 `JSONSerialization`**，所以 JSON5、尾逗号、注释都不支持；无效输入返回
   `Failure.invalidJSON`，界面显示「无效的 JSON」而不是原样回显。
 - `Outcome.nodeCount` 与 `byteSize` 都来自同一次解析，不要为了显示再去解析一遍。
+- **输入变化走 `Debouncer`，且树只解析一次。** `JSONFormatterLogic.analyze(_:)` 一次解析同时给出
+  有效性、树根、节点数；超过 `treeParseLimit`（512KB）只做有效性判断、不建树（界面提示
+  「文件较大，树视图已跳过」）。别在 `body` 或 `onChange` 里同步解析大文本。
 - 缩进设置键是 `jsonFormatter.indent`，与设置页 `JSONFormatterFeatureSection` 共用同一个 `@AppStorage` 键。
 - **反转义分自动与手动两条路，逻辑都在 `JSONFormatterLogic`。**
   - `unescape(_:)` 手动：整段带引号的字符串字面量按 JSON 字符串解码；裸的转义正文

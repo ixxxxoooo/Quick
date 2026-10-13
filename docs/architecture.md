@@ -426,6 +426,10 @@ Debug（`.dev`）与 Release 互不污染。
 它挂在 `NSApp.effectiveAppearance` 上而不是 `applyAppearance()` 里 —— 「跟随系统」时我们
 从不赋值，那条路只有这里收得到。
 
+结果列表的应用图标（`ResultListView.AppIconImage`）也走这一份 `IconCache.shared`：先用
+`cachedIcon(forBundlePath:)` 在 `init` 里同步取命中的图标（零白屏），未命中才在 `onAppear` 读盘。
+不要在视图里再养第二份 `NSCache`。
+
 ### 设置窗口
 
 设置界面在 `QuickUI`，但插件实例与系统能力（登录项、快捷键、权限）只有组装层看得到，

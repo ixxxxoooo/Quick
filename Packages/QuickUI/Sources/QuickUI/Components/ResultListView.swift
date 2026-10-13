@@ -4,6 +4,7 @@
 
 import AppKit
 import QuickCore
+import QuickPlatform
 import SwiftUI
 
 /// 统一搜索结果列表组件
@@ -216,16 +217,17 @@ struct ResultRowView: View {
     }
 }
 
-/// 应用图标（内存缓存，保证即开即显零白屏）
+/// 应用图标
+///
+/// 图标统一走 `IconCache.shared`：全应用只有一份图标缓存，不再在这里另养一套。
+/// 命中时 `init` 里就拿到图片，保证即开即显零白屏；未命中的占位块只存在到 `onAppear` 读完磁盘为止。
 private struct AppIconImage: View {
     let path: String
     @State private var image: NSImage?
 
-    private static let cache = NSCache<NSString, NSImage>()
-
     init(path: String) {
         self.path = path
-        _image = State(initialValue: Self.cache.object(forKey: path as NSString))
+        _image = State(initialValue: IconCache.shared.cachedIcon(forBundlePath: path))
     }
 
     var body: some View {
@@ -235,16 +237,13 @@ private struct AppIconImage: View {
                     .resizable()
                     .scaledToFit()
             } else {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.primary.opacity(0.08))
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.thumbnail, style: .continuous)
+                    .fill(DesignTokens.Colors.selection)
             }
         }
         .onAppear {
             guard image == nil else { return }
-            let icon = NSWorkspace.shared.icon(forFile: path)
-            icon.size = NSSize(width: 48, height: 48)
-            Self.cache.setObject(icon, forKey: path as NSString)
-            image = icon
+            image = IconCache.shared.icon(forBundlePath: path)
         }
     }
 }

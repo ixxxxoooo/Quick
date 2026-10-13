@@ -26,6 +26,13 @@ public final class IconCache {
 
     public init() {}
 
+    /// 只查缓存、不读磁盘；未命中返回 `nil`
+    ///
+    /// 视图 `init` 里用它拿「已经有的」图标，免得为了判断有没有而触发一次磁盘读取。
+    public func cachedIcon(forBundlePath bundlePath: String) -> NSImage? {
+        cache[bundlePath]
+    }
+
     /// 获取应用图标
     /// - Parameter bundlePath: 应用 Bundle 路径
     /// - Returns: 应用图标（缓存命中或从文件系统加载）

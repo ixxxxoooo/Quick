@@ -25,6 +25,18 @@ final class AIWebViewWindowManager {
     /// 各 Provider 的 WebView（按需创建，保持登录态）
     private var webViews: [String: WKWebView] = [:]
 
+    /// WebView 的导航 / UI 代理（WebKit 只弱引用代理，必须由这里持有）
+    private let coordinator = AIWebViewCoordinator()
+
+    init() {
+        coordinator.providerResolver = { [weak self] webView in
+            guard let self,
+                let id = self.webViews.first(where: { $0.value === webView })?.key
+            else { return nil }
+            return AIProviderRegistry.provider(for: id)
+        }
+    }
+
     // MARK: - 独立窗口模式
 
     /// 独立窗口模式下每个 Provider 的窗口
@@ -148,6 +160,7 @@ final class AIWebViewWindowManager {
 
     /// 隐藏窗口
     func hideWindow(for providerId: String) {
+        webViews[providerId]?.pauseAllMediaPlayback()
         if isMergeMode || mergedPanel != nil {
             saveMergedFrame()
             saveTabState()
@@ -497,6 +510,8 @@ final class AIWebViewWindowManager {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
+        webView.navigationDelegate = coordinator
+        webView.uiDelegate = coordinator
         webView.customUserAgent =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 
@@ -518,6 +533,10 @@ final class AIWebViewWindowManager {
             let webView = webViews[providerId]
         else { return }
 
+        // 切走的标签不该继续出声（语音 / 视频），WebKit 对不可见页面自会降频
+        if let previous = activeProviderID, previous != providerId {
+            webViews[previous]?.pauseAllMediaPlayback()
+        }
         container.subviews.forEach { $0.removeFromSuperview() }
 
         webView.frame = container.bounds
