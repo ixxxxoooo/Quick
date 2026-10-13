@@ -106,7 +106,7 @@ public struct SuperPanelSettingsView: View {
                         Text("\(Int(thresholdValue)) ms")
                             .font(DesignTokens.Typography.rowTrailing)
                             .foregroundStyle(.secondary)
-                            .frame(width: 56, alignment: .trailing)
+                            .frame(width: DesignTokens.Size.superPanelReadout, alignment: .trailing)
                     }
                 }
             }
@@ -277,7 +277,7 @@ public struct SuperPanelSettingsView: View {
                         icon: { SettingsRowIcon(systemImage: "plus") }
                     )
                 }
-                .frame(maxWidth: 320)
+                .frame(maxWidth: DesignTokens.Size.superPanelNoteMaxWidth)
                 .disabled(availableTools.isEmpty)
 
                 Button("添加") { addTool() }

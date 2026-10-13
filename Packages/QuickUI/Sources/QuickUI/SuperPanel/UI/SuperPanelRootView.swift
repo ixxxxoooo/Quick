@@ -115,7 +115,7 @@ struct SuperPanelRootView: View {
         }
         .padding(.horizontal, DesignTokens.Spacing.xl)
         .padding(.vertical, DesignTokens.Spacing.sm)
-        .background(DesignTokens.Colors.controlSurface.opacity(0.4))
+        .background(DesignTokens.Colors.controlSurface.opacity(DesignTokens.Opacity.controlSurfaceDim))
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(DesignTokens.Colors.separator)
@@ -129,7 +129,7 @@ struct SuperPanelRootView: View {
                 .font(DesignTokens.Typography.compactKeyCap)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .padding(.horizontal, DesignTokens.Spacing.xs)
-                .padding(.vertical, 1)
+                .padding(.vertical, DesignTokens.Spacing.hairline)
                 .background(
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap, style: .continuous)
                         .fill(DesignTokens.Colors.controlSurface)

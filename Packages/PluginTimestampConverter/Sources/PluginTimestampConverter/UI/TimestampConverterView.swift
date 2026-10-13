@@ -42,7 +42,7 @@ struct TimestampConverterView: View {
                         .font(DesignTokens.Typography.keyCap)
                         .padding(.horizontal, DesignTokens.Spacing.sm)
                         .padding(.vertical, DesignTokens.Spacing.xxs)
-                        .background(Color.accentColor.opacity(0.15))
+                        .background(Color.accentColor.opacity(DesignTokens.Opacity.tint))
                         .foregroundStyle(Color.accentColor)
                         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap))
                 }
@@ -50,7 +50,7 @@ struct TimestampConverterView: View {
             .padding(.horizontal, DesignTokens.Spacing.lg)
             .padding(.vertical, DesignTokens.Spacing.md)
 
-            Divider().opacity(0.3).padding(.horizontal, DesignTokens.Spacing.lg)
+            Divider().opacity(DesignTokens.Opacity.divider).padding(.horizontal, DesignTokens.Spacing.lg)
 
             // 结果卡片
             if !results.isEmpty {
@@ -58,7 +58,7 @@ struct TimestampConverterView: View {
                     VStack(spacing: DesignTokens.Spacing.xs) {
                         ForEach(results, id: \.key) { item in
                             HStack {
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                                     Text(item.label)
                                         .font(DesignTokens.Typography.keyCap)
                                         .foregroundStyle(DesignTokens.Colors.textTertiary)
@@ -109,7 +109,7 @@ struct TimestampConverterView: View {
 
             Spacer(minLength: 0)
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             // 底部当前时间
             HStack(spacing: DesignTokens.Spacing.sm) {

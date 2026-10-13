@@ -30,7 +30,7 @@ struct CalendarView: View {
             monthPanel
                 .frame(width: DesignTokens.Size.calendarPanelWidth)
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             dayPanel
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -190,7 +190,7 @@ struct CalendarView: View {
             .padding(.horizontal, DesignTokens.Spacing.xl)
             .padding(.top, DesignTokens.Spacing.xl)
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             switch service.accessState {
             case .notDetermined: permissionPrompt
@@ -309,6 +309,6 @@ struct CalendarView: View {
 
     private func color(for event: CalendarEvent) -> Color {
         guard let c = event.color else { return DesignTokens.Colors.progress }
-        return Color(red: c.red, green: c.green, blue: c.blue)
+        return Color(red: c.red, green: c.green, blue: c.blue)  // ui-literal-ok: 日历自带的用户颜色，不是设计值
     }
 }

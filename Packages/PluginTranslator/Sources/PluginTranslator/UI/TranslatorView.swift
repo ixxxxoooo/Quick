@@ -39,7 +39,7 @@ struct TranslatorView: View {
     var body: some View {
         VStack(spacing: 0) {
             languageBar
-            Divider().opacity(0.4)
+            Divider().opacity(DesignTokens.Opacity.divider)
             content
         }
         .task { bootstrap() }
@@ -69,7 +69,7 @@ struct TranslatorView: View {
                 }
             }
             .labelsHidden()
-            .frame(maxWidth: 140)
+            .frame(maxWidth: DesignTokens.Size.settingsControlWide)
 
             Button {
                 swapLanguages()
@@ -87,7 +87,7 @@ struct TranslatorView: View {
                 }
             }
             .labelsHidden()
-            .frame(maxWidth: 140)
+            .frame(maxWidth: DesignTokens.Size.settingsControlWide)
 
             Spacer(minLength: DesignTokens.Spacing.sm)
 
@@ -131,7 +131,7 @@ struct TranslatorView: View {
             TextEditor(text: $buffer.text)
                 .font(DesignTokens.Typography.rowTitle)
                 .scrollContentBackground(.hidden)
-                .frame(minHeight: 88, maxHeight: 160)
+                .frame(minHeight: DesignTokens.Size.translatorEditorMinHeight, maxHeight: DesignTokens.Size.translatorEditorMaxHeight)
                 .padding(DesignTokens.Spacing.sm)
                 .background(
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
@@ -243,7 +243,7 @@ struct TranslatorView: View {
                             Text(sense.pos)
                                 .font(DesignTokens.Typography.keyCap)
                                 .foregroundStyle(DesignTokens.Colors.progress)
-                                .frame(width: 34, alignment: .leading)
+                                .frame(width: DesignTokens.Size.translatorLabelWidth, alignment: .leading)
                         }
                         Text(sense.meaning)
                             .font(DesignTokens.Typography.rowTrailing)
@@ -375,7 +375,7 @@ private struct TranslationHistorySheet: View {
             }
             .padding(DesignTokens.Spacing.lg)
 
-            Divider().opacity(0.4)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             if store.items.isEmpty {
                 Text("还没有翻译记录")
@@ -415,6 +415,6 @@ private struct TranslationHistorySheet: View {
                 }
             }
         }
-        .frame(width: 420, height: 480)
+        .frame(width: DesignTokens.Size.translatorHistoryWidth, height: DesignTokens.Size.translatorHistoryHeight)
     }
 }

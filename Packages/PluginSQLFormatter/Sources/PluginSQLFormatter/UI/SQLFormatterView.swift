@@ -31,7 +31,7 @@ struct SQLFormatterView: View {
         VStack(spacing: 0) {
             toolbar
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             HSplitView {
                 editorPane(title: "输入") {
@@ -46,7 +46,7 @@ struct SQLFormatterView: View {
                 }
             }
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             statusBar
         }
@@ -114,7 +114,7 @@ struct SQLFormatterView: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 140)
+            .frame(width: DesignTokens.Size.settingsControlWide)
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .padding(.vertical, DesignTokens.Spacing.sm)
@@ -136,7 +136,7 @@ struct SQLFormatterView: View {
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 200)
+        .frame(minWidth: DesignTokens.Size.editorMinWidth)
     }
 
     // MARK: - 状态栏

@@ -42,7 +42,7 @@ struct SystemMonitorView: View {
         HStack(spacing: 0) {
             sidebar
                 .frame(width: DesignTokens.Size.monitorSidebar)
-            Divider().opacity(0.35)
+            Divider().opacity(DesignTokens.Opacity.divider)
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -258,7 +258,7 @@ struct SystemMonitorView: View {
         }
         .padding(.horizontal, DesignTokens.Spacing.xl)
         .frame(height: DesignTokens.Size.bottomBarHeight)
-        .background(DesignTokens.Colors.cardFill.opacity(0.35))
+        .background(DesignTokens.Colors.cardFill.opacity(DesignTokens.Opacity.cardFillDim))
     }
 
     private func openActivityMonitor() {

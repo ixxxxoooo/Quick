@@ -69,7 +69,7 @@ struct PluginHeaderView: View {
     private var backButton: some View {
         Button(action: onBack) {
             Image(systemName: "chevron.left")
-                .font(.system(size: 14, weight: .semibold))
+                .font(DesignTokens.Typography.headerButtonSemibold)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .frame(
                     width: DesignTokens.Size.pluginBackButton,
@@ -100,7 +100,7 @@ struct PluginHeaderView: View {
     private var detachButton: some View {
         Button(action: onDetach) {
             Image(systemName: "rectangle.portrait.and.arrow.right")
-                .font(.system(size: 14, weight: .medium))
+                .font(DesignTokens.Typography.headerButtonMedium)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .frame(
                     width: DesignTokens.Size.pluginBackButton,

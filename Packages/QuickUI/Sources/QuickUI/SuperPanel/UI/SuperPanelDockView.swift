@@ -65,7 +65,7 @@ struct SuperPanelDockView: View {
                     )
                     .background(
                         RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                            .fill(DesignTokens.Colors.progress.opacity(0.10))
+                            .fill(DesignTokens.Colors.progress.opacity(DesignTokens.Opacity.tint))
                     )
                 Text(tool.title)
                     .font(DesignTokens.Typography.compactKeyCap)

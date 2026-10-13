@@ -46,7 +46,7 @@ struct SettingsSearchField: View {
         }
         .overlay {
             Capsule()
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: DesignTokens.Size.hairlineThin)
         }
         .contentShape(.rect)
         .onTapGesture { isFocused = true }

@@ -240,7 +240,7 @@ struct ClipboardListView: View {
                 if count > 0 {
                     Text("\(count)")
                         .font(DesignTokens.Typography.compactKeyCap)
-                        .foregroundStyle(isSelected ? .white.opacity(0.8) : DesignTokens.Colors.textTertiary)
+                        .foregroundStyle(isSelected ? .white.opacity(DesignTokens.Opacity.onAccentSecondary) : DesignTokens.Colors.textTertiary)
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.md)
@@ -449,14 +449,14 @@ private struct ClipboardRowView: View {
             RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
                 .fill(
                     isSelected
-                        ? Color.accentColor.opacity(0.2)
+                        ? Color.accentColor.opacity(DesignTokens.Opacity.tintStrong)
                         : (hover.hoveredID == entry.id ? DesignTokens.Colors.rowHover : .clear)
                 )
         }
         .overlay {
             if isSelected {
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
-                    .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
+                    .strokeBorder(Color.accentColor.opacity(DesignTokens.Opacity.accentStroke), lineWidth: DesignTokens.Size.hairline)
             }
         }
         .onHover(perform: onHoverChange)

@@ -17,7 +17,7 @@ struct AISettingsView: View {
         Form {
             Section {
                 Toggle(isOn: $mergeWindows) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                         Text("合并为标签页窗口")
                         Text("开启后所有 AI 服务共用一个窗口，通过标签页切换")
                             .font(DesignTokens.Typography.keyCap)
@@ -27,7 +27,7 @@ struct AISettingsView: View {
                 .help("关闭时每个 AI 服务使用独立窗口")
 
                 Toggle(isOn: $alwaysOnTop) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                         Text("窗口默认置顶")
                         Text("新打开的 AI 窗口默认悬浮在最前")
                             .font(DesignTokens.Typography.keyCap)
@@ -76,7 +76,7 @@ private struct AIProviderSettingsRow: View {
                     .foregroundStyle(Color(hex: provider.accent) ?? Color.accentColor)
                     .frame(width: DesignTokens.Size.rowIcon)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                     Text(provider.name)
                         .font(DesignTokens.Typography.rowTitle)
                     Text(provider.url.replacingOccurrences(of: "https://", with: ""))

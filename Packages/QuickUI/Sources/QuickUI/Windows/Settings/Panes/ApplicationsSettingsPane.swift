@@ -72,7 +72,7 @@ struct ApplicationsSettingsPane: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, DesignTokens.Spacing.xs)
 
                 if apps.isEmpty {
                     Text(query.isEmpty ? "暂无已索引的应用程序。" : "没有匹配「\(query)」的应用。")
@@ -89,7 +89,7 @@ struct ApplicationsSettingsPane: View {
                             showAll = true
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
                     }
                 }
             } header: {
@@ -146,10 +146,10 @@ private struct AppItemRow: View {
                         .foregroundStyle(DesignTokens.Colors.textSecondary)
                 }
             }
-            .frame(width: 20, height: 20)
+            .frame(width: DesignTokens.Size.settingsRowIcon, height: DesignTokens.Size.settingsRowIcon)
 
             // 应用名与类型
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 Text(app.name)
                     .lineLimit(1)
                 Text(app.isSystemApp ? "系统应用" : "应用程序")
@@ -169,7 +169,7 @@ private struct AppItemRow: View {
             )
 
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.Spacing.xxs)
         .onAppear {
             if iconImage == nil {
                 iconImage = dataSource.appIcon(for: app.path)

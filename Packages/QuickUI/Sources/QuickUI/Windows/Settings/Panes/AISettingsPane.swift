@@ -106,7 +106,7 @@ public struct AISettingsPane: View {
                         }
                     }
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 220)
+                    .frame(width: DesignTokens.Size.settingsFieldMedium)
 
                     Button {
                         showKey.toggle()
@@ -126,7 +126,7 @@ public struct AISettingsPane: View {
             ) {
                 TextField(provider.defaultBaseURL, text: $baseURL)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 260)
+                    .frame(width: DesignTokens.Size.settingsFieldLarge)
             }
 
             SettingsRow(
@@ -137,7 +137,7 @@ public struct AISettingsPane: View {
                 HStack(spacing: DesignTokens.Spacing.sm) {
                     TextField(provider.defaultModel, text: $model)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 200)
+                        .frame(width: DesignTokens.Size.settingsFieldWide)
 
                     if !provider.suggestedModels.isEmpty {
                         Menu {
@@ -149,7 +149,7 @@ public struct AISettingsPane: View {
                                 .font(DesignTokens.Typography.compactIcon)
                         }
                         .menuStyle(.borderlessButton)
-                        .frame(width: 24)
+                        .frame(width: DesignTokens.Size.settingsGlyphColumn)
                         .help("选择常见模型")
                     }
                 }
@@ -208,7 +208,7 @@ public struct AISettingsPane: View {
             ) {
                 HStack(spacing: DesignTokens.Spacing.sm) {
                     Slider(value: $temperature, in: 0...2, step: 0.1)
-                        .frame(width: 160)
+                        .frame(width: DesignTokens.Size.settingsFieldSmall)
                     Text(String(format: "%.1f", temperature))
                         .font(DesignTokens.Typography.rowTrailing)
                         .foregroundStyle(.secondary)

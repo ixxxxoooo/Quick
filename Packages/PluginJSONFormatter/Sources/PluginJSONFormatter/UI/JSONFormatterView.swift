@@ -64,11 +64,11 @@ struct JSONFormatterView: View {
         VStack(spacing: 0) {
             toolbar
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             content
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             statusBar
         }

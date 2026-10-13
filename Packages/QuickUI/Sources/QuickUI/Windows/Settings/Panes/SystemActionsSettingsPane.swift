@@ -69,9 +69,9 @@ private struct SystemActionRow: View {
             Image(systemName: action.icon)
                 .font(DesignTokens.Typography.iconGlyph)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 20, height: 20)
+                .frame(width: DesignTokens.Size.settingsRowIcon, height: DesignTokens.Size.settingsRowIcon)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 Text(action.title)
                     .lineLimit(1)
                 Text(action.description)
@@ -98,6 +98,6 @@ private struct SystemActionRow: View {
                 dataSource.setCommandEnabled(CommandID.systemAction(action.id), enabled: newValue)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.Spacing.xxs)
     }
 }

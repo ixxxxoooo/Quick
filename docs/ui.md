@@ -33,6 +33,11 @@ withAnimation(.easeOut(duration: DesignTokens.Duration.hover)) { ... }
 需要一个新的数值时，**先往 `DesignTokens` 加一个带名字、带注释的令牌**，
 再在视图里引用它。不允许「就这一次先写死」。
 
+**这条由 `Scripts/check-ui-literals.py` 机械检查**（接入 `run-tests.sh` 与提交钩子）：
+`padding / frame / cornerRadius / opacity / font(size:) / Color(red:) / 栈 spacing / offset / lineWidth / shadow`
+里出现非零数字即失败。`0` 不算（「没有」不是设计值）。确有理由的行尾写
+`// ui-literal-ok: 理由`（例如日历自带的用户颜色），不要为了过检查而把数字藏进局部常量。
+
 ---
 
 ## 2. 面板几何（与设计基准对齐）

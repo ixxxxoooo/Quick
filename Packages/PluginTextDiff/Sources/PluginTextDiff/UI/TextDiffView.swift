@@ -53,7 +53,7 @@ struct TextDiffView: View {
         VStack(spacing: 0) {
             toolbar
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             HSplitView {
                 editorColumn(text: $bufferA.text, title: "原文", states: leftStates, role: .leading)
@@ -152,7 +152,7 @@ struct TextDiffView: View {
             .font(DesignTokens.Typography.keyCap)
             .padding(.horizontal, DesignTokens.Spacing.sm)
             .padding(.vertical, DesignTokens.Spacing.xxs)
-            .background(color.opacity(0.15))
+            .background(color.opacity(DesignTokens.Opacity.diffBand))
             .foregroundStyle(color)
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap))
     }
@@ -182,7 +182,7 @@ struct TextDiffView: View {
                 syncRole: role
             )
         }
-        .frame(minWidth: 240)
+        .frame(minWidth: DesignTokens.Size.diffPaneMinWidth)
     }
 
     // MARK: - 逐行状态

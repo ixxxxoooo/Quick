@@ -79,7 +79,7 @@ struct URLCodecView: View {
             .padding(.horizontal, DesignTokens.Spacing.lg)
             .padding(.vertical, DesignTokens.Spacing.sm)
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             // 编辑区
             HSplitView {
@@ -110,7 +110,7 @@ struct URLCodecView: View {
                 .frame(minWidth: DesignTokens.Size.editorMinWidth)
             }
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             // 状态栏
             HStack(spacing: DesignTokens.Spacing.lg) {

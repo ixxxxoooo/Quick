@@ -56,12 +56,12 @@ struct SuperPanelHeaderView: View {
         .padding(.vertical, DesignTokens.Spacing.xxs)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                .fill(DesignTokens.Colors.progress.opacity(0.12))
+                .fill(DesignTokens.Colors.progress.opacity(DesignTokens.Opacity.tint))
         )
     }
 
     private var tabSegment: some View {
-        HStack(spacing: 1) {
+        HStack(spacing: DesignTokens.Spacing.hairline) {
             ForEach(SuperPanelTab.allCases) { tab in
                 Button {
                     model.select(tab)
@@ -91,7 +91,7 @@ struct SuperPanelHeaderView: View {
                 .focusable(false)
             }
         }
-        .padding(1)
+        .padding(DesignTokens.Spacing.hairline)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.menu + 1, style: .continuous)
                 .fill(DesignTokens.Colors.controlSurface)
@@ -113,7 +113,7 @@ struct SuperPanelHeaderView: View {
                 .padding(.vertical, DesignTokens.Spacing.xxs)
                 .background(
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                        .fill(DesignTokens.Colors.progress.opacity(0.12))
+                        .fill(DesignTokens.Colors.progress.opacity(DesignTokens.Opacity.tint))
                 )
         }
     }

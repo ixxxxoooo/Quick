@@ -40,6 +40,8 @@ public enum DesignTokens {
     // MARK: - 间距
 
     public enum Spacing {
+        /// 1pt 的贴边间距（图标与外框之间的缝）
+        public static let hairline: CGFloat = 1
         public static let xxs = scaled(2)
         public static let xs = scaled(4)
         public static let sm = scaled(6)
@@ -174,6 +176,56 @@ public enum DesignTokens {
         ///
         /// **不随 `panelScale` 缩放**：它是物理像素级的东西，放大只会变成一条粗边。
         public static let hairline: CGFloat = 1
+        /// 半像素细线（卡片描边）
+        public static let hairlineThin: CGFloat = 0.5
+        /// 设置页行首图标
+        public static let settingsRowIcon: CGFloat = 20
+        /// 设置页里的三档输入框宽度
+        public static let settingsFieldSmall: CGFloat = 160
+        public static let settingsFieldMedium: CGFloat = 220
+        public static let settingsFieldLarge: CGFloat = 260
+        /// 发光投影的半径与偏移
+        public static let glowShadowRadius: CGFloat = 6
+        public static let glowShadowOffsetY: CGFloat = 2
+        /// 弹出层投影：半径与纵向偏移
+        public static let popoverShadowRadius: CGFloat = 8
+        public static let popoverShadowOffsetY: CGFloat = 4
+        /// 插件视图里的方形图标按钮 / 控件高度
+        public static let controlSquare: CGFloat = 28
+        /// 插件列表里的 Provider 图标
+        public static let providerIcon: CGFloat = 32
+        /// 插件头部大图标底块与其中的图形字号
+        public static let heroTile: CGFloat = 40
+        public static let heroGlyph: CGFloat = 20
+        /// Diff 面板最小宽度
+        public static let diffPaneMinWidth: CGFloat = 240
+        /// 翻译：输入框高度范围、语言标签宽度、历史面板尺寸
+        public static let translatorEditorMinHeight: CGFloat = 88
+        public static let translatorEditorMaxHeight: CGFloat = 160
+        public static let translatorLabelWidth: CGFloat = 34
+        public static let translatorHistoryWidth: CGFloat = 420
+        public static let translatorHistoryHeight: CGFloat = 480
+        /// Hash：输入框高度与算法名列宽
+        public static let hashInputHeight: CGFloat = 100
+        public static let hashLabelWidth: CGFloat = 55
+        /// UUID：选项控件宽度与序号列宽
+        public static let uuidOptionWidth: CGFloat = 130
+        public static let indexColumnWidth: CGFloat = 20
+        /// 截图设置里的预览框
+        public static let screenshotPreview = CGSize(width: 120, height: 80)
+        /// 超级面板设置：数值读数列宽、说明文案最大宽度
+        public static let superPanelReadout: CGFloat = 56
+        public static let superPanelNoteMaxWidth: CGFloat = 320
+        /// 设置页：窄列、宽字段、对话框宽度
+        public static let settingsColumnNarrow: CGFloat = 80
+        public static let settingsFieldWide: CGFloat = 200
+        public static let settingsGlyphColumn: CGFloat = 24
+        public static let settingsDialogWidth: CGFloat = 420
+        public static let settingsRowGlyph: CGFloat = 18
+        /// 快捷键录制框内的小图标 / 圆角
+        public static let recorderGlyph: CGFloat = 18
+        public static let recorderHeight: CGFloat = 24
+        public static let recorderKeyRadius: CGFloat = 4
         /// 空状态 / 英雄位图标尺寸
         public static let emptyStateIcon = scaled(32)
         /// 月历单元格的高度
@@ -357,6 +409,30 @@ public enum DesignTokens {
     public enum Opacity {
         /// 破坏性按钮的底色浓度
         public static let destructiveFill: Double = 0.16
+        /// 分隔线的淡化程度（系统 `Divider` 在玻璃上偏重，统一压淡）
+        public static let divider: Double = 0.3
+        /// 强调色 / 进度色的浅色底（徽标、选中块、图标底）
+        public static let tint: Double = 0.12
+        /// 强调色的较重底色（拖拽高亮等需要更醒目的场景）
+        public static let tintStrong: Double = 0.2
+        /// 弹出层投影的浓度
+        public static let popoverShadow: Double = 0.15
+        /// 次要文字再淡一档
+        public static let dimmed: Double = 0.7
+        /// 卡片底色的淡化版（嵌在卡片里的次级区块）
+        public static let cardFillDim: Double = 0.35
+        /// 控件底色的淡化版
+        public static let controlSurfaceDim: Double = 0.4
+        /// 选中行（强调色底）上的次要文字
+        public static let onAccentSecondary: Double = 0.8
+        /// 强调色描边
+        public static let accentStroke: Double = 0.5
+        /// Diff 行底色
+        public static let diffBand: Double = 0.15
+        /// 发光投影
+        public static let glow: Double = 0.3
+        /// 录制快捷键里键帽的底色
+        public static let keyCapFill: Double = 0.08
     }
 
     // MARK: - 动画时长
@@ -389,6 +465,9 @@ public enum DesignTokens {
         public static let rowTitle = scaledStyle(.body)
         /// 列表行里 SF Symbol 图标的字体
         public static let rowSymbol = Font.system(size: scaled(13), weight: .medium)
+        /// 插件头部按钮图标
+        public static let headerButtonSemibold = Font.system(size: 14, weight: .semibold)
+        public static let headerButtonMedium = Font.system(size: 14, weight: .medium)
         /// 列表行右侧文本
         public static let rowTrailing = scaledStyle(.callout)
         /// 分组标题

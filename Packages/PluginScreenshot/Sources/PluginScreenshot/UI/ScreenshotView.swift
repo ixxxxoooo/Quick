@@ -50,7 +50,7 @@ struct ScreenshotView: View {
                 Text(label)
                     .font(DesignTokens.Typography.keyCap)
             }
-            .frame(width: 120, height: 80)
+            .frame(width: DesignTokens.Size.screenshotPreview.width, height: DesignTokens.Size.screenshotPreview.height)
             .background(DesignTokens.Colors.cardFill)
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.card))
         }

@@ -25,7 +25,7 @@ struct HashCalculatorView: View {
             TextEditor(text: $buffer.text)
                 .font(DesignTokens.Typography.code)
                 .scrollContentBackground(.hidden)
-                .frame(height: 100)
+                .frame(height: DesignTokens.Size.hashInputHeight)
                 .padding(.horizontal, DesignTokens.Spacing.lg)
                 .padding(.top, DesignTokens.Spacing.md)
                 .overlay(alignment: .topLeading) {
@@ -39,7 +39,7 @@ struct HashCalculatorView: View {
                     }
                 }
 
-            Divider().opacity(0.3).padding(.horizontal, DesignTokens.Spacing.lg)
+            Divider().opacity(DesignTokens.Opacity.divider).padding(.horizontal, DesignTokens.Spacing.lg)
 
             // 结果列表
             if !results.isEmpty {
@@ -64,7 +64,7 @@ struct HashCalculatorView: View {
                                 Text(item.algorithm.rawValue)
                                     .font(DesignTokens.Typography.code).fontWeight(.medium)
                                     .foregroundStyle(Color.accentColor)
-                                    .frame(width: 55, alignment: .leading)
+                                    .frame(width: DesignTokens.Size.hashLabelWidth, alignment: .leading)
 
                                 Text(item.value)
                                     .font(DesignTokens.Typography.code)

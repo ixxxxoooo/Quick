@@ -46,7 +46,7 @@ struct SuperPanelSpotlightCard: View {
                 )
                 .background(
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                        .fill(DesignTokens.Colors.progress.opacity(0.12))
+                        .fill(DesignTokens.Colors.progress.opacity(DesignTokens.Opacity.tint))
                 )
 
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
@@ -88,7 +88,7 @@ struct SuperPanelSpotlightCard: View {
                     .font(DesignTokens.Typography.compactKeyCap)
                     .padding(.horizontal, DesignTokens.Spacing.sm)
                     .padding(.vertical, DesignTokens.Spacing.xxs)
-                    .background(Capsule().fill(DesignTokens.Colors.progress.opacity(0.12)))
+                    .background(Capsule().fill(DesignTokens.Colors.progress.opacity(DesignTokens.Opacity.tint)))
                     .foregroundStyle(DesignTokens.Colors.progress)
             }
         }
@@ -295,7 +295,7 @@ struct SuperPanelSpotlightCard: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                        .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: 0.5)
+                        .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairlineThin)
                 )
             Text(rgb)
                 .font(DesignTokens.Typography.rowTrailing)

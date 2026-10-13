@@ -111,6 +111,10 @@ EventKit、Vision、Spotlight、CoreLocation、Accessibility、`screencapture` �
   `Packages/Plugin*`、`project.yml`、`AppCore.registerPlugins`、超级面板工作台目录
   （`SuperPanelQuickTool.swift`）与上下文动作里的 `navigate("…")` 目标必须互相对得上。
   下线一个插件时，字符串引用最容易漏，这条检查把它变成提交门禁。
+- **视图里的裸设计字面量由 `Scripts/check-ui-literals.py` 守**（同样接入 `run-tests.sh`）：
+  `.padding(8)`、`.frame(width: 120)`、`cornerRadius: 6`、`.opacity(0.12)`、`.font(.system(size: 14))` 这类
+  一律改用 `DesignTokens`。值为 0 的不算；确有理由的行尾写 `// ui-literal-ok: 理由`。
+  `Model/` 目录与 `DesignTokens.swift` 本身不扫。
 
 **不测（除非另有理由）**
 - SwiftUI 视图的像素级外观 —— 那靠人工验收与 `docs/ui.md` 的规范约束。

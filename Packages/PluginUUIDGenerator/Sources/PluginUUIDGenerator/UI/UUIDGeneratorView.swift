@@ -19,7 +19,7 @@ struct UUIDGeneratorView: View {
             // 工具栏
             HStack(spacing: DesignTokens.Spacing.md) {
                 Stepper("数量: \(count)", value: $count, in: 1...100)
-                    .frame(width: 130)
+                    .frame(width: DesignTokens.Size.uuidOptionWidth)
 
                 Toggle("大写", isOn: $uppercase)
                 Toggle("去连字符", isOn: $removeDashes)
@@ -41,7 +41,7 @@ struct UUIDGeneratorView: View {
             .padding(.horizontal, DesignTokens.Spacing.lg)
             .padding(.vertical, DesignTokens.Spacing.sm)
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             // 结果列表
             ScrollView {
@@ -51,7 +51,7 @@ struct UUIDGeneratorView: View {
                             Text("\(index + 1)")
                                 .font(DesignTokens.Typography.compactKeyCap)
                                 .foregroundStyle(DesignTokens.Colors.textTertiary)
-                                .frame(width: 20, alignment: .trailing)
+                                .frame(width: DesignTokens.Size.indexColumnWidth, alignment: .trailing)
 
                             Text(uuid)
                                 .font(DesignTokens.Typography.code)
@@ -87,7 +87,7 @@ struct UUIDGeneratorView: View {
                 .padding(.vertical, DesignTokens.Spacing.sm)
             }
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             // 状态栏
             HStack {
