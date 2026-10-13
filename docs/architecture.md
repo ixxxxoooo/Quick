@@ -70,6 +70,8 @@
 
 顺序是有意的，改动前想清楚依赖：
 
+0. `launchGuard.begin(exempt:)` —— 崩溃自愈判定（见下节）。**必须先于注册插件**：
+   被隔离的插件要在注册时就读到「已停用」
 1. `AIConfig.migrateAPIKeyIfNeeded()` —— API Key 从 UserDefaults 迁入 Keychain（一次性）
 2. `migrateHostStorage()` —— 打开数据库、应用宿主 schema。**必须先于注册插件**：
    需要真表的插件在构造时就要拿到存储句柄
@@ -86,7 +88,22 @@
 12. `applyLaunchArguments()` —— 开发启动参数（`-showPalette` 等验收开关统一在这里处理）
 
 退出走 `prepareForTermination()`：停热键 → 摘菜单栏 → `deactivate()` 各插件 →
-`EventBus.shared.removeAll()`。
+`EventBus.shared.removeAll()` → `launchGuard.markCleanExit()`。
+
+### 崩溃自愈（`LaunchGuard`）
+
+[`QuickPlatform/System/LaunchGuard.swift`](../Packages/QuickPlatform/Sources/QuickPlatform/System/LaunchGuard.swift)
+回答「上次是不是没退干净，死在谁手上」，状态存在 `Application Support/<bundle id>/launch-state.json`。
+
+- 启动时置 `running`，`prepareForTermination()` 里清掉；下次启动若 `running` 仍为真即异常退出。
+  SIGTERM 也经过 `prepareForTermination()`，所以 `restart.sh` 不会被误判成崩溃。
+- 每个插件的**构造**与 `activate()` 前后用 `guardStart(_:_:)` 包住，先落盘再执行。崩溃时磁盘上留着
+  嫌疑插件的 id。
+- **同一个插件连续两次死在启动里才自动停用**（`strikeLimit`）。一次可能是别处刚好崩在这个窗口，
+  贸然停用用户的功能比多崩一次更糟。启动器豁免。正常退出清零所有嫌疑；用户在设置里重新启用后重新计数。
+- 连续 3 次异常退出视为崩溃循环，HUD 提示去看日志。
+- **崩溃保护自己不能成为崩溃源**：状态文件读不出来就当全新状态，写失败只记日志。
+- 状态文件独立于数据库 —— 数据库本身就可能是崩溃的原因（见 `ResilientDatabase`）。
 
 ### 新增状态的规矩
 

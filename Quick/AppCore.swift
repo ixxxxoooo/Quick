@@ -128,6 +128,18 @@ final class AppCore {
     /// 数据库健康状况；`start()` 末尾据此提示用户
     private(set) var databaseNotice: String?
 
+    /// 崩溃自愈：记录上次是否异常退出，以及死在哪个插件的启动里
+    ///
+    /// 状态文件独立于数据库 —— 数据库本身就可能是崩溃的原因，不能把它放在同一个地方。
+    private let launchGuard = LaunchGuard(
+        fileURL: AppPaths.applicationSupport().appendingPathComponent("launch-state.json"))
+
+    /// 本次启动因反复崩溃而被自动停用的插件名；`start()` 末尾据此提示用户
+    private var quarantinedPluginNames: [String] = []
+
+    /// 是否处于崩溃循环（连续多次异常退出）
+    private var isCrashLoop = false
+
     /// 打开数据库
     ///
     /// 走 `ResilientDatabase` 的三级降级：正常 → 隔离坏库后重建 → 内存库。
@@ -210,6 +222,18 @@ final class AppCore {
     /// 按顺序完成：创建插件 → 注册事件 → 启动服务 → 激活插件。
     func start() {
         log.notice("AppCore 启动，bundle id=\(Bundle.main.bundleIdentifier ?? "-", privacy: .public)")
+
+        // -1. 崩溃自愈：必须在注册插件之前 —— 插件的启用状态在注册时读取。
+        //    启动器是核心，豁免隔离：停用它等于把 Quick 变成空壳。
+        let launchOutcome = launchGuard.begin(exempt: [LauncherPlugin.id])
+        isCrashLoop = launchOutcome.isCrashLoop
+        for pluginID in launchOutcome.quarantine {
+            settingsStore.setPluginEnabled(pluginID, enabled: false)
+            log.error("插件 \(pluginID, privacy: .public) 连续两次死在启动里，已自动停用")
+        }
+        quarantinedPluginNames = launchOutcome.quarantine.map { pluginID in
+            pluginRegistrations.first { $0.type.id == pluginID }?.type.name ?? pluginID
+        }
 
         // 0. API Key：UserDefaults 明文 → Keychain（失败保留旧值，下次再试）
         AIConfig.migrateAPIKeyIfNeeded()
@@ -297,7 +321,7 @@ final class AppCore {
 
         // 8. 激活所有已启用的插件
         for plugin in plugins where plugin.isEnabled {
-            plugin.activate()
+            launchGuard.guardStart(type(of: plugin).id) { plugin.activate() }
         }
         rebuildCommandCatalog()
 
@@ -305,8 +329,17 @@ final class AppCore {
         applyLaunchArguments(ProcessInfo.processInfo.arguments)
 
         // 存储出过问题就明说：用户看到的症状是「历史记不住」，根因只在日志里
-        if let notice = databaseNotice {
-            hudController.show(message: notice, tone: .warning)
+        // 同一时刻只能显示一条 HUD（后一条会顶掉前一条），所以把要说的话合成一条
+        var notices: [String] = []
+        if let notice = databaseNotice { notices.append(notice) }
+        if !quarantinedPluginNames.isEmpty {
+            let names = quarantinedPluginNames.joined(separator: "、")
+            notices.append("「\(names)」连续启动崩溃，已自动停用，可在 设置 → 插件 中重新启用")
+        } else if isCrashLoop {
+            notices.append("Quick 最近多次异常退出，原因请查看日志")
+        }
+        if !notices.isEmpty {
+            hudController.show(message: notices.joined(separator: "；"), tone: .warning)
         }
 
         log.notice("AppCore 启动完成")
@@ -417,6 +450,8 @@ final class AppCore {
             plugin.deactivate()
         }
         EventBus.shared.removeAll()
+        // 走到这里才算正常退出；SIGTERM 也会经过 `prepareForTermination`，所以重启脚本不会被当成崩溃
+        launchGuard.markCleanExit()
         log.notice("退出清理完成")
     }
 
@@ -637,7 +672,8 @@ final class AppCore {
 
         // 再实例化
         for registration in registrations {
-            let plugin = registration.make()
+            // 构造也算「启动」：init 里崩溃同样要能指认到这个插件
+            let plugin = launchGuard.guardStart(registration.type.id) { registration.make() }
             plugin.isEnabled = settingsStore.isPluginEnabled(type(of: plugin).id)
             plugins.append(plugin)
         }
