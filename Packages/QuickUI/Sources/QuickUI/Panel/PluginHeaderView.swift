@@ -78,6 +78,9 @@ struct PluginHeaderView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // 不接收键盘焦点：插件视图一打开就被系统分配到第一个可聚焦控件，
+        // 返回按钮会顶着一圈蓝色焦点环；返回有 Esc，不需要靠 Tab 走到它
+        .focusable(false)
         .accessibilityLabel("返回搜索")
         .help("返回主搜索 (Esc)")
     }
@@ -109,6 +112,7 @@ struct PluginHeaderView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusable(false)
         .accessibilityLabel("分离为独立窗口")
         .help("分离为独立窗口 (⌘D)")
     }

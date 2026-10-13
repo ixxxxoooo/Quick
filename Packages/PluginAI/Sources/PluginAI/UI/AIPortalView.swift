@@ -271,16 +271,12 @@ struct AIPortalView: View {
     // MARK: - 底部
 
     private var footerSection: some View {
-        VStack(spacing: DesignTokens.Spacing.xs) {
-            Text("搜索 AI 名称可直接打开对应窗口")
-                .font(DesignTokens.Typography.inlineIcon)
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-            Text("关闭窗口后登录态仍然保持")
-                .font(DesignTokens.Typography.inlineIcon)
-                .foregroundStyle(DesignTokens.Colors.textTertiary.opacity(DesignTokens.Opacity.dimmed))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, DesignTokens.Spacing.sm)
+        // 合并成一行：两行提示会把内容撑出 475 的面板高度，凭空多出一段滚动
+        Text("搜索 AI 名称可直接打开对应窗口 · 关闭窗口后登录态仍然保持")
+            .font(DesignTokens.Typography.inlineIcon)
+            .foregroundStyle(DesignTokens.Colors.textTertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, DesignTokens.Spacing.xs)
     }
 
     // MARK: - Toast

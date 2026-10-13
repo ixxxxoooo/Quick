@@ -310,6 +310,20 @@ final class LineNumberRulerView: NSRulerView {
 
     override var requiredThickness: CGFloat { DesignTokens.Size.codeEditorGutter }
 
+    /// 只画行号，不画系统给标尺铺的底色：那层底色是不随面板材质变的纯白，
+    /// 浅色下与透出毛玻璃的编辑区形成一块突兀的白条；改成与编辑区同底，
+    /// 仅靠右缘一条发丝线分隔。
+    override func draw(_ dirtyRect: NSRect) {
+        drawHashMarksAndLabels(in: dirtyRect)
+        NSColor(DesignTokens.Colors.cardStroke).setFill()
+        NSRect(
+            x: bounds.maxX - DesignTokens.Size.hairlineThin,
+            y: dirtyRect.minY,
+            width: DesignTokens.Size.hairlineThin,
+            height: dirtyRect.height
+        ).fill()
+    }
+
     override func drawHashMarksAndLabels(in rect: NSRect) {
         guard let textView else { return }
 

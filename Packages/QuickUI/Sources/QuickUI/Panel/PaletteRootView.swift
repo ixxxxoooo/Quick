@@ -378,6 +378,9 @@ struct PaletteRootView: View {
                 )
             }
         }
+        // 面板是浮窗，打开插件时系统会把初始焦点给到第一个可聚焦控件
+        // （常是某个工具栏按钮），随即顶着一圈焦点环。焦点本身保留，只不画环。
+        .focusEffectDisabled()
     }
 
     // MARK: - 空状态

@@ -522,6 +522,11 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
   （位置、图标、字重）。
 - 文本对比度：`textTertiary` 是允许的最淡文本，不要再用更淡的颜色做正文。
 - 键盘可达：面板内所有主要操作都要能用键盘完成，这也是底栏要展示快捷键的原因。
+- **焦点环**：浮窗打开插件时，系统会把初始焦点给第一个可聚焦控件（常是工具栏按钮），随即顶着
+  一圈蓝环。`PaletteRootView` 对插件区整体加了 `.focusEffectDisabled()`（焦点保留、只不画环），
+  头部的返回 / 分离按钮另有 `.focusable(false)`（返回有 Esc）。新增的插件视图不必再各自处理。
+- **行号标尺**：`CodeEditorView` 的 `LineNumberRulerView` 重写了 `draw(_:)`，只画行号与右缘发丝线。
+  系统默认给标尺铺的是不随材质变的纯白底，浅色下会在毛玻璃编辑区旁边留一条白带。
 - **读屏（VoiceOver）**：结果列表每行是一个按钮，念「标题，来源插件」，选中行带 `.isSelected`，
   `accessibilityAction` 等同回车；⌘数字提示对读屏隐藏（它是视觉提示）。
 - **减弱动态效果**：所有动画一律走 `Motion`（`Motion.animation` / `Motion.withAnimation` /
