@@ -329,6 +329,11 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 - 需要「浮起的玻璃控件」时用现成的 `View.frosted(in:)` 修饰器，它封装了
   `.glassEffect(.regular.interactive().tint(...))`。**不要在视图里重复写这段配置。**
 - 不要堆叠多层玻璃 —— 每层都是一次独立的 GPU pass，且会互相糊掉。
+- **AppKit 自绘的浮层（截图工具栏）用 `NSGlassEffectView`，颜色只用语义色**（`labelColor`、
+  `controlAccentColor`、`separatorColor`）：它们在 `draw(_:)` 里按视图当前的
+  `effectiveAppearance` 解析，浅 / 深 / 跟随系统切换时无需任何额外代码。**不要写死「深底 + 白字」**
+  —— 浅色主题下那是一块外来物。尺寸与浓度放在 `DesignTokens.ScreenshotToolbar`。
+  唯一例外是直接压在被压暗截图上的标签（选区尺寸、窗口名），它们必须在任意截图上可读。
 
 ### 投影由 AppKit 负责，不要在 SwiftUI 里画
 

@@ -404,6 +404,49 @@ public enum DesignTokens {
         }
     }
 
+    // MARK: - 截图标注工具栏
+
+    /// 截图遮罩上的就地工具栏（AppKit 自绘，所以用 `CGFloat` / `Double` 而不是 SwiftUI 类型）
+    ///
+    /// 它是玻璃材质（`NSGlassEffectView`），颜色一律走语义色，**不在这里定义颜色**。
+    public enum ScreenshotToolbar {
+        /// 图标按钮尺寸（宽 × 高）
+        public static let buttonSize = CGSize(width: scaled(28), height: scaled(26))
+        /// 色块 / 线宽按钮的点击区域边长
+        public static let smallButton = scaled(22)
+        /// 色块圆的直径
+        public static let swatchDiameter = scaled(14)
+        /// 选中色块外环线宽
+        public static let swatchRingWidth: CGFloat = 1.5
+        /// 选中色块外环与色块之间的缝
+        public static let swatchRingGap = scaled(2)
+        /// 线宽圆点的直径（细 / 中 / 粗，与 `AnnotationDefaults.lineWidths` 一一对应）
+        public static let widthDotDiameters: [CGFloat] = [scaled(4), scaled(7), scaled(10)]
+        /// 选中态底板 / 悬停底板圆角
+        public static let pillRadius = scaled(8)
+        /// 图标字号（pt）
+        public static let iconPointSize = scaled(14)
+        /// 组内按钮间距
+        public static let itemSpacing = scaled(2)
+        /// 组间间距（含分隔线两侧）
+        public static let groupSpacing = scaled(8)
+        /// 工具栏内边距
+        public static let insets = NSEdgeInsets(
+            top: scaled(6), left: scaled(10), bottom: scaled(6), right: scaled(10))
+        /// 分隔线高度
+        public static let separatorHeight = scaled(16)
+        /// 与选区、画布边缘的最小间隙
+        public static let placementMargin = scaled(10)
+        /// 悬停底板的浓度（作用在 `labelColor` 上）
+        public static let hoverFill: CGFloat = 0.1
+        /// 按下底板的浓度
+        public static let pressedFill: CGFloat = 0.18
+        /// 色块描边浓度（白 / 黑色块在玻璃上需要一圈轮廓才不会消失）
+        public static let swatchStroke: CGFloat = 0.25
+        /// 不可用按钮（如无可撤销的标注）的整体浓度
+        public static let disabledAlpha: CGFloat = 0.35
+    }
+
     // MARK: - 阴影
 
     // 面板与 HUD 的投影没有令牌，因为**它们不是自绘的**：

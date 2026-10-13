@@ -4,6 +4,7 @@
 
 import AppKit
 import QuickCore
+import QuickUI
 
 /// 遮罩画布上的最终动作
 enum OverlayAction {
@@ -40,11 +41,13 @@ final class OverlayCanvasView: NSView {
     // MARK: - 状态
 
     private var selection: CGRect?
-    private var annotations: [Annotation] = []
+    private var annotations: [Annotation] = [] {
+        didSet { toolbar?.setCanUndo(!annotations.isEmpty) }
+    }
     private var draft: Annotation?
-    private var tool: AnnotationTool = .rectangle
-    private var color: RGBAColor = .red
-    private var lineWidth: CGFloat = 3
+    private var tool: AnnotationTool = AnnotationDefaults.tool
+    private var color: RGBAColor = AnnotationDefaults.color
+    private var lineWidth: CGFloat = AnnotationDefaults.lineWidth
     private var counterValue = 1
 
     private var selectionOrigin: CGPoint?
@@ -231,6 +234,7 @@ final class OverlayCanvasView: NSView {
         dismissToolbar()
         selection = nil
         annotations.removeAll()
+        counterValue = 1
         selectionOrigin = point
         needsDisplay = true
     }
@@ -403,27 +407,20 @@ final class OverlayCanvasView: NSView {
         bar.onTool = { [weak self] tool in self?.activate(tool) }
         bar.onColor = { [weak self] color in self?.color = color }
         bar.onLineWidth = { [weak self] width in self?.lineWidth = width }
+        bar.onUndo = { [weak self] in self?.undoLastAnnotation() }
         bar.onConfirm = { [weak self] in self?.deliver(.save) }
         bar.onCopy = { [weak self] in self?.deliver(.copy) }
         bar.onPin = { [weak self] in self?.deliver(.pin) }
         bar.onCancel = { [weak self] in self?.onCancel?() }
         bar.layoutSubtreeIfNeeded()
+        bar.select(tool: tool)
+        bar.setCanUndo(!annotations.isEmpty)
         let size = bar.fittingSize
         addSubview(bar)
         toolbar = bar
-        positionToolbar(near: selection, size: size)
-    }
-
-    private func positionToolbar(near selection: CGRect, size: NSSize) {
-        guard let toolbar else { return }
-        let margin: CGFloat = 10
-        var x = selection.minX
-        x = min(max(margin, x), bounds.width - size.width - margin)
-        var y = selection.minY - size.height - margin
-        if y < margin {
-            y = min(selection.maxY + margin, bounds.height - size.height - margin)
-        }
-        toolbar.frame = NSRect(x: x, y: y, width: size.width, height: size.height)
+        bar.frame = ToolbarPlacement.frame(
+            near: selection, size: size, in: bounds,
+            margin: DesignTokens.ScreenshotToolbar.placementMargin)
     }
 
     private func dismissToolbar() {
@@ -433,7 +430,14 @@ final class OverlayCanvasView: NSView {
 
     private func activate(_ tool: AnnotationTool) {
         self.tool = tool
-        if tool == .text { return }
+    }
+
+    /// 撤销最后一条标注；序号被撤销时把计数退回去，下一个序号才不会出现断档
+    private func undoLastAnnotation() {
+        guard let last = annotations.last else { return }
+        if case .counter(_, let value) = last.kind { counterValue = value }
+        annotations.removeLast()
+        needsDisplay = true
     }
 
     // MARK: - 键盘
@@ -457,12 +461,19 @@ final class OverlayCanvasView: NSView {
         case (.command, 2):  // ⌘D
             deliver(.pin)
         case (.command, 6):  // ⌘Z
-            if !annotations.isEmpty {
-                annotations.removeLast()
-                needsDisplay = true
-            }
+            undoLastAnnotation()
         default:
-            super.keyDown(with: event)
+            // 数字键 1…8 切换工具（与工具栏上的顺序一致）
+            if flags.isEmpty, let digit = event.charactersIgnoringModifiers.flatMap(Int.init),
+                (1...AnnotationToolbarView.toolOrder.count).contains(digit),
+                toolbar != nil
+            {
+                let chosen = AnnotationToolbarView.toolOrder[digit - 1]
+                activate(chosen)
+                toolbar?.select(tool: chosen)
+            } else {
+                super.keyDown(with: event)
+            }
         }
     }
 

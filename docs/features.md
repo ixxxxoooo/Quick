@@ -309,6 +309,15 @@
   的冻结帧，烘焙用的是全分辨率裁剪图 —— 两者坐标尺度不同，所以各自传对应的 `baseImage`。
 - **多显示器：每块屏一个遮罩**，选区只在其中一块上成立，交付时按那块屏算屏幕矩形。
 - 截图期间 `NSApp.activate` 打断前台 App，`finish()` 时把前台还给用户原来的 App。
+- **工具栏是玻璃（`NSGlassEffectView`）+ 语义色，跟随 `NSApp.appearance`。** 不写死颜色：图标用
+  `labelColor`，选中态用 `controlAccentColor` 底板 + 白图标，悬停 / 按下是 `labelColor` 的淡底。
+  遮罩窗口自己不设 `appearance`，所以会继承应用级的浅 / 深 / 跟随系统。尺寸与浓度都在
+  `DesignTokens.ScreenshotToolbar`。**例外**：选区尺寸标签与窗口名标签仍是「深色底 + 白字」——
+  它们直接压在被压暗的截图上，不是工具栏的一部分，需要在任何截图内容上保持可读。
+- **工具栏按钮不接受第一响应者**（自绘的轻量视图，不是 `NSButton`）：点过工具栏之后键盘仍在画布上，
+  Esc / ⏎ / ⌘Z 照样生效。
+- **画布与工具栏共用 `AnnotationDefaults`**（初始工具 / 颜色 / 线宽档位）。此前两边各写各的，
+  工具栏高亮第 2 档（4）而画布实际画 3。
 - 钉图是常驻置顶窗口（`PinWindowController`）：可拖动、滚轮/捏合缩放、双击 / Esc / ⌘W 关闭、右键复制。
 
 #### 内部结构
@@ -319,6 +328,7 @@
 | `Model/AnnotationRenderer.swift` | 把标注画进 CG 位图上下文（形状、箭头、文字、马赛克、序号）。纯 CG + CoreText |
 | `Model/CaptureOutput.swift` | 裁剪、烘焙、缩放、编码（ImageIO） |
 | `Model/DisplaySnapshot.swift` | 一帧冻结画面 + point→pixel 换算 |
+| `Model/ToolbarPlacement.swift` | 工具栏相对选区的摆放（下 → 上 → 选区内部），纯函数 |
 | `Model/ScreenshotNaming.swift` | 文件名 / 时间戳 / 格式（纯函数，可独立测） |
 | `Service/CaptureEngine.swift` | ScreenCaptureKit 抓屏（全屏 / 按窗口） |
 | `Service/WindowEnumerator.swift` | `CGWindowListCopyWindowInfo` 窗口枚举与命中（悬停高亮 / 单击选窗） |
@@ -327,15 +337,17 @@
 | `Service/ScreenshotDelivery.swift` | 保存到桌面 / 复制到剪贴板 / 快门音 |
 | `UI/OverlayWindowController.swift` | 一块屏的遮罩窗 |
 | `UI/OverlayCanvasView.swift` | 选区 + 标注的绘制与鼠标/键盘交互 |
-| `UI/AnnotationToolbarView.swift` | 选区旁的就地工具栏（AppKit） |
+| `UI/AnnotationToolbarView.swift` | 选区旁的就地工具栏（AppKit，玻璃材质）与它的按钮 `ToolbarButton` |
 | `UI/PinContentView.swift` | 钉图内容视图（拖动 / 缩放 / 关闭） |
 
 #### 交互
 
 - 框选：拖拽出一块区域；单击（几乎不拖动）选中点下的窗口。
-- 选区就绪后工具栏出现在选区下方（放不下则在上方）。
-- 工具：矩形、椭圆、箭头、画笔、荧光笔、文字、马赛克、序号；颜色 7 档；线宽 3 档。
-- 快捷键：Esc 取消，⏎ / ⌘S 保存，⌘C 复制，⌘D 钉图，⌘Z 撤销上一条标注。
+- 选区就绪后工具栏出现在选区下方；放不下则在上方；上下都放不下（接近全屏）则落在选区内部底边。
+- 工具：矩形、椭圆、箭头、画笔、荧光笔、文字、马赛克、序号；颜色 7 档；线宽 3 档（三个大小递增的圆点）。
+- 工具栏上有撤销按钮：没有可撤销的标注时置灰；撤销序号会把计数退回去，下一个序号不会断档。
+- 快捷键：数字键 1–8 切换工具（顺序同工具栏），Esc 取消，⏎ / ⌘S 保存，⌘C 复制，⌘D 钉图，
+  ⌘Z 撤销上一条标注。每个按钮的悬停提示里都写着对应快捷键。
 - 保存去向由设置页的「保存到桌面」决定：开着则落盘 + 复制，关掉则只复制。
 
 #### 已知限制

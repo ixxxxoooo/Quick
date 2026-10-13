@@ -61,7 +61,7 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 | `PluginClipboard` | 去重/排序/剪枝、条数与图片预算、坏行降级 | 有覆盖 |
 | `PluginSystemMonitor` | 时长/字节/`ps` 解析、内存/磁盘/电源/CPU tick、温度聚合、偏好映射 | 有覆盖 |
 | `PluginKillProcess` | `ps` 解析与过滤、偏好回落、触发词入口 | 有覆盖 |
-| `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式 | 有覆盖 |
+| `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式、工具栏摆放（上 / 下 / 内部 / 夹边）、标注默认值一致性 | 有覆盖 |
 | `PluginTranslator` | 词典方向、触发词前缀、语言判定 | 有覆盖 |
 | `PluginCalendar` | 时间区间格式、排序；农历 / 干支 / 节气对照权威表；节日规则；放假与补班查询；`HolidayStore` 刷新节流与坏数据拒收；内置数据对照国务院公告 | 有覆盖 |
 | `PluginAI` | Provider 注册表完整性、搜索排序与触发闸门 | 有覆盖 |
