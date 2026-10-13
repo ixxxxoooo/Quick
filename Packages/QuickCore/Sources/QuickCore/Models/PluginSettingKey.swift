@@ -58,6 +58,12 @@ public enum PluginSettingKey {
         public static let reminderMinutes = "calendar.reminderMinutes"
         public static let autoExtractMeetingLinks = "calendar.autoExtractMeetingLinks"
         public static let showWeekNumber = "calendar.showWeekNumber"
+        /// 月历与详情里显示法定节假日（休 / 班角标、近期假期）
+        public static let showHolidays = "calendar.showHolidays"
+        /// 月历与详情里显示黄历（干支、生肖、节气、节日）
+        public static let showAlmanac = "calendar.showAlmanac"
+        /// 联网更新法定节假日数据
+        public static let updateHolidaysOnline = "calendar.updateHolidaysOnline"
     }
 
     /// AI 聚合插件的 UI 行为（置顶、Provider 开关）。键前缀 `ai.*`。

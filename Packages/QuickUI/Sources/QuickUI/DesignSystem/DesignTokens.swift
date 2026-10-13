@@ -242,6 +242,8 @@ public enum DesignTokens {
         public static let calendarWeekColumn = scaled(26)
         /// 事件 / 日期小圆点直径
         public static let calendarDot = scaled(6)
+        /// 日期信息卡左侧大号日期的槽位宽度
+        public static let calendarHeroColumn = scaled(72)
         /// 空状态占位区的最小高度（滚动容器里没有 `maxHeight: .infinity` 可用）
         public static let emptyStateMinHeight = scaled(120)
         /// 列表顶部 / 底部渐隐带的高度
@@ -517,6 +519,10 @@ public enum DesignTokens {
         public static let compactIcon = Font.system(size: scaled(11), weight: .regular)
         /// 空状态图标字体
         public static let emptyStateIcon = Font.system(size: scaled(32), weight: .light)
+        /// 日期信息卡里的大号日期
+        public static let calendarHeroDay = Font.system(size: scaled(44), weight: .semibold)
+        /// 月历格子右上角的「休 / 班」角标
+        public static let calendarBadge = Font.system(size: scaled(9), weight: .semibold)
         /// HUD 提示的语义图标字体
         public static let hudIcon = Font.system(size: scaled(14), weight: .semibold)
         /// 底栏按钮字体

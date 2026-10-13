@@ -2,28 +2,39 @@
 // Quick — 原生 macOS 效率启动器
 // @author ygw
 
-import AppKit
 import QuickCore
 import QuickUI
 import SwiftUI
 
 /// 日历插件视图
 ///
-/// 左：月历（农历小字、事件小圆点、可选周数列）；右：所选日期的日程。
-/// 未授权日历时月历与农历仍可用，右侧给出授权入口 —— 授权由用户主动触发，不在启动时弹框。
+/// 左：月历（休 / 班角标、节日与节气小字、事件小圆点、可选周数列）+ 假期倒数；
+/// 右：所选日期的信息卡、日程、近期节假日。
+/// 未授权日历时月历、农历与节假日仍可用，日程区给出授权入口 —— 授权由用户主动触发，不在启动时弹框。
 struct CalendarView: View {
 
     let service: CalendarService
+    let holidayStore: HolidayStore
 
     @State private var displayedMonth = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
     @State private var selectedDate = Calendar.current.startOfDay(for: Date())
     @State private var events: [CalendarEvent] = []
     @State private var markedDays: Set<Date> = []
+    @State private var holidays: HolidayCalendar
+    @State private var observances: [Almanac.Observance] = []
 
     @AppStorage(PluginSettingKey.Calendar.showWeekNumber) private var showWeekNumber = false
     @AppStorage(PluginSettingKey.Calendar.autoExtractMeetingLinks) private var extractsLinks = true
+    @AppStorage(PluginSettingKey.Calendar.showHolidays) private var showHolidays = true
+    @AppStorage(PluginSettingKey.Calendar.showAlmanac) private var showAlmanac = true
 
     private let calendar = Calendar.current
+
+    init(service: CalendarService, holidayStore: HolidayStore) {
+        self.service = service
+        self.holidayStore = holidayStore
+        _holidays = State(initialValue: holidayStore.calendar)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -38,6 +49,8 @@ struct CalendarView: View {
         .onAppear { service.refreshAccessState() }
         .task(id: selectedDate) { reloadEvents() }
         .task(id: displayedMonth) { reloadMarks() }
+        .task { await refreshHolidays() }
+        .task { observances = Almanac.upcomingObservances(from: today, limit: 3) }
         .onChange(of: service.accessState) { _, _ in
             reloadEvents()
             reloadMarks()
@@ -52,6 +65,14 @@ struct CalendarView: View {
     private func reloadMarks() {
         markedDays = service.daysWithEvents(inMonthOf: displayedMonth)
     }
+
+    /// 到点才联网；拿到新数据后换掉内存里的那份，月历立刻带上新年份的休 / 班
+    private func refreshHolidays() async {
+        guard CalendarPreferences.updatesHolidaysOnline() else { return }
+        if await holidayStore.refreshIfNeeded() { holidays = holidayStore.calendar }
+    }
+
+    private var today: CivilDate { CivilDate(Date(), calendar: calendar) }
 
     // MARK: - 月历
 
@@ -89,9 +110,21 @@ struct CalendarView: View {
                     }
                 }
             }
+
+            if showHolidays { monthSummary }
             Spacer(minLength: 0)
         }
         .padding(DesignTokens.Spacing.xl)
+    }
+
+    @ViewBuilder
+    private var monthSummary: some View {
+        let month = CivilDate(displayedMonth, calendar: calendar)
+        let monthPeriods = holidays.periods(inYear: month.year, month: month.month)
+        let next = holidays.next(from: today)
+        if next != nil || !monthPeriods.isEmpty {
+            MonthHolidaySummary(next: next, monthPeriods: Array(monthPeriods.prefix(3)), today: today)
+        }
     }
 
     private var weekdayHeader: some View {
@@ -114,20 +147,25 @@ struct CalendarView: View {
     @ViewBuilder
     private func dayCell(_ date: Date?) -> some View {
         if let date {
+            let civil = CivilDate(date, calendar: calendar)
+            let almanac = Almanac.day(for: civil)
+            let status = showHolidays ? holidays.status(on: civil) : nil
             let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
             let isToday = calendar.isDateInToday(date)
             let hasEvents = markedDays.contains(calendar.startOfDay(for: date))
+            let isHighlighted = showAlmanac && almanac.cellLabel != almanac.lunarLabel
             Button {
                 selectedDate = calendar.startOfDay(for: date)
             } label: {
                 VStack(spacing: 0) {
-                    Text("\(calendar.component(.day, from: date))")
+                    Text("\(civil.day)")
                         .font(DesignTokens.Typography.rowTitle)
                         .fontWeight(isToday ? .semibold : .regular)
-                    Text(CalendarFormatting.lunarCellLabel(for: date))
+                    Text(showAlmanac ? almanac.cellLabel : almanac.lunarLabel)
                         .font(DesignTokens.Typography.compactKeyCap)
                         .lineLimit(1)
-                        .foregroundStyle(isSelected ? DesignTokens.Colors.onAccent : DesignTokens.Colors.textTertiary)
+                        .minimumScaleFactor(0.8)
+                        .foregroundStyle(subLabelColor(isSelected: isSelected, highlighted: isHighlighted))
                     Circle()
                         .fill(hasEvents ? (isSelected ? DesignTokens.Colors.onAccent : DesignTokens.Colors.progress) : .clear)
                         .frame(width: DesignTokens.Size.calendarDot, height: DesignTokens.Size.calendarDot)
@@ -141,12 +179,15 @@ struct CalendarView: View {
                 .frame(height: DesignTokens.Size.calendarCellHeight)
                 .background {
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
-                        .fill(isSelected ? DesignTokens.Colors.progress : .clear)
+                        .fill(cellFill(isSelected: isSelected, status: status))
+                }
+                .overlay(alignment: .topTrailing) {
+                    if let status { badge(status, isSelected: isSelected) }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(accessibilityLabel(for: date, hasEvents: hasEvents))
+            .accessibilityLabel(accessibilityLabel(for: date, almanac: almanac, status: status, hasEvents: hasEvents))
             .accessibilityAddTraits(isSelected ? .isSelected : [])
         } else {
             // 空格必须是**固定高度**：`Color.clear` 在纵向上本来就是弹性的，
@@ -155,10 +196,40 @@ struct CalendarView: View {
         }
     }
 
-    private func accessibilityLabel(for date: Date, hasEvents: Bool) -> String {
-        let base = date.formatted(.dateTime.month().day().weekday(.wide))
-        let lunar = CalendarFormatting.lunarCellLabel(for: date)
-        return "\(base)，农历\(lunar)" + (hasEvents ? "，有日程" : "")
+    private func cellFill(isSelected: Bool, status: HolidayStatus?) -> Color {
+        if isSelected { return DesignTokens.Colors.progress }
+        switch status {
+        case .off: return DesignTokens.Colors.success.opacity(DesignTokens.Opacity.tint)
+        case .makeupWorkday: return DesignTokens.Colors.warning.opacity(DesignTokens.Opacity.tint)
+        case nil: return .clear
+        }
+    }
+
+    private func subLabelColor(isSelected: Bool, highlighted: Bool) -> Color {
+        if isSelected { return DesignTokens.Colors.onAccent }
+        return highlighted ? DesignTokens.Colors.textSecondary : DesignTokens.Colors.textTertiary
+    }
+
+    private func badge(_ status: HolidayStatus, isSelected: Bool) -> some View {
+        let tint: Color
+        switch status {
+        case .off: tint = DesignTokens.Colors.success
+        case .makeupWorkday: tint = DesignTokens.Colors.warning
+        }
+        return Text(status.badge)
+            .font(DesignTokens.Typography.calendarBadge)
+            .foregroundStyle(isSelected ? DesignTokens.Colors.onAccent : tint)
+            .padding(.top, DesignTokens.Spacing.xxs)
+            .padding(.trailing, DesignTokens.Spacing.xs)
+    }
+
+    private func accessibilityLabel(
+        for date: Date, almanac: AlmanacDay, status: HolidayStatus?, hasEvents: Bool
+    ) -> String {
+        var text = date.formatted(.dateTime.month().day().weekday(.wide)) + "，农历" + almanac.lunarText
+        if !almanac.highlights.isEmpty { text += "，" + almanac.highlights.joined(separator: "、") }
+        if let status { text += "，" + status.detailText }
+        return text + (hasEvents ? "，有日程" : "")
     }
 
     private func shiftMonth(_ delta: Int) {
@@ -174,144 +245,30 @@ struct CalendarView: View {
         displayedMonth = calendar.dateInterval(of: .month, for: today)?.start ?? today
     }
 
-    // MARK: - 当天日程
+    // MARK: - 所选日期
 
     private var dayPanel: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                Text(selectedDate.formatted(date: .complete, time: .omitted))
-                    .font(DesignTokens.Typography.panelTitle)
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Text(service.lunarDateInfo(for: selectedDate))
-                    if showWeekNumber {
-                        Text("· 第 \(CalendarFormatting.weekNumber(for: selectedDate, calendar: calendar)) 周")
-                    }
+        let civil = CivilDate(selectedDate, calendar: calendar)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xl) {
+                DayInfoCard(
+                    date: selectedDate,
+                    day: Almanac.day(for: civil),
+                    status: showHolidays ? holidays.status(on: civil) : nil,
+                    weekNumber: showWeekNumber
+                        ? CalendarFormatting.weekNumber(for: selectedDate, calendar: calendar) : nil,
+                    showAlmanac: showAlmanac)
+
+                CalendarEventsView(service: service, events: events, isToday: calendar.isDateInToday(selectedDate))
+
+                if showHolidays {
+                    UpcomingHolidaysCard(periods: holidays.upcoming(from: today, limit: 3), today: today)
                 }
-                .font(DesignTokens.Typography.rowTrailing)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-            }
-            .padding(.horizontal, DesignTokens.Spacing.xl)
-            .padding(.top, DesignTokens.Spacing.xl)
-
-            Divider().opacity(DesignTokens.Opacity.divider)
-
-            switch service.accessState {
-            case .notDetermined: permissionPrompt
-            case .denied: deniedPrompt
-            case .authorized: eventList
-            }
-        }
-    }
-
-    private var permissionPrompt: some View {
-        statePlaceholder(
-            icon: "calendar.badge.exclamationmark",
-            title: "授权后可在这里查看日程",
-            detail: "Quick 只读取日程用于展示和开始前提醒，不会修改或上传。"
-        ) {
-            Button("授权访问日历") {
-                Task { await service.requestAccess() }
-            }
-            .buttonStyle(.borderedProminent)
-        }
-    }
-
-    private var deniedPrompt: some View {
-        statePlaceholder(
-            icon: "lock.shield",
-            title: "没有日历访问权限",
-            detail: "请在「系统设置 → 隐私与安全性 → 日历」里允许 Quick，回来后会自动刷新。"
-        ) {
-            Button("打开系统设置") { service.openSystemSettings() }
-                .buttonStyle(.borderedProminent)
-        }
-        .task {
-            // 用户在系统设置里改完回到这里：轮询到授权就自动恢复，不用再点任何东西
-            while !Task.isCancelled {
-                service.refreshAccessState()
-                try? await Task.sleep(for: .seconds(2))
-            }
-        }
-    }
-
-    private func statePlaceholder<Action: View>(
-        icon: String, title: String, detail: String, @ViewBuilder action: () -> Action
-    ) -> some View {
-        VStack(spacing: DesignTokens.Spacing.md) {
-            Image(systemName: icon)
-                .font(DesignTokens.Typography.emptyStateIcon)
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-            Text(title).font(DesignTokens.Typography.rowTitle)
-            Text(detail)
-                .font(DesignTokens.Typography.keyCap)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-                .multilineTextAlignment(.center)
-            action()
-        }
-        .padding(DesignTokens.Spacing.xxl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    @ViewBuilder
-    private var eventList: some View {
-        if events.isEmpty {
-            VStack(spacing: DesignTokens.Spacing.md) {
-                Image(systemName: "calendar.badge.checkmark")
-                    .font(DesignTokens.Typography.emptyStateIcon)
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-                Text(calendar.isDateInToday(selectedDate) ? "今天没有日程安排" : "这一天没有日程安排")
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            ScrollView {
-                LazyVStack(spacing: DesignTokens.Spacing.xs) {
-                    ForEach(events) { event in
-                        eventRow(event)
-                    }
+                if showAlmanac && !observances.isEmpty {
+                    UpcomingObservancesCard(observances: observances, today: today)
                 }
-                .padding(.vertical, DesignTokens.Spacing.sm)
             }
+            .padding(DesignTokens.Spacing.xl)
         }
-    }
-
-    private func eventRow(_ event: CalendarEvent) -> some View {
-        HStack(spacing: DesignTokens.Spacing.md) {
-            Circle()
-                .fill(color(for: event))
-                .frame(width: DesignTokens.Size.calendarDot, height: DesignTokens.Size.calendarDot)
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                Text(event.title)
-                    .font(DesignTokens.Typography.rowTitle)
-                    .lineLimit(2)
-                Text(subtitle(for: event))
-                    .font(DesignTokens.Typography.keyCap)
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-                    .lineLimit(1)
-            }
-            Spacer()
-            if let link = event.meetingLink {
-                Button {
-                    NSWorkspace.shared.open(link)
-                } label: {
-                    Label("加入会议", systemImage: "video.fill")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help(link.absoluteString)
-            }
-        }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
-        .padding(.vertical, DesignTokens.Spacing.md)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func subtitle(for event: CalendarEvent) -> String {
-        [event.timeRange, event.location].compactMap { $0 }.joined(separator: " · ")
-    }
-
-    private func color(for event: CalendarEvent) -> Color {
-        guard let c = event.color else { return DesignTokens.Colors.progress }
-        return Color(red: c.red, green: c.green, blue: c.blue)  // ui-literal-ok: 日历自带的用户颜色，不是设计值
     }
 }

@@ -63,7 +63,7 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 | `PluginKillProcess` | `ps` 解析与过滤、偏好回落、触发词入口 | 有覆盖 |
 | `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式 | 有覆盖 |
 | `PluginTranslator` | 词典方向、触发词前缀、语言判定 | 有覆盖 |
-| `PluginCalendar` | 时间区间格式、排序、农历文本 | 有覆盖 |
+| `PluginCalendar` | 时间区间格式、排序；农历 / 干支 / 节气对照权威表；节日规则；放假与补班查询；`HolidayStore` 刷新节流与坏数据拒收；内置数据对照国务院公告 | 有覆盖 |
 | `PluginAI` | Provider 注册表完整性、搜索排序与触发闸门 | 有覆盖 |
 | 8 个开发者工具 | 各自的纯逻辑（编解码、格式化、diff、字数统计…） | 有覆盖 |
 | 其余插件 | 插件契约 + 从服务里抽出来的纯逻辑 | 有覆盖 |

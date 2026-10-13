@@ -561,7 +561,8 @@
 
 ### 日历（calendar）
 
-读取系统日历今日日程并在插件视图展示；主搜索可预览今日前几条事件；支持农历日期文案。
+月历 + 所选日期的信息卡 + 日程：读取系统日历日程，叠加中国法定节假日（含调休「休 / 班」）与精简黄历
+（农历、干支、生肖、24 节气、传统与公历节日）；主搜索可预览今日前几条事件，也能直接问节假日、节气、农历。
 
 #### 不变量
 
@@ -574,10 +575,28 @@
   `CalendarService` 翻译一次。
 - **动态搜索**：命中触发词后拉取今日事件；无事件时仍返回一条「今日无日程」占位项；有事件时
   **最多 5 条**；选中任一条结果 `action` 发布 `NavigateEvent`（事件项可带 `eventID` 上下文）。
-- **农历文案**由 `CalendarFormatting.lunar`（中国历 + `zh_CN` 长日期）生成；月历格子的小字由
-  `lunarCellLabel` 给出（初一显示月份，闰月带「闰」）。
-- **视图 = 月历 + 当天日程**：月份切换、点选日期、「今天」；有事件的日子画小圆点；周数列由
-  `calendar.showWeekNumber` 控制，周的算法跟随系统区域设置（`weekOfYear`）。
+- **「某一天」的属性一律用 `CivilDate`（公历年月日）表达，不用 `Date`。** 节假日、节气、干支都与时区无关，
+  用 `Date` 会把时区带进来；它基于儒略日整数运算，只在边界与 `Date` 互转。
+- **农历、干支、节气、节日全部由 `Almanac` 一次算出**（`AlmanacDay`）。农历换算固定用
+  `Asia/Shanghai` 时区 + 正午取样，不随系统时区漂移；月历格子小字优先级 **节日 > 节气 > 农历日**
+  （初一显示月名，闰月带「闰」）。**黄历是精简版：不含宜忌**（各来源结果不一，没有公认的标准答案）。
+- **节气日期查表，不用公式。** `SolarTermTable`（1901–2100）取自香港天文台公历农历对照表，由
+  `Scripts/gen-calendar-data.py` 生成，**不要手改**。试过 Meeus 天文近似：2869 个节气里有 5–8 个
+  离午夜只差几分钟而差一天，所以放弃近似。月柱以「节」换月、月干按五虎遁由立春年的年干推出。
+- **节假日数据 = 内置 + 缓存 + 联网**（`HolidayStore`，`Sendable`，`Mutex` 保护，搜索路径可直接读）。
+  内置数据在 `BundledHolidays`（也由生成脚本产出，来源 holiday-cn，**每次更新必须对照 JSON 里
+  `papers` 指向的国务院公告核对**；2026 年已逐条核对）。联网拿到并通过校验（年份合法、非空、日期都在
+  本年）的数据整年覆盖内置；空数据是「尚未公布」而不是错误，坏数据永不覆盖好数据。
+  成功后一周内不再请求，失败后一小时内不重试；数据源 jsDelivr 优先、GitHub 原始地址兜底。
+- **节假日 JSON 只列与默认周末作息不同的日子**：`isOffDay` 为真是放假（含落在周末的法定假日），
+  为假是调休补班；没出现的日子周末休、工作日上班。相邻同名放假日合成一段（`HolidayPeriod`），
+  中秋与国庆连放时 JSON 里是同一个名字；补班日归到同名且日期最近的一段。
+- **视图 = 月历 + 所选日期**：月份切换、点选日期、「今天」；有事件的日子画小圆点；右栏是信息卡（大号日期、
+  农历、干支、节日 / 放假状态）、日程、近期节假日、近期节日。**右栏每块都是紧凑的一块，不撑满整栏** ——
+  没有日程或没授权时撑满只会留下一大片空白。官方放假安排尚未公布时，「近期节日」补位。
+  周数列由 `calendar.showWeekNumber` 控制，周的算法跟随系统区域设置（`weekOfYear`）。
+- **主搜索**：`节假日 / 假期 / holiday` → 近期 3 段假期（含倒数与补班）；`节气` → 下一个节气；
+  `农历 / lunar` → 今天的农历与干支；其余触发词仍走日程。这三类结果**不依赖日历权限**。
 - **会议链接**（`MeetingLinkExtractor`）只认 Zoom / 腾讯会议 / Google Meet / Teams / 飞书 / 钉钉 /
   Webex 等已知域名（后缀匹配，防 `evilzoom.us`），在日程旁显示「加入会议」；设置
   `calendar.autoExtractMeetingLinks` 关掉后不识别。
@@ -591,10 +610,19 @@
 | 文件 | 职责 |
 | --- | --- |
 | `Model/CalendarEvent.swift` | 事件值类型、排序、会议链接识别、提醒计划 |
-| `Model/CalendarFormatting.swift` | 农历、周数、月历网格 |
+| `Model/CalendarFormatting.swift` | 周数、月历网格 |
+| `Model/CivilDate.swift` | 公历年月日值类型（儒略日运算） |
+| `Model/Almanac.swift` | 农历 / 干支 / 生肖 / 节气 / 节日（`AlmanacDay`），近期节日 |
+| `Model/SolarTermTable.swift` | 1901–2100 年节气表（生成文件） |
+| `Model/HolidayCalendar.swift` | 年度放假安排解码校验、放假 / 补班查询、假期分段 |
+| `Model/HolidayText.swift` | 倒数、日期范围、补班等展示文案（可测试） |
+| `Model/BundledHolidays.swift` | 内置放假安排（生成文件） |
+| `Service/HolidayStore.swift` | 内置 + 缓存 + 联网更新 |
 | `Model/CalendarPreferences.swift` | 三项偏好的读取与夹取 |
 | `Service/CalendarService.swift` | 权限、按天 / 按月查询、提醒排程 |
-| `UI/CalendarView.swift` | 月历 + 当天日程 + 授权引导 |
+| `UI/CalendarView.swift` | 月历 + 所选日期 |
+| `UI/CalendarInfoViews.swift` | 信息卡、近期节假日、近期节日、月历下方的假期摘要 |
+| `UI/CalendarEventsView.swift` | 日程区：授权引导 / 空状态 / 事件列表 |
 | `CalendarPlugin.swift` | 搜索、命令声明 |
 
 #### 持久化
@@ -604,12 +632,20 @@
 | `calendar.reminderMinutes` | 提醒提前分钟，0 = 不提醒 | 10 |
 | `calendar.autoExtractMeetingLinks` | 识别会议链接并显示「加入会议」 | true |
 | `calendar.showWeekNumber` | 月历显示周数列 | false |
+| `calendar.showHolidays` | 显示休 / 班角标、近期假期与倒数 | true |
+| `calendar.showAlmanac` | 显示干支、生肖、节气、节日；关闭后月历只留农历日期 | true |
+| `calendar.updateHolidaysOnline` | 联网更新节假日 | true |
+
+另有一份**缓存**（不是设置）`calendar.holidays.cache`：联网拿到的年度 JSON 与上次成功 / 尝试时间。
 
 #### 已知限制
 
 - 只读：不创建 / 修改日程；点击日程不会跳转到系统日历。
 - 功能命令默认 `perform` 仅打开插件面板。
-- 描述中的「节假日安排」暂无独立数据源，仅农历字符串。
+- 节气表只覆盖 1901–2100 年，之外没有节气与月柱（日柱、农历照常）。
+- 内置放假安排只含 2024–2026 年；之后的年份靠联网更新或发版更新。国务院通常在 11 月前后公布次年安排，
+  公布前「近期节假日」卡片会说明尚未公布。
+- 联网数据是第三方整理的 JSON（数据源，不是代码依赖）；它出错时只会被校验拒收，回落到内置数据。
 
 ### 网络工具（networktools）
 

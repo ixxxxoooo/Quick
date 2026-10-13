@@ -151,11 +151,6 @@ final class CalendarService {
             red: Double(rgb.redComponent), green: Double(rgb.greenComponent), blue: Double(rgb.blueComponent))
     }
 
-    /// 农历日期信息
-    func lunarDateInfo(for date: Date = Date()) -> String {
-        CalendarFormatting.lunar(for: date)
-    }
-
     // MARK: - 提醒
 
     /// 开始排提醒并保持更新；可重复调用

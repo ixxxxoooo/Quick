@@ -120,26 +120,6 @@ struct CalendarEventSortingTests {
     }
 }
 
-@Suite("农历文本")
-struct CalendarFormattingTests {
-
-    /// 农历文本由「中国日历 + zh_CN」这组配置决定，配置被改会在界面上悄悄变化，
-    /// 所以用固定公历日期把输出钉住
-    @Test("固定日期的农历文本")
-    func lunarText() {
-        #expect(CalendarFormatting.lunar(for: gregorianDate(year: 2026, month: 9, day: 21)) == "2026丙午年八月十一")
-        #expect(CalendarFormatting.lunar(for: gregorianDate(year: 2026, month: 2, day: 17)) == "2026丙午年正月初一")
-        #expect(CalendarFormatting.lunar(for: gregorianDate(year: 2024, month: 2, day: 10)) == "2024甲辰年正月初一")
-        #expect(CalendarFormatting.lunar(for: gregorianDate(year: 2000, month: 1, day: 1)) == "1999己卯年冬月廿五")
-    }
-
-    /// 农历新年当天必须落在「正月初一」，这是最容易看出来的整体错位
-    @Test("春节当天是正月初一")
-    func springFestival() {
-        #expect(CalendarFormatting.lunar(for: gregorianDate(year: 2026, month: 2, day: 17)).hasSuffix("正月初一"))
-    }
-}
-
 @MainActor
 @Suite("日历服务无权限路径")
 struct CalendarServiceTests {
@@ -151,11 +131,6 @@ struct CalendarServiceTests {
         #expect(await service.todayEvents().isEmpty)
         #expect(CalendarService(accessState: .denied).events(on: Date()).isEmpty)
         #expect(CalendarService(accessState: .denied).daysWithEvents(inMonthOf: Date()).isEmpty)
-    }
-
-    @Test("农历信息非空")
-    func lunarInfoNonEmpty() {
-        #expect(!CalendarService().lunarDateInfo().isEmpty)
     }
 }
 
@@ -362,17 +337,6 @@ struct CalendarGridTests {
         #expect(CalendarFormatting.weekNumber(for: gregorianDate(year: 2026, month: 1, day: 1), calendar: cal) == 1)
         #expect(CalendarFormatting.weekNumber(for: gregorianDate(year: 2026, month: 12, day: 31), calendar: cal) == 53)
     }
-
-    @Test("农历小字：初一显示月份，闰月带「闰」，其余是日名")
-    func lunarCellLabels() {
-        // 2026-02-17 春节：正月初一
-        #expect(CalendarFormatting.lunarCellLabel(for: gregorianDate(year: 2026, month: 2, day: 17)) == "正月")
-        #expect(CalendarFormatting.lunarCellLabel(for: gregorianDate(year: 2026, month: 2, day: 19)) == "初三")
-        // 2026-09-21 = 八月十一
-        #expect(CalendarFormatting.lunarCellLabel(for: gregorianDate(year: 2026, month: 9, day: 21)) == "十一")
-        // 2025 年有闰六月：2025-07-25 为闰六月初一
-        #expect(CalendarFormatting.lunarCellLabel(for: gregorianDate(year: 2025, month: 7, day: 25)) == "闰六月")
-    }
 }
 
 @Suite("日历偏好")
@@ -384,6 +348,16 @@ struct CalendarPreferencesTests {
         #expect(CalendarPreferences.reminderMinutes(defaults: suite) == 10)
         #expect(CalendarPreferences.extractsMeetingLinks(defaults: suite))
         #expect(!CalendarPreferences.showsWeekNumber(defaults: suite))
+        #expect(CalendarPreferences.showsHolidays(defaults: suite))
+        #expect(CalendarPreferences.showsAlmanac(defaults: suite))
+        #expect(CalendarPreferences.updatesHolidaysOnline(defaults: suite))
+
+        suite.set(false, forKey: PluginSettingKey.Calendar.showHolidays)
+        suite.set(false, forKey: PluginSettingKey.Calendar.showAlmanac)
+        suite.set(false, forKey: PluginSettingKey.Calendar.updateHolidaysOnline)
+        #expect(!CalendarPreferences.showsHolidays(defaults: suite))
+        #expect(!CalendarPreferences.showsAlmanac(defaults: suite))
+        #expect(!CalendarPreferences.updatesHolidaysOnline(defaults: suite))
 
         suite.set(-5, forKey: PluginSettingKey.Calendar.reminderMinutes)
         #expect(CalendarPreferences.reminderMinutes(defaults: suite) == 0)

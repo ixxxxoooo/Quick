@@ -28,4 +28,19 @@ enum CalendarPreferences {
     static func showsWeekNumber(defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: PluginSettingKey.Calendar.showWeekNumber) as? Bool ?? false
     }
+
+    /// 是否显示法定节假日
+    static func showsHolidays(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: PluginSettingKey.Calendar.showHolidays) as? Bool ?? true
+    }
+
+    /// 是否显示黄历（干支、生肖、节气、节日）
+    static func showsAlmanac(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: PluginSettingKey.Calendar.showAlmanac) as? Bool ?? true
+    }
+
+    /// 是否联网更新节假日数据
+    static func updatesHolidaysOnline(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: PluginSettingKey.Calendar.updateHolidaysOnline) as? Bool ?? true
+    }
 }
