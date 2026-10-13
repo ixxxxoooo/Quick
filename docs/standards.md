@@ -71,6 +71,11 @@ let entries = await Task.detached { await scanner.scanApplications() }.value
 self.entries = entries
 ```
 
+**输入框实时计算用 `Debouncer`（`QuickUI`）。** 输入量小（≤ 4096 字节）同步算、零延迟；
+超过阈值则 150ms 防抖，并在 `Task.detached` 里算，结果回主 actor 时丢弃过期的一次。
+开发者工具（Hash / Base64 / URL / SQL / JSON）一律走它，不要在 `onChange` 里直接跑重活。
+闭包捕获的是输入与选项的**值拷贝**，不要捕获 `self` 或视图状态。
+
 - **不要新增 actor。** 本项目只有「主 actor」与「无隔离」两档。加第三个 actor 意味着你还没
   想清楚所有权；先用 `nonisolated` 函数 + `Sendable` 数据解决。
 - **不要用 `DispatchQueue`。** 尤其不要 `DispatchQueue.main.async` 来回切 —— 那是 Swift 5 的写法。

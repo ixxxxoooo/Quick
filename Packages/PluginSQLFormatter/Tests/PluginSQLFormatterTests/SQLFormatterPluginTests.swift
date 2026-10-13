@@ -124,3 +124,18 @@ struct SQLFormatterPluginTests {
         #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }
+
+@Suite("SQL 格式化耗时回归")
+struct SQLFormatterPerformanceTests {
+
+    @Test("约 200 KB 的 SQL 在 3 秒内格式化完")
+    func largeInputIsFast() {
+        let statement = "SELECT a, b, c FROM t1 JOIN t2 ON t1.id = t2.id WHERE x > 1 AND y IN (1,2,3) ORDER BY a;\n"
+        let big = String(repeating: statement, count: 2_200)
+        let start = ContinuousClock.now
+        let formatted = SQLFormatterLogic.format(big, indent: 2)
+        let elapsed = ContinuousClock.now - start
+        #expect(!formatted.isEmpty)
+        #expect(elapsed < .seconds(3), "耗时 \(elapsed)")
+    }
+}

@@ -21,6 +21,8 @@ struct SQLFormatterView: View {
     @State private var output = ""
     @State private var indent = 2
     @State private var statementCount = 0
+    /// 大输入走防抖 + 后台计算，小输入同步算（见 `Debouncer`）
+    @State private var debouncer = Debouncer()
 
     /// 粘贴检测跳转时携带的初始文本
     @Environment(\.pluginContext) private var pluginContext
@@ -49,6 +51,9 @@ struct SQLFormatterView: View {
             statusBar
         }
         .onChange(of: input) { _, _ in autoFormat() }
+        // 缩进档位改了要立刻按新缩进重排：以前只有改文本才会重排，切换后输出纹丝不动
+        .onChange(of: indent) { _, _ in if !input.isEmpty { formatSQL() } }
+        .onDisappear { debouncer.cancel() }
         .onAppear {
             // 从导航上下文读取初始输入（粘贴检测自动跳转场景）。
             // **带了初始文本就覆盖**：缓冲区是插件级的、会跨次保留，只在「空」时加载会被旧内容挡住。
@@ -163,6 +168,7 @@ struct SQLFormatterView: View {
 
     private func autoFormat() {
         guard !input.isEmpty else {
+            debouncer.cancel()
             output = ""
             statementCount = 0
             return
@@ -170,12 +176,23 @@ struct SQLFormatterView: View {
         formatSQL()
     }
 
+    /// 格式化 + 统计语句数；大输入后台算（点「格式化」与边打边排共用这一条路径）
     private func formatSQL() {
-        output = SQLFormatterLogic.format(input, indent: indent)
-        statementCount = SQLFormatterLogic.statementCount(in: input)
+        let text = input
+        let width = indent
+        debouncer.schedule(
+            weight: text.utf8.count,
+            work: {
+                (SQLFormatterLogic.format(text, indent: width), SQLFormatterLogic.statementCount(in: text))
+            },
+            apply: { formatted, count in
+                output = formatted
+                statementCount = count
+            })
     }
 
     private func compactSQL() {
+        debouncer.cancel()
         output = SQLFormatterLogic.minify(input)
     }
 }

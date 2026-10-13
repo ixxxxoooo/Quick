@@ -16,6 +16,8 @@ struct HashCalculatorView: View {
     }
     @State private var results: [(algorithm: HashCalculatorLogic.Algorithm, value: String)] = []
     @State private var copiedAlgorithm: HashCalculatorLogic.Algorithm?
+    /// 大输入走防抖 + 后台计算，小输入同步算（见 `Debouncer`）
+    @State private var debouncer = Debouncer()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -110,10 +112,15 @@ struct HashCalculatorView: View {
             }
         }
         .onChange(of: input) { _, _ in calculate() }
+        .onDisappear { debouncer.cancel() }
     }
 
     private func calculate() {
-        results = HashCalculatorLogic.digests(of: input)
+        let text = input
+        debouncer.schedule(
+            weight: text.utf8.count,
+            work: { HashCalculatorLogic.digests(of: text) },
+            apply: { results = $0 })
     }
 
     private func copyAll() {

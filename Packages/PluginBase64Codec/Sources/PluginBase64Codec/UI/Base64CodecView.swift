@@ -21,6 +21,8 @@ struct Base64CodecView: View {
     @State private var output = ""
     @State private var mode: Mode = .encode
     @State private var errorMessage: String?
+    /// 大输入走防抖 + 后台计算，小输入同步算（见 `Debouncer`）
+    @State private var debouncer = Debouncer()
 
     /// 编解码规则与设置页共用同一个键：那边改了这边立即生效
     @AppStorage(PluginSettingKey.Base64Codec.urlSafe) private var urlSafe = false
@@ -125,20 +127,40 @@ struct Base64CodecView: View {
         .onChange(of: input) { _, _ in transform() }
         .onChange(of: urlSafe) { _, _ in transform() }
         .onChange(of: wrapLines) { _, _ in transform() }
+        .onChange(of: mode) { _, _ in transform() }
+        .onDisappear { debouncer.cancel() }
     }
 
     private func transform() {
-        guard !input.isEmpty else { output = ""; errorMessage = nil; return }
-        do {
-            output =
-                mode == .encode
-                ? try Base64CodecLogic.encode(input, options: options)
-                : try Base64CodecLogic.decode(input, options: options)
-            errorMessage = nil
-        } catch {
+        guard !input.isEmpty else {
+            debouncer.cancel()
             output = ""
-            errorMessage = "无效的 Base64"
+            errorMessage = nil
+            return
         }
+        // 把要用的值拷成局部常量：计算在后台线程跑，闭包不能碰视图状态
+        let text = input
+        let currentMode = mode
+        let currentOptions = options
+        debouncer.schedule(
+            weight: text.utf8.count,
+            work: {
+                Result {
+                    currentMode == .encode
+                        ? try Base64CodecLogic.encode(text, options: currentOptions)
+                        : try Base64CodecLogic.decode(text, options: currentOptions)
+                }
+            },
+            apply: { result in
+                switch result {
+                case .success(let value):
+                    output = value
+                    errorMessage = nil
+                case .failure:
+                    output = ""
+                    errorMessage = "无效的 Base64"
+                }
+            })
     }
 
     private func swap() {

@@ -105,6 +105,51 @@ enum JSONFormatterLogic {
     /// 自动反转义：只在「当前不是合法 JSON、但反转义之后是合法 JSON」时才还原
     ///
     /// 这样既不会改动用户正在写的正常 JSON，也不会把普通文本误当成转义内容。
+    // MARK: - 一次性分析
+
+    /// 超过它就不再构建节点树：树要为每个节点分配对象，几 MB 的 JSON 会占用大量内存与时间。
+    /// 体积更大的文本仍会校验合法性，只是树视图不可用。
+    static let treeParseLimit = 512 * 1024
+
+    /// 一次分析的结果：编辑器每次文本变化只需要这一份
+    struct Analysis: Sendable, Equatable {
+        /// 自动反转义后的文本（与输入相同表示不需要改写）
+        let text: String
+        /// 节点树；非法、为空或体积超限时为 `nil`
+        let root: JSONNode?
+        /// 文本为空白
+        let isBlank: Bool
+        /// 是合法 JSON
+        let isValid: Bool
+        /// 因体积超限而跳过了树
+        let treeSkipped: Bool
+    }
+
+    /// 反转义 + 校验 + 建树合并成一次分析
+    ///
+    /// 以前每次按键要做两遍完整解析（`autoUnescape` 一遍、`parseTree` 一遍），
+    /// 现在是纯函数、可放到后台线程，并且体积超限时只做校验不建树。
+    static func analyze(_ input: String) -> Analysis {
+        guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return Analysis(text: input, root: nil, isBlank: true, isValid: false, treeSkipped: false)
+        }
+        // 与 `autoUnescape` 同一规则（原文合法就不动；否则反转义后合法才采用），
+        // 但把解析结果直接复用，合法输入只解析一遍
+        var text = input
+        var parsed = try? parse(input)
+        if parsed == nil, let decoded = try? unescape(input), let reparsed = try? parse(decoded) {
+            text = decoded
+            parsed = reparsed
+        }
+        guard let parsed else {
+            return Analysis(text: text, root: nil, isBlank: false, isValid: false, treeSkipped: false)
+        }
+        if text.utf8.count > treeParseLimit {
+            return Analysis(text: text, root: nil, isBlank: false, isValid: true, treeSkipped: true)
+        }
+        return Analysis(text: text, root: node(from: parsed), isBlank: false, isValid: true, treeSkipped: false)
+    }
+
     static func autoUnescape(_ input: String) -> String {
         guard !input.isEmpty else { return input }
         if (try? parse(input)) != nil { return input }

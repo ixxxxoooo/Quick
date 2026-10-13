@@ -231,3 +231,58 @@ struct JSONFormatterPluginTests {
         #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }
+
+@Suite("JSON 一次性分析")
+struct JSONAnalysisTests {
+
+    @Test("合法 JSON：给出树，文本不改写")
+    func validJSON() {
+        let analysis = JSONFormatterLogic.analyze(#"{"a":[1,2,{"b":null}]}"#)
+        #expect(analysis.isValid)
+        #expect(analysis.root != nil)
+        #expect(analysis.text == #"{"a":[1,2,{"b":null}]}"#)
+        #expect(!analysis.isBlank && !analysis.treeSkipped)
+    }
+
+    @Test("被转义的 JSON：文本被自动还原，且还原后合法")
+    func escapedJSONIsUnescaped() {
+        let escaped = #"{\"a\":1}"#
+        let analysis = JSONFormatterLogic.analyze(escaped)
+        #expect(analysis.text == #"{"a":1}"#)
+        #expect(analysis.isValid)
+        // 与旧的 autoUnescape 行为一致
+        #expect(analysis.text == JSONFormatterLogic.autoUnescape(escaped))
+    }
+
+    @Test("非法与空白输入")
+    func invalidAndBlank() {
+        let invalid = JSONFormatterLogic.analyze("{oops")
+        #expect(!invalid.isValid && invalid.root == nil && !invalid.isBlank)
+        let blank = JSONFormatterLogic.analyze("  \n ")
+        #expect(blank.isBlank && !blank.isValid)
+        #expect(JSONFormatterLogic.analyze("").isBlank)
+    }
+
+    @Test("超过体积上限只校验、不建树")
+    func oversizeSkipsTree() {
+        let item = #"{"k":"vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"},"#
+        let count = JSONFormatterLogic.treeParseLimit / item.utf8.count + 10
+        let big = "[" + String(repeating: item, count: count) + "1]"
+        #expect(big.utf8.count > JSONFormatterLogic.treeParseLimit)
+        let analysis = JSONFormatterLogic.analyze(big)
+        #expect(analysis.isValid)
+        #expect(analysis.treeSkipped)
+        #expect(analysis.root == nil)
+    }
+
+    @Test("耗时回归：1 MB JSON 的分析在 2 秒内完成")
+    func largeAnalysisIsFast() {
+        let item = #"{"k":"vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"},"#
+        let big = "[" + String(repeating: item, count: 25_000) + "1]"
+        let start = ContinuousClock.now
+        let analysis = JSONFormatterLogic.analyze(big)
+        let elapsed = ContinuousClock.now - start
+        #expect(analysis.isValid)
+        #expect(elapsed < .seconds(2), "耗时 \(elapsed)")
+    }
+}

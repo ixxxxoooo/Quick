@@ -144,3 +144,18 @@ struct HashCalculatorPluginTests {
         #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }
+
+@Suite("哈希耗时回归")
+struct HashPerformanceTests {
+
+    @Test("5 MB 文本的全部摘要在 3 秒内算完")
+    func largeInputDigestsAreFast() {
+        let big = String(repeating: "The quick brown fox jumps over the lazy dog. ", count: 120_000)
+        #expect(big.utf8.count > 5_000_000)
+        let start = ContinuousClock.now
+        let results = HashCalculatorLogic.digests(of: big)
+        let elapsed = ContinuousClock.now - start
+        #expect(!results.isEmpty)
+        #expect(elapsed < .seconds(3), "耗时 \(elapsed)")
+    }
+}

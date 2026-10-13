@@ -22,6 +22,8 @@ struct URLCodecView: View {
     /// 单独存一份而不是从 output 反推：失败时 output 是空的，
     /// 空结果和「输入为空」在界面上无法区分。
     @State private var error: String?
+    /// 大输入走防抖 + 后台计算，小输入同步算（见 `Debouncer`）
+    @State private var debouncer = Debouncer()
 
     /// 编码选项与设置页共用同一个键：那边改了这边立即生效
     @AppStorage(PluginSettingKey.URLCodec.encodeSpacesAsPluses) private var spacesAsPluses = false
@@ -132,22 +134,40 @@ struct URLCodecView: View {
         .onChange(of: input) { _, _ in transform() }
         .onChange(of: spacesAsPluses) { _, _ in transform() }
         .onChange(of: encodeFullUrl) { _, _ in transform() }
+        .onChange(of: mode) { _, _ in transform() }
+        .onDisappear { debouncer.cancel() }
     }
 
     private func transform() {
-        guard !input.isEmpty else { output = ""; error = nil; return }
-        if mode == .encode {
-            output = URLCodecLogic.encode(input, options: options)
+        guard !input.isEmpty else {
+            debouncer.cancel()
+            output = ""
             error = nil
-        } else {
-            do {
-                output = try URLCodecLogic.decode(input, options: options)
-                error = nil
-            } catch {
-                output = ""
-                self.error = "解码失败：存在非法的百分号序列"
-            }
+            return
         }
+        // 把要用的值拷成局部常量：计算在后台线程跑，闭包不能碰视图状态
+        let text = input
+        let isEncode = mode == .encode
+        let currentOptions = options
+        debouncer.schedule(
+            weight: text.utf8.count,
+            work: {
+                Result {
+                    isEncode
+                        ? URLCodecLogic.encode(text, options: currentOptions)
+                        : try URLCodecLogic.decode(text, options: currentOptions)
+                }
+            },
+            apply: { result in
+                switch result {
+                case .success(let value):
+                    output = value
+                    error = nil
+                case .failure:
+                    output = ""
+                    error = "解码失败：存在非法的百分号序列"
+                }
+            })
     }
 
     private func swap() {
