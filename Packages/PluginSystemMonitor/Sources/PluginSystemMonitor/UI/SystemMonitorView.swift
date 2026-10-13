@@ -71,23 +71,6 @@ struct SystemMonitorView: View {
                 .padding(.horizontal, DesignTokens.Spacing.sm)
                 .padding(.vertical, DesignTokens.Spacing.md)
             }
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: DesignTokens.Spacing.sm) {
-                Image(systemName: "gauge.with.dots.needle.67percent")
-                    .font(DesignTokens.Typography.sidebarIcon)
-                Text("系统监控")
-                    .font(DesignTokens.Typography.bar)
-            }
-            .foregroundStyle(DesignTokens.Colors.textSecondary)
-            .padding(.horizontal, DesignTokens.Spacing.lg)
-            .padding(.vertical, DesignTokens.Spacing.sm)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(DesignTokens.Colors.controlSurface)
-            )
-            .padding(DesignTokens.Spacing.md)
         }
     }
 
@@ -236,29 +219,12 @@ struct SystemMonitorView: View {
     // MARK: - Footer
 
     private var footer: some View {
-        HStack {
-            Spacer()
-            Button {
+        ActionPillBar {
+            ActionPillButton(title: "打开活动监视器", keyCap: "↵") {
                 openActivityMonitor()
-            } label: {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Text("打开活动监视器")
-                        .font(DesignTokens.Typography.bar)
-                    KeyCapChip(text: "↵", style: .outline, scale: .compact)
-                }
-                .padding(.horizontal, DesignTokens.Spacing.md)
-                .frame(height: DesignTokens.Size.barButtonHeight)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(DesignTokens.Colors.controlSurface)
-                )
             }
-            .buttonStyle(.plain)
             .keyboardShortcut(.return, modifiers: [])
         }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
-        .frame(height: DesignTokens.Size.bottomBarHeight)
-        .background(DesignTokens.Colors.cardFill.opacity(DesignTokens.Opacity.cardFillDim))
     }
 
     private func openActivityMonitor() {

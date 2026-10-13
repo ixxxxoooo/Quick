@@ -250,6 +250,13 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
   的 `hoverArmed`），但列表要听 `keyboardScrollToken`、不能听 `selectedIndex`：指针底下
   那一行本来就在可视区里，跟着 `selectedIndex` 滚会让光标扫过**第一行**时命中
   `scrollTo(anchor: .top)`，把内容往上顶一个内边距 —— 表现就是「跳一下」。
+- **两端滚到「内容的端点」，不是「第一项 / 最后一项」。** 列表有内边距时，
+  `scrollTo(firstItem, anchor: .top)` 会把第一行贴到视口顶沿，内边距被滚出可视区，
+  列表就比静止时往上缩一截：结果少（装得下、没法滚）和结果多（能滚）时第一行位置差了一截，
+  输入时看起来是「列表往下跳了一下」。做法：滚动内容最前、最后各放一个零高度的
+  `ListTopMarker()` / `ListBottomMarker()`（**必须在带内边距的容器之外**），跟随与换批回顶
+  一律走 `proxy.follow(index:count:itemID:)` / `proxy.scrollToTopEdge()`，不要直接
+  `scrollTo(items[0].id, anchor: .top)`。
 - **悬停高亮由列表持有，行只读。** 行各自记 `@State isHovered` 时，键盘移动导致列表
   滚动，而滚动不会给指针底下那一行补一次 `onHover(false)` —— 旧的灰色高亮留在原地，
   和键盘选中项同时亮着，看起来就是一层残影。列表统一持有 `hoveredID`（见
@@ -418,6 +425,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | `PaletteBackground` | 面板背景：vibrancy + scrim + 边缘高光，一处配置。**不含投影** |
 | `Scrolling/EdgeDissolve` | 滚动内容在浮动栏下方淡出的遮罩，`.edgeDissolve()` 挂载 |
 | `KeyCapChip` | 快捷键帽。`.filled`（底栏）/ `.outline`（列表行）两种样式 |
+| `ActionPillLabel` / `ActionPillButton` / `ActionPillBar` | 底栏动作胶囊（文字 + 键帽，毛玻璃胶囊底）与其右对齐、**无背景**的底栏容器。主搜索的「打开 ↵ / 操作 ⌘K」和各插件底栏（系统监控、结束进程）共用，**插件不要再自己拼 `controlSurface` 胶囊**；底栏不铺底色，列表从它下面穿过时用 `.bottomEdgeDissolve()` 淡出 |
 | `BarButton` | 栏位按钮：悬停胶囊 + 图标/文字。`.titled`（底栏）/ `.icon`（窗口标题栏，此时 `title` 只作无障碍标签）两种样式，`.destructive` 色调给关闭用 |
 | `SettingsTileIcon` | 设置侧栏彩色色块图标（18pt 圆角色块 + Medium 白色 SF Symbol），对齐 Raycast Preferences。**public**：插件的设置页住在插件自己的包里，那里也要用同一套色块 |
 | `SettingsRow` | 设置页的一行：固定宽度图标槽 + 标题/副标题 + 尾部控件，尾部可同行（`.inline`）或换行（`.below`）。**public**，插件包里的设置页靠它拼出与宿主一致的行 |
@@ -469,6 +477,17 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 - **不要复制粘贴组件。** 需要变体就给现有组件加一个参数或样式枚举
   （参考 `KeyCapChip.Style`）。
 - 新的共享组件必须：从令牌取所有数值、支持明暗两模式、在 `docs/ui.md` 登记。
+
+---
+
+### 可点击区域必须覆盖整个按钮
+
+`.buttonStyle(.plain)` 的按钮，**透明的内边距与透明底色默认点不到**：只有文字、图标、
+以及有填充色的部分响应点击。凡是带 `.padding` / `.frame` 的自定义按钮，label 末尾
+必须加 `.contentShape(...)`（形状与外观一致）；用 `.onTapGesture` 的行，
+`.contentShape` 要放在手势**之前**，命中形状只对它之后添加的手势生效。
+典型反例：剪贴板的「全部 / 文本 / 图片 / 收藏」标签，未选中时底色是 `Color.clear`，
+用户点按钮边缘毫无反应。
 
 ---
 

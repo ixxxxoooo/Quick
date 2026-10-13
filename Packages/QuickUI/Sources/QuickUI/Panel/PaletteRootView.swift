@@ -316,39 +316,22 @@ struct PaletteRootView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// 主操作胶囊
+    /// 主操作胶囊：点击等同于按 ↵，执行当前选中项
     private var primaryActionPill: some View {
-        HStack(spacing: DesignTokens.Spacing.xs) {
-            Text("打开")
-                .font(DesignTokens.Typography.bar)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-            KeyCapChip(text: "↵", style: .outline, scale: .compact)
+        ActionPillButton(title: "打开", keyCap: "↵") {
+            selection.activate?(selection.index)
         }
-        .padding(.horizontal, DesignTokens.Spacing.md)
-        .frame(height: DesignTokens.Size.barButtonHeight)
-        .frosted(in: Capsule())
     }
 
     /// 「操作」胶囊：提示 ⌘K 可以打开更多操作，也可以直接点
     private var actionsPill: some View {
-        Button {
+        ActionPillButton(title: "操作", keyCap: "⌘K") {
             if actionMenu.isOpen {
                 actionMenu.close()
             } else {
                 openActionMenuFromPill()
             }
-        } label: {
-            HStack(spacing: DesignTokens.Spacing.xs) {
-                Text("操作")
-                    .font(DesignTokens.Typography.bar)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                KeyCapChip(text: "⌘K", style: .outline, scale: .compact)
-            }
-            .padding(.horizontal, DesignTokens.Spacing.md)
-            .frame(height: DesignTokens.Size.barButtonHeight)
-            .frosted(in: Capsule())
         }
-        .buttonStyle(.plain)
         .padding(.leading, DesignTokens.Spacing.sm)
         .accessibilityLabel("打开操作菜单")
     }

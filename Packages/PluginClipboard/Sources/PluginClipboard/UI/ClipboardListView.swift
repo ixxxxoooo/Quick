@@ -197,6 +197,11 @@ struct ClipboardListView: View {
                 Image(systemName: "trash")
                     .font(DesignTokens.Typography.inlineIcon)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .frame(
+                        width: DesignTokens.Size.clipboardFavoriteButton,
+                        height: DesignTokens.Size.clipboardFavoriteButton
+                    )
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("清空历史")
@@ -251,8 +256,12 @@ struct ClipboardListView: View {
                     .fill(isSelected ? Color.accentColor : Color.clear)
             )
             .foregroundStyle(isSelected ? .white : DesignTokens.Colors.textSecondary)
+            // 命中区域必须覆盖整个按钮：透明的内边距默认不可点，
+            // 不加这句就只有点到图标和文字本身才切换标签
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - 列表
@@ -260,6 +269,7 @@ struct ClipboardListView: View {
     private var entryList: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                ListTopMarker()
                 LazyVStack(spacing: DesignTokens.Spacing.xxs) {
                     ForEach(Array(currentEntries.enumerated()), id: \.element.id) { index, entry in
                         ClipboardRowView(
@@ -287,6 +297,7 @@ struct ClipboardListView: View {
                 }
                 .padding(.horizontal, DesignTokens.Spacing.md)
                 .padding(.vertical, DesignTokens.Spacing.xs)
+                ListBottomMarker()
             }
             // 系统滚动条是为带标题栏的窗口设计的，和面板的玻璃语言冲突（见 docs/ui.md）。
             // 面板高度固定、条目数有限，滚动位置靠键盘导航足够可感。
@@ -296,10 +307,7 @@ struct ClipboardListView: View {
             .onChange(of: selectedIndex) { _, newIndex in
                 let entries = currentEntries
                 guard newIndex >= 0, newIndex < entries.count else { return }
-                proxy.scrollTo(
-                    entries[newIndex].id,
-                    anchor: ListScrollFollow.anchor(for: newIndex, count: entries.count)
-                )
+                proxy.follow(index: newIndex, count: entries.count, itemID: entries[newIndex].id)
             }
         }
     }
@@ -461,8 +469,9 @@ private struct ClipboardRowView: View {
             }
         }
         .onHover(perform: onHoverChange)
-        .onTapGesture { onSelect() }
+        // contentShape 必须在手势之前：命中形状只对它之后添加的手势生效
         .contentShape(Rectangle())
+        .onTapGesture { onSelect() }
         .contextMenu {
             Button {
                 onSelect()

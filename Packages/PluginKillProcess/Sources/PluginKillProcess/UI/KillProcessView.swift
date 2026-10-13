@@ -123,21 +123,23 @@ struct KillProcessView: View {
     private var processList: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                ListTopMarker()
                 LazyVStack(spacing: 0) {
                     ForEach(visibleProcesses) { process in
                         processRow(process)
                             .id(process.id)
                     }
                 }
+                ListBottomMarker()
             }
+            // 底部动作胶囊没有背景，列表从它下面穿过时淡出，文字不会和胶囊叠在一起
+            .bottomEdgeDissolve()
             // 边缘跟随、不做动画：见 `ListScrollFollow`。居中 + 动画会让长按方向键时整个列表一直在滑。
             .onChange(of: selectedID) { _, newValue in
                 guard let newValue,
                     let index = visibleProcesses.firstIndex(where: { $0.id == newValue })
                 else { return }
-                proxy.scrollTo(
-                    newValue,
-                    anchor: ListScrollFollow.anchor(for: index, count: visibleProcesses.count))
+                proxy.follow(index: index, count: visibleProcesses.count, itemID: newValue)
             }
         }
     }
@@ -194,10 +196,12 @@ struct KillProcessView: View {
             Image(systemName: service.sortMode == .cpu ? "cpu" : "memorychip")
                 .font(DesignTokens.Typography.sidebarIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
+            // 固定宽度、右对齐：数字位数不同时图标列不能跟着左右漂（39.3% 与 4.7% 曾让图标错位）
             Text(service.sortMode == .cpu ? process.cpuText : process.memoryText)
                 .font(DesignTokens.Typography.code)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .monospacedDigit()
+                .frame(width: DesignTokens.Size.processMetricWidth, alignment: .trailing)
         }
     }
 
@@ -215,64 +219,19 @@ struct KillProcessView: View {
     // MARK: - Footer
 
     private var footer: some View {
-        HStack {
-            HStack(spacing: DesignTokens.Spacing.sm) {
-                Image(systemName: "xmark.circle")
-                    .font(DesignTokens.Typography.sidebarIcon)
-                Text("结束进程")
-                    .font(DesignTokens.Typography.bar)
-            }
-            .foregroundStyle(DesignTokens.Colors.textSecondary)
-            .padding(.horizontal, DesignTokens.Spacing.lg)
-            .padding(.vertical, DesignTokens.Spacing.sm)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(DesignTokens.Colors.controlSurface)
-            )
-
-            Spacer()
-
-            Button {
+        ActionPillBar {
+            ActionPillButton(title: "结束", keyCap: "↵") {
                 killSelected(force: false)
-            } label: {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Text("结束")
-                        .font(DesignTokens.Typography.bar)
-                    KeyCapChip(text: "↵", style: .outline, scale: .compact)
-                }
-                .padding(.horizontal, DesignTokens.Spacing.md)
-                .frame(height: DesignTokens.Size.barButtonHeight)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(DesignTokens.Colors.controlSurface)
-                )
             }
-            .buttonStyle(.plain)
             .disabled(selectedProcess == nil)
             .keyboardShortcut(.return, modifiers: [])
 
-            Button {
+            ActionPillButton(title: "强制结束", keyCap: "⌘↵") {
                 killSelected(force: true)
-            } label: {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Text("强制结束")
-                        .font(DesignTokens.Typography.bar)
-                    KeyCapChip(text: "⌘↵", style: .outline, scale: .compact)
-                }
-                .padding(.horizontal, DesignTokens.Spacing.md)
-                .frame(height: DesignTokens.Size.barButtonHeight)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(DesignTokens.Colors.controlSurface)
-                )
             }
-            .buttonStyle(.plain)
             .disabled(selectedProcess == nil)
             .keyboardShortcut(.return, modifiers: .command)
         }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
-        .frame(height: DesignTokens.Size.bottomBarHeight)
-        .background(DesignTokens.Colors.cardFill.opacity(DesignTokens.Opacity.cardFillDim))
     }
 
     private var selectedProcess: ProcessRecord? {

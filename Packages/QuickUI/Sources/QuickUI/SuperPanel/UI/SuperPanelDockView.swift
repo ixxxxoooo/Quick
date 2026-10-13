@@ -80,6 +80,7 @@ struct SuperPanelDockView: View {
                         isSelected || isHovered
                             ? DesignTokens.Colors.selection : DesignTokens.Colors.cardFill)
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("打开 \(tool.title)")
@@ -127,6 +128,8 @@ struct SuperPanelDockView: View {
                         RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
                             .fill(hoveredID == item.id ? DesignTokens.Colors.rowHover : Color.clear)
                     )
+                    // 悬停前底色是透明的，没有这句整行只有文字和图标可点
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("打开「\(item.title)」")

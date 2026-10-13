@@ -210,6 +210,8 @@ public enum DesignTokens {
         public static let hashLabelWidth: CGFloat = 55
         /// UUID：选项控件宽度与序号列宽
         public static let uuidOptionWidth: CGFloat = 130
+        /// 结束进程列表右侧指标（CPU % / 内存）的列宽，容纳 `1024.5 MB`
+        public static let processMetricWidth: CGFloat = scaled(84)
         /// UUID 版本分段控件宽度
         public static let uuidVersionPickerWidth: CGFloat = 90
         /// HMAC 密钥输入框宽度

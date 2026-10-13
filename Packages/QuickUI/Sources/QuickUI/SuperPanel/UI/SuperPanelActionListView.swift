@@ -81,6 +81,8 @@ struct SuperPanelActionListView: View {
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
                     .fill(isSelected ? DesignTokens.Colors.selection : Color.clear)
             )
+            // 命中区域覆盖整个按钮：未选中时底色是透明的，透明区域默认点不到
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .padding(.horizontal, DesignTokens.Spacing.md)

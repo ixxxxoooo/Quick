@@ -213,8 +213,9 @@ struct SystemActionRow: View {
                         : (isHovered ? DesignTokens.Colors.rowHover : .clear))
         }
         .onHover { isHovered = $0 }
-        .onTapGesture { onTap() }
+        // contentShape 必须在手势之前：命中形状只对它之后添加的手势生效
         .contentShape(Rectangle())
+        .onTapGesture { onTap() }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
     }

@@ -70,6 +70,8 @@ public struct ResultListView: View {
     public var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                // 顶/底锚点在内边距之外：滚到两端时内边距跟着露出来，列表不会比静止时矮一截
+                ListTopMarker()
                 LazyVStack(spacing: DesignTokens.Spacing.xxs) {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         ResultRowView(
@@ -116,14 +118,16 @@ public struct ResultListView: View {
                 }
                 .padding(.horizontal, DesignTokens.Spacing.md)
                 .padding(.vertical, DesignTokens.Spacing.sm)
+                ListBottomMarker()
             }
             // 系统滚动条和面板的玻璃语言冲突：它是为带标题栏的窗口设计的。
             // 面板高度固定、条目数有限，滚动位置靠键盘导航已经足够可感知。
             .scrollIndicators(.never)
             .onChange(of: resultSetFingerprint) { _, _ in
-                guard let first = items.first?.id else { return }
-                // 不加动画：换一批结果时从中间滑回顶部会让人以为列表在乱动
-                proxy.scrollTo(first, anchor: .top)
+                guard !items.isEmpty else { return }
+                // 不加动画：换一批结果时从中间滑回顶部会让人以为列表在乱动。
+                // 滚到「内容顶端」而不是「第一行」：后者会把顶部内边距滚掉，第一行就往上缩一截
+                proxy.scrollToTopEdge()
             }
             .onChange(of: selection?.hoverDisarmToken) { _, _ in
                 hoveredID = nil
@@ -140,10 +144,7 @@ public struct ResultListView: View {
                 guard let index = selection?.index,
                     index >= 0, index < items.count
                 else { return }
-                proxy.scrollTo(
-                    items[index].id,
-                    anchor: ListScrollFollow.anchor(for: index, count: items.count)
-                )
+                proxy.follow(index: index, count: items.count, itemID: items[index].id)
             }
         }
         .edgeDissolve()

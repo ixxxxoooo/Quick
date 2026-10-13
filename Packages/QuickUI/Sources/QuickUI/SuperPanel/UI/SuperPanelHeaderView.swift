@@ -86,6 +86,8 @@ struct SuperPanelHeaderView: View {
                                     ? DesignTokens.Colors.selection
                                     : Color.clear)
                     )
+                    // 未选中的标签底色透明：补上命中区域，点标签的任何位置都切换
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .focusable(false)

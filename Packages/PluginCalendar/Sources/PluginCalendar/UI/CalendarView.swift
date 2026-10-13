@@ -137,7 +137,8 @@ struct CalendarView: View {
                         ? DesignTokens.Colors.onAccent
                         : (isToday ? DesignTokens.Colors.progress : DesignTokens.Colors.textPrimary)
                 )
-                .frame(maxWidth: .infinity, minHeight: DesignTokens.Size.calendarCellHeight)
+                .frame(maxWidth: .infinity)
+                .frame(height: DesignTokens.Size.calendarCellHeight)
                 .background {
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
                         .fill(isSelected ? DesignTokens.Colors.progress : .clear)
@@ -148,7 +149,9 @@ struct CalendarView: View {
             .accessibilityLabel(accessibilityLabel(for: date, hasEvents: hasEvents))
             .accessibilityAddTraits(isSelected ? .isSelected : [])
         } else {
-            Color.clear.frame(maxWidth: .infinity, minHeight: DesignTokens.Size.calendarCellHeight)
+            // 空格必须是**固定高度**：`Color.clear` 在纵向上本来就是弹性的，
+            // 带空格的行（首行 / 末行）会被撑到吃掉剩余高度，整个月历就变形了
+            Color.clear.frame(maxWidth: .infinity).frame(height: DesignTokens.Size.calendarCellHeight)
         }
     }
 
