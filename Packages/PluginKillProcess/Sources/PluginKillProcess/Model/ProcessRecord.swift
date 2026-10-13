@@ -14,6 +14,17 @@ struct ProcessRecord: Identifiable, Sendable, Equatable {
     /// RSS，单位 KB
     let rssKilobytes: Int
 
+    /// 副标题里展示的路径：家目录缩成 `~`，空路径（内核进程等）返回 `nil`
+    ///
+    /// 家目录作为参数传入而不是在这里取，模型层不碰环境（测试里可以随便传）。
+    func displayPath(home: String) -> String? {
+        guard !path.isEmpty else { return nil }
+        guard !home.isEmpty, home != "/" else { return path }
+        if path == home { return "~" }
+        if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
+        return path
+    }
+
     var cpuText: String {
         String(format: "%.1f%%", cpuPercent)
     }

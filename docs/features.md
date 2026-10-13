@@ -417,6 +417,10 @@
 
 #### 不变量
 
+- **列表滚动跟随走 `ListScrollFollow`（边缘跟随、不做动画）**，不要用 `anchor: .center` + 动画：
+  长按方向键时整个列表会一直在滑。副标题是 `PID · 路径`，路径由 `ProcessRecord.displayPath(home:)`
+  把家目录缩成 `~`（家目录由视图层注入，模型层不碰环境）。
+
 - **搜索框落在面板标题栏**，靠 `supportsPanelSearch == true`；内容区不再重复搜索框。
 - **CPU / 内存排序切换在列表上方分段控件**，不挤在标题栏。
 - **永不列出 / 结束宿主自身 PID**（`ProcessInfo.processIdentifier`）。

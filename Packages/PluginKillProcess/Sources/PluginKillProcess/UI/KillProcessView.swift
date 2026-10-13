@@ -42,7 +42,7 @@ struct KillProcessView: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
             if visibleProcesses.isEmpty {
                 emptyState
             } else {
@@ -130,11 +130,14 @@ struct KillProcessView: View {
                     }
                 }
             }
+            // 边缘跟随、不做动画：见 `ListScrollFollow`。居中 + 动画会让长按方向键时整个列表一直在滑。
             .onChange(of: selectedID) { _, newValue in
-                guard let newValue else { return }
-                withAnimation(.easeOut(duration: DesignTokens.Duration.hover)) {
-                    proxy.scrollTo(newValue, anchor: .center)
-                }
+                guard let newValue,
+                    let index = visibleProcesses.firstIndex(where: { $0.id == newValue })
+                else { return }
+                proxy.scrollTo(
+                    newValue,
+                    anchor: ListScrollFollow.anchor(for: index, count: visibleProcesses.count))
             }
         }
     }
@@ -150,10 +153,12 @@ struct KillProcessView: View {
                         .font(DesignTokens.Typography.bar)
                         .foregroundStyle(DesignTokens.Colors.textPrimary)
                         .lineLimit(1)
-                    if showPID {
-                        Text("PID \(process.id)")
+                    if showPID || process.displayPath(home: Self.homeDirectory) != nil {
+                        Text(Self.subtitle(for: process, showPID: showPID))
                             .font(DesignTokens.Typography.keyCap)
                             .foregroundStyle(DesignTokens.Colors.textTertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
                 Spacer(minLength: DesignTokens.Spacing.sm)
@@ -172,6 +177,16 @@ struct KillProcessView: View {
             Button("结束") { requestKill(process, force: false) }
             Button("强制结束", role: .destructive) { requestKill(process, force: true) }
         }
+    }
+
+    /// 家目录在视图层取一次（模型层不碰环境）
+    private static let homeDirectory = NSHomeDirectory()
+
+    /// 副标题：`PID 123 · ~/path`，两段各自可缺
+    private static func subtitle(for process: ProcessRecord, showPID: Bool) -> String {
+        [showPID ? "PID \(process.id)" : nil, process.displayPath(home: homeDirectory)]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
     private func metricLabel(for process: ProcessRecord) -> some View {
@@ -257,7 +272,7 @@ struct KillProcessView: View {
         }
         .padding(.horizontal, DesignTokens.Spacing.xl)
         .frame(height: DesignTokens.Size.bottomBarHeight)
-        .background(DesignTokens.Colors.cardFill.opacity(0.35))
+        .background(DesignTokens.Colors.cardFill.opacity(DesignTokens.Opacity.cardFillDim))
     }
 
     private var selectedProcess: ProcessRecord? {

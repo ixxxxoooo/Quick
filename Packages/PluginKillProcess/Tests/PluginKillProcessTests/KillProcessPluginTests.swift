@@ -249,3 +249,39 @@ struct KillConfirmPolicyTests {
         #expect(KillConfirmPolicy.message(force: false, processName: "WindowServer").contains("核心"))
     }
 }
+
+@Suite("进程副标题路径")
+struct ProcessDisplayPathTests {
+
+    private func record(path: String) -> ProcessRecord {
+        ProcessRecord(
+            id: 1, name: "x", path: path, cpuPercent: 0, memoryPercent: 0, rssKilobytes: 0)
+    }
+
+    @Test("家目录下的路径缩成 ~")
+    func homeAbbreviated() {
+        #expect(record(path: "/Users/a/Apps/x").displayPath(home: "/Users/a") == "~/Apps/x")
+    }
+
+    @Test("恰好是家目录本身")
+    func homeItself() {
+        #expect(record(path: "/Users/a").displayPath(home: "/Users/a") == "~")
+    }
+
+    @Test("名字前缀相同的另一个目录不能误缩")
+    func similarPrefixNotAbbreviated() {
+        #expect(record(path: "/Users/ab/x").displayPath(home: "/Users/a") == "/Users/ab/x")
+    }
+
+    @Test("系统路径原样返回，空路径没有副标题")
+    func systemAndEmpty() {
+        #expect(record(path: "/usr/sbin/cfprefsd").displayPath(home: "/Users/a") == "/usr/sbin/cfprefsd")
+        #expect(record(path: "").displayPath(home: "/Users/a") == nil)
+    }
+
+    @Test("家目录为空或根目录时不缩写")
+    func degenerateHome() {
+        #expect(record(path: "/x").displayPath(home: "/") == "/x")
+        #expect(record(path: "/x").displayPath(home: "") == "/x")
+    }
+}
