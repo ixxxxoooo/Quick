@@ -629,7 +629,12 @@ public final class PaletteCoordinator {
     // MARK: - 搜索
 
     /// 聚合搜索入口：依赖注入后委托给 `PaletteSearchEngine`
-    public func search(query: String) async -> PaletteSearchOutcome {
+    ///
+    /// - Parameter progress: 慢来源逐个返回时的增量结果，见 `PaletteSearchEngine.search`
+    public func search(
+        query: String,
+        progress: (@MainActor (PaletteSearchOutcome) -> Void)? = nil
+    ) async -> PaletteSearchOutcome {
         await PaletteSearchEngine.search(
             query: query,
             staticCommands: staticCommands,
@@ -638,7 +643,8 @@ public final class PaletteCoordinator {
             recentItemIDs: usageHistory?.recentItemIDs(limit: 12) ?? [],
             invokeCommand: invokeCommand,
             log: log,
-            hostSource: hostSearchSource
+            hostSource: hostSearchSource,
+            progress: progress
         )
     }
 
@@ -654,9 +660,9 @@ public final class PaletteCoordinator {
             paletteQuery: paletteQuery,
             paletteMode: paletteMode,
             pluginSearch: pluginSearch,
-            searchHandler: { [weak self] query in
+            searchHandler: { [weak self] query, progress in
                 guard let self else { return .empty }
-                return await self.search(query: query)
+                return await self.search(query: query, progress: progress)
             },
             pluginViewProvider: { [weak self] pluginID, context in
                 guard let self else { return nil }

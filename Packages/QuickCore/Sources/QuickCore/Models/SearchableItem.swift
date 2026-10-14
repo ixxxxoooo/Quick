@@ -43,7 +43,7 @@ public struct SearchableItem: Identifiable, Sendable {
     public let action: @Sendable @MainActor () -> Void
 
     /// 图标类型枚举
-    public enum IconType: Sendable {
+    public enum IconType: Sendable, Equatable {
         /// SF Symbol 图标
         case symbol
         /// 应用 Bundle 图标（值为 bundle path）

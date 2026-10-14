@@ -75,6 +75,9 @@ public enum PaletteSearchEngine {
     ///   - hostSource: 宿主自己的搜索来源（文件搜索）。它不是插件，
     ///     所以不出现在插件列表里；但它的 `sourceID` 同样受
     ///     `isSearchSourceEnabled` 管，设置里关掉后连 `accepts` 都不会被调用
+    ///   - progress: 增量回调。动态来源**逐个**完成时，把「静态结果 + 已返回的来源」合并后的
+    ///     中间结果交出去 —— 一个慢来源（文件搜索、网络）不再把已经算好的应用与命令一起扣住。
+    ///     最后一个来源完成时不回调（那份就是返回值）；被取消后不再回调
     /// - Returns: 去重、排序、限流之后的结果，附带超时的插件 id
     public static func search(
         query: String,
@@ -85,7 +88,8 @@ public enum PaletteSearchEngine {
         invokeCommand: @escaping @MainActor @Sendable (String) -> Void,
         log: Logger,
         pluginTimeout: Duration = PaletteSearchEngine.pluginTimeout,
-        hostSource: (any PaletteHostSearchSource)? = nil
+        hostSource: (any PaletteHostSearchSource)? = nil,
+        progress: (@MainActor (PaletteSearchOutcome) -> Void)? = nil
     ) async -> PaletteSearchOutcome {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
@@ -133,6 +137,7 @@ public enum PaletteSearchEngine {
         }
 
         let dynamicItems = await withTaskGroup(of: PluginSearchResult.self) { group in
+            var addedTasks = 0
             // 宿主来源与插件走同一个任务组：超时、取消、结果汇总都是同一套规则，
             // 不给它开第二条路径。标识在任务外取好 —— 它们是主 actor 上的属性。
             if let hostSource, isSearchSourceEnabled(hostSource.sourceID),
@@ -140,6 +145,7 @@ public enum PaletteSearchEngine {
             {
                 let sourceID = hostSource.sourceID
                 let displayName = hostSource.displayName
+                addedTasks += 1
                 group.addTask {
                     let items = await hostSource.search(query: trimmed)
                     let named = items.map { item in
@@ -151,6 +157,7 @@ public enum PaletteSearchEngine {
             for plugin in dynamicPlugins {
                 let pluginName = type(of: plugin).name
                 let pluginID = type(of: plugin).id
+                addedTasks += 1
                 group.addTask {
                     let outcome = await searchDynamic(
                         plugin: plugin, pluginID: pluginID, query: trimmed, log: log,
@@ -167,11 +174,22 @@ public enum PaletteSearchEngine {
             }
             var results: [SearchableItem] = []
             var timedOut: [String] = []
+            var pending = addedTasks
             for await outcome in group {
+                pending -= 1
                 if let items = outcome.items {
                     results.append(contentsOf: items)
                 }
                 if outcome.didTimeOut { timedOut.append(outcome.pluginID) }
+                // 还有来源在路上、且这一个确实带来了新条目：先把当前能给的交出去
+                if pending > 0, let progress, !Task.isCancelled, outcome.items?.isEmpty == false {
+                    progress(
+                        PaletteSearchOutcome(
+                            items: merged(
+                                staticItems + results, isEmptyQuery: trimmed.isEmpty,
+                                recents: recentItemIDs),
+                            timedOutPluginIDs: timedOut))
+                }
             }
             return DynamicSearchBatch(items: results, timedOutPluginIDs: timedOut)
         }
@@ -181,29 +199,8 @@ public enum PaletteSearchEngine {
             return .empty
         }
 
-        let collected = staticItems + dynamicItems.items
-
-        // 去重：
-        // 1. 按 id 去重：重复 id 会让 `ForEach` 进入未定义行为
-        // 2. 按「同插件 + 同标题」去重：例如 `plugin.open.json-formatter` 与
-        //    `json-formatter.format` 都叫「JSON 格式化」，只留相关度高的那条
-        var seenIDs = Set<String>()
-        var seenPluginTitle = Set<String>()
-        let idDeduped = collected.filter { seenIDs.insert($0.id).inserted }
-        let sorted = idDeduped.sorted {
-            $0.relevance == $1.relevance ? $0.id < $1.id : $0.relevance > $1.relevance
-        }
-        let deduped = sorted.filter { item in
-            let key = "\(item.pluginID)|\(item.title)"
-            return seenPluginTitle.insert(key).inserted
-        }
-
-        var finalSorted = deduped
-        if trimmed.isEmpty {
-            finalSorted = promotingRecents(finalSorted, recents: recentItemIDs)
-        }
-
-        let limited = Array(finalSorted.prefix(resultLimit))
+        let limited = merged(
+            staticItems + dynamicItems.items, isEmptyQuery: trimmed.isEmpty, recents: recentItemIDs)
         let timedOutIDs = dynamicItems.timedOutPluginIDs
 
         signpost.endInterval("palette.search", interval)
@@ -229,6 +226,30 @@ public enum PaletteSearchEngine {
         }
 
         return PaletteSearchOutcome(items: limited, timedOutPluginIDs: timedOutIDs)
+    }
+
+    /// 去重、排序、空查询时提权最近使用、限流 —— 最终结果与增量结果走同一条路径
+    ///
+    /// 去重：
+    /// 1. 按 id 去重：重复 id 会让 `ForEach` 进入未定义行为
+    /// 2. 按「同插件 + 同标题」去重：例如 `plugin.open.json-formatter` 与
+    ///    `json-formatter.format` 都叫「JSON 格式化」，只留相关度高的那条
+    static func merged(
+        _ collected: [SearchableItem], isEmptyQuery: Bool, recents: [String]
+    ) -> [SearchableItem] {
+        var seenIDs = Set<String>()
+        var seenPluginTitle = Set<String>()
+        let idDeduped = collected.filter { seenIDs.insert($0.id).inserted }
+        let sorted = idDeduped.sorted {
+            $0.relevance == $1.relevance ? $0.id < $1.id : $0.relevance > $1.relevance
+        }
+        var result = sorted.filter { item in
+            seenPluginTitle.insert("\(item.pluginID)|\(item.title)").inserted
+        }
+        if isEmptyQuery {
+            result = promotingRecents(result, recents: recents)
+        }
+        return Array(result.prefix(resultLimit))
     }
 
     /// 查询单个动态插件，超时即取消它的工作

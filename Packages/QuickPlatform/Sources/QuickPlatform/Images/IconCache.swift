@@ -44,14 +44,33 @@ public final class IconCache {
         let icon = NSWorkspace.shared.icon(forFile: bundlePath)
         icon.size = NSSize(width: 32, height: 32)
 
+        store(icon, forKey: bundlePath)
+        return icon
+    }
+
+    /// 异步获取应用图标：磁盘读取放到后台，不占主线程
+    ///
+    /// 搜索一次换一批结果，每行首次出现都要读图标；同步读会让主线程在按键之间卡一下。
+    /// 命中缓存时立即返回；并发请求同一路径各读一次（读完再入缓存，后到的覆盖先到的，内容相同）。
+    public func loadIcon(forBundlePath bundlePath: String) async -> NSImage? {
+        if let cached = cache[bundlePath] { return cached }
+        let loaded = await Task.detached(priority: .userInitiated) {
+            let icon = NSWorkspace.shared.icon(forFile: bundlePath)
+            icon.size = NSSize(width: 32, height: 32)
+            return icon
+        }.value
+        if let cached = cache[bundlePath] { return cached }
+        store(loaded, forKey: bundlePath)
+        return loaded
+    }
+
+    /// 写入缓存；到上限清掉一半
+    private func store(_ icon: NSImage, forKey key: String) {
         if cache.count >= maxCacheSize {
-            // 简单 LRU：清除一半缓存
             let keys = Array(cache.keys.prefix(maxCacheSize / 2))
             for key in keys { cache.removeValue(forKey: key) }
         }
-
-        cache[bundlePath] = icon
-        return icon
+        cache[key] = icon
     }
 
     /// 获取应用图标（通过 Bundle ID）

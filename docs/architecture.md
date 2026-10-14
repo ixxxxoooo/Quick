@@ -217,6 +217,9 @@ public protocol PluginSettingsProviding { func makeSettingsView() -> AnyView? }
   参考 `NoteStore` / `ClipboardStore` 的 `searchSnapshot`。
 - **`dynamicSearch` 必须尊重取消。** 调用方（`PaletteSearchEngine`）并发且带超时，
   插件内部若有昂贵准备，要检查 `Task.isCancelled`。
+- **聚合搜索是增量交付的。** 动态来源逐个完成时，`PaletteSearchEngine.search(progress:)` 把
+  「静态结果 + 已返回来源」合并后先交给列表，慢来源（文件搜索、网络）不再扣住已经算好的结果；
+  增量与最终结果走同一个 `merged(...)`，视图侧按 id 保住用户已经移动过的选中项。
 - **`makeView()` 返回的视图不要持有 `AppCore`。** 需要能力就通过插件构造器注入。
 - **`activate()` / `deactivate()` 必须成对且幂等。** 插件可能被反复启停。
 - **`deactivate()` 里要落盘。** 未保存的运行时状态在退出时就丢了。
@@ -459,7 +462,7 @@ Debug（`.dev`）与 Release 互不污染。
 从不赋值，那条路只有这里收得到。
 
 结果列表的应用图标（`ResultListView.AppIconImage`）也走这一份 `IconCache.shared`：先用
-`cachedIcon(forBundlePath:)` 在 `init` 里同步取命中的图标（零白屏），未命中才在 `onAppear` 读盘。
+`cachedIcon(forBundlePath:)` 在 `init` 里同步取命中的图标（零白屏），未命中才由 `loadIcon(forBundlePath:)` 在后台读盘（`.task`，不占主线程）。
 不要在视图里再养第二份 `NSCache`。
 
 ### 设置窗口

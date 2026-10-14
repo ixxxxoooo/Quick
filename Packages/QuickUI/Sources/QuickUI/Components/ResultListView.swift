@@ -83,6 +83,9 @@ public struct ResultListView: View {
                             quickNumber: showsQuickNumbers && index < PaletteSelection.quickSelectLimit
                                 ? index + 1 : nil
                         )
+                        // 选中 / 悬停每动一下，列表都要重新求值；行相等就直接跳过它的 body，
+                        // 只有「旧选中」与「新选中」两行真正重算（标题高亮是其中最贵的一步）
+                        .equatable()
                         .id(item.id)
                         // 读屏：一行一个按钮，念「标题，来源插件」，选中态要让 VoiceOver 知道
                         .accessibilityElement(children: .ignore)
@@ -158,7 +161,7 @@ public struct ResultListView: View {
 /// 单行布局：图标 · 标题 ·（弹性）· 右侧类型标签 / 键位提示。参考实现也是这个形状 ——
 /// **行内不放描述文字**，放标题下方还是右侧都不放：一屏能看到的条目数优先。
 /// 插件仍在 `SearchableItem.subtitle` 里提供描述，但面板没有它的渲染点。
-struct ResultRowView: View {
+struct ResultRowView: View, Equatable {
     let item: SearchableItem
     let isSelected: Bool
     let isHovered: Bool
@@ -168,6 +171,17 @@ struct ResultRowView: View {
     /// ⌘数字直达的序号（1…9）；`nil` 不显示
     var quickNumber: Int?
 
+    /// 只比较**画得出来**的输入：`action` 是闭包，不参与（也无法比较）
+    nonisolated static func == (lhs: ResultRowView, rhs: ResultRowView) -> Bool {
+        lhs.item.id == rhs.item.id && lhs.item.title == rhs.item.title
+            && lhs.item.icon == rhs.item.icon && lhs.item.pluginName == rhs.item.pluginName
+            && lhs.item.shortcutHint == rhs.item.shortcutHint
+            && lhs.item.iconType == rhs.item.iconType
+            && lhs.isSelected == rhs.isSelected && lhs.isHovered == rhs.isHovered
+            && lhs.showsIcon == rhs.showsIcon && lhs.query == rhs.query
+            && lhs.quickNumber == rhs.quickNumber
+    }
+
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.lg) {
             if showsIcon {
@@ -175,7 +189,7 @@ struct ResultRowView: View {
                     .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
             }
 
-            Text(MatchHighlighter.attributed(title: item.title, query: query))
+            Text(HighlightCache.attributed(title: item.title, query: query))
                 .font(DesignTokens.Typography.rowTitle)
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
                 .lineLimit(1)
@@ -256,7 +270,7 @@ struct ResultRowView: View {
 /// 应用图标
 ///
 /// 图标统一走 `IconCache.shared`：全应用只有一份图标缓存，不再在这里另养一套。
-/// 命中时 `init` 里就拿到图片，保证即开即显零白屏；未命中的占位块只存在到 `onAppear` 读完磁盘为止。
+/// 命中时 `init` 里就拿到图片，保证即开即显零白屏；未命中的占位块只存在到后台读完磁盘为止（不占主线程）。
 private struct AppIconImage: View {
     let path: String
     @State private var image: NSImage?
@@ -277,9 +291,34 @@ private struct AppIconImage: View {
                     .fill(DesignTokens.Colors.iconTile)
             }
         }
-        .onAppear {
+        // 未命中缓存时在后台读盘；滚动 / 换结果时视图消失会自动取消这个任务
+        .task(id: path) {
             guard image == nil else { return }
-            image = IconCache.shared.icon(forBundlePath: path)
+            image = await IconCache.shared.loadIcon(forBundlePath: path)
         }
     }
+}
+
+/// 标题高亮的缓存
+///
+/// 高亮要做不区分音标的子串搜索，对每一行都不便宜；而同一个「标题 + 查询」在退格、
+/// 回到上一个查询、列表重建时会反复出现。容量到顶就整体清空：条目便宜、命中集中在最近几次查询，
+/// 不值得为它写 LRU。
+@MainActor
+enum HighlightCache {
+    private static var storage: [String: AttributedString] = [:]
+    static let capacity = 400
+
+    static func attributed(title: String, query: String) -> AttributedString {
+        guard !query.isEmpty else { return AttributedString(title) }
+        let key = query + "\u{0}" + title
+        if let hit = storage[key] { return hit }
+        let value = MatchHighlighter.attributed(title: title, query: query)
+        if storage.count >= capacity { storage.removeAll(keepingCapacity: true) }
+        storage[key] = value
+        return value
+    }
+
+    static var count: Int { storage.count }
+    static func reset() { storage.removeAll() }
 }

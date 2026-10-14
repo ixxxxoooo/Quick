@@ -61,7 +61,9 @@ struct PaletteRootView: View {
     ///
     /// 返回 `PaletteSearchOutcome` 而不是裸数组：结果里带着「哪些插件超时了」，
     /// 面板才能把「没搜完」与「没找到」区分开告诉用户。
-    var searchHandler: (String) async -> PaletteSearchOutcome
+    ///
+    /// 第二个参数是增量回调：慢来源还没回来时，先把已有的结果交给列表。
+    var searchHandler: (String, @escaping @MainActor (PaletteSearchOutcome) -> Void) async -> PaletteSearchOutcome
 
     /// 获取插件视图（由协调器注入）
     ///
@@ -419,20 +421,37 @@ struct PaletteRootView: View {
                 guard !Task.isCancelled else { return }
                 isSearching = true
             }
-            let outcome = await searchHandler(text)
+            let outcome = await searchHandler(text) { partial in
+                // 增量：保住用户已经移动过的选中项，别让后到的慢来源把光标拽回第一行
+                apply(partial, keepingSelection: true)
+            }
             showSpinner.cancel()
             guard !Task.isCancelled else { return }
 
-            results = outcome.items
-            selection.items = outcome.items
-            timedOutPluginCount = outcome.timedOutPluginIDs.count
+            apply(outcome, keepingSelection: false)
             isSearching = false
-            selection.update(count: outcome.items.count) { index in
-                guard outcome.items.indices.contains(index) else { return }
-                // 记在动作之前：动作可能切走插件、甚至关掉面板
-                onItemActivated?(outcome.items[index].id)
-                outcome.items[index].action()
-            }
+        }
+    }
+
+    /// 把一批结果写进列表与选择状态
+    ///
+    /// - Parameter keepingSelection: 增量更新时为真：用户已经往下选过，就按 id 找回原来那一项。
+    private func apply(_ outcome: PaletteSearchOutcome, keepingSelection: Bool) {
+        let previousID: String? =
+            keepingSelection && selection.index > 0 && results.indices.contains(selection.index)
+            ? results[selection.index].id : nil
+
+        results = outcome.items
+        selection.items = outcome.items
+        timedOutPluginCount = outcome.timedOutPluginIDs.count
+        selection.update(count: outcome.items.count) { index in
+            guard outcome.items.indices.contains(index) else { return }
+            // 记在动作之前：动作可能切走插件、甚至关掉面板
+            onItemActivated?(outcome.items[index].id)
+            outcome.items[index].action()
+        }
+        if let previousID, let restored = outcome.items.firstIndex(where: { $0.id == previousID }) {
+            selection.index = restored
         }
     }
 }
