@@ -15,7 +15,7 @@ struct SuperPanelHeaderView: View {
     var body: some View {
         ZStack {
             HStack(spacing: DesignTokens.Spacing.sm) {
-                if model.hasContext {
+                if model.hasContext, !model.isLoading {
                     sourceBadge
                 } else {
                     title
@@ -29,7 +29,7 @@ struct SuperPanelHeaderView: View {
                 }
             }
 
-            if model.hasContext {
+            if model.hasContext, !model.isLoading {
                 tabSegment
             }
         }
@@ -108,7 +108,7 @@ struct SuperPanelHeaderView: View {
             Text("超级面板")
                 .font(DesignTokens.Typography.rowTitle)
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
-            Text(SuperPanelTab.dock.rawValue)
+            Text(model.isLoading ? "识别中…" : SuperPanelTab.dock.rawValue)
                 .font(DesignTokens.Typography.compactKeyCap)
                 .foregroundStyle(DesignTokens.Colors.progress)
                 .padding(.horizontal, DesignTokens.Spacing.sm)

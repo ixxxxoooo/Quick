@@ -26,8 +26,6 @@ struct SuperPanelRootView: View {
     let onReplaceWithClipboard: (String) -> Void
     let onCopyClipboard: (String) -> Void
 
-    @State private var hoveredID: String?
-
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 0) {
@@ -38,19 +36,17 @@ struct SuperPanelRootView: View {
                 )
 
                 if model.isLoading {
-                    loading
+                    SuperPanelSkeleton()
                 } else {
                     switch model.activeTab {
                     case .context:
                         SuperPanelActionListView(
                             model: model,
-                            hoveredID: $hoveredID,
                             onCopy: onCopyClipboard
                         )
                     case .dock:
                         SuperPanelDockView(
                             model: model,
-                            hoveredID: $hoveredID,
                             onLaunchTool: onLaunchTool,
                             onRecentItem: onRecentItem,
                             onReplaceWithClipboard: onReplaceWithClipboard,
@@ -86,41 +82,27 @@ struct SuperPanelRootView: View {
         }
     }
 
-    private var loading: some View {
-        HStack(spacing: DesignTokens.Spacing.md) {
-            ProgressView().controlSize(.small)
-            Text("正在识别内容…")
-                .font(DesignTokens.Typography.rowTrailing)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
-        .padding(.vertical, DesignTokens.Spacing.xxl)
-    }
-
+    /// 浮动胶囊底栏：没有分隔线、没有整条背景，只留一粒提示，把高度还给内容
     private var footer: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            if model.activeTab == .context {
-                hint("↑↓", "导航")
+            switch model.activeTab {
+            case .context:
+                hint("↑↓", "选择")
                 hint("↵", "执行")
+            case .dock:
+                hint("↑↓←→", "移动")
+                hint("↵", "打开")
             }
             if model.hasContext {
-                hint("←→", "切换")
-            }
-            if model.activeTab == .dock {
-                hint("1–9", "快捷")
+                hint("⇥", "切换")
             }
             hint("esc", "关闭")
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
-        .padding(.vertical, DesignTokens.Spacing.sm)
-        .background(DesignTokens.Colors.controlSurface.opacity(DesignTokens.Opacity.controlSurfaceDim))
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(DesignTokens.Colors.separator)
-                .frame(height: DesignTokens.Size.hairline)
-        }
+        .padding(.horizontal, DesignTokens.Spacing.md)
+        .padding(.vertical, DesignTokens.Spacing.xs)
+        .background(Capsule().fill(DesignTokens.Colors.controlSurface.opacity(DesignTokens.Opacity.controlSurfaceDim)))
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, DesignTokens.Spacing.sm)
     }
 
     private func hint(_ key: String, _ label: String) -> some View {

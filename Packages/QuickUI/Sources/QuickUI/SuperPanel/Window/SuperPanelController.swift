@@ -53,15 +53,10 @@ public final class SuperPanelController {
     private var resignObserver: NSObjectProtocol?
     private var toastTask: Task<Void, Never>?
 
-    /// 是否已经把面板显示出来（alpha 0 → 1）
-    ///
-    /// 唤出时先把窗口摆好、量好内容高度，再一次性显形 —— 否则用户会看到面板先以
-    /// 「加载中」的矮高度出现，再撑到内容高度，像一段展开动画。
-    private var isRevealed = false
-    /// 内容是否已经加载完成（可以显形了）
-    private var contentReady = false
-    /// 兜底显形：内容高度没变化时 `onPreferenceChange` 不会回调，靠它把面板显示出来
-    private var revealFallback: Task<Void, Never>?
+    /// 最近一次量到的内容高度（骨架期间只记录不应用，识别完成后补一次）
+    private var lastContentHeight: CGFloat = 0
+    /// 识别完成后的高度收敛：内容高度没变化时 `onPreferenceChange` 不会回调，靠它兜底
+    private var settleTask: Task<Void, Never>?
 
     /// 唤出代数：抓选区是异步的，期间又唤出一次时用它丢弃过期结果
     private var showGeneration = 0
@@ -105,25 +100,26 @@ public final class SuperPanelController {
 
         let visibleFrame = screen.visibleFrame
         targetVisibleFrame = visibleFrame
-        let initialSize = CGSize(
-            width: DesignTokens.Size.superPanelWidth, height: DesignTokens.Size.superPanelInitialHeight)
+        let skeletonSize = CGSize(
+            width: DesignTokens.Size.superPanelWidth, height: DesignTokens.Size.superPanelSkeletonHeight)
         let placement = SuperPanelPlacement.resolve(
-            cursor: cursor, panelSize: initialSize, visibleFrame: visibleFrame)
+            cursor: cursor, panelSize: skeletonSize, visibleFrame: visibleFrame)
         self.placement = placement
 
         ensurePanel()
         guard let panel else { return }
-        // 先以透明摆好：窗口要真正在屏上布局过，根视图才会量出内容高度。
-        // 量好、显形之前用户看不到任何中间态。
+        // 骨架先行：立刻把面板以骨架高度摆出来（不取焦点），用户按下就有反馈；
+        // 抓选区与识别在后台跑，完成后原地替换内容并收敛高度。
         showGeneration += 1
         let generation = showGeneration
-        isRevealed = false
-        contentReady = false
-        revealFallback?.cancel()
-        revealFallback = nil
-        panel.alphaValue = 0
-        panel.setContentSize(initialSize)
-        panel.setFrameOrigin(placement.origin(for: initialSize, visibleFrame: visibleFrame))
+        settleTask?.cancel()
+        settleTask = nil
+        panel.alphaValue = 1
+        panel.setContentSize(skeletonSize)
+        panel.setFrameOrigin(placement.origin(for: skeletonSize, visibleFrame: visibleFrame))
+        // 只 `orderFrontRegardless`、不 `makeKey`：非激活浮窗不会抢走原应用的焦点，
+        // 随后合成的 ⌘C 才能打在原应用的选区上。
+        panel.orderFrontRegardless()
 
         log.notice(
             "超级面板已唤出，光标=(\(Int(cursor.x), privacy: .public), \(Int(cursor.y), privacy: .public))，方向=\(String(describing: placement.horizontal), privacy: .public)/\(String(describing: placement.vertical), privacy: .public)"
@@ -132,7 +128,7 @@ public final class SuperPanelController {
         // **抓选区必须在面板取得焦点之前。** 抓选区是合成 ⌘C：一旦面板 `makeKey` +
         // `NSApp.activate` 把焦点抢过来，⌘C 就打在了 Quick 自己身上，原应用里那段
         // 鼠标选中的文字根本收不到 —— 结果只能退回去读剪贴板（没复制就什么都没有）。
-        // 所以先抓、抓完再显示，与 Fasty 的顺序一致。
+        // 所以先抓、抓完再取焦点（骨架期间面板只是「可见」，不是 key）。
         let capture = captureSelection
         let asyncTranslate = translate
         Task.detached(priority: .userInitiated) {
@@ -176,22 +172,10 @@ public final class SuperPanelController {
         panel.orderOut(nil)
         toastTask?.cancel()
         toastTask = nil
-        revealFallback?.cancel()
-        revealFallback = nil
-        isRevealed = false
-        contentReady = false
+        settleTask?.cancel()
+        settleTask = nil
         model.toast = nil
         log.notice("超级面板已收起")
-    }
-
-    /// 内容量好后一次性显形
-    private func reveal() {
-        guard !isRevealed, let panel else { return }
-        isRevealed = true
-        revealFallback?.cancel()
-        revealFallback = nil
-        panel.alphaValue = 1
-        log.debug("超级面板已显形，高度 \(Int(panel.frame.height), privacy: .public)")
     }
 
     /// 真正推到前台并取焦点
@@ -234,13 +218,12 @@ public final class SuperPanelController {
         log.notice(
             "超级面板识别完成：文本长度 \(sourceText.count, privacy: .public)，预览 \(previews.count, privacy: .public) 条")
 
-        // 内容就绪：下一次布局回调（或兜底）就把面板显形
-        contentReady = true
-        revealFallback?.cancel()
-        revealFallback = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(140))
-            guard !Task.isCancelled else { return }
-            self?.reveal()
+        // 内容替换后高度可能没变化（不会触发布局回调），补一次收敛
+        settleTask?.cancel()
+        settleTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled, let self else { return }
+            self.adjustHeight(to: self.lastContentHeight, force: true)
         }
     }
 
@@ -251,21 +234,23 @@ public final class SuperPanelController {
     // MARK: - 高度自适应
 
     /// 内容量出自然高度后调整窗口，并以光标为锚点重定位
-    private func adjustHeight(to contentHeight: CGFloat) {
+    ///
+    /// 识别期间（骨架）只记录不应用：骨架的自然高度比占位高度矮，应用了反而多一次抖动。
+    private func adjustHeight(to contentHeight: CGFloat, force: Bool = false) {
+        lastContentHeight = contentHeight
+        guard force || !model.isLoading else { return }
         guard let panel, let placement, let visibleFrame = targetVisibleFrame,
-            contentHeight > 0
+            let height = SuperPanelHeightPolicy.resolve(
+                contentHeight: contentHeight,
+                minHeight: DesignTokens.Size.superPanelMinHeight,
+                maxHeight: DesignTokens.Size.superPanelMaxHeight)
         else { return }
 
-        let height = min(
-            max(contentHeight, DesignTokens.Size.superPanelMinHeight),
-            DesignTokens.Size.superPanelMaxHeight)
         let size = CGSize(width: DesignTokens.Size.superPanelWidth, height: height)
         if abs(panel.frame.height - height) > 1 {
             panel.setContentSize(size)
             panel.setFrameOrigin(placement.origin(for: size, visibleFrame: visibleFrame))
         }
-        // 内容就绪后第一次量到高度就显形；还没就绪时保持透明（用户看不到撑高的过程）
-        if contentReady { reveal() }
     }
 
     // MARK: - 动作
@@ -367,35 +352,44 @@ public final class SuperPanelController {
     }
 
     private func handleMove(_ delta: Int) -> Bool {
-        model.moveSelection(delta)
+        guard !model.isLoading else { return false }
+        return model.moveSelection(delta)
     }
 
-    private func handleTab() -> Bool {
-        guard model.hasContext else { return false }
+    private func handleHorizontal(_ delta: Int) -> Bool {
+        guard !model.isLoading else { return false }
+        return model.moveHorizontal(delta)
+    }
+
+    private func handleToggleTab() -> Bool {
+        guard !model.isLoading, model.hasContext else { return false }
         model.toggleTab()
         return true
     }
 
     private func handleSubmit() -> Bool {
-        switch model.activeTab {
-        case .context:
-            guard model.actions.indices.contains(model.selectedIndex) else { return false }
-            model.actions[model.selectedIndex].execute()
-        case .dock:
-            guard model.quickTools.indices.contains(model.selectedIndex) else { return false }
-            launch(tool: model.quickTools[model.selectedIndex])
-        }
-        return true
+        guard !model.isLoading else { return false }
+        return performItem(at: model.selectedIndex)
     }
 
-    private func handleNumber(_ index: Int) -> Bool {
+    /// 直达键：数字 1–9、字母 a–z，序号与行上的键帽一致
+    private func handleKey(_ key: Character) -> Bool {
+        guard !model.isLoading, let index = model.itemIndex(forKey: key) else { return false }
+        return performItem(at: index)
+    }
+
+    /// 执行当前标签下第 `index` 项
+    private func performItem(at index: Int) -> Bool {
         switch model.activeTab {
         case .context:
             guard model.actions.indices.contains(index) else { return false }
             model.actions[index].execute()
         case .dock:
-            guard model.quickTools.indices.contains(index) else { return false }
-            launch(tool: model.quickTools[index])
+            switch model.dockItem(at: index) {
+            case .tool(let tool): launch(tool: tool)
+            case .recent(let item): activate(recent: item)
+            case nil: return false
+            }
         }
         return true
     }
@@ -426,43 +420,16 @@ public final class SuperPanelController {
         let panel = SuperPanelPanel(rootView: root)
         panel.onEscape = { [weak self] in self?.handleEscape() ?? false }
         panel.onMove = { [weak self] delta in self?.handleMove(delta) ?? false }
-        panel.onTab = { [weak self] _ in self?.handleTab() ?? false }
+        panel.onHorizontal = { [weak self] delta in self?.handleHorizontal(delta) ?? false }
+        panel.onToggleTab = { [weak self] in self?.handleToggleTab() ?? false }
         panel.onSubmit = { [weak self] in self?.handleSubmit() ?? false }
-        panel.onNumber = { [weak self] index in self?.handleNumber(index) ?? false }
+        panel.onKey = { [weak self] key in self?.handleKey(key) ?? false }
         panel.onReplace = { [weak self] in self?.handleReplace() ?? false }
         panel.onCopy = { [weak self] in
-            guard let self else { return false }
-            let textToCopy: String
-            if let preview = self.model.primaryPreview {
-                switch preview {
-                case .translation(_, _, let translated, _, _):
-                    textToCopy = translated ?? self.model.sourceText
-                case .math(_, let result):
-                    textToCopy = result
-                case .timestamp(_, let formatted, _, let unixSeconds, _, _, let isFromDateString):
-                    textToCopy = isFromDateString ? (unixSeconds ?? formatted) : formatted
-                case .color(let hex, _):
-                    textToCopy = hex
-                case .base64(let decoded):
-                    textToCopy = decoded
-                case .urlEncoded(let decoded):
-                    textToCopy = decoded
-                case .filePath(let path, _, _):
-                    textToCopy = path
-                case .url(let url, _):
-                    textToCopy = url
-                case .email(let email):
-                    textToCopy = email
-                case .ip(let address):
-                    textToCopy = address
-                case .phone(let formatted):
-                    textToCopy = formatted
-                case .json, .sql, .plainText:
-                    textToCopy = self.model.sourceText
-                }
-            } else {
-                textToCopy = self.model.sourceText
-            }
+            guard let self, !self.model.isLoading else { return false }
+            let textToCopy =
+                self.model.primaryPreview?.copyText(sourceText: self.model.sourceText)
+                ?? self.model.sourceText
             let trimmed = textToCopy.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return false }
             self.copy(trimmed)

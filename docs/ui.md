@@ -76,15 +76,21 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 
 ### 超级面板（与主面板独立）
 
-光标旁弹出的上下文面板，几何对齐 **Fasty**，**不跟** `panelScale`（主面板 825×523
-与它无关）。窗口宽高由内容在下列范围内自适应；落点偏移见
-`SuperPanelPlacement`（纯模型，可单测）。
+光标旁弹出的紧凑竖向列表面板，**不跟** `panelScale`（主面板 825×523 与它无关）。
+窗口高度由内容在下列范围内自适应；落点偏移见 `SuperPanelPlacement`（纯模型，可单测）。
+
+结构：头部（来源徽章 / 标签）→ 内容 → 浮动胶囊底栏（没有分隔线与整条背景）。
+上下文态每个动作占**单行**（图标 + 标题 + 右侧补充文字 + 直达键帽）；一行能说完的预览
+（网址 / 算式 / 邮箱 / IP / 电话）不单独出卡，答案并入第一个动作的右侧文字，
+文件 / 颜色 / JSON / 解码结果等多行信息才出预览卡（`SmartPreview.hasRichDetail`）。
+工作台是 4 列工具网格 + 紧凑的最近使用行，全部可用键盘走完。唤出后先以骨架出现，
+识别完成再原地替换并收敛高度（骨架期间只记录高度、不应用，避免多一次抖动）。
 
 | 令牌 | 值 | 说明 |
 | --- | --- | --- |
-| `Size.superPanelWidth` | 390 | 固定宽度 |
-| `Size.superPanelInitialHeight` | 320 | 首次布局占位 |
-| `Size.superPanelMinHeight` | 120 | 最矮 |
+| `Size.superPanelWidth` | 340 | 固定宽度 |
+| `Size.superPanelSkeletonHeight` | 176 | 骨架高度（识别完成前的占位） |
+| `Size.superPanelMinHeight` | 96 | 最矮 |
 | `Size.superPanelMaxHeight` | 620 | 最高，超出内部滚动 |
 | `Radius.superPanel` | 16 | 窗口与背景圆角 |
 

@@ -16,12 +16,14 @@ final class SuperPanelPanel: NSPanel {
     var onEscape: (() -> Bool)?
     /// 上下键回调（`-1` 上移、`+1` 下移）
     var onMove: ((Int) -> Bool)?
-    /// 左右键回调（标签切换）
-    var onTab: ((Int) -> Bool)?
+    /// 左右键回调（`-1` 左、`+1` 右）：上下文态切标签，工作台态在网格里移动
+    var onHorizontal: ((Int) -> Bool)?
+    /// Tab 键：切换上下文 / 工作台
+    var onToggleTab: (() -> Bool)?
     /// 回车回调
     var onSubmit: (() -> Bool)?
-    /// 数字键回调（1 起）
-    var onNumber: ((Int) -> Bool)?
+    /// 直达键回调（数字 1–9、字母 a–z，已转小写）；返回 `true` 表示命中了条目
+    var onKey: ((Character) -> Bool)?
     /// ⌥回车：替换原文
     var onReplace: (() -> Bool)?
     /// ⌘C 复制
@@ -36,7 +38,7 @@ final class SuperPanelPanel: NSPanel {
             contentRect: NSRect(
                 x: 0, y: 0,
                 width: DesignTokens.Size.superPanelWidth,
-                height: DesignTokens.Size.superPanelInitialHeight
+                height: DesignTokens.Size.superPanelSkeletonHeight
             ),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -98,9 +100,16 @@ final class SuperPanelPanel: NSPanel {
             return
         }
 
-        // 左右键：标签切换
+        // 左右键
         if modifiers.isDisjoint(with: [.command, .option, .control]),
-            let delta = PalettePanel.horizontalDelta(for: event), onTab?(delta) == true
+            let delta = PalettePanel.horizontalDelta(for: event), onHorizontal?(delta) == true
+        {
+            return
+        }
+
+        // Tab：切换上下文 / 工作台
+        if Int(event.keyCode) == kVK_Tab, modifiers.isDisjoint(with: [.command, .option, .control]),
+            onToggleTab?() == true
         {
             return
         }
@@ -112,12 +121,11 @@ final class SuperPanelPanel: NSPanel {
             return
         }
 
-        // 数字键 1–9：直接执行第 n 项
-        if modifiers.isEmpty,
-            let chars = event.charactersIgnoringModifiers,
-            chars.count == 1,
-            let digit = Int(chars), (1...9).contains(digit),
-            onNumber?(digit - 1) == true
+        // 直达键：数字 1–9 再接字母 a–z，直接执行第 n 项（Shift / 大写锁定不影响）
+        if modifiers.isSubset(of: [.shift, .capsLock]),
+            let chars = event.charactersIgnoringModifiers?.lowercased(),
+            chars.count == 1, let key = chars.first,
+            onKey?(key) == true
         {
             return
         }

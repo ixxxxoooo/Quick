@@ -378,14 +378,14 @@ public enum DesignTokens {
 
         // MARK: 超级面板
 
-        /// 超级面板固定宽度（对齐 Fasty 390pt，**不跟** `panelScale`）
-        public static let superPanelWidth: CGFloat = 390
+        /// 超级面板固定宽度（紧凑竖向列表，**不跟** `panelScale`）
+        public static let superPanelWidth: CGFloat = 340
         /// 超级面板最矮高度（仅一行提示时）
-        public static let superPanelMinHeight: CGFloat = 120
+        public static let superPanelMinHeight: CGFloat = 96
         /// 超级面板最高高度（超出则内容区内部滚动）
         public static let superPanelMaxHeight: CGFloat = 620
-        /// 超级面板初始高度（内容量出来前的占位）
-        public static let superPanelInitialHeight: CGFloat = 320
+        /// 超级面板骨架高度：唤出后先以这个高度出现，内容识别完再收敛到真实高度
+        public static let superPanelSkeletonHeight: CGFloat = 176
 
         // MARK: AI 聚合标签栏
 

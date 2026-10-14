@@ -30,7 +30,15 @@ public final class MouseTriggerMonitor: @unchecked Sendable {
     public struct Configuration: Sendable, Equatable {
         public var rightLongPressEnabled: Bool
         public var middleClickEnabled: Bool
-        /// 右键长按阈值（毫秒），夹紧到 50…1500；中键不受此限制
+        /// 阈值下限（毫秒）
+        public static let minThresholdMilliseconds: UInt64 = 50
+        /// 阈值上限（毫秒）
+        ///
+        /// 与设置页滑块的上限必须一致：此前这里是 1500 而滑块只到 1000，
+        /// 两个夹紧口径不同，手改 defaults 就能得到界面上永远选不到的值。
+        public static let maxThresholdMilliseconds: UInt64 = 1000
+
+        /// 右键长按阈值（毫秒），夹紧到 50…1000；中键不受此限制
         public var thresholdMilliseconds: UInt64
 
         public init(
@@ -49,7 +57,7 @@ public final class MouseTriggerMonitor: @unchecked Sendable {
 
         /// 将阈值夹紧到合法区间
         public static func clampedThreshold(_ ms: UInt64) -> UInt64 {
-            min(1500, max(50, ms))
+            min(maxThresholdMilliseconds, max(minThresholdMilliseconds, ms))
         }
     }
 

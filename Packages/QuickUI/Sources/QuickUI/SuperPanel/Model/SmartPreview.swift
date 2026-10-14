@@ -126,4 +126,72 @@ public enum SmartPreview: Sendable, Equatable {
         if case .plainText = self { return false }
         return true
     }
+
+    // MARK: - 面板展示用（纯文本，视图与控制器共用）
+
+    /// 是否值得单独占一块「预览卡」
+    ///
+    /// 网址 / 算式 / 邮箱 / IP / 电话这类预览，答案一行就说完了，直接由第一个动作的副标题
+    /// 带出，不再多占一块卡片的高度；文件、颜色、JSON、解码结果等有多行信息的才出卡。
+    public var hasRichDetail: Bool {
+        switch self {
+        case .filePath, .color, .base64, .urlEncoded, .json, .sql, .timestamp, .translation: true
+        case .url, .math, .email, .ip, .phone, .plainText: false
+        }
+    }
+
+    /// 主标题：直接给「答案」，而不是类型标签
+    public var headline: String {
+        switch self {
+        case .url(_, let domain): domain
+        case .filePath(let path, _, _): (path as NSString).lastPathComponent
+        case .color(let hex, _): hex
+        case .timestamp(_, let formatted, _, let unixSeconds, _, _, let isFromDateString):
+            isFromDateString ? (unixSeconds ?? formatted) : formatted
+        case .math(_, let result): result
+        case .email(let email): email
+        case .ip(let address): address
+        case .phone(let formatted): formatted
+        case .base64: "Base64"
+        case .urlEncoded: "URL 编码"
+        case .json(let summary, let lines): "\(summary) · \(lines) 行"
+        case .sql(let statement, let lines): "\(statement) · \(lines) 行"
+        case .translation(let source, _, let translated, _, _): translated ?? source
+        case .plainText: "文本"
+        }
+    }
+
+    /// 副标题：补充说明，没有可补充的就是 nil
+    public var subheadline: String? {
+        switch self {
+        case .url(let url, _): return url
+        case .filePath(let path, _, _): return path
+        case .color(_, let rgb): return rgb
+        case .timestamp(let original, _, let relative, _, _, _, _): return "\(relative) · \(original)"
+        case .math(let expr, _): return expr
+        case .translation(let source, _, let translated, let phonetic, _):
+            if let phonetic, !phonetic.isEmpty { return "\(phonetic) · \(source)" }
+            return translated != nil ? source : nil
+        case .base64, .urlEncoded, .json, .sql, .email, .ip, .phone, .plainText:
+            return nil
+        }
+    }
+
+    /// 「复制」该预览时应写入剪贴板的文本；`sourceText` 是兜底的原文
+    public func copyText(sourceText: String) -> String {
+        switch self {
+        case .translation(_, _, let translated, _, _): translated ?? sourceText
+        case .math(_, let result): result
+        case .timestamp(_, let formatted, _, let unixSeconds, _, _, let isFromDateString):
+            isFromDateString ? (unixSeconds ?? formatted) : formatted
+        case .color(let hex, _): hex
+        case .base64(let decoded), .urlEncoded(let decoded): decoded
+        case .filePath(let path, _, _): path
+        case .url(let url, _): url
+        case .email(let email): email
+        case .ip(let address): address
+        case .phone(let formatted): formatted
+        case .json, .sql, .plainText: sourceText
+        }
+    }
 }

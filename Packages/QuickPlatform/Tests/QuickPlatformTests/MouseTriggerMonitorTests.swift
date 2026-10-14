@@ -9,12 +9,12 @@ import Testing
 @Suite("MouseTriggerMonitor")
 struct MouseTriggerMonitorTests {
 
-    @Test("阈值夹紧到 50…1500")
+    @Test("阈值夹紧到 50…1000")
     func thresholdClamping() {
         #expect(MouseTriggerMonitor.Configuration.clampedThreshold(0) == 50)
         #expect(MouseTriggerMonitor.Configuration.clampedThreshold(49) == 50)
         #expect(MouseTriggerMonitor.Configuration.clampedThreshold(450) == 450)
-        #expect(MouseTriggerMonitor.Configuration.clampedThreshold(2000) == 1500)
+        #expect(MouseTriggerMonitor.Configuration.clampedThreshold(2000) == 1000)
     }
 
     @Test("两边都关时不需要监听")
@@ -36,6 +36,6 @@ struct MouseTriggerMonitorTests {
     @Test("init 会对阈值做夹紧")
     func initClampsThreshold() {
         let config = MouseTriggerMonitor.Configuration(thresholdMilliseconds: 9999)
-        #expect(config.thresholdMilliseconds == 1500)
+        #expect(config.thresholdMilliseconds == 1000)
     }
 }

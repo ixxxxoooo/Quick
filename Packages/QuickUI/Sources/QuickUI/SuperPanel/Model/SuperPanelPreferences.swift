@@ -3,6 +3,7 @@
 // @author ygw
 
 import Foundation
+import QuickPlatform
 
 /// 超级面板的鼠标唤出配置（纯逻辑，可单测）
 public struct SuperPanelMouseConfig: Sendable, Equatable {
@@ -82,8 +83,9 @@ public enum SuperPanelPreferences {
     public static let defaultLongPressEnabled = true
     public static let defaultMiddleClickEnabled = true
     public static let defaultThresholdMs = 450
-    public static let minThresholdMs = 50
-    public static let maxThresholdMs = 1000
+    /// 阈值区间与鼠标监听器共用同一份常量：两处各写一个数迟早会不一致
+    public static let minThresholdMs = Int(MouseTriggerMonitor.Configuration.minThresholdMilliseconds)
+    public static let maxThresholdMs = Int(MouseTriggerMonitor.Configuration.maxThresholdMilliseconds)
     public static let thresholdStepMs = 50
 
     public static let defaultOpacity = 0.85
