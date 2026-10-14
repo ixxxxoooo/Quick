@@ -600,9 +600,22 @@
 - **节假日 JSON 只列与默认周末作息不同的日子**：`isOffDay` 为真是放假（含落在周末的法定假日），
   为假是调休补班；没出现的日子周末休、工作日上班。相邻同名放假日合成一段（`HolidayPeriod`），
   中秋与国庆连放时 JSON 里是同一个名字；补班日归到同名且日期最近的一段。
-- **视图 = 月历 + 所选日期**：月份切换、点选日期、「今天」；有事件的日子画小圆点；右栏是信息卡（大号日期、
-  农历、干支、节日 / 放假状态）、日程、近期节假日、近期节日。**右栏每块都是紧凑的一块，不撑满整栏** ——
-  没有日程或没授权时撑满只会留下一大片空白。官方放假安排尚未公布时，「近期节日」补位。
+- **三个视图：月 / 周 / 日，共用同一份状态（所选日期 + 月历显示的月份）。** 顶部工具栏是标题、
+  分段控件、上一个 / 今天 / 下一个；前后移动一步会把**所选日期一起挪走**（`CalendarNavigation`），
+  切换视图不丢位置。选中的视图记在 `calendar.viewMode`（随切换自动保存，不在设置页里），非法值回落月视图。
+  - 月：月历网格 + 右栏（信息卡、日程、近期节假日、近期节日）。**右栏每块都是紧凑的一块，不撑满整栏** ——
+    没有日程或没授权时撑满只会留下一大片空白。有事件的日子画小圆点。
+  - 周：一天一栏，每栏列出当日日程、休 / 班角标、农历；一次 `events(from:to:)` 取一周再按天归并，
+    **不逐日各查一次 EventKit**。宽度不够七列并排时改成纵向的一天一段，不做横向滚动。
+  - 日：时间轴（全天事件置顶，其余按小时摆放，重叠的并排分列，`CalendarDayLayout`）+ 日期信息卡。
+    首次显示滚到第一件事前一小时 / 今天的「现在」附近，不停在凌晨的空白里。
+- **内容区跟着窗口尺寸走（`CalendarLayoutMetrics`）。** 纯函数：输入内容区尺寸，输出单栏 / 双栏、月历栏宽、
+  格高、是否显示农历小字 / 周数列 / 假期摘要、月历栏是否需要滚动。窗口拖大格子变高（夹在
+  `calendarCellMin/MaxHeight` 之间），拖窄收成单栏，过矮先收起农历小字、再收起摘要，**永远不裁剪**
+  （连最小格高都放不下时月历栏自己滚动）。所有数值由 `Limits` 注入，视图层用 `DesignTokens`
+  构造（`Limits.design`）；分离窗口最小宽 400，落在单栏档，可用。
+- **每日黄历按 `CivilDate` 缓存（`AlmanacCache`）**：月历每次重绘要给 28–42 格各算一遍农历 / 干支 / 节气，
+  同一天的结果永远不变；月网格只在月份变化时重建，不在 `body` 里每次重算。
   周数列由 `calendar.showWeekNumber` 控制，周的算法跟随系统区域设置（`weekOfYear`）。
 - **主搜索**：`节假日 / 假期 / holiday` → 近期 3 段假期（含倒数与补班）；`节气` → 下一个节气；
   `农历 / lunar` → 今天的农历与干支；其余触发词仍走日程。这三类结果**不依赖日历权限**。
@@ -619,7 +632,11 @@
 | 文件 | 职责 |
 | --- | --- |
 | `Model/CalendarEvent.swift` | 事件值类型、排序、会议链接识别、提醒计划 |
-| `Model/CalendarFormatting.swift` | 周数、月历网格 |
+| `Model/CalendarFormatting.swift` | 周数、月历网格、周的 7 天 |
+| `Model/CalendarViewMode.swift` | 月 / 周 / 日视图枚举与前后移动（`CalendarNavigation`） |
+| `Model/CalendarLayoutMetrics.swift` | 内容区尺寸 → 单栏 / 双栏、格高、各元素显隐 |
+| `Model/CalendarDayLayout.swift` | 事件按天归并、日视图时间轴布局 |
+| `Model/AlmanacCache.swift` | 黄历按日缓存 |
 | `Model/CivilDate.swift` | 公历年月日值类型（儒略日运算） |
 | `Model/Almanac.swift` | 农历 / 干支 / 生肖 / 节气 / 节日（`AlmanacDay`），近期节日 |
 | `Model/SolarTermTable.swift` | 1901–2100 年节气表（生成文件） |
@@ -627,9 +644,10 @@
 | `Model/HolidayText.swift` | 倒数、日期范围、补班等展示文案（可测试） |
 | `Model/BundledHolidays.swift` | 内置放假安排（生成文件） |
 | `Service/HolidayStore.swift` | 内置 + 缓存 + 联网更新 |
-| `Model/CalendarPreferences.swift` | 三项偏好的读取与夹取 |
-| `Service/CalendarService.swift` | 权限、按天 / 按月查询、提醒排程 |
-| `UI/CalendarView.swift` | 月历 + 所选日期 |
+| `Model/CalendarPreferences.swift` | 偏好的读取与夹取（含视图模式） |
+| `Service/CalendarService.swift` | 权限、按天 / 区间 / 按月查询、提醒排程 |
+| `UI/CalendarView.swift` | 工具栏 + 三视图路由 + 自适应布局 |
+| `UI/CalendarMonthGrid.swift` / `CalendarWeekView.swift` / `CalendarDayView.swift` | 月网格 / 周视图 / 日时间轴 |
 | `UI/CalendarInfoViews.swift` | 信息卡、近期节假日、近期节日、月历下方的假期摘要 |
 | `UI/CalendarEventsView.swift` | 日程区：授权引导 / 空状态 / 事件列表 |
 | `CalendarPlugin.swift` | 搜索、命令声明 |
@@ -640,6 +658,7 @@
 | --- | --- | --- |
 | `calendar.reminderMinutes` | 提醒提前分钟，0 = 不提醒 | 10 |
 | `calendar.autoExtractMeetingLinks` | 识别会议链接并显示「加入会议」 | true |
+| `calendar.viewMode` | 上次使用的视图（`month` / `week` / `day`，自动保存） | `month` |
 | `calendar.showWeekNumber` | 月历显示周数列 | false |
 | `calendar.showHolidays` | 显示休 / 班角标、近期假期与倒数 | true |
 | `calendar.showAlmanac` | 显示干支、生肖、节气、节日；关闭后月历只留农历日期 | true |

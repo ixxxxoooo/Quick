@@ -6,7 +6,7 @@ import QuickUI
 import SwiftUI
 
 /// 卡片底：与设置页、剪贴板预览共用的填充 + 描边
-private struct CalendarCardBackground: ViewModifier {
+struct CalendarCardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
@@ -21,7 +21,7 @@ private struct CalendarCardBackground: ViewModifier {
 }
 
 extension View {
-    fileprivate func calendarCard() -> some View { modifier(CalendarCardBackground()) }
+    func calendarCard() -> some View { modifier(CalendarCardBackground()) }
 }
 
 /// 一枚小标签：节日名、节气、放假 / 补班状态
@@ -104,16 +104,9 @@ struct DayInfoCard: View {
             if let term = day.solarTerm { result.append((term, DesignTokens.Colors.progress)) }
         }
         if let status {
-            result.append((status.detailText, status.isOff ? DesignTokens.Colors.success : DesignTokens.Colors.warning))
+            result.append((status.detailText, status.isOffDay ? DesignTokens.Colors.success : DesignTokens.Colors.warning))
         }
         return result
-    }
-}
-
-extension HolidayStatus {
-    fileprivate var isOff: Bool {
-        if case .off = self { return true }
-        return false
     }
 }
 

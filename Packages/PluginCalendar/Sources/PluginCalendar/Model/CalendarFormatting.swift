@@ -55,6 +55,15 @@ enum CalendarFormatting {
         }
     }
 
+    /// 包含 `date` 的那一周的 7 天（每天零点），首日由 `calendar.firstWeekday` 决定
+    static func weekDates(containing date: Date, calendar: Calendar = .current) -> [Date] {
+        let day = calendar.startOfDay(for: date)
+        let weekday = calendar.component(.weekday, from: day)
+        let offset = (weekday - calendar.firstWeekday + 7) % 7
+        guard let first = calendar.date(byAdding: .day, value: -offset, to: day) else { return [day] }
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: first) }
+    }
+
     /// 表头的星期缩写，按 `firstWeekday` 起排
     static func weekdaySymbols(calendar: Calendar = .current) -> [String] {
         let symbols = calendar.veryShortStandaloneWeekdaySymbols

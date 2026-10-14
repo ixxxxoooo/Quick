@@ -254,10 +254,33 @@ public enum DesignTokens {
         public static let recorderKeyRadius: CGFloat = 4
         /// 空状态 / 英雄位图标尺寸
         public static let emptyStateIcon = scaled(32)
-        /// 月历单元格的高度
-        public static let calendarCellHeight = scaled(42)
-        /// 月历左侧面板宽度
-        public static let calendarPanelWidth = scaled(320)
+        /// 月历单元格高度的下限 / 上限：窗口变高格子跟着变高，但不无限拉伸
+        public static let calendarCellMinHeight = scaled(30)
+        public static let calendarCellMaxHeight = scaled(72)
+        /// 双栏时月历栏的宽度范围（实际宽度按内容宽度的比例取，再夹进这个范围）
+        public static let calendarMonthColumnMin = scaled(300)
+        public static let calendarMonthColumnMax = scaled(440)
+        /// 内容宽度低于它时日历收成单栏
+        public static let calendarCompactWidth = scaled(520)
+        /// 周视图七列并排所需的最小宽度，不够就改成纵向的一天一段
+        public static let calendarWeekColumnsMinWidth = scaled(560)
+        /// 格子低于 / 窄于它时不再放农历小字
+        public static let calendarLunarMinCellHeight = scaled(40)
+        public static let calendarLunarMinCellWidth = scaled(34)
+        /// 格子窄于它时不放周数列
+        public static let calendarWeekNumberMinCell = scaled(40)
+        /// 星期表头高度（估算月历之外占用的高度用）
+        public static let calendarWeekdayHeader = scaled(18)
+        /// 月历下方假期摘要的预留高度，以及放下它之后格高的下限
+        public static let calendarSummaryHeight = scaled(104)
+        public static let calendarSummaryMinCell = scaled(36)
+        /// 日视图时间轴每小时的高度与左侧时刻栏宽度
+        public static let calendarHourHeight = scaled(48)
+        public static let calendarTimelineGutter = scaled(44)
+        /// 周视图每天一栏的最小宽度
+        public static let calendarWeekDayMinWidth = scaled(72)
+        /// 日历顶部分段控件宽度
+        public static let calendarModePicker = scaled(132)
         /// 月历周数列宽度
         public static let calendarWeekColumn = scaled(26)
         /// 事件 / 日期小圆点直径

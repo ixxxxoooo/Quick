@@ -58,6 +58,8 @@ public enum PluginSettingKey {
         public static let reminderMinutes = "calendar.reminderMinutes"
         public static let autoExtractMeetingLinks = "calendar.autoExtractMeetingLinks"
         public static let showWeekNumber = "calendar.showWeekNumber"
+        /// 上次使用的视图：`month` / `week` / `day`（不在设置页里，随视图切换自动记住）
+        public static let viewMode = "calendar.viewMode"
         /// 月历与详情里显示法定节假日（休 / 班角标、近期假期）
         public static let showHolidays = "calendar.showHolidays"
         /// 月历与详情里显示黄历（干支、生肖、节气、节日）

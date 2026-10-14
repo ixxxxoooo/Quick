@@ -93,9 +93,16 @@ final class CalendarService {
 
     /// 某一天的事件（按开始时间排序）；未授权返回空
     func events(on day: Date, calendar: Calendar = .current) -> [CalendarEvent] {
-        guard accessState == .authorized else { return [] }
         let start = calendar.startOfDay(for: day)
         guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
+        return events(from: start, to: end)
+    }
+
+    /// 一段时间内的事件（按开始时间排序）；未授权返回空
+    ///
+    /// 周视图一次取一周再按天归并，而不是逐日各查一次 EventKit。
+    func events(from start: Date, to end: Date) -> [CalendarEvent] {
+        guard accessState == .authorized, start < end else { return [] }
         return fetch(from: start, to: end)
     }
 

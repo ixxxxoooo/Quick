@@ -8,21 +8,30 @@ import SwiftUI
 
 /// 日历插件视图
 ///
-/// 左：月历（休 / 班角标、节日与节气小字、事件小圆点、可选周数列）+ 假期倒数；
-/// 右：所选日期的信息卡、日程、近期节假日。
-/// 未授权日历时月历、农历与节假日仍可用，日程区给出授权入口 —— 授权由用户主动触发，不在启动时弹框。
+/// 顶部是工具栏（标题 · 月/周/日 · 上一个/今天/下一个），下面按所选视图展示：
+/// - 月：月历网格 + 所选日期详情；
+/// - 周：一天一栏，每栏列出当日日程；
+/// - 日：当天时间轴 + 日期信息卡。
+///
+/// **内容区跟着窗口尺寸走**（`CalendarLayoutMetrics`）：拖大格子变高、拖窄收成单栏、
+/// 过矮自动收起农历小字与假期摘要，永远不裁剪。三个视图共用 `selectedDate` / `displayedMonth`，
+/// 切换视图不丢位置。未授权日历时月历、农历与节假日仍可用，日程区给出授权入口 ——
+/// 授权由用户主动触发，不在启动时弹框。
 struct CalendarView: View {
 
     let service: CalendarService
     let holidayStore: HolidayStore
 
-    @State private var displayedMonth = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
-    @State private var selectedDate = Calendar.current.startOfDay(for: Date())
+    @State private var displayedMonth: Date
+    @State private var selectedDate: Date
+    @State private var gridRows: [CalendarFormatting.WeekRow]
     @State private var events: [CalendarEvent] = []
+    @State private var weekEvents: [Date: [CalendarEvent]] = [:]
     @State private var markedDays: Set<Date> = []
     @State private var holidays: HolidayCalendar
     @State private var observances: [Almanac.Observance] = []
 
+    @AppStorage(PluginSettingKey.Calendar.viewMode) private var modeRaw = CalendarViewMode.default.rawValue
     @AppStorage(PluginSettingKey.Calendar.showWeekNumber) private var showWeekNumber = false
     @AppStorage(PluginSettingKey.Calendar.autoExtractMeetingLinks) private var extractsLinks = true
     @AppStorage(PluginSettingKey.Calendar.showHolidays) private var showHolidays = true
@@ -33,30 +42,72 @@ struct CalendarView: View {
     init(service: CalendarService, holidayStore: HolidayStore) {
         self.service = service
         self.holidayStore = holidayStore
+        let position = CalendarNavigation.position(for: Date())
+        _displayedMonth = State(initialValue: position.displayedMonth)
+        _selectedDate = State(initialValue: position.selectedDate)
+        _gridRows = State(initialValue: CalendarFormatting.monthGrid(containing: position.displayedMonth))
         _holidays = State(initialValue: holidayStore.calendar)
     }
 
+    private var mode: CalendarViewMode { CalendarViewMode(storedValue: modeRaw) }
+
+    private var weekDays: [Date] { CalendarFormatting.weekDates(containing: selectedDate, calendar: calendar) }
+
+    private var today: CivilDate { CivilDate(Date(), calendar: calendar) }
+
+    private var decorations: CalendarDecorations {
+        CalendarDecorations(
+            holidays: holidays, showHolidays: showHolidays, showAlmanac: showAlmanac,
+            markedDays: markedDays, calendar: calendar)
+    }
+
+    /// 周事件的加载键：只有周视图才需要，且随「哪一周 / 授权状态」变化
+    private struct WeekLoadKey: Hashable {
+        let weekStart: Date?
+        let authorized: Bool
+    }
+
+    private var weekLoadKey: WeekLoadKey {
+        WeekLoadKey(
+            weekStart: mode == .week ? weekDays.first : nil,
+            authorized: service.accessState == .authorized)
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
-            monthPanel
-                .frame(width: DesignTokens.Size.calendarPanelWidth)
-
+        VStack(spacing: 0) {
+            toolbar
             Divider().opacity(DesignTokens.Opacity.divider)
-
-            dayPanel
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            GeometryReader { proxy in
+                content(size: proxy.size)
+            }
         }
         .onAppear { service.refreshAccessState() }
         .task(id: selectedDate) { reloadEvents() }
         .task(id: displayedMonth) { reloadMarks() }
+        .task(id: weekLoadKey) { reloadWeekEvents() }
         .task { await refreshHolidays() }
         .task { observances = Almanac.upcomingObservances(from: today, limit: 3) }
+        .onChange(of: displayedMonth) { _, month in
+            gridRows = CalendarFormatting.monthGrid(containing: month, calendar: calendar)
+        }
+        .onChange(of: selectedDate) { _, date in
+            // 周 / 日视图里挪走了所选日期：月历显示的月份要跟上，切回月视图时才不会对不上
+            if !calendar.isDate(date, equalTo: displayedMonth, toGranularity: .month) {
+                displayedMonth = calendar.dateInterval(of: .month, for: date)?.start ?? date
+            }
+        }
         .onChange(of: service.accessState) { _, _ in
             reloadEvents()
             reloadMarks()
+            reloadWeekEvents()
         }
-        .onChange(of: extractsLinks) { _, _ in reloadEvents() }
+        .onChange(of: extractsLinks) { _, _ in
+            reloadEvents()
+            reloadWeekEvents()
+        }
     }
+
+    // MARK: - 数据
 
     private func reloadEvents() {
         events = service.events(on: selectedDate)
@@ -66,55 +117,133 @@ struct CalendarView: View {
         markedDays = service.daysWithEvents(inMonthOf: displayedMonth)
     }
 
+    /// 周视图一次取一周，再按天归并；不逐日各查一次
+    private func reloadWeekEvents() {
+        guard mode == .week, let first = weekDays.first,
+            let last = weekDays.last,
+            let end = calendar.date(byAdding: .day, value: 1, to: last)
+        else { return }
+        weekEvents = CalendarDayLayout.eventsByDay(
+            service.events(from: first, to: end), days: weekDays, calendar: calendar)
+    }
+
     /// 到点才联网；拿到新数据后换掉内存里的那份，月历立刻带上新年份的休 / 班
     private func refreshHolidays() async {
         guard CalendarPreferences.updatesHolidaysOnline() else { return }
         if await holidayStore.refreshIfNeeded() { holidays = holidayStore.calendar }
     }
 
-    private var today: CivilDate { CivilDate(Date(), calendar: calendar) }
+    // MARK: - 工具栏
 
-    // MARK: - 月历
+    private var toolbar: some View {
+        HStack(spacing: DesignTokens.Spacing.md) {
+            Text(title)
+                .font(DesignTokens.Typography.panelTitle)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: DesignTokens.Spacing.md)
 
-    private var monthPanel: some View {
-        VStack(spacing: DesignTokens.Spacing.md) {
+            Picker("视图", selection: Binding(get: { mode }, set: { modeRaw = $0.rawValue })) {
+                ForEach(CalendarViewMode.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: DesignTokens.Size.calendarModePicker)
+
             HStack(spacing: DesignTokens.Spacing.sm) {
-                Text(displayedMonth.formatted(.dateTime.year().month(.wide)))
-                    .font(DesignTokens.Typography.panelTitle)
-                Spacer()
-                Button { shiftMonth(-1) } label: { Image(systemName: "chevron.left") }
-                    .accessibilityLabel("上个月")
+                Button { step(-1) } label: { Image(systemName: "chevron.left") }
+                    .accessibilityLabel(mode.stepLabel(forward: false))
                 Button("今天") { goToToday() }
-                Button { shiftMonth(1) } label: { Image(systemName: "chevron.right") }
-                    .accessibilityLabel("下个月")
+                Button { step(1) } label: { Image(systemName: "chevron.right") }
+                    .accessibilityLabel(mode.stepLabel(forward: true))
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
+        }
+        .padding(.horizontal, DesignTokens.Spacing.xl)
+        .padding(.vertical, DesignTokens.Spacing.md)
+    }
 
-            weekdayHeader
+    private var title: String {
+        switch mode {
+        case .month:
+            return displayedMonth.formatted(.dateTime.year().month(.wide))
+        case .week:
+            guard let first = weekDays.first, let last = weekDays.last else { return "" }
+            return first.formatted(.dateTime.year().month().day()) + " – "
+                + last.formatted(.dateTime.month().day())
+        case .day:
+            return selectedDate.formatted(.dateTime.year().month().day().weekday(.wide))
+        }
+    }
 
-            let rows = CalendarFormatting.monthGrid(containing: displayedMonth, calendar: calendar)
-            VStack(spacing: DesignTokens.Spacing.xxs) {
-                ForEach(rows) { row in
-                    HStack(spacing: DesignTokens.Spacing.xxs) {
-                        if showWeekNumber {
-                            Text(row.weekNumber.map(String.init) ?? "")
-                                .font(DesignTokens.Typography.compactKeyCap)
-                                .foregroundStyle(DesignTokens.Colors.textTertiary)
-                                .frame(width: DesignTokens.Size.calendarWeekColumn)
-                                .accessibilityLabel(row.weekNumber.map { "第 \($0) 周" } ?? "")
-                        }
-                        ForEach(row.cells) { cell in
-                            dayCell(cell.date)
-                        }
+    private func step(_ delta: Int) {
+        apply(CalendarNavigation.moved(from: selectedDate, mode: mode, by: delta, calendar: calendar))
+    }
+
+    private func goToToday() {
+        apply(CalendarNavigation.position(for: Date(), calendar: calendar))
+    }
+
+    private func apply(_ position: CalendarNavigation.Position) {
+        selectedDate = position.selectedDate
+        displayedMonth = position.displayedMonth
+    }
+
+    // MARK: - 内容
+
+    @ViewBuilder
+    private func content(size: CGSize) -> some View {
+        switch mode {
+        case .month: monthContent(size: size)
+        case .week: weekContent(size: size)
+        case .day: dayContent(size: size)
+        }
+    }
+
+    // MARK: 月
+
+    private func monthContent(size: CGSize) -> some View {
+        let metrics = CalendarLayoutMetrics.make(
+            size: size, rows: gridRows.count, wantsWeekNumber: showWeekNumber,
+            wantsSummary: showHolidays, limits: .design)
+
+        return Group {
+            switch metrics.columns {
+            case .double:
+                HStack(spacing: 0) {
+                    monthPanel(metrics)
+                        .frame(width: metrics.monthColumnWidth)
+                    Divider().opacity(DesignTokens.Opacity.divider)
+                    ScrollView { dayDetail }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            case .single:
+                ScrollView {
+                    VStack(spacing: 0) {
+                        monthPanel(metrics)
+                        Divider().opacity(DesignTokens.Opacity.divider)
+                        dayDetail
                     }
                 }
             }
+        }
+    }
 
-            if showHolidays { monthSummary }
+    @ViewBuilder
+    private func monthPanel(_ metrics: CalendarLayoutMetrics) -> some View {
+        let panel = VStack(spacing: DesignTokens.Spacing.md) {
+            CalendarMonthGrid(
+                rows: gridRows, metrics: metrics, decorations: decorations, selectedDate: $selectedDate)
+            if metrics.showsSummary { monthSummary }
             Spacer(minLength: 0)
         }
         .padding(DesignTokens.Spacing.xl)
+
+        // 双栏下连最小格高都放不下时月历栏自己滚动，而不是把底行裁掉
+        if metrics.scrollsMonth { ScrollView { panel } } else { panel }
     }
 
     @ViewBuilder
@@ -127,148 +256,109 @@ struct CalendarView: View {
         }
     }
 
-    private var weekdayHeader: some View {
-        HStack(spacing: DesignTokens.Spacing.xxs) {
-            if showWeekNumber {
-                Text("周")
-                    .font(DesignTokens.Typography.compactKeyCap)
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-                    .frame(width: DesignTokens.Size.calendarWeekColumn)
-            }
-            ForEach(Array(CalendarFormatting.weekdaySymbols(calendar: calendar).enumerated()), id: \.offset) { _, symbol in
-                Text(symbol)
-                    .font(DesignTokens.Typography.compactKeyCap)
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
-                    .frame(maxWidth: .infinity)
+    // MARK: 周
+
+    private func weekContent(size: CGSize) -> some View {
+        let metrics = CalendarLayoutMetrics.make(
+            size: size, rows: gridRows.count, wantsWeekNumber: false, wantsSummary: false,
+            limits: .design)
+
+        return VStack(spacing: 0) {
+            permissionStrip
+            CalendarWeekView(
+                days: weekDays, eventsByDay: weekEvents, isVertical: metrics.weekIsVertical,
+                decorations: decorations, selectedDate: $selectedDate)
+        }
+    }
+
+    // MARK: 日
+
+    private func dayContent(size: CGSize) -> some View {
+        let metrics = CalendarLayoutMetrics.make(
+            size: size, rows: gridRows.count, wantsWeekNumber: false, wantsSummary: false,
+            limits: .design)
+        let timeline = CalendarDayLayout.timeline(events: events, on: selectedDate, calendar: calendar)
+        let isToday = calendar.isDateInToday(selectedDate)
+
+        return Group {
+            switch metrics.columns {
+            case .double:
+                HStack(spacing: 0) {
+                    VStack(spacing: 0) {
+                        permissionStrip
+                        CalendarDayTimeline(day: selectedDate, timeline: timeline, isToday: isToday)
+                            .padding(DesignTokens.Spacing.xl)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Divider().opacity(DesignTokens.Opacity.divider)
+                    ScrollView { dayInfoOnly }
+                        .frame(width: metrics.monthColumnWidth)
+                }
+            case .single:
+                ScrollView {
+                    VStack(spacing: 0) {
+                        dayInfoOnly
+                        permissionStrip
+                        CalendarDayTimeline(day: selectedDate, timeline: timeline, isToday: isToday)
+                            .frame(height: DesignTokens.Size.calendarHourHeight * CGFloat(12))
+                            .padding(DesignTokens.Spacing.xl)
+                    }
+                }
             }
         }
+    }
+
+    /// 日 / 周视图里没授权日历时的引导条（已授权时不占位）
+    @ViewBuilder
+    private var permissionStrip: some View {
+        if service.accessState != .authorized {
+            CalendarEventsView(service: service, events: [], isToday: false)
+                .padding(.horizontal, DesignTokens.Spacing.xl)
+                .padding(.top, DesignTokens.Spacing.md)
+        }
+    }
+
+    // MARK: 所选日期
+
+    /// 月视图右栏 / 单栏下方：信息卡 + 日程 + 近期节假日
+    private var dayDetail: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xl) {
+            dayInfoCard
+            CalendarEventsView(service: service, events: events, isToday: calendar.isDateInToday(selectedDate))
+            upcomingCards
+        }
+        .padding(DesignTokens.Spacing.xl)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 日视图右栏：日程已在时间轴里，这里只放信息卡与近期节假日
+    private var dayInfoOnly: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xl) {
+            dayInfoCard
+            upcomingCards
+        }
+        .padding(DesignTokens.Spacing.xl)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var dayInfoCard: some View {
+        let civil = CivilDate(selectedDate, calendar: calendar)
+        return DayInfoCard(
+            date: selectedDate,
+            day: AlmanacCache.shared.day(for: civil),
+            status: showHolidays ? holidays.status(on: civil) : nil,
+            weekNumber: showWeekNumber
+                ? CalendarFormatting.weekNumber(for: selectedDate, calendar: calendar) : nil,
+            showAlmanac: showAlmanac)
     }
 
     @ViewBuilder
-    private func dayCell(_ date: Date?) -> some View {
-        if let date {
-            let civil = CivilDate(date, calendar: calendar)
-            let almanac = Almanac.day(for: civil)
-            let status = showHolidays ? holidays.status(on: civil) : nil
-            let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
-            let isToday = calendar.isDateInToday(date)
-            let hasEvents = markedDays.contains(calendar.startOfDay(for: date))
-            let isHighlighted = showAlmanac && almanac.cellLabel != almanac.lunarLabel
-            Button {
-                selectedDate = calendar.startOfDay(for: date)
-            } label: {
-                VStack(spacing: 0) {
-                    Text("\(civil.day)")
-                        .font(DesignTokens.Typography.rowTitle)
-                        .fontWeight(isToday ? .semibold : .regular)
-                    Text(showAlmanac ? almanac.cellLabel : almanac.lunarLabel)
-                        .font(DesignTokens.Typography.compactKeyCap)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .foregroundStyle(subLabelColor(isSelected: isSelected, highlighted: isHighlighted))
-                    Circle()
-                        .fill(hasEvents ? (isSelected ? DesignTokens.Colors.onAccent : DesignTokens.Colors.progress) : .clear)
-                        .frame(width: DesignTokens.Size.calendarDot, height: DesignTokens.Size.calendarDot)
-                }
-                .foregroundStyle(
-                    isSelected
-                        ? DesignTokens.Colors.onAccent
-                        : (isToday ? DesignTokens.Colors.progress : DesignTokens.Colors.textPrimary)
-                )
-                .frame(maxWidth: .infinity)
-                .frame(height: DesignTokens.Size.calendarCellHeight)
-                .background {
-                    RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
-                        .fill(cellFill(isSelected: isSelected, status: status))
-                }
-                .overlay(alignment: .topTrailing) {
-                    if let status { badge(status, isSelected: isSelected) }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(accessibilityLabel(for: date, almanac: almanac, status: status, hasEvents: hasEvents))
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-        } else {
-            // 空格必须是**固定高度**：`Color.clear` 在纵向上本来就是弹性的，
-            // 带空格的行（首行 / 末行）会被撑到吃掉剩余高度，整个月历就变形了
-            Color.clear.frame(maxWidth: .infinity).frame(height: DesignTokens.Size.calendarCellHeight)
+    private var upcomingCards: some View {
+        if showHolidays {
+            UpcomingHolidaysCard(periods: holidays.upcoming(from: today, limit: 3), today: today)
         }
-    }
-
-    private func cellFill(isSelected: Bool, status: HolidayStatus?) -> Color {
-        if isSelected { return DesignTokens.Colors.progress }
-        switch status {
-        case .off: return DesignTokens.Colors.success.opacity(DesignTokens.Opacity.tint)
-        case .makeupWorkday: return DesignTokens.Colors.warning.opacity(DesignTokens.Opacity.tint)
-        case nil: return .clear
-        }
-    }
-
-    private func subLabelColor(isSelected: Bool, highlighted: Bool) -> Color {
-        if isSelected { return DesignTokens.Colors.onAccent }
-        return highlighted ? DesignTokens.Colors.textSecondary : DesignTokens.Colors.textTertiary
-    }
-
-    private func badge(_ status: HolidayStatus, isSelected: Bool) -> some View {
-        let tint: Color
-        switch status {
-        case .off: tint = DesignTokens.Colors.success
-        case .makeupWorkday: tint = DesignTokens.Colors.warning
-        }
-        return Text(status.badge)
-            .font(DesignTokens.Typography.calendarBadge)
-            .foregroundStyle(isSelected ? DesignTokens.Colors.onAccent : tint)
-            .padding(.top, DesignTokens.Spacing.xxs)
-            .padding(.trailing, DesignTokens.Spacing.xs)
-    }
-
-    private func accessibilityLabel(
-        for date: Date, almanac: AlmanacDay, status: HolidayStatus?, hasEvents: Bool
-    ) -> String {
-        var text = date.formatted(.dateTime.month().day().weekday(.wide)) + "，农历" + almanac.lunarText
-        if !almanac.highlights.isEmpty { text += "，" + almanac.highlights.joined(separator: "、") }
-        if let status { text += "，" + status.detailText }
-        return text + (hasEvents ? "，有日程" : "")
-    }
-
-    private func shiftMonth(_ delta: Int) {
-        guard let moved = calendar.date(byAdding: .month, value: delta, to: displayedMonth),
-            let start = calendar.dateInterval(of: .month, for: moved)?.start
-        else { return }
-        displayedMonth = start
-    }
-
-    private func goToToday() {
-        let today = calendar.startOfDay(for: Date())
-        selectedDate = today
-        displayedMonth = calendar.dateInterval(of: .month, for: today)?.start ?? today
-    }
-
-    // MARK: - 所选日期
-
-    private var dayPanel: some View {
-        let civil = CivilDate(selectedDate, calendar: calendar)
-        return ScrollView {
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xl) {
-                DayInfoCard(
-                    date: selectedDate,
-                    day: Almanac.day(for: civil),
-                    status: showHolidays ? holidays.status(on: civil) : nil,
-                    weekNumber: showWeekNumber
-                        ? CalendarFormatting.weekNumber(for: selectedDate, calendar: calendar) : nil,
-                    showAlmanac: showAlmanac)
-
-                CalendarEventsView(service: service, events: events, isToday: calendar.isDateInToday(selectedDate))
-
-                if showHolidays {
-                    UpcomingHolidaysCard(periods: holidays.upcoming(from: today, limit: 3), today: today)
-                }
-                if showAlmanac && !observances.isEmpty {
-                    UpcomingObservancesCard(observances: observances, today: today)
-                }
-            }
-            .padding(DesignTokens.Spacing.xl)
+        if showAlmanac && !observances.isEmpty {
+            UpcomingObservancesCard(observances: observances, today: today)
         }
     }
 }

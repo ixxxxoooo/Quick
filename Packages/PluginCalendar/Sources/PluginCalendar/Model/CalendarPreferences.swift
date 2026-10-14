@@ -29,6 +29,11 @@ enum CalendarPreferences {
         defaults.object(forKey: PluginSettingKey.Calendar.showWeekNumber) as? Bool ?? false
     }
 
+    /// 上次使用的视图；缺失或非法回落月视图
+    static func viewMode(defaults: UserDefaults = .standard) -> CalendarViewMode {
+        CalendarViewMode(storedValue: defaults.string(forKey: PluginSettingKey.Calendar.viewMode))
+    }
+
     /// 是否显示法定节假日
     static func showsHolidays(defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: PluginSettingKey.Calendar.showHolidays) as? Bool ?? true

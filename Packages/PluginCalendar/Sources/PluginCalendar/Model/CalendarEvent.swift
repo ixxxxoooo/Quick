@@ -18,7 +18,7 @@ struct CalendarColor: Equatable, Sendable {
 /// 纯值类型。EventKit 的 `EKEvent` 只在 `CalendarService` 里被翻译成它一次，
 /// 之后插件和视图都只认这个类型 —— 这样「时间范围怎么显示」「事件怎么排序」
 /// 这类纯逻辑才能不启动 EventKit 就被测试。
-struct CalendarEvent: Identifiable, Sendable {
+struct CalendarEvent: Identifiable, Sendable, Equatable {
     let id: String
     let title: String
     let startDate: Date

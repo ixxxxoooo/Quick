@@ -107,7 +107,7 @@ struct CalendarEventsView: View {
     private func eventRow(_ event: CalendarEvent) -> some View {
         HStack(spacing: DesignTokens.Spacing.md) {
             Circle()
-                .fill(color(for: event))
+                .fill(event.displayColor)
                 .frame(width: DesignTokens.Size.calendarDot, height: DesignTokens.Size.calendarDot)
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 Text(event.title)
@@ -138,8 +138,4 @@ struct CalendarEventsView: View {
         [event.timeRange, event.location].compactMap { $0 }.joined(separator: " · ")
     }
 
-    private func color(for event: CalendarEvent) -> Color {
-        guard let c = event.color else { return DesignTokens.Colors.progress }
-        return Color(red: c.red, green: c.green, blue: c.blue)  // ui-literal-ok: 日历自带的用户颜色，不是设计值
-    }
 }
