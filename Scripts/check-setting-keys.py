@@ -24,6 +24,13 @@ KEY_FILES = [
     ROOT / "Packages/QuickCore/Sources/QuickCore/Models/SettingsKey.swift",
 ]
 
+# 超级面板的键定义在它自己的偏好类型里（与读取逻辑同文件）。
+# 要扫它的键；但读取方恰恰也在这个文件里（`mouseConfiguration` 等），所以它**不**从语料里排除 ——
+# 定义行是 `static let x = "superPanel.x"`，不会被 `Key.x` 的引用模式误判成读取。
+EXTRA_KEY_FILES = [
+    ROOT / "Packages/QuickUI/Sources/QuickUI/SuperPanel/Model/SuperPanelPreferences.swift",
+]
+
 # 引用形式 → 说明。键名用「引用文本」表示，例如 `SettingsKey.foo`
 ALLOWED_UNREAD: dict[str, str] = {}
 
@@ -34,7 +41,7 @@ ENUM = re.compile(r"^\s*(?:public\s+)?enum\s+(\w+)")
 def collect_keys() -> list[tuple[str, Path, int]]:
     """返回 (引用文本, 定义文件, 行号)。嵌套枚举按 `PluginSettingKey.Foo.bar` 展开。"""
     keys: list[tuple[str, Path, int]] = []
-    for path in KEY_FILES:
+    for path in KEY_FILES + EXTRA_KEY_FILES:
         stack: list[tuple[str, int]] = []  # (枚举名, 进入时的缩进)
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             indent = len(line) - len(line.lstrip())

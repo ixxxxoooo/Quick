@@ -167,11 +167,11 @@ struct CurrencyConversionTests {
         #expect(reloaded.current?.updatedAt == Date(timeIntervalSince1970: 2_000_000_000))
     }
 
-    @Test("设置：缺省为开")
-    func onlineSettingDefaultsOn() {
+    @Test("设置：缺省为关（离线优先，用户主动开启才联网）")
+    func onlineSettingDefaultsOff() {
         let suite = UserDefaults(suiteName: "calc.pref.\(UUID().uuidString)")!
-        #expect(CalcPreferences.onlineCurrencyRates(defaults: suite))
-        suite.set(false, forKey: "calculator.onlineCurrencyRates")
         #expect(!CalcPreferences.onlineCurrencyRates(defaults: suite))
+        suite.set(true, forKey: "calculator.onlineCurrencyRates")
+        #expect(CalcPreferences.onlineCurrencyRates(defaults: suite))
     }
 }

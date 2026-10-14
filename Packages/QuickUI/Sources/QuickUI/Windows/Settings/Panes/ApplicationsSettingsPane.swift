@@ -4,6 +4,7 @@
 
 import AppKit
 import QuickCore
+import QuickPlatform
 import SwiftUI
 
 /// 应用程序设置面板
@@ -96,10 +97,8 @@ struct ApplicationsSettingsPane: View {
             } header: {
                 Text("应用程序（\(totalCount) 个）")
             } footer: {
-                Text("别名用来在主面板里搜到这个应用。快捷键到「快捷键」页添加。")
+                Text("别名用来在主面板里搜到这个应用。快捷键到「快捷键」页添加，终端命令在「终端命令」页管理。")
             }
-
-            CommandsSettingsPane(dataSource: dataSource, embedded: true)
         }
         .formStyle(.grouped)
         .onAppear {
@@ -171,10 +170,10 @@ private struct AppItemRow: View {
 
         }
         .padding(.vertical, DesignTokens.Spacing.xxs)
-        .onAppear {
-            if iconImage == nil {
-                iconImage = dataSource.appIcon(for: app.path)
-            }
+        // 应用列表有几百行：图标在后台读盘并进 `IconCache`，不在滚动时卡主线程
+        .task(id: app.path) {
+            guard iconImage == nil else { return }
+            iconImage = await IconCache.shared.loadIcon(forBundlePath: app.path)
         }
     }
 }

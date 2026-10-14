@@ -14,30 +14,22 @@ import SwiftUI
 struct CommandsSettingsPane: View {
 
     let dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource
-    var embedded = false
 
     @State private var runShellFallback: Bool
     @State private var showingAddSheet = false
     @State private var editingCommand: SettingsCustomCommandItem?
     @AppStorage(PluginSettingKey.Shell.preferredTerminal) private var preferredTerminal = "com.apple.Terminal"
 
-    init(dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource, embedded: Bool = false) {
+    init(dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource) {
         self.dataSource = dataSource
-        self.embedded = embedded
         _runShellFallback = State(initialValue: dataSource.isRunShellFallbackEnabled)
     }
 
     var body: some View {
-        Group {
-            if embedded {
-                sections
-            } else {
-                Form {
-                    sections
-                }
-                .formStyle(.grouped)
-            }
+        Form {
+            sections
         }
+        .formStyle(.grouped)
         .sheet(isPresented: $showingAddSheet) {
             CommandEditorSheet(dataSource: dataSource, existingCommand: nil)
         }

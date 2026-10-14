@@ -14,29 +14,19 @@ struct SystemMonitorView: View {
 
     @AppStorage(PluginSettingKey.SystemMonitor.defaultTab) private var defaultTabRaw =
         SystemMonitorPreferences.defaultTab.rawValue
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeCPU) private var cpuModeRaw =
-        SystemMonitorPreferences.defaultCPUMode.rawValue
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeMemory) private var memoryModeRaw =
-        SystemMonitorPreferences.defaultMemoryMode.rawValue
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeDisk) private var diskModeRaw =
-        SystemMonitorPreferences.defaultDiskMode.rawValue
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeBattery) private var batteryModeRaw =
-        SystemMonitorPreferences.defaultBatteryMode.rawValue
+    @AppStorage(PluginSettingKey.SystemMonitor.displayMode) private var modeRaw =
+        SystemMonitorPreferences.defaultMode.rawValue
 
     @State private var selectedTab: SystemMonitorTab = SystemMonitorPreferences.defaultTab
 
-    private var cpuMode: UsageDisplayMode {
-        SystemMonitorPreferences.displayMode(storedValue: cpuModeRaw, fallback: .used)
+    private var usageMode: UsageDisplayMode {
+        SystemMonitorPreferences.displayMode(
+            storedValue: modeRaw, fallback: SystemMonitorPreferences.defaultMode)
     }
-    private var memoryMode: UsageDisplayMode {
-        SystemMonitorPreferences.displayMode(storedValue: memoryModeRaw, fallback: .used)
-    }
-    private var diskMode: UsageDisplayMode {
-        SystemMonitorPreferences.displayMode(storedValue: diskModeRaw, fallback: .free)
-    }
-    private var batteryMode: UsageDisplayMode {
-        SystemMonitorPreferences.displayMode(storedValue: batteryModeRaw, fallback: .free)
-    }
+    private var cpuMode: UsageDisplayMode { usageMode }
+    private var memoryMode: UsageDisplayMode { usageMode }
+    private var diskMode: UsageDisplayMode { usageMode }
+    private var batteryMode: UsageDisplayMode { SystemMonitorPreferences.batteryMode }
 
     var body: some View {
         HStack(spacing: 0) {

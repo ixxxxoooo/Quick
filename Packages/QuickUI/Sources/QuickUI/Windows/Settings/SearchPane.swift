@@ -13,21 +13,27 @@ struct SearchPane: View {
     var body: some View {
         Form {
             Section {
-                ForEach(dataSource.searchSources) { source in
-                    Toggle(
-                        isOn: Binding(
-                            get: { enabled[source.id] ?? source.isEnabled },
-                            set: { newValue in
-                                enabled[source.id] = newValue
-                                dataSource.setSearchSourceEnabled(source.id, enabled: newValue)
+                ForEach(SearchSourceGroup.grouping(dataSource.searchSources)) { group in
+                    DisclosureGroup {
+                        ForEach(group.sources) { source in
+                            Toggle(
+                                isOn: Binding(
+                                    get: { enabled[source.id] ?? source.isEnabled },
+                                    set: { newValue in
+                                        enabled[source.id] = newValue
+                                        dataSource.setSearchSourceEnabled(source.id, enabled: newValue)
+                                    }
+                                )
+                            ) {
+                                SettingsRow(
+                                    title: source.title,
+                                    subtitle: source.subtitle.isEmpty ? nil : source.subtitle,
+                                    icon: { SettingsRowIcon(systemImage: source.icon) }
+                                )
                             }
-                        )
-                    ) {
-                        SettingsRow(
-                            title: source.title,
-                            subtitle: source.subtitle,
-                            icon: { SettingsRowIcon(systemImage: source.icon) }
-                        )
+                        }
+                    } label: {
+                        Text("\(group.category.title)  \(group.enabledCount(overrides: enabled))/\(group.sources.count)")
                     }
                 }
             } header: {

@@ -284,7 +284,8 @@ final class SettingsBridge: SettingsDataSource {
             SettingsSearchSource(
                 id: plugin.id,
                 title: plugin.name,
-                subtitle: "关闭后，主面板不再搜索这个插件的命令和结果。",
+                // 统一说明在页脚；逐行重复同一句话只会拉长列表
+                subtitle: "",
                 icon: plugin.icon,
                 isEnabled: core.settingsStore.isSearchSourceEnabled(plugin.id)
             )

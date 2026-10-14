@@ -189,36 +189,40 @@ public struct AISettingsPane: View {
 
     private var generationSection: some View {
         Section {
-            SettingsRow(
-                title: "最大生成长度",
-                subtitle: "单次回复最多多少 token。",
-                icon: { SettingsRowIcon(systemImage: "text.badge.plus") }
-            ) {
-                Stepper(
-                    "\(maxTokens)",
-                    value: $maxTokens,
-                    in: AIConfig.minMaxTokens...AIConfig.maxMaxTokens,
-                    step: 256
-                )
-                .frame(width: DesignTokens.Size.settingsControlWide)
-            }
+            DisclosureGroup("生成参数（高级）") {
+                SettingsRow(
+                    title: "最大生成长度",
+                    subtitle: "单次回复最多多少 token。",
+                    icon: { SettingsRowIcon(systemImage: "text.badge.plus") }
+                ) {
+                    Stepper(
+                        "\(maxTokens)",
+                        value: $maxTokens,
+                        in: AIConfig.minMaxTokens...AIConfig.maxMaxTokens,
+                        step: 256
+                    )
+                    .frame(width: DesignTokens.Size.settingsControlWide)
+                }
 
-            SettingsRow(
-                title: "采样温度",
-                subtitle: "越低越稳定，越高越发散（0–2）。Anthropic 上限为 1。",
-                icon: { SettingsRowIcon(systemImage: "thermometer.medium") }
-            ) {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Slider(value: $temperature, in: 0...AIConfig.maxTemperature, step: 0.1)
-                        .frame(width: DesignTokens.Size.settingsFieldSmall)
-                    Text(String(format: "%.1f", temperature))
-                        .font(DesignTokens.Typography.rowTrailing)
-                        .foregroundStyle(.secondary)
-                        .frame(width: DesignTokens.Size.settingsReadout, alignment: .trailing)
+                SettingsRow(
+                    title: "采样温度",
+                    subtitle: "越低越稳定，越高越发散（0–2）。Anthropic 上限为 1。",
+                    icon: { SettingsRowIcon(systemImage: "thermometer.medium") }
+                ) {
+                    HStack(spacing: DesignTokens.Spacing.sm) {
+                        Slider(value: $temperature, in: 0...AIConfig.maxTemperature, step: 0.1)
+                            .frame(width: DesignTokens.Size.settingsFieldSmall)
+                        Text(String(format: "%.1f", temperature))
+                            .font(DesignTokens.Typography.rowTrailing)
+                            .foregroundStyle(.secondary)
+                            .frame(width: DesignTokens.Size.settingsReadout, alignment: .trailing)
+                    }
                 }
             }
         } header: {
             Text("生成参数")
+        } footer: {
+            Text("默认值适合绝大多数场景。「AI 聚合」插件打开的是各家网页版，不使用这里的 API Key 与参数。")
         }
     }
 

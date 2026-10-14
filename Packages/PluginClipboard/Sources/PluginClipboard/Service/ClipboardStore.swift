@@ -89,8 +89,19 @@ final class ClipboardStore {
     /// 读的是设置页里那个键 —— 以前这里硬编码 500，设置页上的「历史记录上限」
     /// 改了没有任何效果。
     private var maxEntries: Int {
-        let configured = UserDefaults.standard.integer(forKey: PluginSettingKey.Clipboard.maxEntries)
-        return configured > 0 ? configured : 500
+        Self.resolvedMaxEntries(
+            configured: UserDefaults.standard.integer(forKey: PluginSettingKey.Clipboard.maxEntries))
+    }
+
+    /// 历史条数默认值：条数越多，每次打开剪贴板与搜索要处理的行越多
+    static let defaultMaxEntries = 300
+
+    /// 历史条数硬上限（设置页的步进器上限，存储层同样夹到它）
+    static let maxEntriesCap = 1000
+
+    /// 把设置里存的值解析成实际上限：未设置 / 非正数用默认值，过大夹到硬上限
+    static func resolvedMaxEntries(configured: Int) -> Int {
+        configured > 0 ? min(configured, maxEntriesCap) : defaultMaxEntries
     }
 
     /// 图片总占用上限

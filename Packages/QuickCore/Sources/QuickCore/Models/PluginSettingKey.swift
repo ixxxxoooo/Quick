@@ -93,10 +93,8 @@ public enum PluginSettingKey {
         public static let interval = "sysmonitor.interval"
         public static let showMenuBarStats = "sysmonitor.showMenuBarStats"
         public static let defaultTab = "sysmonitor.defaultTab"
-        public static let displayModeCPU = "sysmonitor.displayModeCPU"
-        public static let displayModeMemory = "sysmonitor.displayModeMemory"
-        public static let displayModeDisk = "sysmonitor.displayModeDisk"
-        public static let displayModeBattery = "sysmonitor.displayModeBattery"
+        /// CPU / 内存 / 磁盘共用的「已用 / 空闲」口径（电池固定显示剩余电量）
+        public static let displayMode = "sysmonitor.displayMode"
     }
 
     /// 结束进程

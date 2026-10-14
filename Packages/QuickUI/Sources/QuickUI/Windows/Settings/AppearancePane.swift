@@ -127,28 +127,32 @@ struct AppearancePane: View {
     }
 
     /// 毛玻璃与透明度
+    ///
+    /// 收益小：默认值已经调好，拖动滑杆还会让整个面板连续重绘，所以收进「高级」折叠，步进也放大。
     private var transparencySection: some View {
         Section {
-            SettingsRow(
-                title: "面板背景浓度",
-                subtitle: "毛玻璃底层遮罩相对默认的增减：0% 是默认，负数更透，正数更实。",
-                icon: { SettingsRowIcon(systemImage: "slider.horizontal.below.rectangle") }
-            ) {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Slider(
-                        value: Binding(
-                            get: { Double(panelTransparency) },
-                            set: { panelTransparency = Int($0) }
-                        ),
-                        in: -50...50,
-                        step: 5
-                    )
-                    .frame(width: DesignTokens.Size.settingsControl)
+            DisclosureGroup("高级") {
+                SettingsRow(
+                    title: "面板背景浓度",
+                    subtitle: "毛玻璃底层遮罩相对默认的增减：0% 是默认，负数更透，正数更实。",
+                    icon: { SettingsRowIcon(systemImage: "slider.horizontal.below.rectangle") }
+                ) {
+                    HStack(spacing: DesignTokens.Spacing.sm) {
+                        Slider(
+                            value: Binding(
+                                get: { Double(panelTransparency) },
+                                set: { panelTransparency = Int($0) }
+                            ),
+                            in: -50...50,
+                            step: 10
+                        )
+                        .frame(width: DesignTokens.Size.settingsControl)
 
-                    Text("\(panelTransparency > 0 ? "+\(panelTransparency)" : "\(panelTransparency)")%")
-                        .font(DesignTokens.Typography.keyCap)
-                        .foregroundStyle(.secondary)
-                        .frame(width: DesignTokens.Size.settingsReadout, alignment: .trailing)
+                        Text("\(panelTransparency > 0 ? "+\(panelTransparency)" : "\(panelTransparency)")%")
+                            .font(DesignTokens.Typography.keyCap)
+                            .foregroundStyle(.secondary)
+                            .frame(width: DesignTokens.Size.settingsReadout, alignment: .trailing)
+                    }
                 }
             }
         } header: {

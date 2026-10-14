@@ -56,10 +56,6 @@ extension SettingsBridge {
         return items
     }
 
-    func appIcon(for path: String) -> NSImage? {
-        core.iconCache.icon(forBundlePath: path)
-    }
-
     func setAppAlias(_ alias: String?, for bundleID: String) {
         core.settingsStore.setAlias(alias, for: "app." + bundleID)
         core.cachedIndexedApps = nil

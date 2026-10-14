@@ -58,7 +58,7 @@ struct PluginsPane: View {
                             Toggle(isOn: binding(for: plugin.id)) {
                                 SettingsRow(
                                     title: plugin.name,
-                                    subtitle: "plugin.\(plugin.id)",
+                                    subtitle: plugin.description.isEmpty ? nil : plugin.description,
                                     icon: {
                                         let tab = SettingsTab.tab(forPluginID: plugin.id)
                                         SettingsRowIcon(

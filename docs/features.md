@@ -114,9 +114,9 @@
   在历史里只有一条，且 `id` 与时间戳是**后一次**的。这依赖 `text` 完全相等 ——
   不要把比较改成 `preview` 或前缀比较，那会把两段前缀相同的内容误判为重复。
   关掉这个开关时不发去重语句，两条都留下（顺序仍是新的在前）。
-- **历史上限 500 条，且裁剪时保留置顶与收藏。** 裁剪逻辑是
-  「所有 pinned/favorite + 未被标记的前 500 条」，所以**收藏条目不计入上限**，
-  理论上总数可以超过 500。这是刻意的：不能因为历史满了就把用户主动收藏的东西删掉。
+- **历史上限默认 300 条（设置里最多 1000），且裁剪时保留置顶与收藏。** 裁剪逻辑是
+  「所有 pinned/favorite + 未被标记的前 N 条」，所以**收藏条目不计入上限**，
+  理论上总数可以超过 N。这是刻意的：不能因为历史满了就把用户主动收藏的东西删掉。
 - **`clearHistory()` 保留收藏与置顶。** 它是「清空历史」不是「清空数据」，
   用户点它时不期望连收藏一起没。
 - **搜索是 `contains` 子串匹配 + 小写化，不是模糊匹配。** 空查询返回全部。
@@ -208,7 +208,7 @@
 
 | 上限 | 设置键 | 默认 | 豁免 |
 | --- | --- | --- | --- |
-| 条数 | `clipboard.maxEntries` | 500 | 置顶、收藏 |
+| 条数 | `clipboard.maxEntries` | 300（上限 1000） | 置顶、收藏 |
 | 图片总字节 | `clipboard.imageByteBudget` | 256 MB | 置顶、收藏 |
 
 条数上限以前硬编码在 store 里，设置页那个 Stepper 改了没有任何效果 —— 现在两边读同一个键。
@@ -409,10 +409,7 @@
 | --- | --- | --- |
 | `sysmonitor.interval` | 采样秒数（1/2/5/10） | 2 |
 | `sysmonitor.defaultTab` | 打开时选中的标签 | `system-info` |
-| `sysmonitor.displayModeCPU` | CPU 已用/空闲 | `used` |
-| `sysmonitor.displayModeMemory` | 内存已用/空闲 | `used` |
-| `sysmonitor.displayModeDisk` | 磁盘已用/空闲 | `free` |
-| `sysmonitor.displayModeBattery` | 电池已用/空闲 | `free` |
+| `sysmonitor.displayMode` | CPU / 内存 / 磁盘共用的已用/空闲口径（电池固定显示剩余电量） | `used` |
 | `sysmonitor.showMenuBarStats` | 菜单栏图标旁显示 CPU / 内存摘要 | false |
 
 #### 已知限制

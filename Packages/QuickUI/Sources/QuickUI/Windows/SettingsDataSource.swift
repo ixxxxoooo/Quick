@@ -266,7 +266,6 @@ public protocol LauncherSettingsDataSource: AnyObject {
     func setSearchScopes(_ scopes: [String])
     func restoreDefaultSearchScopes()
     var indexedApplications: [SettingsAppItem] { get }
-    func appIcon(for path: String) -> NSImage?
     func setAppAlias(_ alias: String?, for bundleID: String)
 
     var systemActions: [SettingsSystemActionItem] { get }

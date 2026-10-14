@@ -5,16 +5,16 @@
 import Foundation
 import QuickCore
 
-/// 系统监控偏好：默认标签与各模块的显示口径
+/// 系统监控偏好：默认标签与 CPU / 内存 / 磁盘的显示口径
 ///
 /// 纯映射，不碰 UI；非法存储值一律回落到与设置页默认项一致的安全值。
 enum SystemMonitorPreferences {
 
     static let defaultTab = SystemMonitorTab.systemInfo
-    static let defaultCPUMode = UsageDisplayMode.used
-    static let defaultMemoryMode = UsageDisplayMode.used
-    static let defaultDiskMode = UsageDisplayMode.free
-    static let defaultBatteryMode = UsageDisplayMode.free
+    /// CPU / 内存 / 磁盘共用的默认口径
+    static let defaultMode = UsageDisplayMode.used
+    /// 电池没有「已用」的直观含义，固定显示剩余电量
+    static let batteryMode = UsageDisplayMode.free
 
     static func tab(storedValue: String?) -> SystemMonitorTab {
         guard let storedValue, let tab = SystemMonitorTab(rawValue: storedValue) else {
@@ -34,31 +34,10 @@ enum SystemMonitorPreferences {
         tab(storedValue: defaults.string(forKey: PluginSettingKey.SystemMonitor.defaultTab))
     }
 
-    static func configuredCPUMode(defaults: UserDefaults = .standard) -> UsageDisplayMode {
+    static func configuredMode(defaults: UserDefaults = .standard) -> UsageDisplayMode {
         displayMode(
-            storedValue: defaults.string(forKey: PluginSettingKey.SystemMonitor.displayModeCPU),
-            fallback: defaultCPUMode
-        )
-    }
-
-    static func configuredMemoryMode(defaults: UserDefaults = .standard) -> UsageDisplayMode {
-        displayMode(
-            storedValue: defaults.string(forKey: PluginSettingKey.SystemMonitor.displayModeMemory),
-            fallback: defaultMemoryMode
-        )
-    }
-
-    static func configuredDiskMode(defaults: UserDefaults = .standard) -> UsageDisplayMode {
-        displayMode(
-            storedValue: defaults.string(forKey: PluginSettingKey.SystemMonitor.displayModeDisk),
-            fallback: defaultDiskMode
-        )
-    }
-
-    static func configuredBatteryMode(defaults: UserDefaults = .standard) -> UsageDisplayMode {
-        displayMode(
-            storedValue: defaults.string(forKey: PluginSettingKey.SystemMonitor.displayModeBattery),
-            fallback: defaultBatteryMode
+            storedValue: defaults.string(forKey: PluginSettingKey.SystemMonitor.displayMode),
+            fallback: defaultMode
         )
     }
 }

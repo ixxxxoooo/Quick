@@ -7,7 +7,7 @@ import QuickUI
 import SwiftUI
 
 struct ClipboardSettingsView: View {
-    @AppStorage(PluginSettingKey.Clipboard.maxEntries) private var maxEntries = 500
+    @AppStorage(PluginSettingKey.Clipboard.maxEntries) private var maxEntries = ClipboardStore.defaultMaxEntries
     /// 图片预算以 MB 为单位给用户选，存储层用的是字节
     @AppStorage(PluginSettingKey.Clipboard.imageByteBudget) private var imageBudgetBytes = 256 * 1024 * 1024
 
@@ -41,7 +41,7 @@ struct ClipboardSettingsView: View {
                 subtitle: "超过上限时自动淘汰最旧的条目。置顶与收藏的条目不受影响。",
                 icon: { SettingsRowIcon(systemImage: "tray.full") }
             ) {
-                Stepper("\(maxEntries) 条", value: $maxEntries, in: 100...5000, step: 100)
+                Stepper("\(maxEntries) 条", value: $maxEntries, in: 100...ClipboardStore.maxEntriesCap, step: 100)
                     .frame(width: DesignTokens.Size.settingsControl)
             }
 
