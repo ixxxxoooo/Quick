@@ -77,6 +77,18 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      # DMG 文件名与镜像内版本取自 Info.plist，而 Release 标题取自 tag：两者不一致就会
+      # 发出「标题 1.2.0、文件名 Quick-1.1.0.dmg」的版本。打 tag 前必须先改 Info.plist。
+      - name: Verify tag matches Info.plist version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          PLIST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Quick/Resources/Info.plist)"
+          if [ "$PLIST_VERSION" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::tag 版本 ${{ steps.version.outputs.version }} 与 Info.plist 的 CFBundleShortVersionString ($PLIST_VERSION) 不一致，请先改 Info.plist 再打 tag。"
+            exit 1
+          fi
+
       # 不要再单独 xcodebuild 一次：那样会绕开 build-dmg.sh 里的签名身份守门。
       - name: Build DMG
         run: bash Scripts/build-dmg.sh

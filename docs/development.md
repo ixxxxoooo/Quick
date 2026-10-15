@@ -275,11 +275,14 @@ bash Scripts/export-signing-cert.sh --upload
 # 本地验打包（可选）
 bash Scripts/build-dmg.sh          # 产出 dist/Quick-<version>.dmg
 
-# 打 tag 触发 .github/workflows/release.yml
-git tag v1.0.0
-git push origin v1.0.0
+# 先把 Quick/Resources/Info.plist 的 CFBundleShortVersionString 改成新版本并提交，
+# 再打同版本的 tag 触发 .github/workflows/release.yml
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
+- **tag 必须与 `CFBundleShortVersionString` 一致**：DMG 文件名与镜像内版本取自 Info.plist，
+  Release 标题取自 tag。`release.yml` 里有一步会在两者不一致时直接失败。
 - 打 tag 的正式发布**没有证书就失败**；手动 `workflow_dispatch` 才允许
   `QUICK_ALLOW_ADHOC=1` 验流程（产物不适合发给用户）。
 - **禁止**：重新跑 `generate-signing-cert.sh`、换 p12、改 Release 的 bundle id。
