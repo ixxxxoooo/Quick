@@ -37,8 +37,11 @@ struct AppDirectoryWatcherTests {
         let testFile = tempDir.appendingPathComponent("TestApp.app")
         try "dummy".write(to: testFile, atomically: true, encoding: .utf8)
 
-        // 等待防抖完成（0.1s + 容差）
-        try await Task.sleep(nanoseconds: 300_000_000)
+        // 轮询等待防抖回调：固定睡眠在全量测试并行、机器繁忙时会偶发超时，
+        // 轮询既不拖慢正常路径，也给了繁忙时足够的余量（上限 3 秒）。
+        for _ in 0..<60 where !expectation.isSet {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
 
         #expect(expectation.isSet)
     }

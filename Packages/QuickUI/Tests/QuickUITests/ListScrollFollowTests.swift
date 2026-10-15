@@ -43,4 +43,28 @@ struct ListScrollFollowTests {
         #expect(ListScrollFollow.anchor(for: 5, count: 0) == nil)
         #expect(ListScrollFollow.anchor(for: -1, count: 10) == nil)
     }
+
+    @Test("两端滚到内容端点，不是第一项 / 最后一项（否则内边距被滚掉，列表跳一下）")
+    func edgesTargetContentEndpoints() {
+        #expect(ListScrollFollow.target(for: 0, count: 10, itemID: "a") == .top)
+        #expect(ListScrollFollow.target(for: 9, count: 10, itemID: "z") == .bottom)
+    }
+
+    @Test("中间项交给 SwiftUI 做最小幅度滚动，带上自己的 ID")
+    func middleTargetsTheItem() {
+        #expect(ListScrollFollow.target(for: 4, count: 10, itemID: "m") == .item("m"))
+        #expect(ListScrollFollow.target(for: 4, count: 10, itemID: 42) == .item(42))
+    }
+
+    @Test("越界下标按中间项处理，不会误滚到端点")
+    func outOfRangeIsAnItem() {
+        #expect(ListScrollFollow.target(for: -1, count: 10, itemID: "x") == .item("x"))
+        #expect(ListScrollFollow.target(for: 5, count: 0, itemID: "x") == .item("x"))
+    }
+
+    @Test("顶端与底端标记的 ID 互不相同，也不会撞上常见的行 ID")
+    func markerIDsAreDistinct() {
+        #expect(ListScrollFollow.topID != ListScrollFollow.bottomID)
+        #expect(ListScrollFollow.topID.hasPrefix("quick.list."))
+    }
 }

@@ -461,8 +461,12 @@ final class DetachedPluginPanel: NSPanel {
 
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown {
-            // Escape 关闭
+            // Escape 关闭；插件正显示模态确认框时 Esc 只关框
             if Int(event.keyCode) == kVK_Escape {
+                if let search, search.wantsCancel {
+                    search.request(.cancel)
+                    return
+                }
                 onClose?()
                 return
             }

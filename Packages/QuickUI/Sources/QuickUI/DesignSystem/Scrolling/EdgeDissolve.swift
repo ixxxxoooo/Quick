@@ -19,6 +19,10 @@ import SwiftUI
 ///    所以这里用 `GeometryReader` + `ignoresSafeArea()` 撑满。
 struct EdgeDissolveMask: ViewModifier {
 
+    /// 顶部是否也渐隐。只有底栏、没有浮动 header 的页面（插件的列表页）传 `false`：
+    /// 顶部那一带是普通工具栏，不该被淡掉
+    var fadesTop = true
+
     /// 顶部渐隐带 = header 高度 + 上内边距 + 一段越过 header 的余量
     private var topFade: CGFloat {
         DesignTokens.Size.headerHeight + DesignTokens.Size.headerPadding
@@ -90,10 +94,16 @@ struct EdgeDissolveMask: ViewModifier {
 
         // 带外那两个全不透明的断点是必需的：少了它们，渐变会在两个低 alpha 之间
         // 跨越整片列表线性插值，把中间的每一行都冲淡。
-        return [
-            .init(color: .black.opacity(0), location: 0),
-            .init(color: .black.opacity(topAlpha), location: topFade / 2 / height),
-            .init(color: .black, location: topFade / height),
+        let top: [Gradient.Stop] =
+            fadesTop
+            ? [
+                .init(color: .black.opacity(0), location: 0),
+                .init(color: .black.opacity(topAlpha), location: topFade / 2 / height),
+                .init(color: .black, location: topFade / height)
+            ]
+            : [.init(color: .black, location: 0)]
+
+        return top + [
             .init(color: .black, location: 1 - bottomFade / height),
             .init(color: .black.opacity(bottomAlpha), location: 1 - bottomFade / 2 / height),
             .init(color: .black.opacity(0), location: 1)
@@ -105,5 +115,12 @@ extension View {
     /// 让滚动内容在浮动栏下方淡出，而不是被硬切
     func edgeDissolve() -> some View {
         modifier(EdgeDissolveMask())
+    }
+
+    /// 只在底栏一侧淡出：插件列表页的底部动作胶囊没有背景，列表从它下面穿过时靠这个避免文字叠在一起
+    ///
+    /// 必须直接挂在 `ScrollView` 上（遮罩靠滚动几何驱动）。
+    public func bottomEdgeDissolve() -> some View {
+        modifier(EdgeDissolveMask(fadesTop: false))
     }
 }

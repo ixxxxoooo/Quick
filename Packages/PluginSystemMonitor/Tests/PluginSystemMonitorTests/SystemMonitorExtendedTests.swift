@@ -25,6 +25,17 @@ struct SystemMonitorPreferencesTests {
         #expect(SystemMonitorPreferences.displayMode(storedValue: "nope", fallback: .used) == .used)
         #expect(SystemMonitorPreferences.displayMode(storedValue: nil, fallback: .free) == .free)
     }
+
+    @Test("CPU/内存/磁盘共用一个口径：未设置为已用，写入后跟随，电池固定显示剩余")
+    func unifiedUsageMode() throws {
+        let suite = try #require(UserDefaults(suiteName: "sysmon.unified.\(UUID().uuidString)"))
+        #expect(SystemMonitorPreferences.configuredMode(defaults: suite) == .used)
+        suite.set("free", forKey: PluginSettingKey.SystemMonitor.displayMode)
+        #expect(SystemMonitorPreferences.configuredMode(defaults: suite) == .free)
+        suite.set("garbage", forKey: PluginSettingKey.SystemMonitor.displayMode)
+        #expect(SystemMonitorPreferences.configuredMode(defaults: suite) == .used)
+        #expect(SystemMonitorPreferences.batteryMode == .free)
+    }
 }
 
 @Suite("占用率显示与压力色阶")

@@ -10,6 +10,44 @@ import Foundation
 /// 代价是在中间插入一行会让其后所有行都显示为「改过」，收益是实现足够小、结果稳定可断言。
 public enum TextDiffLogic {
 
+    /// 对比选项
+    ///
+    /// 只影响「两行算不算相同」，不改变展示出来的文本：被判相同的两行，展示的仍是各自原样。
+    public struct Options: Equatable, Sendable {
+        /// 忽略空白差异：行首尾空白被裁掉，行内连续空白视为一个空格
+        public var ignoreWhitespace: Bool
+        /// 忽略大小写
+        public var ignoreCase: Bool
+
+        public init(ignoreWhitespace: Bool = false, ignoreCase: Bool = false) {
+            self.ignoreWhitespace = ignoreWhitespace
+            self.ignoreCase = ignoreCase
+        }
+
+        public static let `default` = Options()
+
+        /// 把一行规整成「用来比较」的形式
+        func normalize(_ line: String) -> String {
+            var result = line
+            if ignoreWhitespace {
+                result = result.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            }
+            if ignoreCase {
+                result = result.lowercased()
+            }
+            return result
+        }
+
+        /// 两行在这组选项下是否算相同；`nil`（该侧没有这一行）只和 `nil` 相同
+        func areEqual(_ a: String?, _ b: String?) -> Bool {
+            switch (a, b) {
+            case (nil, nil): return true
+            case (let a?, let b?): return normalize(a) == normalize(b)
+            default: return false
+            }
+        }
+    }
+
     /// 差异结果的一行
     public struct DiffLine: Identifiable, Equatable, Sendable {
 
@@ -66,7 +104,9 @@ public enum TextDiffLogic {
     }
 
     /// 按行位置对齐，算出左右两侧各自的逐行状态
-    public static func sideLineStates(_ textA: String, against textB: String) -> SideLineStates {
+    public static func sideLineStates(
+        _ textA: String, against textB: String, options: Options = .default
+    ) -> SideLineStates {
         let linesA = textA.components(separatedBy: "\n")
         let linesB = textB.components(separatedBy: "\n")
         var left: [DiffLine.LineType] = []
@@ -76,7 +116,7 @@ public enum TextDiffLogic {
             let a = index < linesA.count ? linesA[index] : nil
             let b = index < linesB.count ? linesB[index] : nil
 
-            if a == b {
+            if options.areEqual(a, b) {
                 if a != nil { left.append(.same) }
                 if b != nil { right.append(.same) }
             } else {
@@ -92,8 +132,11 @@ public enum TextDiffLogic {
     /// - Parameters:
     ///   - textA: 原文
     ///   - textB: 修改后
+    ///   - options: 忽略空白 / 大小写等选项
     /// - Returns: 对齐后的差异行与增删计数
-    public static func diff(_ textA: String, against textB: String) -> DiffResult {
+    public static func diff(
+        _ textA: String, against textB: String, options: Options = .default
+    ) -> DiffResult {
         let linesA = textA.components(separatedBy: "\n")
         let linesB = textB.components(separatedBy: "\n")
         var lines: [DiffLine] = []
@@ -105,7 +148,7 @@ public enum TextDiffLogic {
             let a = index < linesA.count ? linesA[index] : nil
             let b = index < linesB.count ? linesB[index] : nil
 
-            if a == b {
+            if options.areEqual(a, b) {
                 lines.append(DiffLine(text: a ?? "", type: .same))
             } else {
                 // 同一行被改写时先记删除再记新增，展示顺序才和常规 diff 一致

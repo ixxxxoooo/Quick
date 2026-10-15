@@ -274,7 +274,7 @@ struct AIPluginTests {
 struct AIProviderCommandTests {
 
     /// 这个 suite 里其他 Provider 的启用状态是稳定的，deepseek 不是
-    private static var stableProviders: [AIProvider] {
+    private static var stableProviders: [PluginAI.AIProvider] {
         AIProviderRegistry.all.filter { $0.id != "deepseek" }
     }
 

@@ -43,6 +43,12 @@ public final class PalettePanel: NSPanel, NSWindowDelegate {
     /// 主搜索里左右键属于搜索框的光标移动，只有插件内搜索（标签切换）才需要拦截。
     var onTab: ((Int) -> Bool)?
 
+    /// Tab 键回调，返回 `true` 表示已消费（主搜索里用来进入 AI 对话）
+    var onTabKey: (() -> Bool)?
+
+    /// 导航键回调（翻页 / 跳首尾 / ⌘数字直达），返回 `true` 表示已消费
+    var onNavigate: ((PaletteKeyMap.Navigation) -> Bool)?
+
     /// 回车回调，返回 `true` 表示已消费
     var onSubmit: (() -> Bool)?
 
@@ -140,6 +146,18 @@ public final class PalettePanel: NSPanel, NSWindowDelegate {
             return
         }
 
+        // Tab：主搜索里进入 AI 对话
+        //
+        // 输入法组字中的 Tab 是「切换候选」，不能抢。
+        if event.type == .keyDown,
+            Int(event.keyCode) == kVK_Tab,
+            event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
+            (firstResponder as? NSTextView)?.hasMarkedText() != true,
+            onTabKey?() == true
+        {
+            return
+        }
+
         // 裸退格键（搜索框为空时）
         if event.type == .keyDown,
             Int(event.keyCode) == kVK_Delete,
@@ -159,6 +177,17 @@ public final class PalettePanel: NSPanel, NSWindowDelegate {
             event.modifierFlags.isDisjoint(with: [.command, .option]),
             let delta = Self.verticalDelta(for: event),
             onMove?(delta) == true
+        {
+            return
+        }
+
+        // 翻页 / 跳首尾 / ⌘数字直达（与上下键同理必须在这一层拦）
+        if event.type == .keyDown,
+            let navigation = PaletteKeyMap.navigation(
+                keyCode: Int(event.keyCode),
+                modifiers: event.modifierFlags,
+                characters: event.charactersIgnoringModifiers),
+            onNavigate?(navigation) == true
         {
             return
         }

@@ -406,10 +406,19 @@ struct ClipboardLimitTests {
         UserDefaults.standard.removeObject(forKey: PluginSettingKey.Clipboard.maxEntries)
         let store = try ClipboardStore(
             storage: PluginStorage(pluginID: ClipboardPlugin.id, database: makeDatabase()))
-        for index in 0..<505 {
+        for index in 0..<(ClipboardStore.defaultMaxEntries + 5) {
             store.add(ClipboardEntry(text: "条目 \(index)"))
         }
-        #expect(store.entries.count == 500)
+        #expect(store.entries.count == ClipboardStore.defaultMaxEntries)
+    }
+
+    @Test("上限解析：未设置用默认 300，过大夹到 1000，合法值原样")
+    func resolvedMaxEntries() {
+        #expect(ClipboardStore.defaultMaxEntries == 300)
+        #expect(ClipboardStore.resolvedMaxEntries(configured: 0) == 300)
+        #expect(ClipboardStore.resolvedMaxEntries(configured: -5) == 300)
+        #expect(ClipboardStore.resolvedMaxEntries(configured: 700) == 700)
+        #expect(ClipboardStore.resolvedMaxEntries(configured: 5000) == ClipboardStore.maxEntriesCap)
     }
 }
 

@@ -144,3 +144,80 @@ struct HashCalculatorPluginTests {
         #expect(await plugin.dynamicSearch(query: "天气").isEmpty)
     }
 }
+
+@Suite("哈希耗时回归")
+struct HashPerformanceTests {
+
+    @Test("5 MB 文本的全部摘要在 3 秒内算完")
+    func largeInputDigestsAreFast() {
+        let big = String(repeating: "The quick brown fox jumps over the lazy dog. ", count: 120_000)
+        #expect(big.utf8.count > 5_000_000)
+        let start = ContinuousClock.now
+        let results = HashCalculatorLogic.digests(of: big)
+        let elapsed = ContinuousClock.now - start
+        #expect(!results.isEmpty)
+        #expect(elapsed < .seconds(3), "耗时 \(elapsed)")
+    }
+}
+
+@Suite("HMAC")
+struct HashHMACTests {
+
+    /// Wikipedia 上公开的标准向量：key = "key"，message = "The quick brown fox jumps over the lazy dog"
+    private let message = "The quick brown fox jumps over the lazy dog"
+
+    @Test("四种算法的 HMAC 与公开标准向量一致")
+    func matchesKnownVectors() {
+        let expected: [HashCalculatorLogic.Algorithm: String] = [
+            .md5: "80070713463e7749b90c2dc24911e275",
+            .sha1: "de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9",
+            .sha256: "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+            .sha512: "b42af09057bac1e2d41708e48a902e09b5ff7f12ab428a4fe86653c73dd248fb"
+                + "82f948a549f7b791a5b41915ee4d1ec3935357e4e2317250d0372afa2ebeeb3a"
+        ]
+        for (algorithm, value) in expected {
+            #expect(HashCalculatorLogic.hmac(message, key: "key", algorithm: algorithm) == value)
+        }
+    }
+
+    @Test("密钥为空走普通摘要，非空走 HMAC，且列表顺序不变")
+    func emptyKeyFallsBackToPlainDigest() {
+        let plain = HashCalculatorLogic.digests(of: message)
+        let keyed = HashCalculatorLogic.digests(of: message, hmacKey: "key")
+        #expect(HashCalculatorLogic.digests(of: message, hmacKey: "").map(\.value) == plain.map(\.value))
+        #expect(keyed.map(\.algorithm) == plain.map(\.algorithm))
+        #expect(keyed.map(\.value) != plain.map(\.value))
+    }
+
+    @Test("输入为空时即使有密钥也返回空列表")
+    func emptyInputStaysEmpty() {
+        #expect(HashCalculatorLogic.digests(of: "", hmacKey: "key").isEmpty)
+    }
+}
+
+@Suite("Hash 展示与自动复制")
+struct HashDisplayTests {
+
+    @Test("大写设置只改展示，不改计算结果")
+    func uppercaseIsDisplayOnly() {
+        let value = HashCalculatorLogic.digest("abc", algorithm: .md5)
+        #expect(value == "900150983cd24fb0d6963f7d28e17f72")
+        #expect(HashCalculatorLogic.display(value, uppercase: true) == "900150983CD24FB0D6963F7D28E17F72")
+        #expect(HashCalculatorLogic.display(value, uppercase: false) == value)
+    }
+
+    @Test("自动复制取 SHA256，并遵循大小写设置")
+    func autoCopyPicksSHA256() {
+        let results = HashCalculatorLogic.digests(of: "abc")
+        let plain = HashCalculatorLogic.autoCopyValue(in: results, uppercase: false)
+        #expect(plain == HashCalculatorLogic.digest("abc", algorithm: .sha256))
+        #expect(
+            HashCalculatorLogic.autoCopyValue(in: results, uppercase: true)
+                == plain?.uppercased())
+    }
+
+    @Test("没有结果时没有可复制的内容")
+    func autoCopyIsNilWithoutResults() {
+        #expect(HashCalculatorLogic.autoCopyValue(in: [], uppercase: false) == nil)
+    }
+}

@@ -54,20 +54,19 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 
 | 包 | 测试文件 | 状态 |
 | --- | --- | --- |
-| `QuickCore` | `EventBus`、模糊匹配与拼音匹配、SQLite 封装、`PluginStorage`、设置键、最近使用 | 有覆盖 |
-| `QuickUI` | 面板显隐与模式、分离窗口控制器、悬浮胶囊几何与位置持久化、面板自动行为与设置读取、首屏按最近使用重排 | 有覆盖 |
-| `QuickPlatform` | 热键注册、应用扫描与条目的匹配形态、键盘布局服务 | 有覆盖 |
+| `QuickCore` | `EventBus`、模糊匹配与拼音匹配、SQLite 封装、`PluginStorage`、设置键、最近使用；AI 服务商与预设、默认模型回落、Key 隔离；会话分组 / 淘汰 / 上下文裁剪 / 中断恢复 | 有覆盖 |
+| `QuickUI` | 面板显隐与模式、分离窗口控制器、悬浮胶囊几何与位置持久化、面板自动行为与设置读取、首屏按最近使用重排；AI 对话控制器状态机（发送 / 失败 / 重新生成 / 删除撤销 / 重命名 / 置顶 / 草稿 / 落盘往返）、Markdown 块解析、对话键位 | 有覆盖 |
+| `QuickPlatform` | 热键注册、应用扫描与条目的匹配形态、键盘布局服务；AI 请求构造与 SSE 解析、模型列表解析、会话文件存储 | 有覆盖 |
 | `PluginLauncher` | 使用频率与收藏的持久化往返 | 有覆盖 |
 | `PluginClipboard` | 去重/排序/剪枝、条数与图片预算、坏行降级 | 有覆盖 |
-| `PluginNotes` · `PluginSnippets` | 表读写往返、排序 | 有覆盖 |
 | `PluginSystemMonitor` | 时长/字节/`ps` 解析、内存/磁盘/电源/CPU tick、温度聚合、偏好映射 | 有覆盖 |
 | `PluginKillProcess` | `ps` 解析与过滤、偏好回落、触发词入口 | 有覆盖 |
-| `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式 | 有覆盖 |
+| `PluginScreenshot` | `screencapture` 参数、文件名与时间戳格式、工具栏摆放（上 / 下 / 内部 / 夹边）、标注默认值一致性 | 有覆盖 |
 | `PluginTranslator` | 词典方向、触发词前缀、语言判定 | 有覆盖 |
-| `PluginOCR` · `PluginFileSearch` | 触发词匹配、文本拼接、查询前缀解析、图标映射 | 有覆盖 |
-| `PluginCalendar` | 时间区间格式、排序、农历文本 | 有覆盖 |
+| `PluginSQLFormatter` / `PluginHashCalculator` / `PluginTimestampConverter` | 设置真正生效：关键字大小写与缩进、大写与自动复制取值、默认单位与时区、未知设置值回落默认 | 有覆盖 |
+| `PluginCalendar` | 时间区间格式、排序、会议链接识别；月历 / 年历网格；农历 / 干支 / 节气 / 节日；传统黄历；法定休班标记；日历源过滤 | 有覆盖 |
 | `PluginAI` | Provider 注册表完整性、搜索排序与触发闸门 | 有覆盖 |
-| 11 个开发者工具 | 各自的纯逻辑（编解码、格式化、diff、字数统计…） | 有覆盖 |
+| 8 个开发者工具 | 各自的纯逻辑（编解码、格式化、diff、字数统计…） | 有覆盖 |
 | 其余插件 | 插件契约 + 从服务里抽出来的纯逻辑 | 有覆盖 |
 
 **28 个包全部有测试目标，由 `Scripts/run-tests.sh` 强制**：少一个包就红。
@@ -80,11 +79,11 @@ Packages/<Package>/Tests/<Package>Tests/<Something>Tests.swift
 
 ### 系统依赖的部分怎么测
 
-EventKit、Vision、Spotlight、CoreLocation、Accessibility、`screencapture` 这类东西在测试里
+EventKit、Vision、Spotlight、Accessibility、`screencapture` 这类东西在测试里
 要么要授权、要么很慢、要么直接挂。规矩是：**把系统调用挤到边缘，把纯计算剥出来测**。
 
 - 窗口布局的坐标计算、`ps` 输出的解析、`resolv.conf` 的解析、`screencapture` 的参数拼装、
-  天气授权状态的映射 —— 这些都是这样从系统调用里剥出来的，
+  截图工具栏的摆放 —— 这些都是这样从系统调用里剥出来的，
   落在 `Sources/<Pkg>/Model/`（Foundation-only，可脱离 App 独立编译）。
 - 真正的系统调用不测；测的是**我们对返回值的处理**。
 - 剥不出来（例如「向 EventKit 取事件」这一步本身）就明确写进报告，
@@ -109,6 +108,17 @@ EventKit、Vision、Spotlight、CoreLocation、Accessibility、`screencapture` �
   `SearchableItem.id` 在同一插件内不重复。
 - **触发词唯一性由 `Scripts/check-trigger-words.py` 统一守**（已接入 `run-tests.sh`），
   插件测试里不必重复实现跨插件扫描。
+- **插件声明与注册表一致性由 `Scripts/check-plugin-references.py` 守**（同样接入 `run-tests.sh`）：
+  `Packages/Plugin*`、`project.yml`、`AppCore.registerPlugins`、超级面板工作台目录
+  （`SuperPanelQuickTool.swift`）与上下文动作里的 `navigate("…")` 目标必须互相对得上。
+  下线一个插件时，字符串引用最容易漏，这条检查把它变成提交门禁。
+- **视图里的裸设计字面量由 `Scripts/check-ui-literals.py` 守**（同样接入 `run-tests.sh`）：
+  `.padding(8)`、`.frame(width: 120)`、`cornerRadius: 6`、`.opacity(0.12)`、`.font(.system(size: 14))` 这类
+  一律改用 `DesignTokens`。值为 0 的不算；确有理由的行尾写 `// ui-literal-ok: 理由`。
+  `Model/` 目录与 `DesignTokens.swift` 本身不扫。
+- **死设置键由 `Scripts/check-setting-keys.py` 守**（同样接入 `run-tests.sh`）：`PluginSettingKey` /
+  `SettingsKey` 里每个键，除设置页（路径含 `/Settings/`）之外必须至少有一处引用。
+  键只被设置页写、没有人读，开关就是死的（docs/ui.md §11）。
 
 **不测（除非另有理由）**
 - SwiftUI 视图的像素级外观 —— 那靠人工验收与 `docs/ui.md` 的规范约束。

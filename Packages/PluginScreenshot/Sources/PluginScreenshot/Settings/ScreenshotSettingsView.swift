@@ -27,7 +27,8 @@ struct ScreenshotSettingsView: View {
             Toggle(isOn: $saveToDesktop) {
                 SettingsRow(
                     title: "保存到桌面",
-                    subtitle: "截图自动保存到桌面，否则仅复制到剪贴板。"
+                    subtitle: "截图自动保存到桌面，否则仅复制到剪贴板。",
+                    icon: { SettingsRowIcon(systemImage: "menubar.dock.rectangle") }
                 )
             }
         } header: {

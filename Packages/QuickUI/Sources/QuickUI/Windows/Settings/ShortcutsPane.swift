@@ -278,16 +278,16 @@ struct FuzzyKeywordField: View {
                 showSuggestions = false
                 onSubmit(value)
             })
-            .frame(height: 24)
+            .frame(height: DesignTokens.Size.settingsGlyphColumn)
             .padding(.horizontal, DesignTokens.Spacing.sm)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(shape.fill(DesignTokens.Colors.cardFill))
             .overlay(
                 shape.strokeBorder(
-                    isEditing ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: 1)
+                    isEditing ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairline)
             )
             .clipShape(shape)
-            .animation(.easeOut(duration: DesignTokens.Duration.hover), value: isEditing)
+            .animation(Motion.animation(.easeOut(duration: DesignTokens.Duration.hover)), value: isEditing)
             .onChange(of: text) { _, newValue in
                 if !isEditing { draft = newValue }
             }
@@ -324,7 +324,7 @@ struct FuzzyKeywordField: View {
                         Image(systemName: suggestion.icon)
                             .font(DesignTokens.Typography.inlineIcon)
                             .foregroundStyle(DesignTokens.Colors.textTertiary)
-                            .frame(width: 18)
+                            .frame(width: DesignTokens.Size.settingsRowGlyph)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(suggestion.title)
                                 .font(DesignTokens.Typography.rowTitle)
@@ -353,11 +353,11 @@ struct FuzzyKeywordField: View {
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
                 .fill(DesignTokens.Colors.cardFill)
-                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                .shadow(color: .black.opacity(DesignTokens.Opacity.popoverShadow), radius: DesignTokens.Size.popoverShadowRadius, y: DesignTokens.Size.popoverShadowOffsetY)
         )
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: 0.5)
+                .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairlineThin)
         )
         .padding(.top, DesignTokens.Spacing.xxs)
     }

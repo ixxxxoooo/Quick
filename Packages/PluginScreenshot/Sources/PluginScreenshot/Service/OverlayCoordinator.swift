@@ -20,12 +20,19 @@ final class OverlayCoordinator {
 
     var isPresenting: Bool { !controllers.isEmpty }
 
+    /// 正在冻结屏幕的途中（`begin` 里有多处 `await`，期间 `isPresenting` 仍为 false）
+    ///
+    /// 连按两次快捷键时，第二次会在第一次还没出遮罩时进来；没有这个标志就会为每块屏叠出两层遮罩、
+    /// 各持一份整屏位图，内存翻倍且 Esc 只能关掉一层。
+    private var beginGate = ReentryGate()
+
     /// 开始一次截图
     /// - Parameters:
     ///   - windowMode: 是否为「窗口截图」（悬停高亮、点击选窗）
     ///   - preselectFullScreen: 是否一上来就把整块屏框好（全屏截图入口）
     func begin(windowMode: Bool, preselectFullScreen: Bool = false) async {
-        guard !isPresenting else { return }
+        guard !isPresenting, beginGate.tryEnter() else { return }
+        defer { beginGate.leave() }
         EventBus.shared.post(HidePaletteEvent(restoreFocus: false))
         try? await Task.sleep(for: .milliseconds(180))
 

@@ -64,6 +64,9 @@ struct JSONTreeView: View {
                 moveHorizontally(delta)
             case .submit:
                 activateSelection()
+            case .cancel:
+                // 只有声明了 `wantsCancel` 的视图才会收到；这里没有模态层，忽略即可
+                break
             }
         }
     }

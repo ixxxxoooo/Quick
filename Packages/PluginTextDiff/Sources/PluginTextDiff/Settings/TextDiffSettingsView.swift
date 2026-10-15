@@ -24,7 +24,7 @@ struct TextDiffSettingsView: View {
             Toggle(isOn: $ignoreWhitespace) {
                 SettingsRow(
                     title: "忽略空白字符差异",
-                    subtitle: "比对文本时忽略行首行尾空格与换行符的变动。",
+                    subtitle: "忽略行首行尾空白，行内连续空白视为一个；工具栏上的开关与此同步。",
                     icon: { SettingsRowIcon(systemImage: "space") }
                 )
             }

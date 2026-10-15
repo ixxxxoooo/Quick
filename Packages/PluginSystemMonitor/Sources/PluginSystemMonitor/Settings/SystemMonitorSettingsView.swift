@@ -9,10 +9,7 @@ import SwiftUI
 struct SystemMonitorSettingsView: View {
     @AppStorage(PluginSettingKey.SystemMonitor.interval) private var interval = 2
     @AppStorage(PluginSettingKey.SystemMonitor.defaultTab) private var defaultTab = "system-info"
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeCPU) private var cpuMode = "used"
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeMemory) private var memoryMode = "used"
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeDisk) private var diskMode = "free"
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeBattery) private var batteryMode = "free"
+    @AppStorage(PluginSettingKey.SystemMonitor.displayMode) private var usageMode = "used"
     @AppStorage(PluginSettingKey.SystemMonitor.showMenuBarStats) private var showMenuBar = false
 
     var body: some View {
@@ -33,44 +30,14 @@ struct SystemMonitorSettingsView: View {
                 )
             }
 
-            Picker(selection: $cpuMode) {
+            Picker(selection: $usageMode) {
                 Text("显示已用").tag("used")
                 Text("显示空闲").tag("free")
             } label: {
                 SettingsRow(
-                    title: "CPU 显示模式",
-                    subtitle: "侧栏与详情里的 CPU 百分比按已用或空闲展示。",
-                    icon: { SettingsRowIcon(systemImage: "cpu") }
-                )
-            }
-
-            Picker(selection: $memoryMode) {
-                Text("显示已用").tag("used")
-                Text("显示空闲").tag("free")
-            } label: {
-                SettingsRow(
-                    title: "内存显示模式",
-                    subtitle: "侧栏与详情里的内存百分比按已用或空闲展示。"
-                )
-            }
-
-            Picker(selection: $diskMode) {
-                Text("显示已用").tag("used")
-                Text("显示空闲").tag("free")
-            } label: {
-                SettingsRow(
-                    title: "磁盘显示模式",
-                    subtitle: "侧栏与详情里的磁盘百分比按已用或空闲展示。"
-                )
-            }
-
-            Picker(selection: $batteryMode) {
-                Text("显示已用").tag("used")
-                Text("显示空闲").tag("free")
-            } label: {
-                SettingsRow(
-                    title: "电池显示模式",
-                    subtitle: "有内置电池时，按剩余或已用展示电量。"
+                    title: "用量显示方式",
+                    subtitle: "CPU、内存、磁盘的百分比按已用或空闲展示；电池始终显示剩余电量。",
+                    icon: { SettingsRowIcon(systemImage: "gauge.with.dots.needle.50percent") }
                 )
             }
 
@@ -90,14 +57,12 @@ struct SystemMonitorSettingsView: View {
             Toggle(isOn: $showMenuBar) {
                 SettingsRow(
                     title: "菜单栏显示 CPU/内存",
-                    subtitle: "在菜单栏图标旁实时展示系统负载。"
+                    subtitle: "在菜单栏图标旁实时展示 CPU 与内存占用，至少每 2 秒刷新一次；需要开着「显示菜单栏图标」。",
+                    icon: { SettingsRowIcon(systemImage: "menubar.rectangle") }
                 )
             }
-            .disabled(true)
         } header: {
             Text("配置")
-        } footer: {
-            PendingFeatureNote(detail: "「菜单栏显示 CPU/内存」还没有实现：面板内采样已就绪，菜单栏文案尚未接线。")
         }
     }
 }

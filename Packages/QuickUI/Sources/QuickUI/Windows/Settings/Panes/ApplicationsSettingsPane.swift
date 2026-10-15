@@ -4,6 +4,7 @@
 
 import AppKit
 import QuickCore
+import QuickPlatform
 import SwiftUI
 
 /// 应用程序设置面板
@@ -70,9 +71,10 @@ struct ApplicationsSettingsPane: View {
                                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("清空搜索")
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, DesignTokens.Spacing.xs)
 
                 if apps.isEmpty {
                     Text(query.isEmpty ? "暂无已索引的应用程序。" : "没有匹配「\(query)」的应用。")
@@ -89,16 +91,14 @@ struct ApplicationsSettingsPane: View {
                             showAll = true
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
                     }
                 }
             } header: {
                 Text("应用程序（\(totalCount) 个）")
             } footer: {
-                Text("别名用来在主面板里搜到这个应用。快捷键到「快捷键」页添加。")
+                Text("别名用来在主面板里搜到这个应用。快捷键到「快捷键」页添加，终端命令在「终端命令」页管理。")
             }
-
-            CommandsSettingsPane(dataSource: dataSource, embedded: true)
         }
         .formStyle(.grouped)
         .onAppear {
@@ -146,10 +146,10 @@ private struct AppItemRow: View {
                         .foregroundStyle(DesignTokens.Colors.textSecondary)
                 }
             }
-            .frame(width: 20, height: 20)
+            .frame(width: DesignTokens.Size.settingsRowIcon, height: DesignTokens.Size.settingsRowIcon)
 
             // 应用名与类型
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 Text(app.name)
                     .lineLimit(1)
                 Text(app.isSystemApp ? "系统应用" : "应用程序")
@@ -161,7 +161,7 @@ private struct AppItemRow: View {
 
             // 别名输入框（Tinycast 风格）
             AliasField(
-                placeholder: "Add Alias",
+                placeholder: "添加别名",
                 text: $alias,
                 onChange: { newValue in
                     dataSource.setAppAlias(newValue, for: app.bundleID)
@@ -169,11 +169,11 @@ private struct AppItemRow: View {
             )
 
         }
-        .padding(.vertical, 2)
-        .onAppear {
-            if iconImage == nil {
-                iconImage = dataSource.appIcon(for: app.path)
-            }
+        .padding(.vertical, DesignTokens.Spacing.xxs)
+        // 应用列表有几百行：图标在后台读盘并进 `IconCache`，不在滚动时卡主线程
+        .task(id: app.path) {
+            guard iconImage == nil else { return }
+            iconImage = await IconCache.shared.loadIcon(forBundlePath: app.path)
         }
     }
 }

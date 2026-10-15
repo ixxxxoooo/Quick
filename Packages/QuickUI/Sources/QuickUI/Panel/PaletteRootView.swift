@@ -37,6 +37,9 @@ struct PaletteRootView: View {
     /// 焦点在搜索框里，SwiftUI 这一层收不到方向键。
     var selection: PaletteSelection
 
+    /// ⌘K 操作菜单状态（由协调器提供，键盘路由在 AppKit 层）
+    var actionMenu: ActionMenuState
+
     /// 搜索框文本（协调器与视图共用的唯一状态）
     ///
     /// 用桥接对象而不是 `@State`：协调器需要在面板外面改写它（自动粘贴、自动清空、
@@ -58,7 +61,9 @@ struct PaletteRootView: View {
     ///
     /// 返回 `PaletteSearchOutcome` 而不是裸数组：结果里带着「哪些插件超时了」，
     /// 面板才能把「没搜完」与「没找到」区分开告诉用户。
-    var searchHandler: (String) async -> PaletteSearchOutcome
+    ///
+    /// 第二个参数是增量回调：慢来源还没回来时，先把已有的结果交给列表。
+    var searchHandler: (String, @escaping @MainActor (PaletteSearchOutcome) -> Void) async -> PaletteSearchOutcome
 
     /// 获取插件视图（由协调器注入）
     ///
@@ -130,6 +135,9 @@ struct PaletteRootView: View {
             // json-formatter/sql-formatter，导致快捷键切换逻辑失效。
             guard !paletteMode.isPluginMode else { return }
 
+            // 结果马上要换一批，菜单里指向的结果会失效
+            actionMenu.close()
+
             // 粘贴检测：一次性增量超过阈值时检测内容类型
             let delta = newValue.count - oldValue.count
             if delta >= PasteContentDetector.pasteThreshold {
@@ -166,6 +174,14 @@ struct PaletteRootView: View {
         searchResultsArea
             .safeAreaInset(edge: .top, spacing: 0) { searchHeader }
             .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+            .overlay(alignment: .bottomTrailing) {
+                if actionMenu.isOpen {
+                    ActionMenuView(menu: actionMenu)
+                        .padding(.trailing, DesignTokens.Spacing.md)
+                        .padding(.bottom, DesignTokens.Size.bottomBarHeight)
+                        .transition(.opacity)
+                }
+            }
     }
 
     /// 搜索栏
@@ -243,7 +259,9 @@ struct PaletteRootView: View {
                     items: results,
                     selectedIndex: selectionBinding,
                     selection: selection,
-                    showsIcons: showResultIcons
+                    showsIcons: showResultIcons,
+                    query: paletteQuery.text,
+                    showsQuickNumbers: true
                 )
                 if timedOutPluginCount > 0 {
                     timedOutNotice
@@ -279,10 +297,20 @@ struct PaletteRootView: View {
     /// 底栏
     private var bottomBar: some View {
         HStack(spacing: 0) {
+            if !results.isEmpty {
+                // 总数放左侧：让人知道列表滚下去还有多少，而不是只看到当前一屏
+                Text("\(results.count) 个结果")
+                    .font(DesignTokens.Typography.bar)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .padding(.leading, DesignTokens.Spacing.md)
+                    .accessibilityLabel("共 \(results.count) 个结果")
+            }
+
             Spacer(minLength: DesignTokens.Spacing.md)
 
             if showBottomBarHints && !results.isEmpty {
                 primaryActionPill
+                actionsPill
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
@@ -290,17 +318,34 @@ struct PaletteRootView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// 主操作胶囊
+    /// 主操作胶囊：点击等同于按 ↵，执行当前选中项
     private var primaryActionPill: some View {
-        HStack(spacing: DesignTokens.Spacing.xs) {
-            Text("打开")
-                .font(DesignTokens.Typography.bar)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-            KeyCapChip(text: "↵", style: .outline, scale: .compact)
+        ActionPillButton(title: "打开", keyCap: "↵") {
+            selection.activate?(selection.index)
         }
-        .padding(.horizontal, DesignTokens.Spacing.md)
-        .frame(height: DesignTokens.Size.barButtonHeight)
-        .frosted(in: Capsule())
+    }
+
+    /// 「操作」胶囊：提示 ⌘K 可以打开更多操作，也可以直接点
+    private var actionsPill: some View {
+        ActionPillButton(title: "操作", keyCap: "⌘K") {
+            if actionMenu.isOpen {
+                actionMenu.close()
+            } else {
+                openActionMenuFromPill()
+            }
+        }
+        .padding(.leading, DesignTokens.Spacing.sm)
+        .accessibilityLabel("打开操作菜单")
+    }
+
+    /// 从胶囊点开菜单：与 ⌘K 同一条路径（选中项 + 执行回调）
+    private func openActionMenuFromPill() {
+        guard let item = selection.selectedItem else { return }
+        let index = selection.index
+        actionMenu.open(
+            actions: ResultActionCatalog.makeActions(for: item) {
+                selection.activate?(index)
+            })
     }
 
     // MARK: - 插件模式
@@ -313,6 +358,7 @@ struct PaletteRootView: View {
                 pluginIcon: paletteMode.activePluginIcon ?? "questionmark",
                 search: paletteMode.activePluginSupportsSearch ? pluginSearch : nil,
                 onBack: onReturnToSearch,
+                showsDetach: paletteMode.activePluginSupportsDetach,
                 onDetach: {
                     guard let pluginID = paletteMode.activePluginID else { return }
                     EventBus.shared.post(DetachPanelEvent(pluginID: pluginID))
@@ -335,6 +381,9 @@ struct PaletteRootView: View {
                 )
             }
         }
+        // 面板是浮窗，打开插件时系统会把初始焦点给到第一个可聚焦控件
+        // （常是某个工具栏按钮），随即顶着一圈焦点环。焦点本身保留，只不画环。
+        .focusEffectDisabled()
     }
 
     // MARK: - 空状态
@@ -372,19 +421,37 @@ struct PaletteRootView: View {
                 guard !Task.isCancelled else { return }
                 isSearching = true
             }
-            let outcome = await searchHandler(text)
+            let outcome = await searchHandler(text) { partial in
+                // 增量：保住用户已经移动过的选中项，别让后到的慢来源把光标拽回第一行
+                apply(partial, keepingSelection: true)
+            }
             showSpinner.cancel()
             guard !Task.isCancelled else { return }
 
-            results = outcome.items
-            timedOutPluginCount = outcome.timedOutPluginIDs.count
+            apply(outcome, keepingSelection: false)
             isSearching = false
-            selection.update(count: outcome.items.count) { index in
-                guard outcome.items.indices.contains(index) else { return }
-                // 记在动作之前：动作可能切走插件、甚至关掉面板
-                onItemActivated?(outcome.items[index].id)
-                outcome.items[index].action()
-            }
+        }
+    }
+
+    /// 把一批结果写进列表与选择状态
+    ///
+    /// - Parameter keepingSelection: 增量更新时为真：用户已经往下选过，就按 id 找回原来那一项。
+    private func apply(_ outcome: PaletteSearchOutcome, keepingSelection: Bool) {
+        let previousID: String? =
+            keepingSelection && selection.index > 0 && results.indices.contains(selection.index)
+            ? results[selection.index].id : nil
+
+        results = outcome.items
+        selection.items = outcome.items
+        timedOutPluginCount = outcome.timedOutPluginIDs.count
+        selection.update(count: outcome.items.count) { index in
+            guard outcome.items.indices.contains(index) else { return }
+            // 记在动作之前：动作可能切走插件、甚至关掉面板
+            onItemActivated?(outcome.items[index].id)
+            outcome.items[index].action()
+        }
+        if let previousID, let restored = outcome.items.firstIndex(where: { $0.id == previousID }) {
+            selection.index = restored
         }
     }
 }

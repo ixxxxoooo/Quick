@@ -26,8 +26,9 @@ struct SQLFormatterView: View {
     }
 
     /// 与设置页共用的持久化偏好
-    @AppStorage(PluginSettingKey.SQLFormatter.indent) private var indent = 2
-    @AppStorage(PluginSettingKey.SQLFormatter.keywordCase) private var keywordCaseRaw = "uppercase"
+    @AppStorage(PluginSettingKey.SQLFormatter.indent) private var indent = SQLFormatterDefaults.indent
+    @AppStorage(PluginSettingKey.SQLFormatter.keywordCase)
+    private var keywordCaseRaw = SQLFormatterDefaults.keywordCase.rawValue
     @AppStorage(PluginSettingKey.SQLFormatter.wrapLines) private var wrapLines = true
 
     @State private var statementCount = 0
@@ -37,15 +38,15 @@ struct SQLFormatterView: View {
     /// 粘贴检测或超级面板跳转时携带的初始文本
     @Environment(\.pluginContext) private var pluginContext
 
-    private var resolvedKeywordCase: SQLFormatterLogic.KeywordCase {
-        SQLFormatterLogic.KeywordCase(rawOrDefault: keywordCaseRaw)
+    private var resolvedKeywordCase: SQLKeywordCase {
+        SQLKeywordCase(setting: keywordCaseRaw)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             toolbar
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             CodeEditorView(
                 text: $buffer.text,
@@ -60,7 +61,7 @@ struct SQLFormatterView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             statusBar
         }
@@ -149,8 +150,9 @@ struct SQLFormatterView: View {
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
 
             Picker("", selection: $indent) {
-                Text("2 空格").tag(2)
-                Text("4 空格").tag(4)
+                ForEach(SQLFormatterDefaults.indentChoices, id: \.self) { width in
+                    Text("\(width) 空格").tag(width)
+                }
             }
             .labelsHidden()
             .pickerStyle(.segmented)
@@ -219,6 +221,7 @@ struct SQLFormatterView: View {
         lineCount = SQLFormatterLogic.lineCount(in: text)
     }
 
+    /// 格式化 + 统计语句数；大输入后台算（点「格式化」与边打边排共用这一条路径）
     private func formatSQL() {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         text = SQLFormatterLogic.format(

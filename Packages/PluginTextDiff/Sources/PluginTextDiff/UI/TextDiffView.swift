@@ -30,9 +30,16 @@ struct TextDiffView: View {
     @State private var diffResult: [TextDiffLogic.DiffLine] = []
     @State private var addedCount = 0
     @State private var removedCount = 0
+    /// 左右两栏的逐行底色：随文本与选项变化时算一次，不在 `body` 里每次重算
+    @State private var leftStates: [CodeEditorView.LineState] = []
+    @State private var rightStates: [CodeEditorView.LineState] = []
 
     /// 是否开启自动换行（与插件设置同步）
     @AppStorage(PluginSettingKey.TextDiff.wrapLines) private var wrapLines = false
+
+    /// 忽略空白 / 大小写（与设置页同一个键，两处改动互相同步）
+    @AppStorage(PluginSettingKey.TextDiff.ignoreWhitespace) private var ignoreWhitespace = false
+    @AppStorage(PluginSettingKey.TextDiff.ignoreCase) private var ignoreCase = false
 
     /// 语法高亮语言。对比任意文本时默认纯文本
     @State private var language: CodeLanguage = .plain
@@ -46,7 +53,7 @@ struct TextDiffView: View {
         VStack(spacing: 0) {
             toolbar
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             HSplitView {
                 editorColumn(text: $bufferA.text, title: "原文", states: leftStates, role: .leading)
@@ -56,6 +63,8 @@ struct TextDiffView: View {
         .onAppear { computeDiff() }
         .onChange(of: textA) { _, _ in computeDiff() }
         .onChange(of: textB) { _, _ in computeDiff() }
+        .onChange(of: ignoreWhitespace) { _, _ in computeDiff() }
+        .onChange(of: ignoreCase) { _, _ in computeDiff() }
         .onDisappear { scrollSync.detach() }
     }
 
@@ -87,7 +96,21 @@ struct TextDiffView: View {
             }
             .toggleStyle(.button)
             .controlSize(.small)
-            .help("自动换行")
+            .help("自动换行。开启后长行会折成多行，左右两栏不再严格逐行对齐")
+
+            Toggle(isOn: $ignoreWhitespace) {
+                Label("忽略空白", systemImage: "space")
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .help("忽略行首尾空白，行内连续空白视为一个")
+
+            Toggle(isOn: $ignoreCase) {
+                Label("忽略大小写", systemImage: "capslock")
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .help("比较时不区分大小写")
 
             Picker("语法", selection: $language) {
                 ForEach(CodeLanguage.allCases, id: \.self) { option in
@@ -129,7 +152,7 @@ struct TextDiffView: View {
             .font(DesignTokens.Typography.keyCap)
             .padding(.horizontal, DesignTokens.Spacing.sm)
             .padding(.vertical, DesignTokens.Spacing.xxs)
-            .background(color.opacity(0.15))
+            .background(color.opacity(DesignTokens.Opacity.diffBand))
             .foregroundStyle(color)
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap))
     }
@@ -159,18 +182,10 @@ struct TextDiffView: View {
                 syncRole: role
             )
         }
-        .frame(minWidth: 240)
+        .frame(minWidth: DesignTokens.Size.diffPaneMinWidth)
     }
 
     // MARK: - 逐行状态
-
-    private var leftStates: [CodeEditorView.LineState] {
-        states(for: TextDiffLogic.sideLineStates(textA, against: textB).left)
-    }
-
-    private var rightStates: [CodeEditorView.LineState] {
-        states(for: TextDiffLogic.sideLineStates(textA, against: textB).right)
-    }
 
     private func states(for types: [LineType]) -> [CodeEditorView.LineState] {
         types.map { type in
@@ -200,13 +215,23 @@ struct TextDiffView: View {
         diffResult = []
         addedCount = 0
         removedCount = 0
+        leftStates = []
+        rightStates = []
+    }
+
+    /// 当前生效的对比选项
+    private var options: TextDiffLogic.Options {
+        TextDiffLogic.Options(ignoreWhitespace: ignoreWhitespace, ignoreCase: ignoreCase)
     }
 
     /// 对比算法整体在模型层，视图只把结果搬进 `@State`
     private func computeDiff() {
-        let result = TextDiffLogic.diff(textA, against: textB)
+        let result = TextDiffLogic.diff(textA, against: textB, options: options)
         diffResult = result.lines
         addedCount = result.addedCount
         removedCount = result.removedCount
+        let sides = TextDiffLogic.sideLineStates(textA, against: textB, options: options)
+        leftStates = states(for: sides.left)
+        rightStates = states(for: sides.right)
     }
 }

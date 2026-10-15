@@ -42,4 +42,9 @@ enum KillProcessPreferences {
     static func searchInPID(defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: PluginSettingKey.KillProcess.searchInPID) as? Bool ?? false
     }
+
+    /// 强制结束前是否二次确认（未写过时为真）
+    static func confirmForceKill(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: PluginSettingKey.KillProcess.confirmForceKill) as? Bool ?? true
+    }
 }

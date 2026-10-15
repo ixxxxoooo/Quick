@@ -24,13 +24,14 @@ struct SuperPanelSpotlightCard: View {
             detail
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(DesignTokens.Spacing.xl)
+        .padding(DesignTokens.Spacing.lg)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
                 .fill(DesignTokens.Colors.cardFill)
         )
-        .padding(.horizontal, DesignTokens.Spacing.xl)
-        .padding(.top, DesignTokens.Spacing.md)
+        .padding(.horizontal, DesignTokens.Spacing.md)
+        .padding(.top, DesignTokens.Spacing.xs)
+        .padding(.bottom, DesignTokens.Spacing.xs)
     }
 
     // MARK: - 头部
@@ -46,7 +47,7 @@ struct SuperPanelSpotlightCard: View {
                 )
                 .background(
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                        .fill(DesignTokens.Colors.progress.opacity(0.12))
+                        .fill(DesignTokens.Colors.progress.opacity(DesignTokens.Opacity.tint))
                 )
 
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
@@ -81,6 +82,7 @@ struct SuperPanelSpotlightCard: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("复制")
                 .focusable(false)
                 .help("复制")
 
@@ -88,83 +90,19 @@ struct SuperPanelSpotlightCard: View {
                     .font(DesignTokens.Typography.compactKeyCap)
                     .padding(.horizontal, DesignTokens.Spacing.sm)
                     .padding(.vertical, DesignTokens.Spacing.xxs)
-                    .background(Capsule().fill(DesignTokens.Colors.progress.opacity(0.12)))
+                    .background(Capsule().fill(DesignTokens.Colors.progress.opacity(DesignTokens.Opacity.tint)))
                     .foregroundStyle(DesignTokens.Colors.progress)
             }
         }
     }
 
-    private var textToCopy: String {
-        switch preview {
-        case .translation(_, _, let translated, _, _):
-            return translated ?? sourceText
-        case .math(_, let result):
-            return result
-        case .timestamp(_, let formatted, _, let unixSeconds, _, _, let isFromDateString):
-            return isFromDateString ? (unixSeconds ?? formatted) : formatted
-        case .color(let hex, _):
-            return hex
-        case .base64(let decoded):
-            return decoded
-        case .urlEncoded(let decoded):
-            return decoded
-        case .filePath(let path, _, _):
-            return path
-        case .url(let url, _):
-            return url
-        case .email(let email):
-            return email
-        case .ip(let address):
-            return address
-        case .phone(let formatted):
-            return formatted
-        case .json, .sql, .plainText:
-            return sourceText
-        }
-    }
+    private var textToCopy: String { preview.copyText(sourceText: sourceText) }
 
     /// 主标题：直接给「答案」
-    private var primaryText: String {
-        switch preview {
-        case .url(_, let domain): return domain
-        case .filePath(let path, _, _): return (path as NSString).lastPathComponent
-        case .color(let hex, _): return hex
-        case .timestamp(_, let formatted, _, let unixSeconds, _, _, let isFromDateString):
-            return isFromDateString ? (unixSeconds ?? formatted) : formatted
-        case .math(_, let result): return result
-        case .email(let email): return email
-        case .ip(let address): return address
-        case .phone(let formatted): return formatted
-        case .base64: return "Base64"
-        case .urlEncoded: return "URL 编码"
-        case .json(let summary, let lines): return "\(summary) · \(lines) 行"
-        case .sql(let statement, let lines): return "\(statement) · \(lines) 行"
-        case .translation(let source, _, let translated, _, _):
-            return translated ?? source
-        case .plainText: return "文本"
-        }
-    }
+    private var primaryText: String { preview.headline }
 
     /// 副标题：补充说明
-    private var secondaryText: String? {
-        switch preview {
-        case .url(let url, _): return url
-        case .filePath(let path, _, _): return path
-        case .color(_, let rgb): return rgb
-        case .timestamp(let original, _, let relative, _, _, _, _):
-            return "\(relative) · \(original)"
-        case .math(let expr, _): return expr
-        case .translation(let source, _, let translated, let phonetic, _):
-            if let phonetic, !phonetic.isEmpty {
-                return "\(phonetic) · \(source)"
-            } else if translated != nil {
-                return source
-            }
-            return nil
-        case .base64, .urlEncoded, .json, .sql, .email, .ip, .phone, .plainText:
-            return nil
-        }
-    }
+    private var secondaryText: String? { preview.subheadline }
 
     // MARK: - 类型化详情
 
@@ -223,12 +161,16 @@ struct SuperPanelSpotlightCard: View {
         isFromDateString: Bool
     ) -> some View {
         HStack(spacing: DesignTokens.Spacing.xs) {
-            infoChip(relative)
-            if let local = localTime {
-                infoChip("本地: \(local)")
+            // 标题已经给出格式化时间、副标题已经给出相对时间与原文，
+            // 这里只放「标题里没有」的信息：日期文本给本地时间，数字时间戳给秒值，
+            // 再补一个毫秒值 —— 重复同一串数字三遍只会挤出换行。
+            if isFromDateString, let local = localTime {
+                infoChip(local)
+            } else if let sec = unixSeconds, sec != original {
+                infoChip("秒 \(sec)")
             }
-            if let sec = unixSeconds {
-                infoChip("时间戳: \(sec)")
+            if let ms = unixMilliseconds, ms != original {
+                infoChip("毫秒 \(ms)")
             }
         }
     }
@@ -285,24 +227,17 @@ struct SuperPanelSpotlightCard: View {
         }
     }
 
+    /// 色块：RGB 已经在卡片副标题里，这里只放一条横向色带，不再把同一串数字写第二遍
     private func colorDetail(hex: String, rgb: String) -> some View {
-        HStack(spacing: DesignTokens.Spacing.md) {
-            RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                .fill(Self.color(from: hex) ?? .clear)
-                .frame(
-                    width: DesignTokens.Size.rowIcon + DesignTokens.Spacing.xl,
-                    height: DesignTokens.Size.rowIcon + DesignTokens.Spacing.xl
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                        .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: 0.5)
-                )
-            Text(rgb)
-                .font(DesignTokens.Typography.rowTrailing)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-                .textSelection(.enabled)
-            Spacer(minLength: 0)
-        }
+        RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+            .fill(Self.color(from: hex) ?? .clear)
+            .frame(maxWidth: .infinity)
+            .frame(height: DesignTokens.Size.rowIcon)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
+                    .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairlineThin)
+            )
+            .accessibilityLabel("颜色 \(rgb)")
     }
 
     private func decodedDetail(label: String, text: String) -> some View {
@@ -314,7 +249,7 @@ struct SuperPanelSpotlightCard: View {
                 .font(DesignTokens.Typography.code)
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
                 .textSelection(.enabled)
-                .lineLimit(5)
+                .lineLimit(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -328,7 +263,7 @@ struct SuperPanelSpotlightCard: View {
                 .font(DesignTokens.Typography.code)
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
                 .textSelection(.enabled)
-                .lineLimit(8)
+                .lineLimit(5)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

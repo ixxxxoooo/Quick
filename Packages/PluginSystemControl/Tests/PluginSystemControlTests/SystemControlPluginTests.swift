@@ -170,3 +170,42 @@ struct SystemActionAutomationCopyTests {
                 == "清空废纸篓失败：需要「自动化」权限")
     }
 }
+
+@Suite("系统控制的二次确认")
+struct SystemControlConfirmationTests {
+
+    @Test("重启、关机、退出登录、清空废纸篓需要确认，其余不需要")
+    func onlyDestructiveActionsRequireConfirmation() {
+        let confirmed = Set(SystemAction.allCases.filter(\.requiresConfirmation))
+        #expect(confirmed == [.restart, .shutdown, .logout, .emptyTrash])
+    }
+
+    @Test("每个需确认的操作都有专属的后果说明")
+    func confirmationCopyExplainsTheConsequence() {
+        for action in SystemAction.allCases where action.requiresConfirmation {
+            #expect(action.confirmMessage != action.description, "\(action.rawValue) 的确认文案不能只是复述描述")
+            #expect(!action.confirmTitle.isEmpty)
+        }
+    }
+
+    @Test("设置缺省时确认为开，关掉后不再确认")
+    func settingGatesConfirmation() {
+        let suite = UserDefaults(suiteName: "systemcontrol.confirm.\(UUID().uuidString)")!
+        #expect(SystemControlPreferences.shouldConfirm(.shutdown, defaults: suite))
+        #expect(!SystemControlPreferences.shouldConfirm(.lockScreen, defaults: suite))
+
+        suite.set(false, forKey: PluginSettingKey.SystemControl.confirmDestructive)
+        #expect(!SystemControlPreferences.shouldConfirm(.shutdown, defaults: suite))
+    }
+
+    @Test("筛选按标题、描述与关键词命中，空输入返回全部")
+    func filterMatchesTitleDescriptionAndKeywords() {
+        let all = SystemAction.allCases
+        #expect(SystemActionFilter.filter(all, query: "") == all)
+        #expect(SystemActionFilter.filter(all, query: "   ") == all)
+        #expect(SystemActionFilter.filter(all, query: "reboot") == [.restart])
+        #expect(SystemActionFilter.filter(all, query: "废纸篓") == [.emptyTrash])
+        #expect(SystemActionFilter.filter(all, query: "DARK MODE") == [.toggleDarkMode])
+        #expect(SystemActionFilter.filter(all, query: "zzzz").isEmpty)
+    }
+}

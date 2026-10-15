@@ -4,6 +4,7 @@
 
 import Foundation
 import os
+import QuickCore
 
 /// 日历看板视图模式（日 / 月 / 年）
 enum CalendarBoardMode: String, CaseIterable, Identifiable, Sendable {
@@ -16,11 +17,11 @@ enum CalendarBoardMode: String, CaseIterable, Identifiable, Sendable {
 
 /// 日历插件内部偏好键与编解码辅助
 enum CalendarPreferences {
-    static let showLunar = "calendar.showLunar"
-    static let showBuiltInHolidays = "calendar.showBuiltInHolidays"
-    static let showAlmanac = "calendar.showAlmanac"
-    static let showSystemEvents = "calendar.showSystemEvents"
-    static let disabledCalendarIDs = "calendar.disabledCalendarIDs"
+    static let showLunar = PluginSettingKey.Calendar.showLunar
+    static let showBuiltInHolidays = PluginSettingKey.Calendar.showBuiltInHolidays
+    static let showAlmanac = PluginSettingKey.Calendar.showAlmanac
+    static let showSystemEvents = PluginSettingKey.Calendar.showSystemEvents
+    static let disabledCalendarIDs = PluginSettingKey.Calendar.disabledCalendarIDs
 
     static func disabledIDs(from raw: String) -> Set<String> {
         Set(

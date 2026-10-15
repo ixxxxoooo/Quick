@@ -15,6 +15,8 @@ public struct SuperPanelRecentItem: Identifiable, Sendable, Hashable {
         case app
         case plugin
         case command
+        /// 文件（用 `launchPath` 打开）
+        case file
     }
 
     public let id: String
@@ -25,7 +27,7 @@ public struct SuperPanelRecentItem: Identifiable, Sendable, Hashable {
     public let kind: Kind
     /// 跳转用的插件 id（`kind == .plugin`）
     public let pluginID: String?
-    /// 启动用的应用路径（`kind == .app`）
+    /// 启动用的路径（`kind == .app` 是应用，`kind == .file` 是文件）
     public let launchPath: String?
 
     public init(

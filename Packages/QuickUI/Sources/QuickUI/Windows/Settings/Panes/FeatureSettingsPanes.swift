@@ -154,7 +154,7 @@ struct FeatureSettingsPane: View {
                     .padding(.vertical, DesignTokens.Spacing.xxs)
                     .background(
                         RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                            .fill(Color.accentColor.opacity(0.12))
+                            .fill(Color.accentColor.opacity(DesignTokens.Opacity.tint))
                     )
                     .foregroundStyle(Color.accentColor)
             }

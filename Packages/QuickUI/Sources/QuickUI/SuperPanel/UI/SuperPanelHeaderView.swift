@@ -15,7 +15,7 @@ struct SuperPanelHeaderView: View {
     var body: some View {
         ZStack {
             HStack(spacing: DesignTokens.Spacing.sm) {
-                if model.hasContext {
+                if model.hasContext, !model.isLoading {
                     sourceBadge
                 } else {
                     title
@@ -29,7 +29,7 @@ struct SuperPanelHeaderView: View {
                 }
             }
 
-            if model.hasContext {
+            if model.hasContext, !model.isLoading {
                 tabSegment
             }
         }
@@ -56,12 +56,12 @@ struct SuperPanelHeaderView: View {
         .padding(.vertical, DesignTokens.Spacing.xxs)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                .fill(DesignTokens.Colors.progress.opacity(0.12))
+                .fill(DesignTokens.Colors.progress.opacity(DesignTokens.Opacity.tint))
         )
     }
 
     private var tabSegment: some View {
-        HStack(spacing: DesignTokens.Size.hairline) {
+        HStack(spacing: DesignTokens.Spacing.hairline) {
             ForEach(SuperPanelTab.allCases) { tab in
                 Button {
                     model.select(tab)
@@ -89,13 +89,13 @@ struct SuperPanelHeaderView: View {
                     // 命中区铺满整块「图标 + 文字 + 内边距」：`.plain` 按钮只按子视图自身的
                     // 字形框做 HitTest，不补 `contentShape` 就是「必须点准文字才切换」。
                     // 再向外扩半个分隔缝，把两个标签之间的那 1pt 死区也盖住。
-                    .contentShape(Rectangle().inset(by: -DesignTokens.Size.hairline / 2))
+                    .contentShape(Rectangle().inset(by: -DesignTokens.Spacing.hairline / 2))
                 }
                 .buttonStyle(.plain)
                 .focusable(false)
             }
         }
-        .padding(DesignTokens.Size.hairline)
+        .padding(DesignTokens.Spacing.hairline)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.menu + 1, style: .continuous)
                 .fill(DesignTokens.Colors.controlSurface)
@@ -110,14 +110,14 @@ struct SuperPanelHeaderView: View {
             Text("超级面板")
                 .font(DesignTokens.Typography.rowTitle)
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
-            Text(SuperPanelTab.dock.rawValue)
+            Text(model.isLoading ? "识别中…" : SuperPanelTab.dock.rawValue)
                 .font(DesignTokens.Typography.compactKeyCap)
                 .foregroundStyle(DesignTokens.Colors.progress)
                 .padding(.horizontal, DesignTokens.Spacing.sm)
                 .padding(.vertical, DesignTokens.Spacing.xxs)
                 .background(
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                        .fill(DesignTokens.Colors.progress.opacity(0.12))
+                        .fill(DesignTokens.Colors.progress.opacity(DesignTokens.Opacity.tint))
                 )
         }
     }
@@ -136,5 +136,6 @@ struct SuperPanelHeaderView: View {
         .buttonStyle(.plain)
         .focusable(false)
         .help(help)
+        .accessibilityLabel(help)
     }
 }

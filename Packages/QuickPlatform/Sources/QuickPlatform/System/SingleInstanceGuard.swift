@@ -54,10 +54,11 @@ public final class SingleInstanceGuard {
         if flock(fd, LOCK_EX | LOCK_NB) != 0 {
             let errorNumber = errno
             close(fd)
-            if errorNumber == EWOULDBLOCK || errorNumber == EAGAIN {
+            // macOS 上 EWOULDBLOCK 与 EAGAIN 是同一个值，写两个会让编译器报「永不执行」
+            if errorNumber == EWOULDBLOCK {
                 log.notice("检测到已有 Quick 实例在运行，转发唤起信号并退出次级进程")
+                // `Never` 返回：这里不会再往下走，所以不写 `return false`
                 notifyExistingInstanceAndExit(launchArguments: launchArguments)
-                return false
             } else {
                 log.error("flock 失败，errno=\(errorNumber)")
                 return true

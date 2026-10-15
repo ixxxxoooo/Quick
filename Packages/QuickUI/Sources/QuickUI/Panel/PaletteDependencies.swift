@@ -41,6 +41,9 @@ public struct PaletteDependencies {
     /// 可选：没有它时主搜索只走静态命令与插件。
     public let hostSearchSource: (any PaletteHostSearchSource)?
 
+    /// AI 对话（宿主级：面板里按 Tab 进入）
+    public let aiChat: AIChatController
+
     /// 构造依赖
     /// - Parameters:
     ///   - isSearchSourceEnabled: 插件是否参与主搜索
@@ -48,6 +51,7 @@ public struct PaletteDependencies {
     ///   - onDetach: 分离插件面板
     ///   - onPanelWillShow: 面板即将显示
     ///   - onPanelDidHide: 面板已经隐藏
+    ///   - aiChat: AI 对话控制器
     ///   - usageHistory: 最近使用存储；没有时传 nil，首屏就不会按最近使用提权
     ///   - hostSearchSource: 宿主搜索来源；没有时传 nil
     public init(
@@ -56,6 +60,7 @@ public struct PaletteDependencies {
         onDetach: @escaping (String) -> Void,
         onPanelWillShow: @escaping () -> Void,
         onPanelDidHide: @escaping () -> Void,
+        aiChat: AIChatController,
         usageHistory: UsageHistory?,
         hostSearchSource: (any PaletteHostSearchSource)? = nil
     ) {
@@ -64,6 +69,7 @@ public struct PaletteDependencies {
         self.onDetach = onDetach
         self.onPanelWillShow = onPanelWillShow
         self.onPanelDidHide = onPanelDidHide
+        self.aiChat = aiChat
         self.usageHistory = usageHistory
         self.hostSearchSource = hostSearchSource
     }

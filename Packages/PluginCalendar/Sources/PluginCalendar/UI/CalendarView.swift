@@ -264,7 +264,7 @@ struct CalendarView: View {
                             RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap, style: .continuous)
                                 .fill(
                                     isCurrent
-                                        ? Color.accentColor.opacity(0.18)
+                                        ? Color.accentColor.opacity(DesignTokens.Opacity.todayFill)
                                         : Color.clear
                                 )
                         )
@@ -336,7 +336,7 @@ struct CalendarView: View {
                                     Capsule(style: .continuous)
                                         .fill(
                                             cell.isToday
-                                                ? Color.accentColor.opacity(0.16)
+                                                ? Color.accentColor.opacity(DesignTokens.Opacity.todayFill)
                                                 : DesignTokens.Colors.controlSurface
                                         )
                                 )
@@ -450,7 +450,7 @@ struct CalendarView: View {
                 )
                 .background(
                     Circle()
-                        .fill(tint.opacity(0.16))
+                        .fill(tint.opacity(DesignTokens.Opacity.todayFill))
                 )
 
             HStack(spacing: DesignTokens.Spacing.xs) {
@@ -567,10 +567,10 @@ struct CalendarView: View {
             .overlay {
                 if isSelected {
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                        .strokeBorder(Color.accentColor.opacity(0.65), lineWidth: DesignTokens.Size.hairline)
+                        .strokeBorder(Color.accentColor.opacity(DesignTokens.Opacity.accentStrokeStrong), lineWidth: DesignTokens.Size.hairline)
                 } else if cell.isToday {
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                        .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: DesignTokens.Size.hairline)
+                        .strokeBorder(Color.accentColor.opacity(DesignTokens.Opacity.accentStroke), lineWidth: DesignTokens.Size.hairline)
                 }
             }
             .overlay(alignment: .topTrailing) {
@@ -674,7 +674,7 @@ struct CalendarView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.row, style: .continuous)
                     .strokeBorder(
-                        isSelectedMonth ? Color.accentColor.opacity(0.45) : DesignTokens.Colors.cardStroke,
+                        isSelectedMonth ? Color.accentColor.opacity(DesignTokens.Opacity.accentStroke) : DesignTokens.Colors.cardStroke,
                         lineWidth: DesignTokens.Size.hairline
                     )
             )
@@ -706,9 +706,9 @@ struct CalendarView: View {
                 Circle()
                     .fill(
                         isSelected
-                            ? Color.accentColor.opacity(0.25)
+                            ? Color.accentColor.opacity(DesignTokens.Opacity.selectedFill)
                             : (cell.isToday && cell.isCurrentMonth)
-                                ? Color.accentColor.opacity(0.12)
+                                ? Color.accentColor.opacity(DesignTokens.Opacity.tint)
                                 : Color.clear
                     )
             )
@@ -721,7 +721,7 @@ struct CalendarView: View {
             return Color.accentColor
         }
         if !cell.isCurrentMonth {
-            return DesignTokens.Colors.textTertiary.opacity(0.5)
+            return DesignTokens.Colors.textTertiary.opacity(DesignTokens.Opacity.outsideMonthText)
         }
         if cell.isWeekend {
             return DesignTokens.Colors.textSecondary
@@ -736,7 +736,7 @@ struct CalendarView: View {
     ) -> Color {
         if !cell.isCurrentMonth {
             return (isHighlighted ? Color.accentColor : DesignTokens.Colors.textTertiary)
-                .opacity(0.45)
+                .opacity(DesignTokens.Opacity.outsideMonthText)
         }
         if isHighlighted {
             return Color.accentColor
@@ -746,10 +746,10 @@ struct CalendarView: View {
 
     private func cellBackground(for cell: CalendarDayCell, isSelected: Bool, isHovered: Bool) -> Color {
         if isSelected {
-            return Color.accentColor.opacity(0.20)
+            return Color.accentColor.opacity(DesignTokens.Opacity.tintStrong)
         }
         if cell.isToday {
-            return Color.accentColor.opacity(0.08)
+            return Color.accentColor.opacity(DesignTokens.Opacity.faintTint)
         }
         if isHovered {
             return DesignTokens.Colors.rowHover
@@ -805,7 +805,7 @@ struct CalendarView: View {
                         Capsule(style: .continuous)
                             .fill(
                                 cell.isToday
-                                    ? Color.accentColor.opacity(0.16)
+                                    ? Color.accentColor.opacity(DesignTokens.Opacity.todayFill)
                                     : DesignTokens.Colors.controlSurface
                             )
                     )
@@ -871,7 +871,7 @@ struct CalendarView: View {
                     .padding(.horizontal, DesignTokens.Spacing.xxs)
                     .background(
                         RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap / 2, style: .continuous)
-                            .fill(DesignTokens.Colors.success.opacity(0.14))
+                            .fill(DesignTokens.Colors.success.opacity(DesignTokens.Opacity.badgeFill))
                     )
                 Text(almanac.yi.prefix(4).joined(separator: " · "))
                     .font(DesignTokens.Typography.compactKeyCap)
@@ -886,7 +886,7 @@ struct CalendarView: View {
                     .padding(.horizontal, DesignTokens.Spacing.xxs)
                     .background(
                         RoundedRectangle(cornerRadius: DesignTokens.Radius.keyCap / 2, style: .continuous)
-                            .fill(DesignTokens.Colors.destructive.opacity(0.14))
+                            .fill(DesignTokens.Colors.destructive.opacity(DesignTokens.Opacity.badgeFill))
                     )
                 Text(almanac.ji.prefix(4).joined(separator: " · "))
                     .font(DesignTokens.Typography.compactKeyCap)
@@ -944,7 +944,7 @@ struct CalendarView: View {
             .padding(.vertical, DesignTokens.Spacing.xxs)
             .background(
                 Capsule(style: .continuous)
-                    .fill(tint.opacity(0.14))
+                    .fill(tint.opacity(DesignTokens.Opacity.badgeFill))
             )
     }
 
@@ -988,7 +988,7 @@ struct CalendarView: View {
                         .padding(.vertical, DesignTokens.Spacing.xxs)
                         .background(
                             Capsule(style: .continuous)
-                                .fill(Color.accentColor.opacity(0.14))
+                                .fill(Color.accentColor.opacity(DesignTokens.Opacity.badgeFill))
                         )
                         .contentShape(Capsule())
                     }
@@ -1166,7 +1166,7 @@ struct CalendarView: View {
                             .padding(.vertical, DesignTokens.Spacing.xs)
                             .background(
                                 RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
-                                    .fill(Color.accentColor.opacity(0.16))
+                                    .fill(Color.accentColor.opacity(DesignTokens.Opacity.todayFill))
                             )
                             .contentShape(Rectangle())
                     }
@@ -1240,7 +1240,7 @@ struct CalendarView: View {
                     .padding(.vertical, DesignTokens.Spacing.xs)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(Color.accentColor.opacity(0.14))
+                            .fill(Color.accentColor.opacity(DesignTokens.Opacity.badgeFill))
                     )
                     .contentShape(Capsule())
                 }
@@ -1298,7 +1298,7 @@ struct CalendarView: View {
                             .padding(.vertical, DesignTokens.Spacing.xs)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(Color.accentColor.opacity(0.15))
+                                    .fill(Color.accentColor.opacity(DesignTokens.Opacity.badgeFill))
                             )
                             .contentShape(Capsule())
                     }
@@ -1314,7 +1314,7 @@ struct CalendarView: View {
                             .padding(.vertical, DesignTokens.Spacing.xs)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(Color.accentColor.opacity(0.15))
+                                    .fill(Color.accentColor.opacity(DesignTokens.Opacity.badgeFill))
                             )
                             .contentShape(Capsule())
                     }
@@ -1505,6 +1505,6 @@ struct CalendarView: View {
         let r = Double((value >> 16) & 0xFF) / 255.0
         let g = Double((value >> 8) & 0xFF) / 255.0
         let b = Double(value & 0xFF) / 255.0
-        return Color(red: r, green: g, blue: b)
+        return Color(red: r, green: g, blue: b)  // ui-literal-ok: 系统日历源自带的运行时颜色，不是设计数值
     }
 }

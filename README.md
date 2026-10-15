@@ -40,10 +40,6 @@ deprecated-API debt.
 - **Clipboard history** — searchable text history, pinned entries, pasted back into the app you came
   from.
 - **Calculator** — expressions evaluate inline as you type; a scratchpad keeps a persistent history.
-- **Snippets** — reusable text templates, copied with `{date}` / `{clipboard}` / `{random}`
-  placeholders expanded.
-- **Notes and todos** — a lightweight two-tab panel, persisted in SQLite and searchable from the
-  palette.
 - **Translation** — fully offline: on-device translation, the system dictionary for single words, and
   system speech.
 - **Calendar** — today's events in the panel; the palette previews the next few.
@@ -55,7 +51,6 @@ deprecated-API debt.
 - **System monitor** — CPU, memory, disk and network at a glance.
 - **Kill process** — sort processes by CPU or memory, filter by name, send SIGTERM or SIGKILL.
 - **Screenshot** — freeze the screen, select and annotate in place, then save, copy or pin it.
-- **OCR** — Vision text recognition over a screen region, with optional auto-copy.
 - **Network tools** — LAN IP, optional public IP, and the DNS servers your resolver actually uses.
 
 **AI**
@@ -63,11 +58,10 @@ deprecated-API debt.
 - **AI aggregation** — DeepSeek, ChatGPT, Gemini, Claude, 豆包, Kimi, 智谱 and 通义千问 in one plugin,
   opened in Quick's own WebView windows. You stay signed in across restarts.
 
-**Ten developer tools**
+**Eight developer tools**
 
 - JSON formatter (with a collapsible tree), SQL formatter, Base64 codec, URL codec, UUID generator,
-  MD5/SHA-1/SHA-256/SHA-512, timestamp converter, side-by-side text diff, Markdown preview, and a color
-  parser/comparer.
+  MD5/SHA-1/SHA-256/SHA-512, timestamp converter, and a side-by-side text diff.
 
 **Super Panel**
 
@@ -97,7 +91,7 @@ and everything is granted in **System Settings → Privacy & Security**.
 | Permission | What needs it |
 | --- | --- |
 | **Accessibility** | Pasting a result back into the app you came from, restoring focus, and system actions that drive other apps |
-| **Screen Recording** | The screenshot tool and region OCR |
+| **Screen Recording** | The screenshot tool |
 | **Input Monitoring** | Global hotkeys, on setups that don't deliver them otherwise |
 | **Automation (Apple Events)** | System actions driven by AppleScript: appearance, sleep, restart, shut down, log out, empty trash, eject |
 

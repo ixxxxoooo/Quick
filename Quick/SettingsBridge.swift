@@ -23,7 +23,7 @@ final class SettingsBridge: SettingsDataSource {
 
     unowned let core: AppCore
 
-    private let log = QuickLog.app
+    let log = QuickLog.app
 
     init(core: AppCore) {
         self.core = core
@@ -202,7 +202,7 @@ final class SettingsBridge: SettingsDataSource {
     }
 
     /// 把命令 id 解析成设置行。应用和终端命令不在静态声明里，要单独认前缀
-    private func describe(commandID: String) -> SettingsCommandBinding {
+    func describe(commandID: String) -> SettingsCommandBinding {
         if let ownerID = core.pluginID(owningCommand: commandID),
             let command = core.commandDescriptor(of: commandID, in: ownerID)
         {
@@ -280,15 +280,25 @@ final class SettingsBridge: SettingsDataSource {
     }
 
     var searchSources: [SettingsSearchSource] {
-        pluginEntries.map { plugin in
+        let plugins = pluginEntries.map { plugin in
             SettingsSearchSource(
                 id: plugin.id,
                 title: plugin.name,
-                subtitle: "关闭后，主面板不再搜索这个插件的命令和结果。",
+                // 统一说明在页脚；逐行重复同一句话只会拉长列表
+                subtitle: "",
                 icon: plugin.icon,
                 isEnabled: core.settingsStore.isSearchSourceEnabled(plugin.id)
             )
         }
+        // 文件搜索是宿主自己的来源，不在插件列表里，但同样允许单独关闭
+        let files = SettingsSearchSource(
+            id: FileSearchSource.sourceIdentifier,
+            title: "文件搜索",
+            subtitle: "关闭后，输入 f / file / 文件 前缀不再查找本机文件。",
+            icon: "folder",
+            isEnabled: core.settingsStore.isSearchSourceEnabled(FileSearchSource.sourceIdentifier)
+        )
+        return plugins + [files]
     }
 
     func setSearchSourceEnabled(_ pluginID: String, enabled: Bool) {
@@ -296,7 +306,7 @@ final class SettingsBridge: SettingsDataSource {
         core.rebuildCommandCatalog()
     }
 
-    private func bindingRow(for command: CommandDescriptor) -> SettingsCommandBinding {
+    func bindingRow(for command: CommandDescriptor) -> SettingsCommandBinding {
         var seen = Set<String>()
         var dedupedKeywords: [String] = []
         let rawKeywords = command.keywords.isEmpty ? [command.title] : command.keywords
@@ -316,337 +326,5 @@ final class SettingsBridge: SettingsDataSource {
             keycaps: core.hotKeyService.binding(for: command.id)?.keycaps,
             keywords: dedupedKeywords
         )
-    }
-
-    // MARK: - 启动器：应用与搜索范围
-
-    var searchScopes: [String] {
-        core.settingsStore.searchScopes(defaultScopes: SearchScopes.defaults)
-    }
-
-    func setSearchScopes(_ scopes: [String]) {
-        core.settingsStore.setSearchScopes(scopes)
-        Task {
-            await core.appIndex.refresh(scopes: scopes)
-            core.cachedIndexedApps = nil
-        }
-    }
-
-    func restoreDefaultSearchScopes() {
-        setSearchScopes(SearchScopes.defaults)
-    }
-
-    var indexedApplications: [SettingsAppItem] {
-        if let cached = core.cachedIndexedApps {
-            return cached
-        }
-        let items = core.appIndex.apps.map { entry in
-            let alias = core.settingsStore.alias(for: "app." + entry.bundleID)
-            return SettingsAppItem(
-                id: entry.id,
-                name: entry.name,
-                bundleID: entry.bundleID,
-                path: entry.path,
-                isSystemApp: entry.isSystemApp,
-                alias: alias
-            )
-        }
-        if !items.isEmpty {
-            core.cachedIndexedApps = items
-        }
-        return items
-    }
-
-    func appIcon(for path: String) -> NSImage? {
-        core.iconCache.icon(forBundlePath: path)
-    }
-
-    func setAppAlias(_ alias: String?, for bundleID: String) {
-        core.settingsStore.setAlias(alias, for: "app." + bundleID)
-        core.cachedIndexedApps = nil
-    }
-
-    // MARK: - 启动器：系统操作
-
-    var systemActions: [SettingsSystemActionItem] {
-        SystemAction.allCases.map { action in
-            let alias = core.settingsStore.alias(for: "system." + action.rawValue)
-            let commandID = CommandID.systemAction(action.rawValue)
-            return SettingsSystemActionItem(
-                id: action.rawValue,
-                title: action.title,
-                description: action.description,
-                icon: action.icon,
-                alias: alias,
-                isEnabled: core.settingsStore.isCommandEnabled(commandID)
-            )
-        }
-    }
-
-    func setSystemActionAlias(_ alias: String?, for id: String) {
-        core.settingsStore.setAlias(alias, for: "system." + id)
-        core.rebuildCommandCatalog()
-    }
-
-    // MARK: - 启动器：Shell 与自定义命令
-
-    var isRunShellFallbackEnabled: Bool {
-        core.settingsStore.isRunShellFallbackEnabled
-    }
-
-    func setRunShellFallbackEnabled(_ enabled: Bool) {
-        core.settingsStore.setRunShellFallbackEnabled(enabled)
-    }
-
-    var customCommands: [SettingsCustomCommandItem] {
-        if let cached = core.cachedCustomCommands {
-            return cached
-        }
-        let list = core.loadCustomCommands()
-        let items = list.map { cmd in
-            return SettingsCustomCommandItem(
-                id: cmd.id,
-                name: cmd.name,
-                command: cmd.command,
-                isEnabled: cmd.isEnabled,
-                alias: cmd.alias,
-                workingDirectory: cmd.workingDirectory,
-                loadsShellEnvironment: cmd.loadsShellEnvironment
-            )
-        }
-        core.cachedCustomCommands = items
-        return items
-    }
-
-    func addCustomCommand(
-        name: String, command: String, workingDirectory: String?, loadsShellEnvironment: Bool
-    ) {
-        var list = core.loadCustomCommands()
-        let item = CustomCommand(
-            name: name,
-            command: command,
-            isEnabled: true,
-            loadsShellEnvironment: loadsShellEnvironment,
-            workingDirectory: workingDirectory
-        )
-        list.append(item)
-        core.saveCustomCommands(list)
-    }
-
-    func updateCustomCommand(
-        id: UUID,
-        name: String,
-        command: String,
-        isEnabled: Bool,
-        alias: String?,
-        workingDirectory: String?,
-        loadsShellEnvironment: Bool
-    ) {
-        var list = core.loadCustomCommands()
-        guard let index = list.firstIndex(where: { $0.id == id }) else { return }
-        list[index].name = name
-        list[index].command = command
-        list[index].isEnabled = isEnabled
-        list[index].alias = alias
-        list[index].workingDirectory = workingDirectory
-        list[index].loadsShellEnvironment = loadsShellEnvironment
-        core.saveCustomCommands(list)
-    }
-
-    func deleteCustomCommand(id: UUID) {
-        var list = core.loadCustomCommands()
-        list.removeAll { $0.id == id }
-        core.saveCustomCommands(list)
-        core.hotKeyService.setBinding(nil, for: CommandID.shell(id.uuidString), registerNow: false)
-    }
-
-    // MARK: - 功能插件设置
-
-    /// 系统里可选的键盘布局
-    var keyboardLayouts: [SettingsKeyboardLayout] {
-        core.keyboardLayoutService.availableLayouts().map {
-            SettingsKeyboardLayout(id: $0.id, name: $0.name)
-        }
-    }
-
-    var forcedKeyboardLayoutID: String? {
-        UserDefaults.standard.string(forKey: SettingsKey.paletteForceKeyboardLayout)
-    }
-
-    func setForcedKeyboardLayout(_ layoutID: String?) {
-        if let layoutID, !layoutID.isEmpty {
-            UserDefaults.standard.set(layoutID, forKey: SettingsKey.paletteForceKeyboardLayout)
-        } else {
-            UserDefaults.standard.removeObject(forKey: SettingsKey.paletteForceKeyboardLayout)
-        }
-    }
-
-    /// 全部插件，按显示名排序
-    ///
-    /// 排序而不是按注册顺序：注册顺序是代码结构，用户不该看到它。
-    var pluginEntries: [SettingsPlugin] {
-        core.plugins
-            .map {
-                SettingsPlugin(
-                    id: type(of: $0).id,
-                    name: type(of: $0).name,
-                    icon: type(of: $0).icon,
-                    description: type(of: $0).description,
-                    triggerWords: type(of: $0).triggerWords
-                )
-            }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-    }
-
-    func isPluginEnabled(_ id: String) -> Bool {
-        core.settingsStore.isPluginEnabled(id)
-    }
-
-    /// 切换插件启用状态
-    ///
-    /// 三件事必须一起做：持久化、改插件实例、启停插件。
-    /// 只改设置不启停，用户会看到开关变了但功能还在跑（或反过来）。
-    func setPluginEnabled(_ id: String, enabled: Bool) {
-        core.settingsStore.setPluginEnabled(id, enabled: enabled)
-
-        guard let plugin = core.pluginsByID[id] else {
-            log.warning("找不到插件 \(id, privacy: .public)，设置已保存但未同步实例")
-            return
-        }
-        guard plugin.isEnabled != enabled else { return }
-
-        plugin.isEnabled = enabled
-        if enabled {
-            plugin.activate()
-        } else {
-            plugin.deactivate()
-        }
-        log.notice("插件 \(id, privacy: .public) 已\(enabled ? "启用" : "停用", privacy: .public)并同步实例")
-        core.rebuildCommandCatalog()
-    }
-
-    func makeFeatureSettingsView(for tab: SettingsTab) -> AnyView? {
-        guard let pluginID = tab.pluginID,
-            let plugin = core.pluginsByID[pluginID]
-        else {
-            return nil
-        }
-        // 设置页能力同样是运行时查询：没实现就回落到 FeatureSettingsPane 的默认三段式布局，
-        // 这不是错误路径，所以不打日志。
-        return (plugin as? PluginSettingsProviding)?.makeSettingsView()
-    }
-
-    // MARK: - 超级面板
-
-    func makeSuperPanelSettingsView() -> AnyView {
-        AnyView(SuperPanelSettingsView(dataSource: self))
-    }
-
-    var superPanelShortcutKeycaps: [String]? {
-        core.hotKeyService.binding(for: CommandID.superPanel)?.keycaps
-    }
-
-    func setSuperPanelShortcut(keyCode: Int, carbonModifiers: Int) -> Bool {
-        let shortcut = KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: carbonModifiers)
-        let outcome = core.hotKeyService.setBinding(shortcut, for: CommandID.superPanel, registerNow: true)
-        if case .conflict = outcome { return false }
-        return true
-    }
-
-    func clearSuperPanelShortcut() {
-        core.hotKeyService.setBinding(nil, for: CommandID.superPanel, registerNow: false)
-    }
-
-    func clearRecentUsage() {
-        core.usageHistory?.removeAll()
-        log.notice("最近使用记录已清空")
-    }
-
-    // MARK: - AI 基座
-
-    func makeAISettingsView() -> AnyView {
-        AnyView(AISettingsPane(dataSource: self))
-    }
-
-    func testAIConnection() async -> SettingsAITestResult {
-        do {
-            let reply = try await AIService.testConnection()
-            let snippet = reply.isEmpty ? "OK" : String(reply.prefix(40))
-            log.notice("AI 连接测试成功")
-            return SettingsAITestResult(isSuccess: true, message: "连接成功：\(snippet)")
-        } catch {
-            log.warning("AI 连接测试失败：\(error.localizedDescription, privacy: .public)")
-            return SettingsAITestResult(
-                isSuccess: false, message: error.localizedDescription)
-        }
-    }
-
-    // MARK: - 权限
-
-    /// 权限状态
-    ///
-    /// `canRequest` 的判定依据是「系统还会不会再弹框」：
-    /// 未决定的可以申请，已经拒绝过的只能去系统设置里手动打开 ——
-    /// 这时给一个「申请」按钮是骗人的，点了什么都不会发生。
-    func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState {
-        switch permission {
-        case .accessibility:
-            let granted = core.permissionService.isAccessibilityGranted()
-            return SettingsPermissionState(isGranted: granted, canRequest: !granted)
-
-        case .screenCapture:
-            let granted = core.permissionService.isScreenCaptureGranted()
-            return SettingsPermissionState(isGranted: granted, canRequest: !granted)
-
-        case .location:
-            switch core.permissionService.locationStatus() {
-            case .granted:
-                return SettingsPermissionState(isGranted: true, canRequest: false)
-            case .notDetermined:
-                return SettingsPermissionState(isGranted: false, canRequest: true)
-            case .denied:
-                return SettingsPermissionState(isGranted: false, canRequest: false)
-            }
-        }
-    }
-
-    func requestPermission(_ permission: SettingsPermission) {
-        log.notice("用户从设置页申请权限 \(permission.rawValue, privacy: .public)")
-        switch permission {
-        case .accessibility:
-            core.permissionService.requestAccessibility()
-        case .screenCapture:
-            core.permissionService.requestScreenCapture()
-        case .location:
-            // 定位的申请入口只有天气插件那一处（用户主动查看天气时），
-            // 设置页只负责把状态显示出来、把人带到系统设置。
-            core.permissionService.openLocationSettings()
-        }
-    }
-
-    func openPermissionSettings(_ permission: SettingsPermission) {
-        switch permission {
-        case .accessibility:
-            core.permissionService.openAccessibilitySettings()
-        case .screenCapture:
-            core.permissionService.openScreenCaptureSettings()
-        case .location:
-            core.permissionService.openLocationSettings()
-        }
-    }
-
-    // MARK: - 关于
-
-    var versionDescription: String {
-        let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "—"
-        let build = info?["CFBundleVersion"] as? String ?? "—"
-        return "\(version) (\(build))"
-    }
-
-    var bundleIdentifier: String { Bundle.main.bundleIdentifier ?? "—" }
-
-    var panelGeometryDescription: String {
-        "\(Int(DesignTokens.Size.panelWidth)) × \(Int(DesignTokens.Size.panelHeight)) · 圆角 \(Int(DesignTokens.Radius.panel))"
     }
 }

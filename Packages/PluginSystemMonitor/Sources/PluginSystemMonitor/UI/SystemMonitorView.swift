@@ -14,40 +14,30 @@ struct SystemMonitorView: View {
 
     @AppStorage(PluginSettingKey.SystemMonitor.defaultTab) private var defaultTabRaw =
         SystemMonitorPreferences.defaultTab.rawValue
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeCPU) private var cpuModeRaw =
-        SystemMonitorPreferences.defaultCPUMode.rawValue
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeMemory) private var memoryModeRaw =
-        SystemMonitorPreferences.defaultMemoryMode.rawValue
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeDisk) private var diskModeRaw =
-        SystemMonitorPreferences.defaultDiskMode.rawValue
-    @AppStorage(PluginSettingKey.SystemMonitor.displayModeBattery) private var batteryModeRaw =
-        SystemMonitorPreferences.defaultBatteryMode.rawValue
+    @AppStorage(PluginSettingKey.SystemMonitor.displayMode) private var modeRaw =
+        SystemMonitorPreferences.defaultMode.rawValue
 
     @State private var selectedTab: SystemMonitorTab = SystemMonitorPreferences.defaultTab
 
-    private var cpuMode: UsageDisplayMode {
-        SystemMonitorPreferences.displayMode(storedValue: cpuModeRaw, fallback: .used)
+    private var usageMode: UsageDisplayMode {
+        SystemMonitorPreferences.displayMode(
+            storedValue: modeRaw, fallback: SystemMonitorPreferences.defaultMode)
     }
-    private var memoryMode: UsageDisplayMode {
-        SystemMonitorPreferences.displayMode(storedValue: memoryModeRaw, fallback: .used)
-    }
-    private var diskMode: UsageDisplayMode {
-        SystemMonitorPreferences.displayMode(storedValue: diskModeRaw, fallback: .free)
-    }
-    private var batteryMode: UsageDisplayMode {
-        SystemMonitorPreferences.displayMode(storedValue: batteryModeRaw, fallback: .free)
-    }
+    private var cpuMode: UsageDisplayMode { usageMode }
+    private var memoryMode: UsageDisplayMode { usageMode }
+    private var diskMode: UsageDisplayMode { usageMode }
+    private var batteryMode: UsageDisplayMode { SystemMonitorPreferences.batteryMode }
 
     var body: some View {
         HStack(spacing: 0) {
             sidebar
                 .frame(width: DesignTokens.Size.monitorSidebar)
-            Divider().opacity(0.35)
+            Divider().opacity(DesignTokens.Opacity.divider)
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    footer
-                }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            footer
         }
         .onAppear {
             selectedTab = SystemMonitorPreferences.tab(storedValue: defaultTabRaw)
@@ -61,14 +51,16 @@ struct SystemMonitorView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
-        ScrollView {
-            LazyVStack(spacing: DesignTokens.Spacing.xxs) {
-                ForEach(SystemMonitorTab.allCases) { tab in
-                    sidebarRow(tab)
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(spacing: DesignTokens.Spacing.xxs) {
+                    ForEach(SystemMonitorTab.allCases) { tab in
+                        sidebarRow(tab)
+                    }
                 }
+                .padding(.horizontal, DesignTokens.Spacing.sm)
+                .padding(.vertical, DesignTokens.Spacing.md)
             }
-            .padding(.horizontal, DesignTokens.Spacing.sm)
-            .padding(.vertical, DesignTokens.Spacing.md)
         }
     }
 
@@ -217,28 +209,12 @@ struct SystemMonitorView: View {
     // MARK: - Footer
 
     private var footer: some View {
-        HStack {
-            Spacer()
-            Button {
+        ActionPillBar {
+            ActionPillButton(title: "打开活动监视器", keyCap: "↵") {
                 openActivityMonitor()
-            } label: {
-                HStack(spacing: DesignTokens.Spacing.sm) {
-                    Text("打开活动监视器")
-                        .font(DesignTokens.Typography.bar)
-                    KeyCapChip(text: "↵", style: .outline, scale: .compact)
-                }
-                .padding(.horizontal, DesignTokens.Spacing.md)
-                .frame(height: DesignTokens.Size.barButtonHeight)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(DesignTokens.Colors.controlSurface)
-                )
             }
-            .buttonStyle(.plain)
             .keyboardShortcut(.return, modifiers: [])
         }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
-        .frame(height: DesignTokens.Size.bottomBarHeight)
     }
 
     private func openActivityMonitor() {

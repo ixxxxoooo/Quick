@@ -117,9 +117,9 @@
   **去重必须继承旧条目的收藏与置顶。** 从历史回车 / 再复制会写回系统剪贴板，监听器
   再走一遍 `add`；若不继承标志，带 ★ 的旧行被删掉、新行默认未收藏，表现就是
   「收藏用一次就没了」。用户期望回车是粘贴（或仅复制），不是取消收藏。
-- **历史上限 500 条，且裁剪时保留置顶与收藏。** 裁剪逻辑是
-  「所有 pinned/favorite + 未被标记的前 500 条」，所以**收藏条目不计入上限**，
-  理论上总数可以超过 500。这是刻意的：不能因为历史满了就把用户主动收藏的东西删掉。
+- **历史上限默认 300 条（设置里最多 1000），且裁剪时保留置顶与收藏。** 裁剪逻辑是
+  「所有 pinned/favorite + 未被标记的前 N 条」，所以**收藏条目不计入上限**，
+  理论上总数可以超过 N。这是刻意的：不能因为历史满了就把用户主动收藏的东西删掉。
 - **`clearHistory()` 保留收藏与置顶。** 它是「清空历史」不是「清空数据」，
   用户点它时不期望连收藏一起没。
 - **搜索是 `contains` 子串匹配 + 小写化，不是模糊匹配。** 空查询返回全部。
@@ -218,7 +218,7 @@
 
 | 上限 | 设置键 | 默认 | 豁免 |
 | --- | --- | --- | --- |
-| 条数 | `clipboard.maxEntries` | 500 | 置顶、收藏 |
+| 条数 | `clipboard.maxEntries` | 300（上限 1000） | 置顶、收藏 |
 | 图片总字节 | `clipboard.imageByteBudget` | 256 MB | 置顶、收藏 |
 
 条数上限以前硬编码在 store 里，设置页那个 Stepper 改了没有任何效果 —— 现在两边读同一个键。
@@ -303,6 +303,10 @@
 
 #### 不变量
 
+- **`OverlayCoordinator.begin` 用 `ReentryGate` 防重入。** `begin` 里有多处 `await`，挂起期间
+  `isPresenting` 仍为 false；连按快捷键会叠出两层遮罩、各持整屏位图。遮罩关闭时必须
+  `contentView = nil` 并清空 `controllers`，位图随之释放。
+
 - **抓屏走 ScreenCaptureKit**（`CaptureEngine`），不再起 `screencapture` 进程。因此需要
   「屏幕录制」权限，且授权只对授权之后启动的进程生效（授权后要重启 Quick）。
 - **遮罩用 `NSPanel + .nonactivatingPanel`，级别 `.screenSaver`**：全局热键触发时前台是别的
@@ -315,6 +319,15 @@
   的冻结帧，烘焙用的是全分辨率裁剪图 —— 两者坐标尺度不同，所以各自传对应的 `baseImage`。
 - **多显示器：每块屏一个遮罩**，选区只在其中一块上成立，交付时按那块屏算屏幕矩形。
 - 截图期间 `NSApp.activate` 打断前台 App，`finish()` 时把前台还给用户原来的 App。
+- **工具栏是玻璃（`NSGlassEffectView`）+ 语义色，跟随 `NSApp.appearance`。** 不写死颜色：图标用
+  `labelColor`，选中态用 `controlAccentColor` 底板 + 白图标，悬停 / 按下是 `labelColor` 的淡底。
+  遮罩窗口自己不设 `appearance`，所以会继承应用级的浅 / 深 / 跟随系统。尺寸与浓度都在
+  `DesignTokens.ScreenshotToolbar`。**例外**：选区尺寸标签与窗口名标签仍是「深色底 + 白字」——
+  它们直接压在被压暗的截图上，不是工具栏的一部分，需要在任何截图内容上保持可读。
+- **工具栏按钮不接受第一响应者**（自绘的轻量视图，不是 `NSButton`）：点过工具栏之后键盘仍在画布上，
+  Esc / ⏎ / ⌘Z 照样生效。
+- **画布与工具栏共用 `AnnotationDefaults`**（初始工具 / 颜色 / 线宽档位）。此前两边各写各的，
+  工具栏高亮第 2 档（4）而画布实际画 3。
 - 钉图是常驻置顶窗口（`PinWindowController`）：可拖动、滚轮/捏合缩放、双击 / Esc / ⌘W 关闭、右键复制。
 
 #### 内部结构
@@ -325,6 +338,7 @@
 | `Model/AnnotationRenderer.swift` | 把标注画进 CG 位图上下文（形状、箭头、文字、马赛克、序号）。纯 CG + CoreText |
 | `Model/CaptureOutput.swift` | 裁剪、烘焙、缩放、编码（ImageIO） |
 | `Model/DisplaySnapshot.swift` | 一帧冻结画面 + point→pixel 换算 |
+| `Model/ToolbarPlacement.swift` | 工具栏相对选区的摆放（下 → 上 → 选区内部），纯函数 |
 | `Model/ScreenshotNaming.swift` | 文件名 / 时间戳 / 格式（纯函数，可独立测） |
 | `Service/CaptureEngine.swift` | ScreenCaptureKit 抓屏（全屏 / 按窗口） |
 | `Service/WindowEnumerator.swift` | `CGWindowListCopyWindowInfo` 窗口枚举与命中（悬停高亮 / 单击选窗） |
@@ -333,15 +347,17 @@
 | `Service/ScreenshotDelivery.swift` | 保存到桌面 / 复制到剪贴板 / 快门音 |
 | `UI/OverlayWindowController.swift` | 一块屏的遮罩窗 |
 | `UI/OverlayCanvasView.swift` | 选区 + 标注的绘制与鼠标/键盘交互 |
-| `UI/AnnotationToolbarView.swift` | 选区旁的就地工具栏（AppKit） |
+| `UI/AnnotationToolbarView.swift` | 选区旁的就地工具栏（AppKit，玻璃材质）与它的按钮 `ToolbarButton` |
 | `UI/PinContentView.swift` | 钉图内容视图（拖动 / 缩放 / 关闭） |
 
 #### 交互
 
 - 框选：拖拽出一块区域；单击（几乎不拖动）选中点下的窗口。
-- 选区就绪后工具栏出现在选区下方（放不下则在上方）。
-- 工具：矩形、椭圆、箭头、画笔、荧光笔、文字、马赛克、序号；颜色 7 档；线宽 3 档。
-- 快捷键：Esc 取消，⏎ / ⌘S 保存，⌘C 复制，⌘D 钉图，⌘Z 撤销上一条标注。
+- 选区就绪后工具栏出现在选区下方；放不下则在上方；上下都放不下（接近全屏）则落在选区内部底边。
+- 工具：矩形、椭圆、箭头、画笔、荧光笔、文字、马赛克、序号；颜色 7 档；线宽 3 档（三个大小递增的圆点）。
+- 工具栏上有撤销按钮：没有可撤销的标注时置灰；撤销序号会把计数退回去，下一个序号不会断档。
+- 快捷键：数字键 1–8 切换工具（顺序同工具栏），Esc 取消，⏎ / ⌘S 保存，⌘C 复制，⌘D 钉图，
+  ⌘Z 撤销上一条标注。每个按钮的悬停提示里都写着对应快捷键。
 - 保存去向由设置页的「保存到桌面」决定：开着则落盘 + 复制，关掉则只复制。
 
 #### 已知限制
@@ -377,6 +393,11 @@
 - **序列号会出现在系统信息页**；复制系统报告前应提醒用户（与 Raycast 隐私说明一致）。
 - **侧栏不提供搜索框**；六个（含温度共七个）分类直接列出。
 
+- **菜单栏摘要走事件**：`MenuBarStatsRunner` 常驻轻量采样（只读 Mach CPU tick 与 `host_statistics64`，
+  **不起子进程、不扫进程**），按 `MenuBarStats.title` 格式化后发布 `MenuBarTextEvent`；宿主的
+  `StatusItemController` 订阅并落到 `NSStatusItem`。刷新不低于 2 秒；开关关着时只剩 3 秒一次的
+  设置轮询，并发布一次清除。首轮没有 CPU 基线不发，避免闪出 0%。
+
 #### 内部结构
 
 | 文件 | 职责 |
@@ -398,15 +419,12 @@
 | --- | --- | --- |
 | `sysmonitor.interval` | 采样秒数（1/2/5/10） | 2 |
 | `sysmonitor.defaultTab` | 打开时选中的标签 | `system-info` |
-| `sysmonitor.displayModeCPU` | CPU 已用/空闲 | `used` |
-| `sysmonitor.displayModeMemory` | 内存已用/空闲 | `used` |
-| `sysmonitor.displayModeDisk` | 磁盘已用/空闲 | `free` |
-| `sysmonitor.displayModeBattery` | 电池已用/空闲 | `free` |
-| `sysmonitor.showMenuBarStats` | 菜单栏文案（未接线） | false |
+| `sysmonitor.displayMode` | CPU / 内存 / 磁盘共用的已用/空闲口径（电池固定显示剩余电量） | `used` |
+| `sysmonitor.showMenuBarStats` | 菜单栏图标旁显示 CPU / 内存摘要 | false |
 
 #### 已知限制
 
-- 菜单栏 CPU/内存文案开关仍是占位，未接到 `NSStatusItem`。
+- 菜单栏摘要需要「显示菜单栏图标」开着；宿主图标被隐藏时文字也不显示（重新显示时立即恢复）。
 - 未移植风扇转速（Raycast 依赖私有 SMC 工具）。
 - 部分机型 IOHID 温度传感器为空时，仅能看到系统热压力等级。
 - 网络吞吐需要至少两帧采样才有速率；首轮侧栏显示 `—`。
@@ -418,11 +436,18 @@
 
 #### 不变量
 
+- **列表滚动跟随走 `ListScrollFollow`（边缘跟随、不做动画）**，不要用 `anchor: .center` + 动画：
+  长按方向键时整个列表会一直在滑。副标题是 `PID · 路径`，路径由 `ProcessRecord.displayPath(home:)`
+  把家目录缩成 `~`（家目录由视图层注入，模型层不碰环境）。
+
 - **搜索框落在面板标题栏**，靠 `supportsPanelSearch == true`；内容区不再重复搜索框。
 - **CPU / 内存排序切换在列表上方分段控件**，不挤在标题栏。
 - **永不列出 / 结束宿主自身 PID**（`ProcessInfo.processIdentifier`）。
 - **采样只在面板打开时跑**；间隔读 `killprocess.refreshInterval`，非法值回落 3 秒。
 - **结束成功或失败都必须走 `ShowHUDEvent`**，并打 `QuickLog`（成功 `.notice`，失败 `.error`）。
+- **危险结束要二次确认**（`KillConfirmPolicy`）：强制结束（SIGKILL）默认总是确认
+  （设置 `killprocess.confirmForceKill`，默认开）；`WindowServer`、`loginwindow`、`launchd`、
+  `kernel_task`、`SystemUIServer` 这类受保护系统进程**无论设置如何都确认**。确认框 ↵ 确认 / Esc 取消。
 - Model 层禁止 AppKit / SwiftUI。
 
 #### 内部结构
@@ -465,6 +490,12 @@
   每条系统操作都是一条静态命令（`functionCommands`），由 `CommandIndex` 按关键词
   与用户别名统一打分 —— 别名解析在 `rebuildCommandCatalog()` 里做，不在插件的搜索里。
 - **执行后关闭主面板**（`HidePaletteEvent`），与面板内点击一致。
+- **破坏性操作先确认**（`SystemAction.requiresConfirmation`：重启、关机、退出登录、清空废纸篓）。
+  热键与主搜索触发时 `perform` 不直接执行，而是 `NavigateEvent(context: ["confirm": rawValue])`
+  把面板带到插件视图弹确认框 —— 没有「绕过确认」的入口。设置 `systemcontrol.confirmDestructive`
+  （默认开）可关闭；锁屏、睡眠、屏保、弹出磁盘、切换外观不需要确认。
+- **插件视图支持标题栏搜索与键盘**（`supportsPanelSearch == true`）：输入筛选、↑↓ 移动、↵ 执行；
+  在设置里被关掉的命令不出现在列表里。
 - **反馈必须如实**：走 AppleScript 的操作失败时 HUD 提示需「自动化」权限；成功且机器即将
   休眠/重启/注销时**不**伪造成功 HUD。锁屏走 `/usr/bin/pmset displaysleepnow`。
 - **不提供没有实现的操作。** 勿扰 / 专注模式在 macOS 上没有公开的切换 API，
@@ -495,37 +526,43 @@
 - 「锁屏」实为立即关闭显示器睡眠，是否需密码取决于系统「锁屏」设置。
 - 不支持勿扰 / 专注模式切换：macOS 没有公开 API。
 
-### 文件搜索（filesearch）
+### 文件搜索（宿主搜索来源 `filesearch`）
 
-在主搜索用 `f ` / `file ` / `文件 ` 前缀按文件名（可选内容）查 Spotlight；插件面板内可持续输入关键词并打开文件。
+**它不是插件**：能力在 `QuickPlatform/Files/`，装配在 `Quick/FileSearchSource.swift`，
+结果直接进主搜索列表。主搜索用 `f ` / `file ` / `文件 ` 前缀按文件名（可选内容）查 Spotlight。
+没有自己的面板、没有 `Packages/PluginFileSearch`，也不会出现在插件列表里。
 
 #### 不变量
 
 - **主搜索触发词必须带尾随空格**（`f `、`file `、`文件 `）；去掉前缀后关键词不能为空，
-  否则不查 Spotlight、不占用结果位。
-- **动态插件**：实现 `accepts` + `dynamicSearch`，只有前缀合法时才参与聚合搜索。
+  否则不查 Spotlight、不占用结果位（`FileSearchSource.accepts`）。
 - **查询引擎为 `NSMetadataQuery`**，范围 `NSMetadataQueryLocalComputerScope`；谓词由
   `FileSearchQuery.predicate` 纯逻辑构造。
 - **每次搜索开始时读一遍设置**（`FileSearchPreferences.current`）：谓词、隐藏过滤、上限
   必须同一次查询内一致。
-- **结果上限以设置为准**（20 / 50 / 100 / 200，非法值回落 50）；**禁止**在插件里二次写死
+- **结果上限以设置为准**（20 / 50 / 100 / 200，非法值回落 50）；**禁止**二次写死
   `prefix(10)`。
 - **忽略隐藏文件**：路径任一段以 `.` 开头的目录或文件名视为隐藏。
-- **新搜索会取消上一次查询**；**2 秒超时**后返回已收集结果。
-- **主搜索回车打开文件**（`NSWorkspace.open`）并关面板；插件视图内点击结果同样行为。
-- **面板内搜索与主搜索分离**：插件视图不要求 `f ` 前缀，输入变化即触发搜索。
+- **新搜索会取消上一次查询**；**2 秒超时**后返回已收集结果。查询生命周期由
+  `SearchSessionGate`（令牌）管理：每次搜索开始先结束上一个会话（返回空）、领新令牌；
+  观察者、超时任务、`NSMetadataQuery` 都在会话结束时一并清理，迟到的完成通知拿旧令牌被忽略。
+  任务被取消（`Task.cancel`）同样会立即结束会话。
+- **可在设置「搜索范围」里整体关掉**：`PaletteSearchEngine` 先查 `isSearchSourceEnabled("filesearch")`，
+  关掉后连 `accepts` 都不问。
+- **文件结果的 id 形如 `filesearch.<路径>`**（`FileSearchQuery.itemID(forPath:)`）：最近使用里
+  能据此还原成文件项；文件已不存在时不再显示。
+- **回车打开文件**（`NSWorkspace.open`）并关面板。
 - **`Model/` 禁止 AppKit / SwiftUI**；图标映射只返回 SF Symbol 名。
 
 #### 内部结构
 
 | 文件 | 职责 |
 | --- | --- |
-| `Model/FileSearchQuery.swift` | 前缀解析、Spotlight 谓词描述 |
-| `Model/FileSearchPreferences.swift` | 设置映射、过滤规则 |
-| `Model/FileIconMapper.swift` | 扩展名 → 图标名 |
-| `Service/FileSearchSession.swift` | `NSMetadataQuery` 生命周期与结果映射 |
-| `UI/FileSearchView.swift` | 内嵌搜索框 + 结果列表 |
-| `FileSearchPlugin.swift` | 动态搜索、命令 `filesearch.content` |
+| `QuickPlatform/Files/FileSearchQuery.swift` | 前缀解析、Spotlight 谓词描述 |
+| `QuickPlatform/Files/FileSearchPreferences.swift` | 设置映射、过滤规则 |
+| `QuickPlatform/Files/FileIconMapper.swift` | 扩展名 → 图标名 |
+| `QuickPlatform/Files/FileSearchService.swift` | `NSMetadataQuery` 生命周期与结果映射 |
+| `Quick/FileSearchSource.swift` | 实现 `PaletteHostSearchSource`，把结果映射成面板条目 |
 
 #### 持久化
 
@@ -598,13 +635,19 @@
 - **本机 IP**：遍历 `getifaddrs`，仅 IPv4，接口名 **`en0` 或 `en1`**，取第一个命中。
 - **DNS**：读 `/etc/resolv.conf` 全文，由纯函数 `ResolvConf.dnsServers` 解析行首 `nameserver`。
 - **公网 IP 查询可注入**（`NetworkService.init(fetchPublicIP:)`）供测试替换网络。
-- **`Model/ResolvConf.swift` 禁止 AppKit / SwiftUI**。
+- **Ping**：`/sbin/ping`（路径写死、参数走数组、不经 shell）。目标须过 `PingTarget.validated`
+  （只放行主机名 / IP 字符，拒绝 `-` 开头的选项）；包数取 `networkTools.pingCount`，超时取
+  `networkTools.timeout`（读时夹到 1–20 / 1–30）；任务取消会终止子进程；输出由 `PingParser` 解析汇总。
+- **`refresh()` 可重入**：用代数丢弃较早一轮的结果；公网 IP 请求超时取设置、只接受 IP 字面量，失败写日志。
+- **`Model/` 禁止 AppKit / SwiftUI**。
 
 #### 内部结构
 
 | 文件 | 职责 |
 | --- | --- |
 | `Model/ResolvConf.swift` | resolv.conf 文本 → DNS 列表 |
+| `Model/PingModels.swift` | 偏好夹取、目标校验、ping 输出解析 |
+| `Service/PingRunner.swift` | 调用 `/sbin/ping`，可取消 |
 | `Service/NetworkService.swift` | IP/DNS 采集、加载状态 |
 | `UI/NetworkToolsView.swift` | 刷新按钮、信息行、复制 |
 | `NetworkToolsPlugin.swift` | 触发词与单面板导航 |
@@ -614,19 +657,37 @@
 | 键 | 含义 | 默认 |
 | --- | --- | --- |
 | `networkTools.showExternalIP` | 查询并展示公网 IP | true（未写过） |
-| `networkTools.pingCount` | 设置页：Ping 次数 | 4（**未接入**） |
-| `networkTools.timeout` | 设置页：超时秒数 | 5（**未接入**） |
+| `networkTools.pingCount` | Ping 次数 | 4 |
+| `networkTools.timeout` | 超时秒数（Ping 每包 / 公网 IP 请求） | 5 |
 
 #### 已知限制
 
-- **网络测速**、**Ping**、**DNS 切换** 仅在触发词与设置页文案中出现，**无**
-  独立动作与 UI。
+- **网络测速**、**DNS 切换** 仅在触发词中出现，**无**独立动作与 UI。
 - 公网 IP 依赖第三方 HTTPS 服务，离线或被封时显示「无法获取」。
 - 本机 IP 只反映以太网/Wi‑Fi 常见接口，VPN / 桥接 / 其它接口可能看不到。
 
+### 设置备份与恢复（宿主，设置 → 通用）
+
+把偏好域导出成 `.quicksettings`（XML plist），换机或重装后导入。逻辑在
+`QuickPlatform/Settings/SettingsBackup.swift`（纯函数，可独立测）；文件面板与结果提示在
+`GeneralPane`；读写 `UserDefaults` 与重启在 `Quick/SettingsBridge+Backup.swift`。
+
+#### 不变量
+
+- **只带 Quick 自己的键**：`NS*` / `Apple*` / `com.apple.*` 等系统与框架键（窗口位置、语言）
+  导出与导入都过滤。导入**不信任文件**，同样过滤并计数，被篡改的备份改不了系统键。
+- **用 plist 而不是 JSON**：`Bool` / `Int` / `Double` / `Data` / `Date` 往返不丢类型。
+  `Bool` 必须先按 `CFBoolean` 区分，否则 `true` 会被写回成整数 1。
+- **先解析、后写入**：解析失败一个键都不写。写入前先把当前设置另存为
+  `Application Support/<bundle id>/settings-before-import.plist`；这份保险写不出来就中止导入。
+- 版本号高于 `currentVersion` 的备份明确拒绝，不猜着解析；超过 5 MB 直接拒绝（读入内存前先看文件大小）。
+- **不在备份里**：数据库内容（剪贴板历史等）与钥匙串里的 API Key。
+- 导入后提示重启：部分设置（热键、插件启用、外观监听）只在启动时读取，重启才整体生效。
+- 结果在页面内展示，**不弹 `NSAlert`**。
+
 ### 超级面板（Super Panel）
 
-对齐 Fasty 的双态超级面板：在**鼠标处**弹出一块独立浮层，识别选区 / 剪贴板内容给出
+双态超级面板（紧凑竖向列表）：在**鼠标处**弹出一块独立浮层，识别选区 / 剪贴板内容给出
 即时动作；没有内容时提供工作台（常用工具 + 最近使用 + 剪贴板预览）。
 
 **它不是插件，而是宿主级组件。** 面板不进主面板搜索、不进插件列表，设置自成一处。
@@ -649,8 +710,12 @@
 3. **独立浮窗，在鼠标处弹出。** `SuperPanelPanel` 是无边框、非激活、跨空间的浮窗；
    落点由 `SuperPanelPlacement` 纯函数决定：默认在光标右下 6pt，右侧 / 下方空间不足
    自动翻到左 / 上，并严格夹进屏幕可见区。
-4. **高度随内容自适应。** 根视图量出内容自然高度，协调器把窗口高度夹在 120…620 之间；
-   高度变化以光标为锚点重定位（向下的面板顶边不动，向上的底边不动）。
+4. **高度随内容自适应。** 根视图量出内容自然高度，协调器把窗口高度夹在 96…620 之间
+   （`SuperPanelHeightPolicy`）；高度变化以光标为锚点重定位（向下的面板顶边不动，
+   向上的底边不动）。
+   **骨架先行：** 唤出后立刻以骨架高度显示（`orderFrontRegardless`，**不取焦点**），
+   抓选区与识别在后台跑，完成后才 `makeKey` 并原地替换内容。抓选区是合成 ⌘C，
+   所以取焦点必须晚于它；骨架期间的键盘输入一律不消费。
 5. **失焦与外部点击收起。** 失焦收起带 350ms 保护期，避免刚弹出就被底层窗口抢焦；
    面板外的鼠标按下也收起。
 6. **智能预览是纯逻辑。** `SmartPreviewDetector` 不依赖 AppKit，路径存在性通过注入的闭包
@@ -658,18 +723,19 @@
 7. **系统能力由宿主注入。** 抓选区（`SelectionCapture`）、合成粘贴（`PasteService`）、
    最近使用解析都由 `AppCore.wireSuperPanel()` 注入；`QuickUI` 不认识 `QuickPlatform`，
    也不认识插件，依赖方向保持单向。
-8. **跳转插件走 `EventBus`。** 打开翻译 / JSON / 颜色等工具走 `NavigateEvent`，
+8. **跳转插件走 `EventBus`。** 打开翻译 / JSON / 时间戳等工具走 `NavigateEvent`，
    不直接 `import` 其他插件。
 9. **鼠标唤出需要辅助功能权限。** 无权限时监听不启动，设置页提示授权。
 10. **`Model/` 下不 import AppKit / SwiftUI。** `SmartPreview`、`SmartPreviewDetector`、
-    `SuperPanelPlacement`、`SuperPanelPreferences` 都是纯逻辑，可被测试独立编译。
+    `SuperPanelPlacement`、`SuperPanelPreferences`、`SuperPanelNavigation`（直达键、列表 / 网格
+    导航、动作整理、高度策略）都是纯逻辑，可被测试独立编译。
 
 #### 打开方式
 
 | 方式 | 说明 |
 | --- | --- |
 | 全局快捷键 | 默认 `⌥C`，可在「设置 → 超级面板」改或清空 |
-| 右键长按 | 按住右键约 450ms（可调 50–1000ms） |
+| 右键长按 | 按住右键约 450ms（可调 50–1000ms，上下限与 `MouseTriggerMonitor` 共用同一份常量） |
 | 中键单击 | 按下鼠标滚轮键，会保留划词选中 |
 
 鼠标唤出前会先尝试用 ⌘C 抓当前选区（`SelectionCapture`）；没有选区时回落到剪贴板。
@@ -678,14 +744,17 @@
 
 | 键 | 行为 |
 | --- | --- |
-| ← / → | 上下文 ↔ 工作台切换（有内容时才可切） |
-| ↑ / ↓ | 在上下文动作列表里移动选中 |
+| ↑ / ↓ | 上下文：在动作列表里移动（到头回绕）；工作台：在工具网格里上下走，走出网格进入「最近使用」 |
+| ← / → | 上下文：切到工作台；工作台：在网格里左右走，行首再按 ← 回到上下文 |
+| ⇥ Tab | 上下文 ↔ 工作台切换（有内容时才可切） |
 | ↵ | 执行选中项 |
-| 1–9 | 直接执行第 n 个动作 / 快捷工具 |
+| 1–9，然后 A–Z | 直达第 n 项（动作 / 工具 / 最近使用共用同一套键位，行上的键帽就是答案） |
 | ⌥↵ | 把结果替换回原应用的选区 |
 | esc | 收起 |
 | ⌘, | 打开超级面板设置 |
 
+- 动作最多展示 12 项（9 个数字键 + 3 个字母键），同 id 去重，「在 Google 搜索」兜底项永远沉底，
+  裁剪时优先保住它（`SuperPanelActionPlanner`）。
 - 点击动作：复制类会给一眼 toast 再收起；跳转类会先收起再打开主面板到目标插件。
 - 点击工作台卡片：跳转到对应插件。
 - 点击剪贴板预览：把内容替换回原处。
@@ -696,7 +765,7 @@
 | --- | --- | --- |
 | 网址 | `https://…` | 打开、复制 |
 | 文件路径 | `/Users/…`、`~/…` | Finder、终端、复制路径 |
-| 颜色 | `#FF5500` | 复制 HEX、打开颜色工具 |
+| 颜色 | `#FF5500` | 复制色值（目前没有颜色工具插件，不提供「打开颜色工具」） |
 | 时间戳 | `1700000000` | 复制格式化时间、打开时间戳工具 |
 | Base64 | 可解码明文 | 复制解码结果、打开 Base64 工具 |
 | URL 编码 | `%E4%BD%A0` | 复制解码结果、打开 URL 工具 |
@@ -707,8 +776,8 @@
 
 #### 工作台
 
-- **常用工具**：默认八宫格（截图、剪贴板、翻译、AI、备忘、计算、监控、JSON），
-  可在设置里增删与排序，点卡片跳转到对应插件。
+- **常用工具**：默认 4 列八宫格（截图、剪贴板、翻译、AI、日历、计算、监控、JSON），
+  可在设置里增删与排序，点卡片或按直达键跳转到对应插件。
 - **最近使用**：宿主从 `UsageHistory` 解析出最近的应用与工具（最多 4 条）。
 - **剪贴板预览**：最近一条剪贴板内容，点击替换回原处，右侧可复制。
 
@@ -719,7 +788,7 @@
 | 键 | 类型 | 说明 |
 | --- | --- | --- |
 | `superPanel.mouseLongPressEnabled` | Bool | 长按右键唤出（默认 true） |
-| `superPanel.mouseLongPressThresholdMs` | Int | 长按阈值 ms，50…1000（默认 450） |
+| `superPanel.mouseLongPressThresholdMs` | Int | 长按阈值 ms，50…1000（默认 450；监听器与设置页夹紧口径一致） |
 | `superPanel.middleClickEnabled` | Bool | 中键单击唤出（默认 true） |
 | `superPanel.opacity` | Double | 背景不透明度 0.30…1.0（默认 0.85） |
 | `superPanel.material` | String | 背景材质：`hud` / `popover` / `solid`（默认 `hud`） |
@@ -732,12 +801,67 @@
 
 快捷键存在宿主热键服务里，命令 id 为 `core.superPanel`（不进主搜索命令目录）。
 
+### AI 对话与服务商（宿主，主搜索按 Tab 进入）
+
+宿主级功能，不是插件：主搜索里输入后按 **Tab**，把输入框里的文字带进一个对话输入框
+（不自动发送），左侧是会话栏。服务商与模型在「设置 › AI 服务」里配置。
+
+## 不变量
+
+- **对话是面板的一种模式，不是插件。** 它借用插件内容区的渲染路径，模式 id 是
+  `AIChatController.modeID`（`quick.ai-chat`），由协调器特判：名称 / 图标、视图、Esc、
+  快捷键、Tab、禁用分离。不要把它塞进 `plugins` 表，也不要给 `PaletteCoordinator` 加 `@Observable`。
+- **Tab 只在主搜索生效。** 输入法组字中的 Tab 是切换候选，`PalettePanel` 检测到
+  `hasMarkedText()` 时不拦截。插件里的 Tab 属于插件。
+- **Esc 优先级：取消重命名 → 停止生成 → 退出对话。** 退出对话**不会**停止后台生成，
+  回来时回复已经写完。
+- **多服务商，Key 按服务商分存。** `AIProvider.id` 是随机 UUID，Key 的 Keychain 账号是
+  `ai.apiKey.<id>`。预设（`AIProviderPresets`）只是「一键填好 Base URL 与协议」的模板，
+  添加后与自定义服务商无区别；预设只预添加第一个模型，其余让用户挑或自动拉取。
+  只有「已启用、有模型、需要 Key 时已填 Key」的服务商才会出现在对话的模型选择里。
+- **协议只有两种。** OpenAI 兼容（`/chat/completions`）与 Anthropic（`/messages`）。
+  请求构造与流式解析都是纯函数（`AIService.makeChatRequest` / `parseStreamLine`），不起网络可测。
+- **非本机的 `http://` 一律拒绝**：Key 会随请求头明文出网。
+- **没有旧版单服务商迁移。** 旧的 `ai.apiKey` 钥匙串项不再被读取，需要在设置里重新添加服务商。
+- **会话一个会话一个 JSON 文件**（`Application Support/<bundle id>/AIChats`）。写盘是防抖的
+  （改动后 300ms、后台线程），退出与隐藏面板时同步落盘。上限 200 个，超出淘汰最久没动过的
+  未置顶会话。磁盘上空内容、无失败标记的助手消息视为「被中断」，加载时标成失败可重试。
+- **流畅靠这几条：** 会话列表常驻内存、切换不读盘；流式文本每 ~40ms 才合并写入一次；
+  每个会话各有自己的生成任务（A 在生成时可以切到 B）；消息与侧栏行都是 `Equatable`，
+  流式时只有最后一条重算；删除立刻消失、6 秒内可撤销，到期才删文件；
+  空会话不落盘、切走时清掉。
+- **输入框是自绘的 `NSTextView`**（回车发送、⇧/⌥↵ 换行、自动增高、占位文字）。
+  回车在 `PalettePanel` 里对对话模式放行（`routeSubmit` 返回 false），由输入框自己处理。
+- **⌘⌫ 在输入框有字时不吞键**（那是「删到行首」），只有输入框为空才删除会话。
+
+快捷键：`⌘N` 新对话、`⌘[` / `⌘]` 切换会话、`⌘⌫` 删除、`⌘B` 显示 / 隐藏会话栏、`⌘F` 搜索会话、
+`⌘E` 重命名、`⌘⇧P` 置顶、`⌘R` 重新生成、`⌘⇧C` 复制最后一条回复。键位表是
+`AIChatShortcut.resolve` 一个纯函数。
+
+| 文件 | 职责 |
+| --- | --- |
+| `QuickCore/Models/AIProvider*.swift` | 服务商、预设、模型引用、Key 存取、默认模型解析 |
+| `QuickCore/Models/AIChat.swift` | 会话与消息模型、分组 / 淘汰 / 上下文裁剪（纯函数） |
+| `QuickPlatform/AI/AIService.swift` | 流式对话、拉取模型、连接自检；请求与解析纯函数 |
+| `QuickPlatform/AI/ChatSessionFileStore.swift` | 会话文件存储 |
+| `QuickUI/AIChat/AIChatController.swift` | 会话状态机与生成任务（由 `AppCore` 持有，经 `PaletteDependencies` 注入） |
+| `QuickUI/AIChat/Model/` | `ChatMarkdown` 块解析（容忍流式截断）、`AIChatShortcut` 键位 |
+| `QuickUI/AIChat/*View.swift` | 会话栏、消息、Markdown 渲染、输入框 |
+
+开发验收：启动参数 `-showAIChat` 直接进入对话。
+
 ### AI 聚合（ai）
 
 把 8 个 AI 官网（DeepSeek / ChatGPT / Gemini / Claude / 豆包 / Kimi / 智谱 / 通义千问）
 聚合成一个插件：在搜索结果里直达，或在 Quick 自己的窗口里打开页面。
 
 #### 不变量
+
+- **每个 WebView 必须挂 `AIWebViewCoordinator`（导航 + UI 代理）。** 没有它：网页进程崩溃后
+  白屏不恢复；断网只有空白；`target=_blank` 的登录跳转点了没反应；网页的「上传文件」不弹面板。
+  代理只被 WebKit 弱引用，所以由 `AIWebViewWindowManager` 持有。加载失败展示 `AIErrorPage`
+  （用户取消的 `NSURLErrorCancelled` 不算失败），页内「重试」走 `quick-retry://` 由代理拦截。
+- **切走 / 隐藏的页面要 `pauseAllMediaPlayback()`**，别让看不见的标签继续出声。
 
 - **窗口是普通窗口，不是非激活面板。** 这一条决定「切走之后还能不能找回来」：非激活面板
   不进 ⌘Tab / Mission Control，用户一旦从 AI 窗口切到别的应用，就只剩「再从面板点一次」
@@ -904,9 +1028,9 @@
 
 - **空串是合法的 Base64**：`decode("")` 返回 `""` 而不是报错。界面靠 `!input.isEmpty` 提前返回，所以走不到这条路径 —— 测的时候别把它当成错误用例。
 - 解码失败分两种：`Failure.invalidBase64`（不是合法 Base64）与 `Failure.invalidUTF8`（解出来不是 UTF-8 文本）。
-- **解码始终先剥掉空白与换行**：从终端、邮件或折行编码输出粘贴来的 Base64 常带换行或尾随空格，不论是否开启 `wrapsLines` / `isURLSafe` 都能直接解码。
-- `Data(base64Encoded:)` 对填充敏感：非 URL-Safe 模式下缺 `=` 会被判为非法，这是有意的严格。
-- **工具栏模式切换、URL-Safe 与折行开关均实时重算输出**；当右侧输出为空时「互换」与「复制」按钮禁用，避免空输出覆写用户输入或剪贴板。
+- `Data(base64Encoded:)` 对填充敏感：缺 `=` 会被判为非法，这是有意的严格。**但空白（含折行）一律先剥掉**，不论哪种字母表 —— 邮件 / PEM / 日志里的 Base64 常带折行。
+- 两个编解码工具（Base64 / URL）共用 `QuickUI.CodecWorkbench`：模式切换、互换、复制、清空、双栏与状态栏都在组件里，插件只持有状态与转换。改界面改组件，不要再各抄一份。
+- **输出为空时「互换」与「复制」按钮禁用**，避免空输出覆写用户输入或剪贴板。
 
 #### 内部结构
 
@@ -923,8 +1047,10 @@
 #### 不变量
 
 - **两个入口语义不同，不要合并**：`digests(of:)` 对空输入返回 `[]`（界面靠它显示空状态），`digest(_:algorithm:)` 对空输入返回该算法的真实摘要（空串的 MD5 是 `d41d8cd98f00b204e9800998ecf8427e`）。
-- 输出统一是小写十六进制。改大小写会破坏与外部工具对拍的结果。
+- **存储与计算始终是小写十六进制**；设置里的「大写显示」只在展示与复制那一刻转换（`display(_:uppercase:)`），所以切换设置不必重算。
+- **「计算后自动复制」不是每次按键都复制**：停手 `autoCopyDelay`（0.8 秒）之后才复制一次 SHA256，否则每个中间状态的哈希都会灌进剪贴板历史。
 - `Algorithm.allCases` 的顺序就是界面上的行顺序。
+- **HMAC**：`digests(of:hmacKey:)` 密钥非空即改算 HMAC，空串表示不用 HMAC；密钥只存视图 `@State`，不落盘、不进剪贴板历史。用公开标准向量锁定结果。
 
 #### 内部结构
 
@@ -947,7 +1073,11 @@
 - **解析用 `JSONSerialization`**，所以 JSON5、尾逗号、注释都不支持；无效输入返回
   `Failure.invalidJSON`，界面显示「无效的 JSON」而不是原样回显。
 - `Outcome.nodeCount` 与 `byteSize` 都来自同一次解析，不要为了显示再去解析一遍。
-- **设置项与工具栏共用 `@AppStorage` 键**：`jsonFormatter.indent`（2 / 4 空格，切换时非压缩态立即重排）、`jsonFormatter.wrapLines`（自动换行，默认开启）。
+- **输入变化走 `Debouncer`，且树只解析一次。** `JSONFormatterLogic.analyze(_:)` 一次解析同时给出
+  有效性、树根、节点数；超过 `treeParseLimit`（512KB）只做有效性判断、不建树（界面提示
+  「文件较大，树视图已跳过」）。别在 `body` 或 `onChange` 里同步解析大文本。
+- 缩进设置键是 `jsonFormatter.indent`，与设置页 `JSONFormatterFeatureSection` 共用同一个 `@AppStorage` 键。
+- **粘贴会自动反转义并原地格式化**；设置项 `jsonFormatter.wrapLines`（自动换行，默认开启）与工具栏共用同一个 `@AppStorage` 键，缩进切换时非压缩态立即重排。
 - **反转义分自动与手动两条路，逻辑都在 `JSONFormatterLogic`。**
   - `unescape(_:)` 手动：整段带引号的字符串字面量按 JSON 字符串解码；裸的转义正文
     补一层引号再解码。**只解一层** —— 盲目递归会把本该保留的转义也吃掉。
@@ -1003,6 +1133,9 @@
   - 子查询括号 `(SELECT ...)` 自动换行并递进括号深度，普通行内括号（如 `COUNT(*)`、`IN (1, 2)`）保持行内紧凑。
 - **设置项与工具栏共用 `@AppStorage` 键**：`sqlFormatter.indent`（2 / 4 空格）、`sqlFormatter.keywordCase`（`uppercase` / `lowercase`）、`sqlFormatter.wrapLines`（自动换行），切换时立即重排。
 - **词法透传保护**：单/双引号字面量（兼容 `''` 双写与 `\'` 反斜杠转义）、反引号 `` `id` ``、方括号 `[id]`、命名参数 `:param`、变量 `@var` / `@@var`、位置参数 `$1` 及 MyBatis 占位符 `#{id}` / `${table}` 均作为完整词法单元透传，绝不拆散或改写大小写。
+- **关键字大小写**由设置控制（`SQLKeywordCase`），只作用于「独占一行」的那批关键字，字符串字面量与标识符保持原样。设置里不认识的值回落到默认大写。
+- **缩进与大小写的默认值只在 `SQLFormatterDefaults` 里写一份**，设置页与视图共用；工具栏上的缩进选择器与设置页绑定**同一个键**（改工具栏就是改偏好）。
+- 它是词法级的格式化器，不是 SQL 解析器：方言差异不会被特殊处理，但字符串字面量、引号标识符与注释整体透传。
 
 #### 内部结构
 
@@ -1015,6 +1148,10 @@
 #### 不变量
 
 - **是按行位置对齐，不是 LCS 最长公共子序列**：中间插入一行会让其后所有行都被标成「删一行 + 加一行」。改算法等于改可见行为，需同步改测试。
+- **「忽略空白 / 忽略大小写」真的生效**（`TextDiffLogic.Options`）：只影响「两行算不算相同」，
+  展示的仍是原文。忽略空白 = 裁掉行首尾空白并把行内连续空白当一个；「没有这一行」永远不等于空行。
+  工具栏开关与设置页共用同一个键（`textDiff.ignoreWhitespace` / `textDiff.ignoreCase`）。
+- **左右栏底色在文本或选项变化时算一次**，缓存在 `@State`，不在 `body` 里每次重算。
 - **空串等价于一行空行**：`diff("", "")` 会给出 1 行 `.same`（空行）而不是 0 行；`diff("", "x")` 是 1 删 1 加。
 - `DiffLine.LineType` 嵌在 `DiffLine` 里，视图按原拼写使用它。
 - **对比长在编辑器里，不是另起一段结果列表。** 左右各一个 `CodeEditorView`（AppKit 原生 `NSTextView`）：可编辑、语法高亮、行号槽、逐行红绿底。旧实现把差异单独铺在输入框下面，用户明确否掉了 —— 那样看不出「哪一行变成了哪一行」。
@@ -1047,11 +1184,13 @@ Unix 时间戳与日期互转。参考 Fasty timestamp-converter。
 
 #### 不变量
 
-- **必须挡住非有限值与超大值**：`Double("inf")` 能解析成功，而 `Int(inf)` 会直接崩掉进程 —— 一个纯文本输入框不该有让 App 挂掉的能力。上限是 `maximumMagnitude`（1e15）。
-- **毫秒判定取绝对值**：`abs(value) > millisecondsThreshold`。1970 年之前的毫秒时间戳是负数，只看 `> 1e12` 会把它们当秒处理，差一千倍。
+- **必须挡住非有限值与超大值**：`Double("inf")` 能解析成功，而 `Int(inf)` 会直接崩掉进程 —— 一个纯文本输入框不该有让 App 挂掉的能力。上限是 `maximumMagnitude`（1e20，按纳秒算约公元 5138 年）。
+- **按数量级判秒 / 毫秒 / 微秒 / 纳秒**（阈值 1e12 / 1e15 / 1e18），且全部取绝对值。1970 年之前的毫秒时间戳是负数，只看 `> 1e12` 会把它们当秒处理，差一千倍。
 - **时区必须注入**：模型不读 `TimeZone.current`，显示与无时区日期的解析都用传入的时区，否则测不了。ISO 8601 一行固定输出 UTC。
 - **打开面板时若输入框为空，默认按设置单位（秒/毫秒）填入当前时间戳并立即转换**；若已有上次保留的内容或由超级面板携带 `query` 预填，则保留该内容并立即展示转换结果。
-- 只看 `dateFormats` 里列出的 5 种日期格式，其余一律当作无法识别。
+- **设置真的生效**：默认单位（秒 / 毫秒）决定「填入当前」填 10 位还是 13 位；默认时区（本地 / UTC）决定结果卡片主行与底部「当前时间」的时区，也是无时区日期的解析时区。选 UTC 时主行改名「UTC 时间」，并且不再追加重复的 UTC 行。默认值只在 `TimestampConverterDefaults` 写一份。
+- 日期输入先试 ISO 8601（含 `T`，支持 Z / 偏移 / 小数秒），再试 `dateFormats` 里列出的 5 种格式，其余一律当作无法识别。
+- **追加行是 opt-in**：`convert(_:timeZone:now:)` 传入 `now` 才在末尾追加「UTC 时间」「相对现在」；不传则保持原有四行及顺序，原有契约不变。时钟同样由调用方注入。
 
 #### 内部结构
 
@@ -1087,6 +1226,7 @@ URL 百分号编码与解码。参考 Fasty url-codec。
 - **批量生成必须互不相同**：一次生成 N 个就是 N 个不同值（已用 100 个一批的测试锁定）。
 - 大小写与连字符两项持久化在 `uuidGenerator.uppercase` / `uuidGenerator.removeDashes`，与设置页共用同一个键；改其中一边记得另一边读的是同一份值。
 - 去掉连字符后长度是 32，保留时是 36（连字符在 8/13/18/23 位）。
+- **v7 批内严格递增**：同一毫秒连续生成时时间戳顺延 1ms（`max(now, previous + 1)`），复制出去的一批 ID 按字符串排序就是生成顺序；v7 的时钟与随机源可注入。版本选择只存视图 `@State`，不持久化。
 
 #### 内部结构
 

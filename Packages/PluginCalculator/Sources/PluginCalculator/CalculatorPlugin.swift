@@ -26,7 +26,10 @@ public final class CalculatorPlugin: QuickPlugin, PluginViewProviding, PluginSet
     private let log = QuickLog.plugin(CalculatorPlugin.id)
 
     /// 计算引擎（无状态且 Sendable，可从任意隔离域读）
-    private nonisolated let engine = CalcEngine()
+    private nonisolated let engine: CalcEngine
+
+    /// 汇率缓存（引擎只读它，刷新由 `activate()` 触发）
+    private nonisolated let rates = CurrencyRateCache()
 
     /// 计算历史（计算稿纸）
     private let store: CalcHistoryStore
@@ -34,6 +37,7 @@ public final class CalculatorPlugin: QuickPlugin, PluginViewProviding, PluginSet
     /// - Parameter storage: 由 AppCore 注入的存储句柄
     public init(storage: PluginStorage) {
         self.store = CalcHistoryStore(storage: storage)
+        self.engine = CalcEngine(rates: rates)
     }
 
     // MARK: - 存储 schema
@@ -82,7 +86,7 @@ public final class CalculatorPlugin: QuickPlugin, PluginViewProviding, PluginSet
                 id: "calculator.result",
                 pluginID: Self.id,
                 title: result.formatted,
-                subtitle: query,
+                subtitle: result.note.map { "\(query) · \($0)" } ?? query,
                 icon: "equal",
                 relevance: 0.95,  // 计算结果优先级高
                 shortcutHint: autoCopy ? "⏎ 复制" : "⏎ 完成",
@@ -122,6 +126,11 @@ public final class CalculatorPlugin: QuickPlugin, PluginViewProviding, PluginSet
 
     public func activate() {
         log.notice("插件已激活，计算历史 \(self.store.entries.count, privacy: .public) 条")
+        // 汇率只在用户允许在线更新时才联网；缓存没过期时 `refreshIfNeeded` 什么都不做
+        if CalcPreferences.onlineCurrencyRates() {
+            let cache = rates
+            Task { await cache.refreshIfNeeded() }
+        }
     }
 
     public func deactivate() {

@@ -47,6 +47,12 @@ struct JSONFormatterView: View {
     @State private var lineCount = 0
     @State private var lastAction: ActionState?
 
+    /// 因体积超限而跳过了树（只做合法性校验）
+    @State private var treeSkipped = false
+
+    /// 大输入走防抖 + 后台解析，小输入同步算（见 `Debouncer`）
+    @State private var debouncer = Debouncer()
+
     /// 与设置页共用的持久化偏好
     @AppStorage(PluginSettingKey.JSONFormatter.indent) private var indent = 2
     @AppStorage(PluginSettingKey.JSONFormatter.wrapLines) private var wrapLines = true
@@ -70,11 +76,11 @@ struct JSONFormatterView: View {
         VStack(spacing: 0) {
             toolbar
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             content
 
-            Divider().opacity(0.3)
+            Divider().opacity(DesignTokens.Opacity.divider)
 
             statusBar
         }
@@ -88,19 +94,12 @@ struct JSONFormatterView: View {
         .onChange(of: mode) { _, _ in
             updateNavigationWants()
         }
-        .onChange(of: text) { _, newValue in
-            // 自动反转义：只在「当前不是合法 JSON、反转义后是」时才改写，避免和正常编辑打架
-            let normalized = JSONFormatterLogic.autoUnescape(newValue)
-            if normalized != newValue {
-                text = normalized
-                return
-            }
-            refresh()
-        }
+        .onChange(of: text) { _, _ in refresh() }
         .onChange(of: indent) { _, _ in
             guard hasMeaningfulText, lastAction != .minified else { return }
             format()
         }
+        .onDisappear { debouncer.cancel() }
         .onChange(of: root) { _, newRoot in
             collapsed = newRoot.map(JSONTreeLayout.defaultCollapsed) ?? []
             selection = nil
@@ -153,10 +152,10 @@ struct JSONFormatterView: View {
             Image(systemName: "curlybraces")
                 .font(DesignTokens.Typography.emptyStateIcon)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
-            Text("还不是合法的 JSON")
+            Text(treeSkipped ? "内容较大，不展示树视图" : "还不是合法的 JSON")
                 .font(DesignTokens.Typography.rowTitle)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
-            Text("切到「代码」粘贴内容，或先点一下「反转义」")
+            Text(treeSkipped ? "超过 512 KB 的 JSON 只做校验，请在「代码」视图里查看与格式化" : "切到「代码」粘贴内容，或先点一下「反转义」")
                 .font(DesignTokens.Typography.rowTrailing)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
         }
@@ -294,6 +293,10 @@ struct JSONFormatterView: View {
                 Text(error)
                     .font(DesignTokens.Typography.keyCap)
                     .foregroundStyle(DesignTokens.Colors.destructive)
+            } else if treeSkipped {
+                Text("有效 JSON · 体积较大，树视图已停用")
+                    .font(DesignTokens.Typography.keyCap)
+                    .foregroundStyle(DesignTokens.Colors.success)
             } else if root != nil {
                 Text("有效 JSON")
                     .font(DesignTokens.Typography.keyCap)
@@ -348,23 +351,30 @@ struct JSONFormatterView: View {
         }
     }
 
-    /// 重新解析当前文本并刷新错误 / 节点数 / 行数 / 树
+    /// 重新分析当前文本并刷新错误 / 节点数 / 行数 / 树
+    ///
+    /// 自动反转义也在分析里完成：只在「当前不是合法 JSON、反转义后是」时才改写文本，
+    /// 避免和正常编辑打架。大输入在后台解析，结果回来时若文本已变就丢弃。
     private func refresh() {
-        guard hasMeaningfulText else {
-            root = nil
-            lineCount = 0
-            lastAction = nil
-            errorMessage = nil
+        let snapshot = text
+        debouncer.schedule(
+            weight: snapshot.utf8.count,
+            work: { JSONFormatterLogic.analyze(snapshot) },
+            apply: { apply($0, for: snapshot) })
+    }
+
+    /// 把分析结果写回界面；`source` 是分析时的文本，已经过期则忽略
+    private func apply(_ analysis: JSONFormatterLogic.Analysis, for source: String) {
+        guard source == text else { return }
+        if analysis.text != source {
+            text = analysis.text
             return
         }
-        lineCount = JSONFormatterLogic.lineCount(in: text)
-        do {
-            root = try JSONFormatterLogic.parseTree(text)
-            errorMessage = nil
-        } catch {
-            root = nil
-            errorMessage = "无效的 JSON"
-        }
+        root = analysis.root
+        treeSkipped = analysis.treeSkipped
+        lineCount = analysis.isBlank ? 0 : JSONFormatterLogic.lineCount(in: source)
+        if analysis.isBlank { lastAction = nil }
+        errorMessage = analysis.isBlank || analysis.isValid ? nil : "无效的 JSON"
     }
 
     private func format() {
@@ -402,10 +412,12 @@ struct JSONFormatterView: View {
     }
 
     private func clear() {
+        debouncer.cancel()
         text = ""
         root = nil
         lineCount = 0
         lastAction = nil
+        treeSkipped = false
         collapsed = []
         selection = nil
         errorMessage = nil

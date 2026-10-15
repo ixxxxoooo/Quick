@@ -125,13 +125,11 @@ public struct SettingsCustomCommandItem: Identifiable, Sendable {
 public enum SettingsPermission: String, CaseIterable, Sendable {
     case accessibility
     case screenCapture
-    case location
 
     public var title: String {
         switch self {
         case .accessibility: "辅助功能"
         case .screenCapture: "屏幕录制"
-        case .location: "定位服务"
         }
     }
 
@@ -139,7 +137,6 @@ public enum SettingsPermission: String, CaseIterable, Sendable {
         switch self {
         case .accessibility: "accessibility"
         case .screenCapture: "rectangle.dashed.badge.record"
-        case .location: "location"
         }
     }
 
@@ -149,8 +146,6 @@ public enum SettingsPermission: String, CaseIterable, Sendable {
             "用于需要辅助功能的插件操作。系统只允许已授权的应用控制其他界面。"
         case .screenCapture:
             "用于截图与窗口捕获。macOS 只允许已授权的应用读取屏幕内容。"
-        case .location:
-            "用于天气插件。只在你主动查看天气时申请，不会在启动时弹出。"
         }
     }
 }
@@ -222,17 +217,6 @@ public struct SettingsSearchSource: Identifiable, Sendable {
     }
 }
 
-/// AI 连接自检结果
-public struct SettingsAITestResult: Sendable {
-    public let isSuccess: Bool
-    public let message: String
-
-    public init(isSuccess: Bool, message: String) {
-        self.isSuccess = isSuccess
-        self.message = message
-    }
-}
-
 /// 设置窗口的数据源与动作
 ///
 /// **按职责拆成四个子协议再组合**：这个协议有约 50 个成员，而实际用得最多的视图
@@ -282,7 +266,6 @@ public protocol LauncherSettingsDataSource: AnyObject {
     func setSearchScopes(_ scopes: [String])
     func restoreDefaultSearchScopes()
     var indexedApplications: [SettingsAppItem] { get }
-    func appIcon(for path: String) -> NSImage?
     func setAppAlias(_ alias: String?, for bundleID: String)
 
     var systemActions: [SettingsSystemActionItem] { get }
@@ -321,6 +304,19 @@ public protocol PluginSettingsDataSource: AnyObject {
     func setForcedKeyboardLayout(_ layoutID: String?)
 }
 
+/// 一次设置导入的结果
+public struct SettingsImportSummary: Sendable, Equatable {
+    /// 已写入的设置项数
+    public let applied: Int
+    /// 因键不合规被丢弃的条目数
+    public let skipped: Int
+
+    public init(applied: Int, skipped: Int) {
+        self.applied = applied
+        self.skipped = skipped
+    }
+}
+
 /// 宿主级：通用、超级面板、AI、权限、关于
 @MainActor
 public protocol HostSettingsDataSource: AnyObject {
@@ -329,6 +325,14 @@ public protocol HostSettingsDataSource: AnyObject {
     var isLaunchAtLoginEnabled: Bool { get }
     func setLaunchAtLogin(_ enabled: Bool)
     var hotKeyDescription: String { get }
+
+    // MARK: - 备份与恢复
+    /// 把当前设置序列化成备份文件内容
+    func exportSettings() throws -> Data
+    /// 解析备份并写入设置；导入前会自动把现有设置另存一份，导入失败时原设置不动
+    func importSettings(_ data: Data) throws -> SettingsImportSummary
+    /// 重启应用（导入后让新设置整体生效）
+    func restartApplication()
 
     // MARK: - 超级面板（宿主级）
     /// 超级面板的设置页
@@ -342,12 +346,6 @@ public protocol HostSettingsDataSource: AnyObject {
     func clearSuperPanelShortcut()
     /// 清空「最近使用」记录
     func clearRecentUsage()
-
-    // MARK: - AI 基座
-    /// 宿主级 AI 服务设置页
-    func makeAISettingsView() -> AnyView
-    /// 连接自检（发一条最短消息）
-    func testAIConnection() async -> SettingsAITestResult
 
     // MARK: - 权限
     func permissionState(_ permission: SettingsPermission) -> SettingsPermissionState

@@ -46,4 +46,59 @@ struct PaletteSelectionTests {
         #expect(selection.move(-1))
         #expect(selection.keyboardScrollToken != before)
     }
+
+    // MARK: - 跳转 / 翻页 / 数字直达
+
+    @Test("跳到首项与末项")
+    func jumpToEnds() {
+        let selection = PaletteSelection()
+        selection.update(count: 20) { _ in }
+        #expect(selection.jump(to: .last))
+        #expect(selection.index == 19)
+        #expect(selection.jump(to: .first))
+        #expect(selection.index == 0)
+    }
+
+    @Test("没有结果时跳转与翻页都不消费")
+    func emptyResultsDoNotConsume() {
+        let selection = PaletteSelection()
+        selection.update(count: 0) { _ in }
+        #expect(!selection.jump(to: .last))
+        #expect(!selection.page(1))
+        #expect(!selection.activateNumbered(1))
+    }
+
+    @Test("翻页按页大小移动并夹在边界内")
+    func pageClampsToBounds() {
+        let selection = PaletteSelection()
+        selection.update(count: 10) { _ in }
+        #expect(selection.page(1, pageSize: 4))
+        #expect(selection.index == 4)
+        #expect(selection.page(1, pageSize: 4))
+        #expect(selection.page(1, pageSize: 4))
+        #expect(selection.index == 9)
+        #expect(selection.page(-1, pageSize: 100))
+        #expect(selection.index == 0)
+    }
+
+    @Test("⌘数字执行对应行并把选中项挪过去")
+    func numberedActivation() {
+        let selection = PaletteSelection()
+        var activated: [Int] = []
+        selection.update(count: 5) { activated.append($0) }
+        #expect(selection.activateNumbered(3))
+        #expect(activated == [2])
+        #expect(selection.index == 2)
+    }
+
+    @Test("⌘数字超出结果数或范围时不消费")
+    func numberedOutOfRange() {
+        let selection = PaletteSelection()
+        var activated = 0
+        selection.update(count: 3) { _ in activated += 1 }
+        #expect(!selection.activateNumbered(4))
+        #expect(!selection.activateNumbered(0))
+        #expect(!selection.activateNumbered(10))
+        #expect(activated == 0)
+    }
 }

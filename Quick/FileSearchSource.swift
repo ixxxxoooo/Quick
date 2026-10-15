@@ -11,15 +11,18 @@ import QuickUI
 /// 文件搜索作为宿主的一个搜索来源
 ///
 /// **它不是插件**：文件搜索由 `QuickPlatform` 提供能力，装配在这里，结果直接进主搜索
-/// 列表。因此它不出现在插件列表、不能被单独禁用、也没有自己的面板 —— 面板、设置页、
-/// 触发词守卫都不需要，输入 `f ` 前缀就在主搜索里出文件。
+/// 列表。因此它不出现在插件列表、也没有自己的面板 —— 输入 `f ` 前缀就在主搜索里出文件。
+/// 它可以在「设置 → 搜索范围」里被单独关闭（`sourceID` 即开关的 key）。
 ///
 /// 触发词解析（`FileSearchQuery`）与结果过滤（`FileSearchFiltering`）都是
 /// `QuickPlatform` 里的纯逻辑，这里只负责把两侧接上并把结果映射成面板条目。
 @MainActor
 final class FileSearchSource: PaletteHostSearchSource {
 
-    nonisolated let sourceID = "filesearch"
+    /// 搜索范围开关与结果条目共用的标识
+    nonisolated static let sourceIdentifier = "filesearch"
+
+    nonisolated let sourceID = FileSearchSource.sourceIdentifier
     nonisolated let displayName = "文件搜索"
 
     private let service: FileSearchService
@@ -50,8 +53,8 @@ final class FileSearchSource: PaletteHostSearchSource {
     static func items(for files: [FileSearchService.FileResult]) -> [SearchableItem] {
         files.map { file in
             SearchableItem(
-                id: "filesearch.\(file.path)",
-                pluginID: "filesearch",
+                id: FileSearchQuery.itemID(forPath: file.path),
+                pluginID: FileSearchSource.sourceIdentifier,
                 pluginName: "文件搜索",
                 title: file.name,
                 subtitle: file.path,

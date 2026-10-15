@@ -14,30 +14,22 @@ import SwiftUI
 struct CommandsSettingsPane: View {
 
     let dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource
-    var embedded = false
 
     @State private var runShellFallback: Bool
     @State private var showingAddSheet = false
     @State private var editingCommand: SettingsCustomCommandItem?
     @AppStorage(PluginSettingKey.Shell.preferredTerminal) private var preferredTerminal = "com.apple.Terminal"
 
-    init(dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource, embedded: Bool = false) {
+    init(dataSource: any LauncherSettingsDataSource & PluginSettingsDataSource) {
         self.dataSource = dataSource
-        self.embedded = embedded
         _runShellFallback = State(initialValue: dataSource.isRunShellFallbackEnabled)
     }
 
     var body: some View {
-        Group {
-            if embedded {
-                sections
-            } else {
-                Form {
-                    sections
-                }
-                .formStyle(.grouped)
-            }
+        Form {
+            sections
         }
+        .formStyle(.grouped)
         .sheet(isPresented: $showingAddSheet) {
             CommandEditorSheet(dataSource: dataSource, existingCommand: nil)
         }
@@ -131,9 +123,9 @@ private struct CustomCommandRow: View {
             Image(systemName: "terminal")
                 .font(DesignTokens.Typography.iconGlyph)
                 .foregroundStyle(command.isEnabled ? Color.accentColor : .secondary)
-                .frame(width: 20, height: 20)
+                .frame(width: DesignTokens.Size.settingsRowIcon, height: DesignTokens.Size.settingsRowIcon)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 Text(command.name)
                     .lineLimit(1)
                 Text(command.command)
@@ -146,7 +138,7 @@ private struct CustomCommandRow: View {
 
             TextField("设置别名", text: $alias)
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 80)
+                .frame(width: DesignTokens.Size.settingsColumnNarrow)
                 .onChange(of: alias) { _, newValue in
                     dataSource.updateCustomCommand(
                         id: command.id,
@@ -167,6 +159,7 @@ private struct CustomCommandRow: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("编辑")
             .help("编辑")
 
             Button(role: .destructive) {
@@ -177,9 +170,10 @@ private struct CustomCommandRow: View {
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("删除")
             .help("删除")
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.Spacing.xxs)
     }
 }
 
@@ -225,7 +219,7 @@ private struct CommandEditorSheet: View {
             }
 
             Toggle(isOn: $loadsShellEnvironment) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                     Text("加载 Shell 配置（.zshrc）")
                     Text("打开后别名与 .zshrc 里的 PATH 才生效，代价是每次执行多一份加载时间。")
                         .font(.caption)
@@ -252,7 +246,7 @@ private struct CommandEditorSheet: View {
             }
         }
         .padding()
-        .frame(width: 420)
+        .frame(width: DesignTokens.Size.settingsDialogWidth)
         .onAppear {
             if let existingCommand {
                 name = existingCommand.name

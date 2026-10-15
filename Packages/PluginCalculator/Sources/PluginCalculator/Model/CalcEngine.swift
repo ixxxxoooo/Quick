@@ -18,6 +18,21 @@ nonisolated final class CalcEngine: Sendable {
     struct CalcResult: Sendable {
         let value: Double
         let formatted: String
+        /// 附注（例如汇率的更新日期）；普通计算为空
+        let note: String?
+
+        init(value: Double, formatted: String, note: String? = nil) {
+            self.value = value
+            self.formatted = formatted
+            self.note = note
+        }
+    }
+
+    /// 汇率缓存。环境事实一律注入，引擎自己不联网也不读存储
+    private let rateCache: CurrencyRateCache?
+
+    init(rates: CurrencyRateCache? = nil) {
+        self.rateCache = rates
     }
 
     /// 计算表达式
@@ -56,8 +71,9 @@ nonisolated final class CalcEngine: Sendable {
     ///
     /// 给搜索闸门用：不像表达式就不要进求值，主面板每次按键都会问一次。
     func looksLikeExpression(_ expr: String) -> Bool {
-        let unitKeywords = ["to", "in", "转", "换"]
-        if unitKeywords.contains(where: { expr.lowercased().contains($0) }) {
+        // 换算要求「数字 + 单位 + 分隔词 + 单位」的结构：单看包含 `to` / `in`
+        // 会把 `photoshop`、`settings` 这类普通搜索词都放进来
+        if UnitConversion.looksLikeConversion(expr) {
             return true
         }
 
@@ -88,126 +104,47 @@ nonisolated final class CalcEngine: Sendable {
         return CalcResult(value: value, formatted: CalcFormatting.string(from: value, options: options))
     }
 
-    // MARK: - 单位换算
+    // MARK: - 单位与货币换算
 
-    /// 尝试解析单位换算表达式（如 "100 km to mi"）
+    /// 尝试解析换算表达式（`100 km to mi`、`5 斤转kg`、`100 usd to cny`）
+    ///
+    /// 单位名可能含分隔词（`in` 是英寸），所以逐个候选切法试，第一个两边都认识的就是答案。
     private func tryUnitConversion(_ expr: String, options: CalcDisplayOptions) -> CalcResult? {
-        // 简单的单位换算模式匹配
-        let patterns = ["to", "in", "转", "换"]
-        for separator in patterns {
-            let parts = expr.lowercased().components(separatedBy: " \(separator) ")
-            guard parts.count == 2 else { continue }
-
-            let source = parts[0].trimmingCharacters(in: .whitespaces)
-            let targetUnit = parts[1].trimmingCharacters(in: .whitespaces)
-
-            if let result = convertUnit(source: source, targetUnit: targetUnit, options: options) {
-                return result
-            }
+        for request in UnitConversion.requests(in: expr) {
+            if let result = convert(request, options: options) { return result }
         }
         return nil
     }
 
-    /// 执行单位转换
-    private func convertUnit(
-        source: String,
-        targetUnit: String,
-        options: CalcDisplayOptions
-    ) -> CalcResult? {
-        // 解析数值和单位
-        let scanner = Scanner(string: source)
-        guard let value = scanner.scanDouble() else { return nil }
-        let sourceUnit = String(source[scanner.currentIndex...]).trimmingCharacters(in: .whitespaces)
-
-        // 温度换算
-        if let result = convertTemperature(value: value, from: sourceUnit, to: targetUnit, options: options) {
-            return result
-        }
-
-        // 使用 Measurement API 进行通用单位换算
-        if let result = convertMeasurement(
-            value: value, from: sourceUnit, to: targetUnit, options: options)
+    private func convert(_ request: UnitConversion.Request, options: CalcDisplayOptions) -> CalcResult? {
+        // 温度不是线性换算，单独处理；结果带 °C / °F / K 符号
+        if let temperature = UnitConversion.convertTemperature(
+            value: request.value, from: request.fromUnit, to: request.toUnit)
         {
-            return result
-        }
-
-        return nil
-    }
-
-    /// 温度转换
-    private func convertTemperature(
-        value: Double,
-        from: String,
-        to: String,
-        options: CalcDisplayOptions
-    ) -> CalcResult? {
-        let celsiusNames = ["c", "°c", "摄氏", "celsius"]
-        let fahrenheitNames = ["f", "°f", "华氏", "fahrenheit"]
-
-        let fromCelsius = celsiusNames.contains(from.lowercased())
-        let fromFahrenheit = fahrenheitNames.contains(from.lowercased())
-        let toCelsius = celsiusNames.contains(to.lowercased())
-        let toFahrenheit = fahrenheitNames.contains(to.lowercased())
-
-        if fromCelsius && toFahrenheit {
-            let result = value * 9 / 5 + 32
             return CalcResult(
-                value: result, formatted: "\(CalcFormatting.string(from: result, options: options))°F")
-        }
-        if fromFahrenheit && toCelsius {
-            let result = (value - 32) * 5 / 9
-            return CalcResult(
-                value: result, formatted: "\(CalcFormatting.string(from: result, options: options))°C")
+                value: temperature.value,
+                formatted: "\(CalcFormatting.string(from: temperature.value, options: options))\(temperature.symbol)")
         }
 
-        return nil
-    }
-
-    /// 使用 Measurement API 进行换算
-    private func convertMeasurement(
-        value: Double,
-        from: String,
-        to: String,
-        options: CalcDisplayOptions
-    ) -> CalcResult? {
-        // 长度单位映射
-        let lengthUnits: [String: UnitLength] = [
-            "km": .kilometers, "m": .meters, "cm": .centimeters, "mm": .millimeters,
-            "mi": .miles, "yd": .yards, "ft": .feet, "in": .inches,
-            "千米": .kilometers, "米": .meters, "厘米": .centimeters, "英里": .miles
-        ]
-
-        // 重量单位映射
-        let massUnits: [String: UnitMass] = [
-            "kg": .kilograms, "g": .grams, "mg": .milligrams,
-            "lb": .pounds, "oz": .ounces,
-            "千克": .kilograms, "克": .grams, "磅": .pounds
-        ]
-
-        // 尝试长度换算
-        if let fromUnit = lengthUnits[from.lowercased()],
-            let toUnit = lengthUnits[to.lowercased()]
+        if let converted = UnitConversion.convert(
+            value: request.value, from: request.fromUnit, to: request.toUnit)
         {
-            let measurement = Measurement(value: value, unit: fromUnit)
-            let converted = measurement.converted(to: toUnit)
             return CalcResult(
-                value: converted.value,
-                formatted: "\(CalcFormatting.string(from: converted.value, options: options)) \(to)"
-            )
+                value: converted,
+                formatted: "\(CalcFormatting.string(from: converted, options: options)) \(request.toUnit)")
         }
 
-        // 尝试重量换算
-        if let fromUnit = massUnits[from.lowercased()],
-            let toUnit = massUnits[to.lowercased()]
+        // 货币：没有汇率（从没拉成功过、或用户关了在线更新）时不给结果，不编数
+        if let rates = rateCache?.current,
+            let converted = rates.convert(request.value, from: request.fromUnit, to: request.toUnit),
+            let target = rates.code(for: request.toUnit)
         {
-            let measurement = Measurement(value: value, unit: fromUnit)
-            let converted = measurement.converted(to: toUnit)
+            let day = rates.updatedAt.formatted(.dateTime.month().day())
             return CalcResult(
-                value: converted.value,
-                formatted: "\(CalcFormatting.string(from: converted.value, options: options)) \(to)"
-            )
+                value: converted,
+                formatted: "\(CalcFormatting.string(from: converted, options: options)) \(target)",
+                note: "汇率更新于 \(day)")
         }
-
         return nil
     }
 }

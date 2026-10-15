@@ -33,6 +33,11 @@ withAnimation(.easeOut(duration: DesignTokens.Duration.hover)) { ... }
 需要一个新的数值时，**先往 `DesignTokens` 加一个带名字、带注释的令牌**，
 再在视图里引用它。不允许「就这一次先写死」。
 
+**这条由 `Scripts/check-ui-literals.py` 机械检查**（接入 `run-tests.sh` 与提交钩子）：
+`padding / frame / cornerRadius / opacity / font(size:) / Color(red:) / 栈 spacing / offset / lineWidth / shadow`
+里出现非零数字即失败。`0` 不算（「没有」不是设计值）。确有理由的行尾写
+`// ui-literal-ok: 理由`（例如日历自带的用户颜色），不要为了过检查而把数字藏进局部常量。
+
 ---
 
 ## 2. 面板几何（与设计基准对齐）
@@ -71,15 +76,21 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 
 ### 超级面板（与主面板独立）
 
-光标旁弹出的上下文面板，几何对齐 **Fasty**，**不跟** `panelScale`（主面板 825×523
-与它无关）。窗口宽高由内容在下列范围内自适应；落点偏移见
-`SuperPanelPlacement`（纯模型，可单测）。
+光标旁弹出的紧凑竖向列表面板，**不跟** `panelScale`（主面板 825×523 与它无关）。
+窗口高度由内容在下列范围内自适应；落点偏移见 `SuperPanelPlacement`（纯模型，可单测）。
+
+结构：头部（来源徽章 / 标签）→ 内容 → 浮动胶囊底栏（没有分隔线与整条背景）。
+上下文态每个动作占**单行**（图标 + 标题 + 右侧补充文字 + 直达键帽）；一行能说完的预览
+（网址 / 算式 / 邮箱 / IP / 电话）不单独出卡，答案并入第一个动作的右侧文字，
+文件 / 颜色 / JSON / 解码结果等多行信息才出预览卡（`SmartPreview.hasRichDetail`）。
+工作台是 4 列工具网格 + 紧凑的最近使用行，全部可用键盘走完。唤出后先以骨架出现，
+识别完成再原地替换并收敛高度（骨架期间只记录高度、不应用，避免多一次抖动）。
 
 | 令牌 | 值 | 说明 |
 | --- | --- | --- |
-| `Size.superPanelWidth` | 390 | 固定宽度 |
-| `Size.superPanelInitialHeight` | 320 | 首次布局占位 |
-| `Size.superPanelMinHeight` | 120 | 最矮 |
+| `Size.superPanelWidth` | 340 | 固定宽度 |
+| `Size.superPanelSkeletonHeight` | 176 | 骨架高度（识别完成前的占位） |
+| `Size.superPanelMinHeight` | 96 | 最矮 |
 | `Size.superPanelMaxHeight` | 620 | 最高，超出内部滚动 |
 | `Radius.superPanel` | 16 | 窗口与背景圆角 |
 
@@ -123,6 +134,8 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
   不要把它加回行里。
 - 选中/悬停用 `Colors.selection` / `Colors.rowHover` 填充，悬停更淡，
   两者视觉上必须可区分。
+- **标题里命中的字加粗**（`MatchHighlighter`）：子串优先，单个词不是子串时按「词首优先的
+  有序字符」匹配（缩写 `vsc`）。前 9 行右侧标 `⌘1…⌘9`，底栏左侧显示结果总数。
 
 ### 尚未对齐基准的两处（有意为之，不是漏掉）
 
@@ -170,6 +183,10 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
   插件包用不了 `QuickUI` 的 internal 类型，所以行、图标槽、置灰修饰符都是 **public** 的 ——
   这是「插件只管内容区」在设置页上的对应约束，不要为了让它们 internal 而把表单搬回宿主。
 - 设置行的尾部控件用 `DesignTokens.Size.settingsControl` 定宽，行与行才对得齐。
+- **设置要克制：** 默认值调好、很少有人动的项（面板背景浓度、AI 生成参数、结束进程的路径 / PID 搜索）
+  放进 `DisclosureGroup("高级")`；一组同质开关（搜索来源）按 `SearchSourceCategory` 分组并默认折叠，
+  组标题写「已开 / 总数」；插件页不显示 `plugin.<id>` 这类开发者信息，简介直接做开关的副标题。
+  同一功能只有一个入口（终端命令只在「终端命令」页）。**删设置键时不写迁移代码**，读取方回到原默认值。
 
 ### 面板里的键盘导航（为什么不在 SwiftUI 层）
 
@@ -206,7 +223,55 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
 并消费 `commandToken`，这样即使焦点后来被 ⌘F 挪进搜索框，方向键也还到得了列表。
 参见剪贴板与 JSON 树视图。
 
+### 主搜索的导航键位
+
+全部在 `PalettePanel.sendEvent` 里拦（原因同上），翻译集中在 `PaletteKeyMap`（纯函数，可单测）：
+
+| 键 | 动作 | 备注 |
+| --- | --- | --- |
+| ↑ ↓ / ⌃P ⌃N | 上下移动 | 夹边界，不环绕 |
+| PageUp / PageDown | 翻页（7 行） | 任何时候生效 |
+| Home / End | 首项 / 末项 | **仅输入框为空时**，否则是文本光标键 |
+| ⌘↑ / ⌘↓ | 首项 / 末项 | 任何时候生效 |
+| ⌘1…⌘9 | 直达第 n 个结果 | 超出结果数时不消费 |
+| ⌘K | 打开 / 关闭操作菜单 | 见下 |
+
+这些键**只属于主搜索列表**；插件模式一律放行给插件（`PaletteCoordinator.routeNavigation`）。
+
+**⌘K 操作菜单**：`ResultActionCatalog` 按结果形状给出可做的事 —— 第一项永远是「执行」
+（走 `selection.activate`，保证「最近使用」照常记录），应用结果另有「在访达中显示」「复制路径」，
+所有结果都有「复制名称」。菜单打开时 ↑↓ ↵ 属于菜单、Esc 只关菜单，导航键被吞掉不动背后的列表；
+查询变化或面板隐藏都会关闭它（结果换了，菜单指向的结果就失效了）。
+
+### AI 对话里的键盘
+
+主搜索按 **Tab** 进入对话。进入后面板的上下 / 左右 / 回车拦截**全部放行**
+（`routeMove` / `routeTab` / `routeSubmit` 在插件模式下都因 `wantsNavigation` 为假而返回 false），
+输入框是 `NSTextView`，回车发送、⇧/⌥↵ 换行由它自己处理。对话专属的 ⌘ 组合键走
+`onCommandShortcut` → `AIChatShortcut.resolve`（纯函数，可单测）。
+
+- 输入框有字时 `⌘⌫` 不吞键（那是「删到行首」）。
+- Esc：取消重命名 → 停止生成 → 退出对话。
+- 对话内容区没有头部搜索框，也不能分离成独立窗口（头部不显示分离按钮，`⌘D` 无效）。
+- 输入法组字中不拦 Tab / 回车。
+
+### AI 对话里的键盘
+
+主搜索按 **Tab** 进入对话。进入后面板的上下 / 左右 / 回车拦截**全部放行**
+（`routeMove` / `routeTab` / `routeSubmit` 在插件模式下都因 `wantsNavigation` 为假而返回 false），
+输入框是 `NSTextView`，回车发送、⇧/⌥↵ 换行由它自己处理。对话专属的 ⌘ 组合键走
+`onCommandShortcut` → `AIChatShortcut.resolve`（纯函数，可单测）。
+
+- 输入框有字时 `⌘⌫` 不吞键（那是「删到行首」）。
+- Esc：取消重命名 → 停止生成 → 退出对话。
+- 对话内容区没有头部搜索框，也不能分离成独立窗口（头部不显示分离按钮，`⌘D` 无效）。
+- 输入法组字中不拦 Tab / 回车。
+
 ### 列表的滚动跟随与悬停高亮
+
+**渲染开销：** `ResultRowView` 是 `Equatable` 的，列表里用 `.equatable()` 跳过没变的行 ——
+选中 / 悬停每动一下，只有旧选中与新选中两行重算 body；标题高亮（不区分音标的子串搜索）
+再走 `HighlightCache`。给行加新的可见输入时，**必须同步改它的 `==`**，否则新输入不会触发重绘。
 
 四条规则，主搜索列表（`ResultListView`）与插件里的列表都必须遵守。
 
@@ -223,6 +288,13 @@ macOS 截图是 2x，所以逻辑尺寸是 **825×523** —— 两个维度都�
   的 `hoverArmed`），但列表要听 `keyboardScrollToken`、不能听 `selectedIndex`：指针底下
   那一行本来就在可视区里，跟着 `selectedIndex` 滚会让光标扫过**第一行**时命中
   `scrollTo(anchor: .top)`，把内容往上顶一个内边距 —— 表现就是「跳一下」。
+- **两端滚到「内容的端点」，不是「第一项 / 最后一项」。** 列表有内边距时，
+  `scrollTo(firstItem, anchor: .top)` 会把第一行贴到视口顶沿，内边距被滚出可视区，
+  列表就比静止时往上缩一截：结果少（装得下、没法滚）和结果多（能滚）时第一行位置差了一截，
+  输入时看起来是「列表往下跳了一下」。做法：滚动内容最前、最后各放一个零高度的
+  `ListTopMarker()` / `ListBottomMarker()`（**必须在带内边距的容器之外**），跟随与换批回顶
+  一律走 `proxy.follow(index:count:itemID:)` / `proxy.scrollToTopEdge()`，不要直接
+  `scrollTo(items[0].id, anchor: .top)`。
 - **悬停高亮由列表持有，行只读。** 行各自记 `@State isHovered` 时，键盘移动导致列表
   滚动，而滚动不会给指针底下那一行补一次 `onHover(false)` —— 旧的灰色高亮留在原地，
   和键盘选中项同时亮着，看起来就是一层残影。列表统一持有 `hoveredID`（见
@@ -295,6 +367,11 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 - 需要「浮起的玻璃控件」时用现成的 `View.frosted(in:)` 修饰器，它封装了
   `.glassEffect(.regular.interactive().tint(...))`。**不要在视图里重复写这段配置。**
 - 不要堆叠多层玻璃 —— 每层都是一次独立的 GPU pass，且会互相糊掉。
+- **AppKit 自绘的浮层（截图工具栏）用 `NSGlassEffectView`，颜色只用语义色**（`labelColor`、
+  `controlAccentColor`、`separatorColor`）：它们在 `draw(_:)` 里按视图当前的
+  `effectiveAppearance` 解析，浅 / 深 / 跟随系统切换时无需任何额外代码。**不要写死「深底 + 白字」**
+  —— 浅色主题下那是一块外来物。尺寸与浓度放在 `DesignTokens.ScreenshotToolbar`。
+  唯一例外是直接压在被压暗截图上的标签（选区尺寸、窗口名），它们必须在任意截图上可读。
 
 ### 投影由 AppKit 负责，不要在 SwiftUI 里画
 
@@ -391,6 +468,7 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | `PaletteBackground` | 面板背景：vibrancy + scrim + 边缘高光，一处配置。**不含投影** |
 | `Scrolling/EdgeDissolve` | 滚动内容在浮动栏下方淡出的遮罩，`.edgeDissolve()` 挂载 |
 | `KeyCapChip` | 快捷键帽。`.filled`（底栏）/ `.outline`（列表行）两种样式 |
+| `ActionPillLabel` / `ActionPillButton` / `ActionPillBar` | 底栏动作胶囊（文字 + 键帽，毛玻璃胶囊底）与其右对齐、**无背景**的底栏容器。主搜索的「打开 ↵ / 操作 ⌘K」和各插件底栏（系统监控、结束进程）共用，**插件不要再自己拼 `controlSurface` 胶囊**；底栏不铺底色，列表从它下面穿过时用 `.bottomEdgeDissolve()` 淡出 |
 | `BarButton` | 栏位按钮：悬停胶囊 + 图标/文字。`.titled`（底栏）/ `.icon`（窗口标题栏，此时 `title` 只作无障碍标签）两种样式，`.destructive` 色调给关闭用 |
 | `SettingsTileIcon` | 设置侧栏彩色色块图标（18pt 圆角色块 + Medium 白色 SF Symbol），对齐 Raycast Preferences。**public**：插件的设置页住在插件自己的包里，那里也要用同一套色块 |
 | `SettingsRow` | 设置页的一行：固定宽度图标槽 + 标题/副标题 + 尾部控件，尾部可同行（`.inline`）或换行（`.below`）。**public**，插件包里的设置页靠它拼出与宿主一致的行 |
@@ -405,6 +483,8 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | --- | --- |
 | `SearchFieldView` | 统一搜索输入框（图标固定槽位 + 20pt 输入） |
 | `ResultListView` | 统一结果列表（键盘导航 + 悬停 + 滚动跟随）。`ResultRowView` 是它的行 |
+| `CodecWorkbench` | 编解码类工具（Base64 / URL）的共用界面：模式切换、互换、复制、清空、双栏与状态栏 |
+| `MatchHighlighter` | 标题命中高亮的区间计算（子串 / 词首缩写，纯函数） |
 | `ListScrollFollow` | 列表滚动跟随的锚点决策：只有选中项碰到视口边缘才滚（纯函数） |
 
 ### Panel/
@@ -415,6 +495,8 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 | `PaletteCoordinator` | 面板生命周期、定位、聚合搜索。**不要加 `@Observable`** |
 | `PaletteMode` | 面板模式状态桥接（`@Observable`）：搜索模式 vs 插件模式。不持有 NSPanel，安全观察 |
 | `PaletteRootView` | 面板外壳：搜索模式（header / content / bottom bar 三段）或插件模式（插件头部 + makeView） |
+| `PaletteKeyMap` | 主搜索导航键位表（翻页 / 跳首尾 / ⌘数字），纯函数 |
+| `ActionMenuState` / `ActionMenuView` | ⌘K 操作菜单的状态与浮层；`ResultActionCatalog` 决定每条结果的操作 |
 | `PluginHeaderView` | 插件模式头部：返回按钮 + 插件图标/名称 + 分离按钮（⌘D） |
 
 ### Windows/
@@ -441,11 +523,26 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 
 ---
 
+### 可点击区域必须覆盖整个按钮
+
+`.buttonStyle(.plain)` 的按钮，**透明的内边距与透明底色默认点不到**：只有文字、图标、
+以及有填充色的部分响应点击。凡是带 `.padding` / `.frame` 的自定义按钮，label 末尾
+必须加 `.contentShape(...)`（形状与外观一致）；用 `.onTapGesture` 的行，
+`.contentShape` 要放在手势**之前**，命中形状只对它之后添加的手势生效。
+典型反例：剪贴板的「全部 / 文本 / 图片 / 收藏」标签，未选中时底色是 `Color.clear`，
+用户点按钮边缘毫无反应。
+
+---
+
 ## 9. 对话框与提示
 
 - **不要用 `NSAlert`。** 系统弹窗和面板的视觉语言完全冲突（面板是无边框玻璃，
   `NSAlert` 是标题栏窗口）。需要确认时用应用内的自定义对话框面板，
   复用 `Radius.dialog`(20) + `Size.dialogWidth`(420) + 材质背景。
+- **模态确认用 `.confirmDialog(_:search:onConfirm:)`**（`QuickUI/Components/ConfirmDialog.swift`）：
+  给一个 `ConfirmRequest`（标题、说明后果、确认按钮文案、是否危险）即可。**↵ 确认 / Esc 取消**，
+  Esc 优先关对话框而不是退出插件（`PluginSearchQuery.Navigation.cancel` +
+  `PaletteCoordinator.routeCancel()`）。危险操作（结束进程、重启、关机、清空废纸篓）一律走它。
 - **轻量反馈走 `HUDController`**（底部胶囊提示），用 `HUDTone` 表达语义：
   `.success` / `.info` / `.warning` / `.danger`。
 - 需要提示或错误文案时，文案规则：**说清发生了什么 + 下一步能做什么**，
@@ -463,6 +560,21 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
   （位置、图标、字重）。
 - 文本对比度：`textTertiary` 是允许的最淡文本，不要再用更淡的颜色做正文。
 - 键盘可达：面板内所有主要操作都要能用键盘完成，这也是底栏要展示快捷键的原因。
+- **焦点环**：浮窗打开插件时，系统会把初始焦点给第一个可聚焦控件（常是工具栏按钮），随即顶着
+  一圈蓝环。`PaletteRootView` 对插件区整体加了 `.focusEffectDisabled()`（焦点保留、只不画环），
+  头部的返回 / 分离按钮另有 `.focusable(false)`（返回有 Esc）。新增的插件视图不必再各自处理。
+- **行号标尺**：`CodeEditorView` 的 `LineNumberRulerView` 重写了 `draw(_:)`，只画行号与右缘发丝线。
+  系统默认给标尺铺的是不随材质变的纯白底，浅色下会在毛玻璃编辑区旁边留一条白带。
+- **读屏（VoiceOver）**：结果列表每行是一个按钮，念「标题，来源插件」，选中行带 `.isSelected`，
+  `accessibilityAction` 等同回车；⌘数字提示对读屏隐藏（它是视觉提示）。
+- **减弱动态效果**：所有动画一律走 `Motion`（`Motion.animation` / `Motion.withAnimation` /
+  `Motion.duration`），系统开关打开时变成瞬时。不要在视图里直接写 `withAnimation(...)`，
+  AppKit 里的 `NSAnimationContext` 也要 `context.duration = Motion.duration(...)`。
+  动画时长同样不许写字面量（`check-ui-literals.py` 会拦）。
+- **增强对比度**：`DesignTokens.Colors.ramp` 在系统开关打开时把不透明度抬高（`ContrastBoost`，×1.8，
+  最低 0.12）。描边、分隔线、选中底色都是 `ramp`，所以不用逐处适配 —— **新增半透明颜色也走 `ramp`**，
+  别在视图里手写 `.opacity(...)`。注意：`bestMatch` / `NSAppearance.name` 认不出高对比变体，只能读系统开关。
+- 不做动态字体缩放：macOS 没有 iOS 那种全局 Dynamic Type，字号由 `DesignTokens.Typography` 统一给出。
 
 ---
 
@@ -483,6 +595,9 @@ static func adaptive(dark: NSColor, light: NSColor) -> Color
 - **默认值只能有一份，放在读取方那一侧的常量上，设置页引用它。** 设置页再自己写一遍
   字面量，两处迟早漂移，表现同样是「设置页写着 5 秒内、实际行为是关闭」。枚举型的偏好
   也照此办理（见 `PaletteAutoBehavior.defaultPasteWindow` / `defaultClearIdle`）。
+- **这条由 `Scripts/check-setting-keys.py` 机械检查**（接入 `run-tests.sh` 与提交钩子）：键只在
+  设置页（路径含 `/Settings/`）里出现就算死键，门禁失败。同一个键可以由插件视图的 `@AppStorage`
+  直接读写（如 SQL 格式化的缩进，工具栏与设置页共用一个键、一份默认值）。
 - 功能还没实现的控件：**禁用并标注**（`PendingFeatureNote`），不要让它看起来能用。
   保留控件是为了让路线图可见，但那必须写在界面上。
 - 控件对应的功能如果根本不存在（不是「没接上」而是「没做」），把控件和键一起删掉 ——

@@ -36,6 +36,12 @@ struct Base64CodecLogicTests {
         #expect(try Base64CodecLogic.decode("") == "")
     }
 
+    @Test("标准字母表下也忽略折行与空白")
+    func standardDecodeIgnoresWhitespace() throws {
+        #expect(try Base64CodecLogic.decode("aGVs\nbG8=") == "hello")
+        #expect(try Base64CodecLogic.decode("  aGVs bG8=\r\n") == "hello")
+    }
+
     /// `//4=` 是合法 Base64，但解出来是 0xFF 0xFE —— 不是文本，
     /// 视图不能再往下走，否则会把二进制塞进 TextEditor
     @Test("解码结果不是 UTF-8 文本时同样失败")

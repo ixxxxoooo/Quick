@@ -198,3 +198,90 @@ struct KillProcessPluginContractTests {
         #expect(await plugin.dynamicSearch(query: "weather").isEmpty)
     }
 }
+
+@Suite("结束进程的二次确认策略")
+struct KillConfirmPolicyTests {
+
+    @Test("普通进程的普通结束不确认")
+    func plainTerminateOfOrdinaryProcessSkipsConfirmation() {
+        #expect(
+            !KillConfirmPolicy.needsConfirmation(
+                force: false, processName: "Cursor", confirmForceKill: true))
+    }
+
+    @Test("强制结束按设置决定是否确认")
+    func forceKillFollowsTheSetting() {
+        #expect(
+            KillConfirmPolicy.needsConfirmation(
+                force: true, processName: "Cursor", confirmForceKill: true))
+        #expect(
+            !KillConfirmPolicy.needsConfirmation(
+                force: true, processName: "Cursor", confirmForceKill: false))
+    }
+
+    @Test("系统核心进程无论设置如何都要确认")
+    func protectedProcessesAlwaysAsk() {
+        for name in KillConfirmPolicy.protectedNames {
+            #expect(
+                KillConfirmPolicy.needsConfirmation(
+                    force: false, processName: name, confirmForceKill: false),
+                "\(name) 是核心进程，普通结束也必须确认")
+        }
+    }
+
+    @Test("Finder 与 Dock 被杀会自动重启，不算核心进程")
+    func finderAndDockAreNotProtected() {
+        #expect(!KillConfirmPolicy.protectedNames.contains("Finder"))
+        #expect(!KillConfirmPolicy.protectedNames.contains("Dock"))
+    }
+
+    @Test("设置缺省时强制确认为开")
+    func confirmForceKillDefaultsToOn() {
+        let suite = UserDefaults(suiteName: "killprocess.confirm.\(UUID().uuidString)")!
+        #expect(KillProcessPreferences.confirmForceKill(defaults: suite))
+        suite.set(false, forKey: PluginSettingKey.KillProcess.confirmForceKill)
+        #expect(!KillProcessPreferences.confirmForceKill(defaults: suite))
+    }
+
+    @Test("确认文案点名目标进程")
+    func messageNamesTheProcess() {
+        #expect(KillConfirmPolicy.message(force: true, processName: "Cursor").contains("Cursor"))
+        #expect(KillConfirmPolicy.message(force: false, processName: "WindowServer").contains("核心"))
+    }
+}
+
+@Suite("进程副标题路径")
+struct ProcessDisplayPathTests {
+
+    private func record(path: String) -> ProcessRecord {
+        ProcessRecord(
+            id: 1, name: "x", path: path, cpuPercent: 0, memoryPercent: 0, rssKilobytes: 0)
+    }
+
+    @Test("家目录下的路径缩成 ~")
+    func homeAbbreviated() {
+        #expect(record(path: "/Users/a/Apps/x").displayPath(home: "/Users/a") == "~/Apps/x")
+    }
+
+    @Test("恰好是家目录本身")
+    func homeItself() {
+        #expect(record(path: "/Users/a").displayPath(home: "/Users/a") == "~")
+    }
+
+    @Test("名字前缀相同的另一个目录不能误缩")
+    func similarPrefixNotAbbreviated() {
+        #expect(record(path: "/Users/ab/x").displayPath(home: "/Users/a") == "/Users/ab/x")
+    }
+
+    @Test("系统路径原样返回，空路径没有副标题")
+    func systemAndEmpty() {
+        #expect(record(path: "/usr/sbin/cfprefsd").displayPath(home: "/Users/a") == "/usr/sbin/cfprefsd")
+        #expect(record(path: "").displayPath(home: "/Users/a") == nil)
+    }
+
+    @Test("家目录为空或根目录时不缩写")
+    func degenerateHome() {
+        #expect(record(path: "/x").displayPath(home: "/") == "/x")
+        #expect(record(path: "/x").displayPath(home: "") == "/x")
+    }
+}

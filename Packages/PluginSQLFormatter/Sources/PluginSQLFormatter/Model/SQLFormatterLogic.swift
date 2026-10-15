@@ -4,28 +4,37 @@
 
 import Foundation
 
+/// 关键字大小写风格；`rawValue` 就是设置里存的字符串
+enum SQLKeywordCase: String, CaseIterable, Sendable {
+    case uppercase
+    case lowercase
+
+    /// 设置里的值不认识时回落到默认，而不是崩溃或静默变成另一档
+    init(setting: String) {
+        self = SQLKeywordCase(rawValue: setting.lowercased()) ?? SQLFormatterDefaults.keywordCase
+    }
+
+    func apply(to text: String) -> String {
+        switch self {
+        case .uppercase: text.uppercased()
+        case .lowercase: text.lowercased()
+        }
+    }
+}
+
+/// 设置项的默认值：**设置页与插件视图共用这一处**，两边各写一份迟早对不上
+enum SQLFormatterDefaults {
+    static let keywordCase: SQLKeywordCase = .uppercase
+    /// 缩进空格数的可选档位
+    static let indentChoices = [2, 4]
+    static let indent = 2
+}
+
 /// SQL 格式化的纯逻辑
 ///
 /// 从视图里抽出来是为了能脱离 SwiftUI 单独测试 —— `Model/` 不允许 import
 /// SwiftUI/AppKit（仓库红线，靠 grep 保证），视图只负责把结果写进 @State。
 enum SQLFormatterLogic {
-
-    /// 关键字大小写风格
-    enum KeywordCase: String, CaseIterable, Sendable {
-        case uppercase = "uppercase"
-        case lowercase = "lowercase"
-
-        init(rawOrDefault raw: String) {
-            self = KeywordCase(rawValue: raw.lowercased()) ?? .uppercase
-        }
-
-        func apply(to text: String) -> String {
-            switch self {
-            case .uppercase: text.uppercased()
-            case .lowercase: text.lowercased()
-            }
-        }
-    }
 
     /// 单行字符软上限：超过此长度时，遇到逗号自动折行
     private static let maxLineLength = 72
@@ -63,7 +72,7 @@ enum SQLFormatterLogic {
         "AND", "OR", "ON", "USING"
     ]
 
-    /// 行内关键字（不触发换行，但随 `KeywordCase` 规范化大小写）
+    /// 行内关键字（不触发换行，但随 `SQLKeywordCase` 规范化大小写）
     private static let inlineKeywords: Set<String> = [
         "AS", "DISTINCT", "ALL", "IN", "IS", "NOT", "NULL", "TRUE", "FALSE",
         "LIKE", "ILIKE", "RLIKE", "BETWEEN", "EXISTS", "ASC", "DESC",
@@ -95,7 +104,7 @@ enum SQLFormatterLogic {
     static func format(
         _ input: String,
         indent: Int,
-        keywordCase: KeywordCase = .uppercase
+        keywordCase: SQLKeywordCase = SQLFormatterDefaults.keywordCase
     ) -> String {
         let tokens = tokenize(input).filter {
             if case .whitespace = $0 { return false }
@@ -395,7 +404,7 @@ enum SQLFormatterLogic {
     // MARK: - 压缩
 
     /// 压缩：折行与连续空白归一成单个空格，字面量与注释原样保留
-    static func minify(_ input: String, keywordCase: KeywordCase? = nil) -> String {
+    static func minify(_ input: String, keywordCase: SQLKeywordCase? = nil) -> String {
         let tokens = tokenize(input).filter {
             if case .whitespace = $0 { return false }
             return true

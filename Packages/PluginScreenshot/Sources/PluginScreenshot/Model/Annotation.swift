@@ -44,7 +44,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Sendable {
         case .arrow: "arrow.up.right"
         case .pen: "pencil"
         case .highlight: "highlighter"
-        case .text: "textformat"
+        case .text: "character.cursor.ibeam"
         case .mosaic: "squareshape.split.3x3"
         case .counter: "1.circle"
         }
@@ -57,6 +57,19 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Sendable {
         default: true
         }
     }
+}
+
+/// 标注的初始设定与可选档位
+///
+/// 画布与工具栏**都**从这里取值。此前两边各写各的（画布 3、工具栏高亮第 2 档 = 4），
+/// 工具栏上亮着的档位与实际画出来的线宽对不上。
+enum AnnotationDefaults {
+    static let tool: AnnotationTool = .rectangle
+    static let color: RGBAColor = .red
+    /// 线宽三档（point）：细 / 中 / 粗
+    static let lineWidths: [CGFloat] = [2, 4, 7]
+    /// 默认取中档
+    static let lineWidth: CGFloat = 4
 }
 
 /// 与外观无关的 RGBA 颜色

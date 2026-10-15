@@ -88,3 +88,86 @@ struct NetworkToolsSettingWiringTests {
         }
     }
 }
+
+@Suite("Ping 解析与校验")
+struct PingTests {
+
+    @Test("解析 macOS ping 的汇总行")
+    func parsesSummary() throws {
+        let output = """
+            PING apple.com (17.253.144.10): 56 data bytes
+            64 bytes from 17.253.144.10: icmp_seq=0 ttl=52 time=20.1 ms
+
+            --- apple.com ping statistics ---
+            4 packets transmitted, 3 packets received, 25.0% packet loss
+            round-trip min/avg/max/stddev = 19.5/21.25/23.0/1.4 ms
+            """
+        let summary = try #require(PingParser.parse(output))
+        #expect(summary.transmitted == 4)
+        #expect(summary.received == 3)
+        #expect(summary.lossPercent == 25.0)
+        #expect(summary.minMs == 19.5)
+        #expect(summary.avgMs == 21.25)
+        #expect(summary.maxMs == 23.0)
+        #expect(summary.headline.contains("21.2") || summary.headline.contains("21.3"))
+    }
+
+    @Test("全部丢包时没有往返行，仍给出汇总")
+    func parsesTotalLoss() throws {
+        let output = "4 packets transmitted, 0 packets received, 100.0% packet loss"
+        let summary = try #require(PingParser.parse(output))
+        #expect(summary.received == 0)
+        #expect(summary.avgMs == nil)
+        #expect(summary.headline.hasPrefix("不可达"))
+    }
+
+    @Test("主机解析失败等无汇总输出返回 nil")
+    func unparsableOutputIsNil() {
+        #expect(PingParser.parse("ping: cannot resolve nohost.invalid: Unknown host") == nil)
+        #expect(PingParser.parse("") == nil)
+    }
+
+    @Test("目标校验：放行主机名与 IP，拒绝选项与注入字符")
+    func validatesTargets() {
+        #expect(PingTarget.validated(" apple.com ") == "apple.com")
+        #expect(PingTarget.validated("192.168.1.1") == "192.168.1.1")
+        #expect(PingTarget.validated("fe80::1") == "fe80::1")
+        #expect(PingTarget.validated("-f") == nil)
+        #expect(PingTarget.validated("a.com; rm -rf /") == nil)
+        #expect(PingTarget.validated("") == nil)
+        #expect(PingTarget.validated(String(repeating: "a", count: 300)) == nil)
+    }
+
+    @Test("偏好夹到合理范围，缺省取默认")
+    func preferencesAreClamped() {
+        let suite = UserDefaults(suiteName: "networktools.prefs.\(UUID().uuidString)")!
+        #expect(NetworkToolsPreferences.pingCount(defaults: suite) == 4)
+        #expect(NetworkToolsPreferences.timeout(defaults: suite) == 5)
+        suite.set(0, forKey: PluginSettingKey.NetworkTools.pingCount)
+        suite.set(9999, forKey: PluginSettingKey.NetworkTools.timeout)
+        #expect(NetworkToolsPreferences.pingCount(defaults: suite) == 1)
+        #expect(NetworkToolsPreferences.timeout(defaults: suite) == 30)
+    }
+
+    @Test("真实 ping 本机回环：能跑通并解析出 0 丢包")
+    func pingsLoopback() async {
+        let outcome = await PingRunner.run(host: "127.0.0.1", count: 2, timeoutSeconds: 2)
+        guard case let .finished(summary, _) = outcome else {
+            Issue.record("ping 回环失败：\(outcome)")
+            return
+        }
+        #expect(summary.received == 2)
+        #expect(summary.lossPercent == 0)
+    }
+
+    @Test("取消任务会终止 ping 子进程，不会等满全部包数")
+    func cancellationTerminatesThePingProcess() async {
+        let started = ContinuousClock.now
+        let task = Task { await PingRunner.run(host: "127.0.0.1", count: 20, timeoutSeconds: 2) }
+        try? await Task.sleep(for: .milliseconds(300))
+        task.cancel()
+        _ = await task.value
+        // 20 个包按 1 秒间隔要 19 秒以上；被终止则应在几秒内返回
+        #expect(ContinuousClock.now - started < .seconds(8))
+    }
+}

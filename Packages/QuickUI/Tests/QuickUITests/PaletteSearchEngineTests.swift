@@ -291,3 +291,62 @@ struct PaletteSearchEngineTests {
         #expect(outcome.items.count == PaletteSearchEngine.resultLimit)
     }
 }
+
+// MARK: - 宿主来源（文件搜索）
+
+/// 记录 `accepts` / `search` 是否被调用的宿主来源
+@MainActor
+private final class StubHostSource: PaletteHostSearchSource {
+
+    nonisolated let sourceID = "host-stub"
+    nonisolated let displayName = "宿主桩"
+
+    private(set) var acceptsCalls = 0
+    private(set) var searchCalls = 0
+
+    func accepts(query: String) -> Bool {
+        acceptsCalls += 1
+        return true
+    }
+
+    func search(query: String) async -> [SearchableItem] {
+        searchCalls += 1
+        return [
+            SearchableItem(
+                id: "host-stub.1", pluginID: sourceID, pluginName: nil, title: "宿主结果",
+                subtitle: nil, icon: "doc", relevance: 0.5, action: {})
+        ]
+    }
+}
+
+@Suite("宿主搜索来源的开关")
+@MainActor
+struct HostSourceGateTests {
+
+    @Test("来源开启时参与搜索，结果补上来源名")
+    func enabledHostSourceContributes() async {
+        let source = StubHostSource()
+        let outcome = await PaletteSearchEngine.search(
+            query: "abc", staticCommands: [], plugins: [],
+            isSearchSourceEnabled: { _ in true }, recentItemIDs: [],
+            invokeCommand: { _ in }, log: QuickLog.palette, hostSource: source)
+
+        #expect(outcome.items.map(\.id) == ["host-stub.1"])
+        #expect(outcome.items.first?.pluginName == "宿主桩")
+        #expect(source.searchCalls == 1)
+    }
+
+    @Test("来源被关闭后连 accepts 都不会被调用")
+    func disabledHostSourceIsNeverAsked() async {
+        let source = StubHostSource()
+        let outcome = await PaletteSearchEngine.search(
+            query: "abc", staticCommands: [], plugins: [],
+            isSearchSourceEnabled: { $0 != "host-stub" }, recentItemIDs: [],
+            invokeCommand: { _ in }, log: QuickLog.palette, hostSource: source)
+
+        #expect(outcome.items.isEmpty)
+        #expect(source.acceptsCalls == 0, "关掉的来源不该再被问到")
+        #expect(source.searchCalls == 0)
+    }
+}
+

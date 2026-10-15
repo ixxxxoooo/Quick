@@ -15,10 +15,21 @@ struct SystemActionsSettingsPane: View {
 
     let dataSource: any LauncherSettingsDataSource & CommandSettingsDataSource & PluginSettingsDataSource
 
+    @AppStorage(PluginSettingKey.SystemControl.confirmDestructive) private var confirmDestructive = true
+
     var body: some View {
         let actions = dataSource.systemActions
         return Form {
             PluginIntroSection(dataSource: dataSource, pluginID: "systemcontrol")
+            Section {
+                Toggle(isOn: $confirmDestructive) {
+                    SettingsRow(
+                        title: "危险操作前确认",
+                        subtitle: "重新启动、关机、退出登录、清空废纸篓执行前先弹出确认框；热键触发时同样生效。",
+                        icon: { SettingsRowIcon(systemImage: "exclamationmark.triangle") }
+                    )
+                }
+            }
             Section {
                 if actions.isEmpty {
                     Text("暂无系统操作")
@@ -59,9 +70,9 @@ private struct SystemActionRow: View {
             Image(systemName: action.icon)
                 .font(DesignTokens.Typography.iconGlyph)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 20, height: 20)
+                .frame(width: DesignTokens.Size.settingsRowIcon, height: DesignTokens.Size.settingsRowIcon)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                 Text(action.title)
                     .lineLimit(1)
                 Text(action.description)
@@ -73,7 +84,7 @@ private struct SystemActionRow: View {
             Spacer(minLength: DesignTokens.Spacing.md)
 
             AliasField(
-                placeholder: "Add Alias",
+                placeholder: "添加别名",
                 text: $alias,
                 onChange: { newValue in
                     dataSource.setSystemActionAlias(newValue, for: action.id)
@@ -88,6 +99,6 @@ private struct SystemActionRow: View {
                 dataSource.setCommandEnabled(CommandID.systemAction(action.id), enabled: newValue)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignTokens.Spacing.xxs)
     }
 }

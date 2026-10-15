@@ -11,7 +11,18 @@ struct NetworkToolsView: View {
 
     let service: NetworkService
 
+    @State private var pingHost = "apple.com"
+    @State private var showsRawPing = false
+
     var body: some View {
+        ScrollView {
+            content
+        }
+        .task { await service.refresh() }
+        .onDisappear { service.cancelPing() }
+    }
+
+    private var content: some View {
         VStack(spacing: DesignTokens.Spacing.xl) {
             HStack {
                 Text("网络工具")
@@ -36,8 +47,6 @@ struct NetworkToolsView: View {
                     }
                     infoRow("DNS 服务器", value: info.dns.joined(separator: ", "))
                 }
-
-                Spacer()
             } else {
                 VStack(spacing: DesignTokens.Spacing.md) {
                     Image(systemName: "network")
@@ -46,11 +55,70 @@ struct NetworkToolsView: View {
                     Text("点击刷新按钮获取网络信息")
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
-                .frame(maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: DesignTokens.Size.emptyStateMinHeight)
             }
+
+            pingCard
         }
         .padding(DesignTokens.Spacing.xxl)
-        .task { await service.refresh() }
+    }
+
+    // MARK: - Ping
+
+    private var isPinging: Bool {
+        if case .running = service.pingState { return true }
+        return false
+    }
+
+    private var pingCard: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+            HStack(spacing: DesignTokens.Spacing.md) {
+                Text("Ping")
+                    .font(DesignTokens.Typography.sectionHeader)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                TextField("主机名或 IP", text: $pingHost)
+                    .textFieldStyle(.roundedBorder)
+                    .font(DesignTokens.Typography.code)
+                    .onSubmit { service.startPing(host: pingHost) }
+                if isPinging {
+                    Button("停止") { service.cancelPing() }
+                        .buttonStyle(.bordered)
+                } else {
+                    Button("开始") { service.startPing(host: pingHost) }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(PingTarget.validated(pingHost) == nil)
+                }
+            }
+
+            switch service.pingState {
+            case .idle:
+                EmptyView()
+            case .running(let host):
+                HStack(spacing: DesignTokens.Spacing.sm) {
+                    ProgressView().controlSize(.small)
+                    Text("正在 ping \(host)…")
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                }
+            case .finished(_, let summary, let raw):
+                Label(
+                    summary.headline,
+                    systemImage: summary.received == 0 ? "xmark.circle.fill" : "checkmark.circle.fill"
+                )
+                .foregroundStyle(summary.received == 0 ? DesignTokens.Colors.destructive : DesignTokens.Colors.success)
+                DisclosureGroup("详细输出", isExpanded: $showsRawPing) {
+                    Text(raw)
+                        .font(DesignTokens.Typography.code)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            case .failed(_, let message):
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(DesignTokens.Colors.destructive)
+            }
+        }
+        .padding(DesignTokens.Spacing.md)
+        .background(DesignTokens.Colors.cardFill)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.row))
     }
 
     private func infoRow(_ label: String, value: String) -> some View {
@@ -68,6 +136,7 @@ struct NetworkToolsView: View {
                 Image(systemName: "doc.on.doc")
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("复制")
         }
         .padding(DesignTokens.Spacing.md)
         .background(DesignTokens.Colors.cardFill)

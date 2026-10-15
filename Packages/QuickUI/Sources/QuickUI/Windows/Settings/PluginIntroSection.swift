@@ -30,20 +30,14 @@ struct PluginIntroSection: View {
             Toggle(isOn: $isEnabled) {
                 SettingsRow(
                     title: "启用此插件",
-                    subtitle: "开启后可在主面板搜索并使用。",
+                    // 简介直接做开关的副标题：不再单独占一行重复「是什么」
+                    subtitle: plugin?.description.isEmpty == false
+                        ? plugin?.description : "开启后可在主面板搜索并使用。",
                     icon: { SettingsRowIcon(systemImage: plugin?.icon ?? "puzzlepiece.extension") }
                 )
             }
             .onChange(of: isEnabled) { _, newValue in
                 dataSource.setPluginEnabled(pluginID, enabled: newValue)
-            }
-
-            if let description = plugin?.description, !description.isEmpty {
-                SettingsRow(
-                    title: "简介",
-                    subtitle: description,
-                    icon: { SettingsRowIcon(systemImage: "info.circle") }
-                )
             }
         }
     }

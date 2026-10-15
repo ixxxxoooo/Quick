@@ -12,9 +12,6 @@ public enum SettingsKey {
 
     // MARK: - 通用设置
 
-    /// 是否开机自启
-    public static let launchAtLogin = "quick.global.launchAtLogin"
-
     /// 外观模式（跟随系统 / 深色 / 浅色）
     public static let appearance = "quick.global.appearance"
 
@@ -92,20 +89,16 @@ public enum SettingsKey {
     ///
     /// AI 聚合插件的 UI 偏好（置顶、Provider 开关）在 `PluginSettingKey.AIPortal`（`ai.*`）。
     public enum AI {
-        /// 是否启用 AI 能力
-        public static let enabled = "quick.ai.enabled"
-        /// 服务商（`AIProviderKind.rawValue`）
-        public static let provider = "quick.ai.provider"
-        /// 旧版 API Key（仅迁移用；正式存储在 Keychain，见 `AIConfig.apiKeyAccount`）
-        public static let apiKey = "quick.ai.apiKey"
-        /// 自定义 Base URL（空 = 用服务商默认）
-        public static let baseURL = "quick.ai.baseURL"
-        /// 模型名（空 = 用服务商默认）
-        public static let model = "quick.ai.model"
+        /// 已添加的服务商列表（`[AIProvider]` 的 JSON；API Key 不在里面，只在 Keychain）
+        public static let providers = "quick.ai.providers"
+        /// 默认模型（`AIModelRef` 的 JSON）：新会话用它
+        public static let defaultModel = "quick.ai.defaultModel"
         /// 单次最大生成 token 数
         public static let maxTokens = "quick.ai.maxTokens"
         /// 采样温度
         public static let temperature = "quick.ai.temperature"
+        /// AI 对话里会话侧栏是否展开
+        public static let chatSidebarVisible = "quick.ai.chat.sidebarVisible"
     }
 
     // MARK: - 插件开关前缀

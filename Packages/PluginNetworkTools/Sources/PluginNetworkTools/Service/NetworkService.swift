@@ -20,15 +20,29 @@ final class NetworkService {
         let dns: [String]
     }
 
+    /// Ping 的界面状态
+    enum PingState: Equatable {
+        case idle
+        case running(host: String)
+        case finished(host: String, summary: PingSummary, rawOutput: String)
+        case failed(host: String, message: String)
+    }
+
     private(set) var networkInfo: NetworkInfo?
     private(set) var isLoading = false
+    private(set) var pingState: PingState = .idle
+
+    private let log = QuickLog.plugin("networktools")
+    private var pingTask: Task<Void, Never>?
+    /// 刷新的代数：旧一轮刷新晚回来时不覆盖新一轮的结果
+    private var refreshGeneration = 0
 
     /// 公网 IP 的查法（可注入：测试用它替掉真实请求）
     private let fetchPublicIP: @MainActor () async -> String?
 
     /// - Parameter fetchPublicIP: 查询公网 IP 的实现；默认走网络，测试注入固定值
     init(fetchPublicIP: (@MainActor () async -> String?)? = nil) {
-        self.fetchPublicIP = fetchPublicIP ?? Self.publicIPFromNetwork
+        self.fetchPublicIP = fetchPublicIP ?? { await Self.publicIPFromNetwork() }
     }
 
     /// 设置页「显示公网 IP」的当前取值
@@ -39,9 +53,13 @@ final class NetworkService {
     }
 
     /// 获取网络信息
+    ///
+    /// 可重入：再次调用会让较早的一轮作废（结果不落地）；任务被取消时同样丢弃结果。
     func refresh() async {
+        refreshGeneration += 1
+        let generation = refreshGeneration
         isLoading = true
-        defer { isLoading = false }
+        defer { if generation == refreshGeneration { isLoading = false } }
 
         let localIP = getLocalIP()
 
@@ -51,6 +69,7 @@ final class NetworkService {
 
         let dns = getDNSServers()
 
+        guard generation == refreshGeneration, !Task.isCancelled else { return }
         networkInfo = NetworkInfo(
             localIP: localIP,
             publicIP: publicIP,
@@ -89,14 +108,58 @@ final class NetworkService {
     /// 获取公网 IP
     ///
     /// 默认实现，仅在「显示公网 IP」开着时才会被调用（见 `refresh()`）。
+    /// 超时取设置页的「超时时间」；失败写日志而不是静默吞掉。
     private static func publicIPFromNetwork() async -> String? {
         guard let url = URL(string: "https://api.ipify.org") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = TimeInterval(NetworkToolsPreferences.timeout())
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            return String(data: data, encoding: .utf8)
+            let (data, _) = try await URLSession.shared.data(for: request)
+            let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            // 只收 IP 字面量：被运营商劫持时返回的可能是一整页 HTML
+            guard let text, !text.isEmpty, text.count <= 45,
+                text.allSatisfy({ $0.isHexDigit || $0 == "." || $0 == ":" })
+            else { return nil }
+            return text
         } catch {
+            QuickLog.plugin("networktools").error("查询公网 IP 失败：\(error.localizedDescription, privacy: .public)")
             return nil
         }
+    }
+
+    // MARK: - Ping
+
+    /// 开始 Ping；上一次还没结束就先取消它
+    ///
+    /// - Parameter rawHost: 用户输入，会先校验；不合法直接给出失败状态，不起进程
+    func startPing(host rawHost: String) {
+        pingTask?.cancel()
+        guard let host = PingTarget.validated(rawHost) else {
+            pingState = .failed(host: rawHost, message: "请输入有效的主机名或 IP 地址")
+            return
+        }
+        let count = NetworkToolsPreferences.pingCount()
+        let timeout = NetworkToolsPreferences.timeout()
+        pingState = .running(host: host)
+        log.notice("开始 ping \(host, privacy: .private)，\(count) 次，超时 \(timeout) 秒")
+        pingTask = Task { [weak self] in
+            let outcome = await PingRunner.run(host: host, count: count, timeoutSeconds: timeout)
+            guard !Task.isCancelled, let self else { return }
+            switch outcome {
+            case let .finished(summary, rawOutput):
+                pingState = .finished(host: host, summary: summary, rawOutput: rawOutput)
+            case let .failed(message):
+                log.error("ping 失败：\(message, privacy: .public)")
+                pingState = .failed(host: host, message: message)
+            }
+        }
+    }
+
+    /// 取消正在进行的 Ping（视图消失时调用）
+    func cancelPing() {
+        pingTask?.cancel()
+        pingTask = nil
+        if case .running = pingState { pingState = .idle }
     }
 
     /// 获取 DNS 服务器

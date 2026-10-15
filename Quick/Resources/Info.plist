@@ -24,26 +24,19 @@
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>LSUIElement</key>
     <true/>
-    <!-- 定位用途说明。macOS 在申请定位权限时要求 Info.plist 里有这条，
-         缺失会导致申请被系统直接拒绝。两个键都写上：NSLocationUsageDescription 是
-         macOS 文档里的键名，NSLocationWhenInUseUsageDescription 与所调用的
-         requestWhenInUseAuthorization() 同名，不同系统版本会查其中一个。 -->
-    <key>NSLocationUsageDescription</key>
-    <string>Quick 只在你主动查看天气时使用你的大致位置（公里级），不会在启动时申请，也不会记录或上传。</string>
     <!-- 自动化用途说明。控制别的应用（System Events / Finder）要有这条，系统才会弹
          「Quick 想要控制……」的授权框；缺了它不会询问，而是直接以 -1743
          「未获得授权将 Apple 事件发送给 System Events」拒绝，用户查不到原因也没法授权。
          触发点：切换深色模式、睡眠 / 重启 / 关机 / 退出登录、清空废纸篓、推出磁盘。 -->
     <key>NSAppleEventsUsageDescription</key>
     <string>Quick 用 AppleScript 执行你主动选择的系统操作：切换深色模式、睡眠、重启、关机、退出登录、清空废纸篓、推出磁盘。</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Quick 只在你主动查看天气时使用你的大致位置（公里级），不会在启动时申请，也不会记录或上传。</string>
-    <!-- 日历用途说明。EventKit 的 requestFullAccessToEvents() 要求 Info.plist 声明
-         NSCalendarsFullAccessUsageDescription（保留 NSCalendarsUsageDescription 兼容查询），
-         缺失时系统会静默拒绝日历访问权限。 -->
+    <!-- 日历用途说明。EventKit 的 requestFullAccessToEvents() 要求声明
+         NSCalendarsFullAccessUsageDescription，缺了系统会静默拒绝日历访问；
+         NSCalendarsUsageDescription 是旧键名，一并写上保持两套系统接口都能读到。
+         日历看板支持新建系统日程，所以文案要如实说明「读取 + 新建」。 -->
     <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>Quick 在日历看板与搜索结果中展示你的系统日历日程安排，不会修改或上传你的日历数据。</string>
+    <string>Quick 在日历看板展示你的系统日程、识别会议链接并在开始前提醒；仅在你主动新建日程时才会写入，不会上传你的日历数据。</string>
     <key>NSCalendarsUsageDescription</key>
-    <string>Quick 在日历看板与搜索结果中展示你的系统日历日程安排，不会修改或上传你的日历数据。</string>
+    <string>Quick 在日历看板展示你的系统日程、识别会议链接并在开始前提醒；仅在你主动新建日程时才会写入，不会上传你的日历数据。</string>
 </dict>
 </plist>

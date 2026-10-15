@@ -66,20 +66,21 @@ public struct ShortcutRecorder: View {
                                 ? DesignTokens.Colors.textSecondary
                                 : DesignTokens.Colors.textTertiary
                         )
-                        .frame(width: 18, height: 18)
+                        .frame(width: DesignTokens.Size.recorderGlyph, height: DesignTokens.Size.recorderGlyph)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("清除快捷键")
                 .help("清除快捷键")
                 .padding(.trailing, DesignTokens.Spacing.xs)
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.sm)
-        .frame(width: DesignTokens.Size.shortcutRecorder, height: 24)
+        .frame(width: DesignTokens.Size.shortcutRecorder, height: DesignTokens.Size.recorderHeight)
         .background(shape.fill(DesignTokens.Colors.cardFill))
         .overlay(
             shape.strokeBorder(
-                isRecording ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: 1)
+                isRecording ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairline)
         )
         .clipShape(shape)
         .onHover { isHovered = $0 }
@@ -102,10 +103,10 @@ public struct ShortcutRecorder: View {
                         .font(DesignTokens.Typography.keyCap)
                         .foregroundStyle(DesignTokens.Colors.textSecondary)
                         .padding(.horizontal, DesignTokens.Spacing.xs)
-                        .frame(minWidth: 18, minHeight: 18)
+                        .frame(minWidth: DesignTokens.Size.recorderGlyph, minHeight: DesignTokens.Size.recorderGlyph)
                         .background(
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Color.primary.opacity(0.08))
+                            RoundedRectangle(cornerRadius: DesignTokens.Size.recorderKeyRadius, style: .continuous)
+                                .fill(Color.primary.opacity(DesignTokens.Opacity.keyCapFill))
                         )
                 }
             }

@@ -38,4 +38,32 @@ struct SuperPanelPreferencesTests {
         let suite = UserDefaults(suiteName: "superpanel.test.\(UUID().uuidString)")!
         #expect(SuperPanelQuickTools.load(from: suite) == SuperPanelQuickTools.defaults)
     }
+
+    @Test("默认八宫格正好 8 项，且都在目录里")
+    func defaultsAreEightAndInCatalog() {
+        #expect(SuperPanelQuickTools.defaults.count == 8)
+        let catalogIDs = Set(SuperPanelQuickTools.catalog.map(\.id))
+        #expect(SuperPanelQuickTools.defaults.allSatisfy { catalogIDs.contains($0.id) })
+    }
+
+    @Test("目录里的工具 id 与插件 id 都不重复")
+    func catalogHasUniqueIdentifiers() {
+        let ids = SuperPanelQuickTools.catalog.map(\.id)
+        let pluginIDs = SuperPanelQuickTools.catalog.map(\.pluginID)
+        #expect(Set(ids).count == ids.count)
+        #expect(Set(pluginIDs).count == pluginIDs.count)
+    }
+
+    @Test("已下线插件的残留 id 被忽略，不会产生跳到空白页的工具")
+    func staleToolIDsAreDropped() {
+        let suite = UserDefaults(suiteName: "superpanel.test.\(UUID().uuidString)")!
+        SuperPanelQuickTools.save(
+            [SuperPanelQuickTool(id: "notes", title: "备忘", icon: "text.page", pluginID: "notes")],
+            to: suite)
+        // 唯一一项已不在目录里 → 整体回落到默认，而不是留下一个点不开的格子
+        #expect(SuperPanelQuickTools.load(from: suite) == SuperPanelQuickTools.defaults)
+
+        suite.set(["notes", "json", "ocr"], forKey: SuperPanelPreferences.Key.quickTools)
+        #expect(SuperPanelQuickTools.load(from: suite).map(\.id) == ["json"])
+    }
 }

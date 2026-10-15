@@ -74,6 +74,9 @@ public final class PaletteCoordinator {
     /// 所以被 SwiftUI 观察是安全的 —— 会死循环的是协调器本身。
     public let selection = PaletteSelection()
 
+    /// ⌘K 操作菜单状态（独立观察对象，不持有窗口，可被视图安全观察）
+    let actionMenu = ActionMenuState()
+
     /// 剪贴板最后一次变化的时刻（由剪贴板事件更新）
     ///
     /// 自动粘贴只关心「刚刚复制过」，而这个时间点只有剪贴板插件知道（它在轮询变化），
@@ -93,6 +96,12 @@ public final class PaletteCoordinator {
     ///
     /// 首屏顺序依赖它，所以它必须是宿主级的：应用、命令、工具条目都在同一张表里。
     public var usageHistory: UsageHistory? { dependencies?.usageHistory }
+
+    /// AI 对话（由宿主注入）
+    private var aiChat: AIChatController? { dependencies?.aiChat }
+
+    /// 当前是否在 AI 对话里
+    private var isInAIChat: Bool { activePluginID == AIChatController.modeID }
 
     /// 分离面板回调（协调器不直接持有 PluginPanelController）
     public var onDetach: ((String) -> Void)? { dependencies?.onDetach }
@@ -267,6 +276,10 @@ public final class PaletteCoordinator {
         if activePluginID != nil {
             pluginSearch.notifyShown()
         }
+        if isInAIChat {
+            aiChat?.refreshChoices()
+            aiChat?.focusComposer()
+        }
 
         signpost.endInterval("palette.show", interval)
         let totalMS = started.duration(to: .now).ms
@@ -404,6 +417,8 @@ public final class PaletteCoordinator {
     /// - Returns: 被恢复焦点的上一应用（如果有）
     @discardableResult
     public func hide(restoreFocus: Bool = true) -> NSRunningApplication? {
+        actionMenu.close()
+        aiChat?.flushPendingSaves()
         let started = ContinuousClock.now
         let wasVisible = isVisible
         // 隐藏前是不是 key window、第一响应者是谁：拆输入会话的代价与它们直接相关，
@@ -505,11 +520,19 @@ public final class PaletteCoordinator {
         return app
     }
 
+    /// 显示面板并直接进入 AI 对话（开发启动参数 `-showAIChat` 与验收用）
+    public func showAIChat() {
+        if !isVisible { show() }
+        guard !isInAIChat, let aiChat else { return }
+        enterAIChat(aiChat, seed: "")
+    }
+
     /// 导航到指定插件
     /// - Parameters:
     ///   - pluginID: 目标插件 ID
     ///   - context: 附加上下文
     public func navigate(to pluginID: String, context: [String: String] = [:]) {
+        if isInAIChat, pluginID != AIChatController.modeID { aiChat?.leave() }
         activePluginID = pluginID
         query = context["query"] ?? ""
         pluginSearch.reset()
@@ -530,6 +553,7 @@ public final class PaletteCoordinator {
     /// 不重新指定的话用户接下来打的字没有任何地方接收 —— 看起来像输入框坏了。
     /// 焦点要等 SwiftUI 把搜索模式的视图重建出来之后再设，所以延到下一轮 runloop。
     public func popToRoot() {
+        if isInAIChat { aiChat?.leave() }
         activePluginID = nil
         query = ""
         pluginSearch.reset()
@@ -572,6 +596,8 @@ public final class PaletteCoordinator {
     /// 搜索框里有内容时 Esc 只清空，不关面板 —— 关掉整个面板的代价太大，
     /// 而用户按下 Esc 时多半只是想重打一个关键词。
     func handleEscape() {
+        // 对话里的 Esc 先取消重命名 / 停止生成，都没有才退出对话
+        if isInAIChat, aiChat?.handleEscape() == true { return }
         switch Self.escapeAction(isPluginMode: activePluginID != nil, query: query) {
         case .popToRoot:
             popToRoot()
@@ -603,7 +629,12 @@ public final class PaletteCoordinator {
     // MARK: - 搜索
 
     /// 聚合搜索入口：依赖注入后委托给 `PaletteSearchEngine`
-    public func search(query: String) async -> PaletteSearchOutcome {
+    ///
+    /// - Parameter progress: 慢来源逐个返回时的增量结果，见 `PaletteSearchEngine.search`
+    public func search(
+        query: String,
+        progress: (@MainActor (PaletteSearchOutcome) -> Void)? = nil
+    ) async -> PaletteSearchOutcome {
         await PaletteSearchEngine.search(
             query: query,
             staticCommands: staticCommands,
@@ -612,7 +643,8 @@ public final class PaletteCoordinator {
             recentItemIDs: usageHistory?.recentItemIDs(limit: 12) ?? [],
             invokeCommand: invokeCommand,
             log: log,
-            hostSource: hostSearchSource
+            hostSource: hostSearchSource,
+            progress: progress
         )
     }
 
@@ -624,12 +656,13 @@ public final class PaletteCoordinator {
         log.debug("首次创建面板实例")
         let rootView = PaletteRootView(
             selection: selection,
+            actionMenu: actionMenu,
             paletteQuery: paletteQuery,
             paletteMode: paletteMode,
             pluginSearch: pluginSearch,
-            searchHandler: { [weak self] query in
+            searchHandler: { [weak self] query, progress in
                 guard let self else { return .empty }
-                return await self.search(query: query)
+                return await self.search(query: query, progress: progress)
             },
             pluginViewProvider: { [weak self] pluginID, context in
                 guard let self else { return nil }
@@ -646,6 +679,8 @@ public final class PaletteCoordinator {
 
         newPanel.onEscape = { [weak self] in
             guard let self else { return false }
+            // 插件正显示模态确认框：Esc 只关框，不退插件
+            if self.routeCancel() { return true }
             self.handleEscape()
             return true
         }
@@ -654,8 +689,12 @@ public final class PaletteCoordinator {
             self?.hide()
         }
 
+        newPanel.onTabKey = { [weak self] in
+            self?.routeTabKey() ?? false
+        }
+
         newPanel.onDetach = { [weak self] in
-            guard let self, let pluginID = self.activePluginID else { return false }
+            guard let self, let pluginID = self.activePluginID, !self.isInAIChat else { return false }
             self.onDetach?(pluginID)
             return true
         }
@@ -665,10 +704,13 @@ public final class PaletteCoordinator {
         // 头部搜索框默认不聚焦（焦点留在插件视图上，方向键才好用），主动要搜索时才按 ⌘F。
         // 只对声明了插件内搜索的插件生效，其余插件把 ⌘F 放行给它们自己。
         newPanel.onCommandShortcut = { [weak self] event in
-            guard let self, event.charactersIgnoringModifiers?.lowercased() == "f" else {
-                return false
+            guard let self else { return false }
+            if self.isInAIChat { return self.routeAIChatShortcut(event) }
+            switch event.charactersIgnoringModifiers?.lowercased() {
+            case "f": return self.requestPluginSearchFocus()
+            case "k": return self.toggleActionMenu()
+            default: return false
             }
-            return self.requestPluginSearchFocus()
         }
 
         // 上下键与回车在 AppKit 层转给选中状态，见 PalettePanel.sendEvent 的说明。
@@ -681,6 +723,9 @@ public final class PaletteCoordinator {
         }
         newPanel.onSubmit = { [weak self] in
             self?.routeSubmit() ?? false
+        }
+        newPanel.onNavigate = { [weak self] navigation in
+            self?.routeNavigation(navigation) ?? false
         }
         newPanel.onTab = { [weak self] delta in
             self?.routeTab(delta) ?? false
@@ -700,6 +745,10 @@ public final class PaletteCoordinator {
 
     /// 上下键：插件模式转给插件内搜索（仅当插件声明要吃），否则给主搜索列表
     func routeMove(_ delta: Int) -> Bool {
+        if actionMenu.isOpen {
+            actionMenu.move(delta)
+            return true
+        }
         if activePluginID != nil {
             guard pluginSearch.wantsNavigation else { return false }
             pluginSearch.request(.move(delta))
@@ -710,12 +759,93 @@ public final class PaletteCoordinator {
 
     /// 回车：插件模式下转给插件内搜索，否则激活主搜索选中项
     func routeSubmit() -> Bool {
+        if actionMenu.isOpen {
+            return actionMenu.runSelected()
+        }
         if activePluginID != nil {
             guard pluginSearch.wantsNavigation else { return false }
             pluginSearch.request(.submit)
             return true
         }
         return selection.activateSelection()
+    }
+
+    /// ⌘K：打开 / 关闭当前选中结果的操作菜单
+    ///
+    /// 只属于主搜索列表；插件模式把 ⌘K 放行给插件。
+    func toggleActionMenu() -> Bool {
+        guard activePluginID == nil else { return false }
+        if actionMenu.isOpen {
+            actionMenu.close()
+            return true
+        }
+        guard let item = selection.selectedItem else { return false }
+        let index = selection.index
+        actionMenu.open(
+            actions: ResultActionCatalog.makeActions(for: item) { [weak self] in
+                // 走协调器已有的激活路径，保证「最近使用」照常记录
+                self?.selection.activate?(index)
+            })
+        return actionMenu.isOpen
+    }
+
+    /// 翻页 / 跳首尾 / ⌘数字直达：只属于主搜索列表，插件模式一律放行给插件自己
+    func routeNavigation(_ navigation: PaletteKeyMap.Navigation) -> Bool {
+        guard activePluginID == nil, !actionMenu.isOpen else { return actionMenu.isOpen }
+        switch navigation {
+        case .page(let direction):
+            return selection.page(direction)
+        case .jump(let target, let requiresEmptyField):
+            if requiresEmptyField, !paletteQuery.text.isEmpty { return false }
+            return selection.jump(to: target)
+        case .quickSelect(let number):
+            return selection.activateNumbered(number)
+        }
+    }
+
+    /// Esc：插件正显示模态确认框（`wantsCancel`）时转成 `.cancel` 请求，否则不消费
+    func routeCancel() -> Bool {
+        if actionMenu.isOpen {
+            actionMenu.close()
+            return true
+        }
+        guard activePluginID != nil, pluginSearch.wantsCancel else { return false }
+        pluginSearch.request(.cancel)
+        return true
+    }
+
+    /// Tab：主搜索里进入 AI 对话，把搜索框里的文字带进输入框
+    ///
+    /// 只在主搜索生效；插件里的 Tab 属于插件自己。
+    func routeTabKey() -> Bool {
+        guard activePluginID == nil, !actionMenu.isOpen, let aiChat else { return false }
+        enterAIChat(aiChat, seed: query)
+        return true
+    }
+
+    private func enterAIChat(_ chat: AIChatController, seed: String) {
+        log.notice("Tab 进入 AI 对话，带入文字 \(seed.isEmpty ? 0 : seed.count, privacy: .public) 字")
+        activePluginID = AIChatController.modeID
+        pluginSearch.reset()
+        paletteMode.navigate(
+            to: AIChatController.modeID, name: "AI 对话", icon: "sparkles",
+            supportsDetach: false)
+        chat.enter(seed: seed)
+        // 文字已经交给输入框；清掉主搜索框，退回时不会看到残留
+        query = ""
+    }
+
+    /// 对话里的 ⌘ 快捷键；返回 false 时按键继续走响应链（文本编辑）
+    func routeAIChatShortcut(_ event: NSEvent) -> Bool {
+        guard let aiChat else { return false }
+        let flags = event.modifierFlags
+        guard
+            let shortcut = AIChatShortcut.resolve(
+                characters: event.charactersIgnoringModifiers, keyCode: Int(event.keyCode),
+                command: flags.contains(.command), shift: flags.contains(.shift),
+                option: flags.contains(.option), control: flags.contains(.control))
+        else { return false }
+        return aiChat.perform(shortcut)
     }
 
     /// 左右键：只有插件内搜索需要（主搜索的左右键属于搜索框光标）
@@ -787,6 +917,11 @@ public final class PaletteCoordinator {
     /// 视图能力是运行时查询：插件没实现 `PluginViewProviding` 时面板会是空白，
     /// 所以这条路径必须留一条能看出根因的日志。
     private func makePluginView(pluginID: String, context: [String: String]) -> AnyView? {
+        // AI 对话是宿主级模式，不在插件表里
+        if pluginID == AIChatController.modeID {
+            guard let aiChat else { return nil }
+            return AnyView(AIChatView(controller: aiChat))
+        }
         guard let plugin = plugins.first(where: { type(of: $0).id == pluginID }),
             plugin.isEnabled
         else {

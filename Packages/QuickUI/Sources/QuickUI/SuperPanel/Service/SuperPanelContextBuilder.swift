@@ -162,13 +162,6 @@ public enum SuperPanelContextBuilder {
                     subtitle: hex,
                     icon: "paintpalette",
                     execute: { context.copy(hex) }
-                ),
-                SuperPanelAction(
-                    id: "sp.open-color",
-                    title: "打开颜色工具",
-                    subtitle: hex,
-                    icon: "eyedropper",
-                    execute: { context.navigate("color-compare") }
                 )
             ]
 

@@ -1,7 +1,8 @@
 # Quick
 
 原生 macOS 效率启动器：菜单栏常驻 + 全局快捷键（默认 ⌥Space）唤出的命令面板，
-聚合应用启动、剪贴板历史、计算器、文件搜索、系统控制、10 个开发者工具等 25 个内置插件。
+聚合应用启动、剪贴板历史、计算器、文件搜索、系统控制、8 个开发者工具等 19 个内置插件
+（文件搜索由宿主 + `QuickPlatform` 提供，不是插件）。
 
 SwiftUI + AppKit，以 accessory 模式运行（`LSUIElement`，无 Dock 图标）。零第三方依赖。
 
@@ -45,7 +46,7 @@ SwiftUI + AppKit，以 accessory 模式运行（`LSUIElement`，无 Dock 图标�
 | `Packages/QuickCore/` | 内核：`QuickPlugin` 协议、`EventBus`、`SearchableItem`、`QuickLog`、字符串扩展 |
 | `Packages/QuickUI/` | 共享 UI：`DesignTokens`、面板外壳（`PalettePanel`/`PaletteCoordinator`/`PaletteRootView`）、设计系统组件、`HUDController` |
 | `Packages/QuickPlatform/` | 系统能力封装：热键、应用扫描、权限、剪贴板、图标缓存、路径 |
-| `Packages/Plugin*/` | 25 个内置插件，每个一个包；大插件内部再分 `Model/` `Service/` `UI/` `Settings/` |
+| `Packages/Plugin*/` | 19 个内置插件，每个一个包；大插件内部再分 `Model/` `Service/` `UI/` `Settings/` |
 | `Scripts/` | 所有可执行脚本：测试、构建、重启、脚手架、发版 |
 | `docs/` | 规范文档（本目录）；每个功能插件的约束写在 `docs/features.md` |
 | `.githooks/` | 版本控制的 git 钩子，通过 `Scripts/setup.sh` 启用 |
@@ -60,7 +61,7 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
 ```
 
 `QuickCore` 不认识任何插件，`QuickUI` / `QuickPlatform` 也不认识任何插件。只有 `Quick/`
-目标（`AppCore.swift` 注册插件、`SettingsBridge.swift` 提供命令目录桥接）能 `import Plugin*`。
+目标（`AppCore+Plugins.swift` 注册插件、`SettingsBridge.swift` 提供命令目录桥接）能 `import Plugin*`。
 这条按 **target 边界**理解：插件类型不得渗入 `QuickCore` / `QuickUI` / `QuickPlatform` 或其他插件。
 
 ---
@@ -155,7 +156,7 @@ Plugin*  →  QuickUI / QuickPlatform  →  QuickCore
    `Model/ Service/ UI/ Settings/` 目录与一个占位测试）。
 2. 实现 `PluginFooPlugin.swift`，遵循 `QuickPlugin`。`static var id` 必须全局唯一 ——
    它是事件路由和设置存储的主键，一旦发布就不能再改。
-3. 在 `Quick/AppCore.swift#registerPlugins()` 里注册。**这是唯一实例化插件的地方。**
+3. 在 `Quick/AppCore+Plugins.swift#registerPlugins()` 里注册。**这是唯一实例化插件的地方。**
 4. 在 `project.yml` 里加两处（`packages:` 与 `Quick` target 的 `dependencies:`），
    然后 `xcodegen generate`。
 5. 加测试，`./Scripts/run-tests.sh PluginFoo` 必须全绿。

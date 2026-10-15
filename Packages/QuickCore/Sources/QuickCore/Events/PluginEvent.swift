@@ -38,7 +38,7 @@ public struct NavigateEvent: PluginEvent {
 
 /// 请求复制文本到剪贴板
 ///
-/// 插件（如 OCR、计算器）产出结果后发布此事件，
+/// 插件（如计算器）产出结果后发布此事件，
 /// 由 AppCore 路由到 PasteboardService 执行实际复制。
 public struct CopyToClipboardEvent: PluginEvent {
     public static let name = "quick.clipboard.copy"
@@ -52,6 +52,23 @@ public struct CopyToClipboardEvent: PluginEvent {
     public init(text: String, showHUD: Bool = true) {
         self.text = text
         self.showHUD = showHUD
+    }
+}
+
+// MARK: - 菜单栏文字事件
+
+/// 请求菜单栏图标旁显示（或清除）一段文字
+///
+/// 系统监控把 CPU / 内存摘要发布到这里，宿主的 `StatusItemController` 订阅并落到 `NSStatusItem` 上 ——
+/// 插件不认识状态栏，宿主不认识监控，两边只通过事件说话。
+public struct MenuBarTextEvent: PluginEvent {
+    public static let name = "quick.menubar.text"
+
+    /// 要显示的文字；`nil` 表示清除
+    public let text: String?
+
+    public init(text: String?) {
+        self.text = text
     }
 }
 
@@ -126,15 +143,22 @@ public struct ShowPaletteEvent: PluginEvent {
 
 /// 请求打开设置窗口
 ///
-/// `pluginID` 非空时跳到该插件的设置页（精确导航）
+/// `pluginID` 非空时跳到该插件的设置页（精确导航）；
+/// `hostTab` 非空时跳到宿主自己的设置页（如 `aiService`），值是 `SettingsTab.rawValue`
 public struct ShowPaletteSettingsEvent: PluginEvent {
     public static let name = "quick.settings.show"
 
     /// 目标插件 ID；nil 表示打开默认页
     public let pluginID: String?
 
-    public init(pluginID: String? = nil) {
+    /// 宿主设置页的 `SettingsTab.rawValue`
+    ///
+    /// 用字符串而不是枚举：`SettingsTab` 在 QuickUI，QuickCore 不认识它。
+    public let hostTab: String?
+
+    public init(pluginID: String? = nil, hostTab: String? = nil) {
         self.pluginID = pluginID
+        self.hostTab = hostTab
     }
 }
 
@@ -203,4 +227,14 @@ public struct PaletteVisibilityChangedEvent: PluginEvent {
     public init(isVisible: Bool) {
         self.isVisible = isVisible
     }
+}
+
+/// 设置页清空了全部 AI 对话历史
+///
+/// 对话控制器在内存里还持有会话列表，磁盘清掉后必须同步丢掉内存里的，
+/// 否则下一次保存会把「已清空」的会话原样写回去。
+public struct AIChatHistoryClearedEvent: PluginEvent {
+    public static let name = "quick.ai.chat.historyCleared"
+
+    public init() {}
 }

@@ -50,25 +50,23 @@ public enum PluginSettingKey {
         public static let precision = "calculator.precision"
         public static let useGroupingSeparator = "calculator.useGroupingSeparator"
         public static let autoCopy = "calculator.autoCopy"
-    }
-
-    /// 文本片段
-    public enum Snippets {
-        public static let autoExpand = "snippets.autoExpand"
-        public static let showSnippetHint = "snippets.showSnippetHint"
-    }
-
-    /// 笔记
-    public enum Notes {
-        public static let autoSave = "notes.autoSave"
-        public static let defaultFormat = "notes.defaultFormat"
+        public static let onlineCurrencyRates = "calculator.onlineCurrencyRates"
     }
 
     /// 日历
     public enum Calendar {
-        public static let reminderMinutes = "calendar.reminderMinutes"
         public static let autoExtractMeetingLinks = "calendar.autoExtractMeetingLinks"
         public static let showWeekNumber = "calendar.showWeekNumber"
+        /// 显示农历与二十四节气
+        public static let showLunar = "calendar.showLunar"
+        /// 显示内置中国节假日与法定「休 / 班」角标
+        public static let showBuiltInHolidays = "calendar.showBuiltInHolidays"
+        /// 显示传统黄历（干支、值神、冲煞、宜忌）
+        public static let showAlmanac = "calendar.showAlmanac"
+        /// 同步并显示系统日历日程
+        public static let showSystemEvents = "calendar.showSystemEvents"
+        /// 逗号分隔的已停用系统日历源 ID
+        public static let disabledCalendarIDs = "calendar.disabledCalendarIDs"
     }
 
     /// AI 聚合插件的 UI 行为（置顶、Provider 开关）。键前缀 `ai.*`。
@@ -98,10 +96,8 @@ public enum PluginSettingKey {
         public static let interval = "sysmonitor.interval"
         public static let showMenuBarStats = "sysmonitor.showMenuBarStats"
         public static let defaultTab = "sysmonitor.defaultTab"
-        public static let displayModeCPU = "sysmonitor.displayModeCPU"
-        public static let displayModeMemory = "sysmonitor.displayModeMemory"
-        public static let displayModeDisk = "sysmonitor.displayModeDisk"
-        public static let displayModeBattery = "sysmonitor.displayModeBattery"
+        /// CPU / 内存 / 磁盘共用的「已用 / 空闲」口径（电池固定显示剩余电量）
+        public static let displayMode = "sysmonitor.displayMode"
     }
 
     /// 结束进程
@@ -111,6 +107,14 @@ public enum PluginSettingKey {
         public static let showPID = "killprocess.showPID"
         public static let searchInPath = "killprocess.searchInPath"
         public static let searchInPID = "killprocess.searchInPID"
+        /// 强制结束前二次确认（默认开）
+        public static let confirmForceKill = "killprocess.confirmForceKill"
+    }
+
+    /// 系统控制
+    public enum SystemControl {
+        /// 重启、关机、退出登录、清空废纸篓前二次确认（默认开）
+        public static let confirmDestructive = "systemControl.confirmDestructive"
     }
 
     /// 网络工具
@@ -118,12 +122,6 @@ public enum PluginSettingKey {
         public static let pingCount = "networkTools.pingCount"
         public static let timeout = "networkTools.timeout"
         public static let showExternalIP = "networkTools.showExternalIP"
-    }
-
-    /// 文字识别
-    public enum OCR {
-        public static let autoCopy = "ocr.autoCopy"
-        public static let language = "ocr.language"
     }
 
     /// 截图
@@ -180,18 +178,6 @@ public enum PluginSettingKey {
         public static let ignoreWhitespace = "textDiff.ignoreWhitespace"
         public static let ignoreCase = "textDiff.ignoreCase"
         public static let wrapLines = "textDiff.wrapLines"
-    }
-
-    /// Markdown 预览
-    public enum MarkdownPreview {
-        public static let showLineNumbers = "markdownPreview.showLineNumbers"
-        public static let enableMathJax = "markdownPreview.enableMathJax"
-    }
-
-    /// 颜色工具
-    public enum ColorCompare {
-        public static let defaultFormat = "colorCompare.defaultFormat"
-        public static let uppercaseHex = "colorCompare.uppercaseHex"
     }
 
     /// 终端

@@ -286,3 +286,76 @@ struct FileIconMapperTests {
         #expect(FileIconMapper.icon(forFileName: "my report v2.md") == "doc.text")
     }
 }
+
+// MARK: - 条目 id
+
+@Suite("文件搜索条目 id")
+struct FileSearchItemIDTests {
+
+    @Test("路径编码后能原样解码，包括空格与中文")
+    func roundTrip() {
+        for path in ["/Users/x/report.pdf", "/Users/x/我的 文档/报告 v2.pdf", "/a.b/c"] {
+            let id = FileSearchQuery.itemID(forPath: path)
+            #expect(id.hasPrefix(FileSearchQuery.itemIDPrefix))
+            #expect(FileSearchQuery.path(fromItemID: id) == path)
+        }
+    }
+
+    @Test("非文件条目与空路径解码为 nil")
+    func rejectsForeignIDs() {
+        #expect(FileSearchQuery.path(fromItemID: "launcher.app.com.apple.Safari") == nil)
+        #expect(FileSearchQuery.path(fromItemID: "filesearch.") == nil)
+        #expect(FileSearchQuery.path(fromItemID: "") == nil)
+    }
+}
+
+// MARK: - 会话门闸
+
+@Suite("搜索会话门闸")
+struct SearchSessionGateTests {
+
+    @Test("新搜索开始后，旧令牌立即作废")
+    func newSearchSupersedesOldOne() {
+        var gate = SearchSessionGate()
+        let first = gate.begin()
+        #expect(gate.isCurrent(first))
+
+        let second = gate.begin()
+        #expect(!gate.isCurrent(first), "旧查询的完成回调必须被识别为过期")
+        #expect(gate.isCurrent(second))
+    }
+
+    @Test("旧查询乱序完成时不会结束新查询")
+    func staleCompletionCannotFinishTheCurrentSearch() {
+        var gate = SearchSessionGate()
+        let stale = gate.begin()
+        let current = gate.begin()
+
+        let staleAccepted = gate.finish(stale)
+        #expect(!staleAccepted, "过期令牌的收尾必须被拒绝")
+        #expect(gate.isCurrent(current), "新查询不该被旧查询的完成通知提前收尾")
+        let currentAccepted = gate.finish(current)
+        #expect(currentAccepted)
+    }
+
+    @Test("同一令牌只能收尾一次")
+    func finishIsIdempotent() {
+        var gate = SearchSessionGate()
+        let token = gate.begin()
+        let first = gate.finish(token)
+        let second = gate.finish(token)
+        #expect(first)
+        #expect(!second, "超时与完成通知先后到达时，第二次必须是空操作")
+        #expect(!gate.isCurrent(token))
+    }
+
+    @Test("收尾后再开始的搜索拿到的令牌互不相等")
+    func tokensNeverRepeat() {
+        var gate = SearchSessionGate()
+        let a = gate.begin()
+        _ = gate.finish(a)
+        let b = gate.begin()
+        #expect(a != b)
+    }
+}
+

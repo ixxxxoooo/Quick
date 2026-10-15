@@ -40,6 +40,8 @@ public enum DesignTokens {
     // MARK: - 间距
 
     public enum Spacing {
+        /// 1pt 的贴边间距（图标与外框之间的缝）
+        public static let hairline: CGFloat = 1
         public static let xxs = scaled(2)
         public static let xs = scaled(4)
         public static let sm = scaled(6)
@@ -99,6 +101,10 @@ public enum DesignTokens {
         public static let bottomBarHeight = scaled(52)
         /// 底栏按钮高度
         public static let barButtonHeight = scaled(28)
+        /// ⌘K 操作菜单宽度
+        public static let actionMenuWidth = scaled(220)
+        /// 操作菜单行首图标槽位宽度
+        public static let menuIconSlot = scaled(20)
         /// 窗口控制按钮尺寸（分离窗口标题栏右上角的置顶 / 关闭）
         ///
         /// 比 `barButtonHeight` 小一档：标题栏本身只有 `detachedTitleBarHeight` 高，
@@ -172,8 +178,86 @@ public enum DesignTokens {
         ///
         /// **不随 `panelScale` 缩放**：它是物理像素级的东西，放大只会变成一条粗边。
         public static let hairline: CGFloat = 1
+        /// 半像素细线（卡片描边）
+        public static let hairlineThin: CGFloat = 0.5
+        /// 设置页行首图标
+        public static let settingsRowIcon: CGFloat = 20
+        /// 设置页里的三档输入框宽度
+        public static let settingsFieldSmall: CGFloat = 160
+        public static let settingsFieldMedium: CGFloat = 220
+        public static let settingsFieldLarge: CGFloat = 260
+        /// 发光投影的半径与偏移
+        public static let glowShadowRadius: CGFloat = 6
+        public static let glowShadowOffsetY: CGFloat = 2
+        /// 弹出层投影：半径与纵向偏移
+        public static let popoverShadowRadius: CGFloat = 8
+        public static let popoverShadowOffsetY: CGFloat = 4
+        /// 插件视图里的方形图标按钮 / 控件高度
+        public static let controlSquare: CGFloat = 28
+        /// 插件列表里的 Provider 图标
+        public static let providerIcon: CGFloat = 32
+        /// 插件头部大图标底块与其中的图形字号
+        public static let heroTile: CGFloat = 40
+        public static let heroGlyph: CGFloat = 20
+        /// Diff 面板最小宽度
+        public static let diffPaneMinWidth: CGFloat = 240
+        /// 翻译：输入框高度范围、语言标签宽度、历史面板尺寸
+        public static let translatorEditorMinHeight: CGFloat = 88
+        public static let translatorEditorMaxHeight: CGFloat = 160
+        public static let translatorLabelWidth: CGFloat = 34
+        public static let translatorHistoryWidth: CGFloat = 420
+        public static let translatorHistoryHeight: CGFloat = 480
+        /// Hash：输入框高度与算法名列宽
+        public static let hashInputHeight: CGFloat = 100
+        public static let hashLabelWidth: CGFloat = 55
+        /// UUID：选项控件宽度与序号列宽
+        public static let uuidOptionWidth: CGFloat = 130
+        /// 结束进程列表右侧指标（CPU % / 内存）的列宽，容纳 `1024.5 MB`
+        public static let processMetricWidth: CGFloat = scaled(84)
+        /// UUID 版本分段控件宽度
+        public static let uuidVersionPickerWidth: CGFloat = 90
+        /// HMAC 密钥输入框宽度
+        public static let hmacKeyFieldWidth: CGFloat = 220
+        public static let indexColumnWidth: CGFloat = 20
+        /// 截图设置里的预览框
+        public static let screenshotPreview = CGSize(width: 120, height: 80)
+        /// 超级面板设置：数值读数列宽、说明文案最大宽度
+        public static let superPanelReadout: CGFloat = 56
+        public static let superPanelNoteMaxWidth: CGFloat = 320
+        /// 设置页：窄列、宽字段、对话框宽度
+        public static let settingsColumnNarrow: CGFloat = 80
+        public static let settingsFieldWide: CGFloat = 200
+        public static let settingsGlyphColumn: CGFloat = 24
+        public static let settingsDialogWidth: CGFloat = 420
+        /// AI 服务商编辑弹窗：表单较长，比普通弹窗宽、高
+        public static let aiEditorWidth: CGFloat = 520
+        public static let aiEditorHeight: CGFloat = 560
+        /// 拉取到的模型列表弹窗
+        public static let aiModelPickerHeight: CGFloat = 440
+        /// AI 对话：会话侧栏宽度
+        public static let aiChatSidebarWidth: CGFloat = 200
+        /// AI 对话：输入框的最小 / 最大高度（超过最大高度后内部滚动）
+        public static let aiChatComposerMinHeight: CGFloat = 22
+        public static let aiChatComposerMaxHeight: CGFloat = 140
+        /// AI 对话：用户气泡的最大宽度
+        public static let aiChatBubbleMaxWidth: CGFloat = 460
+        /// AI 对话：消息列的最大宽度（宽面板里保持可读的行长）
+        public static let aiChatColumnMaxWidth: CGFloat = 640
+        /// AI 对话：侧栏会话行高与置顶图钉
+        public static let aiChatRowHeight: CGFloat = 30
+        /// AI 对话：侧栏行内与输入框下方的小图标按钮
+        public static let aiChatIconButton: CGFloat = 20
+        /// AI 对话：「正在生成」的小圆点
+        public static let aiChatTypingDot: CGFloat = 6
+        public static let settingsRowGlyph: CGFloat = 18
+        /// 快捷键录制框内的小图标 / 圆角
+        public static let recorderGlyph: CGFloat = 18
+        public static let recorderHeight: CGFloat = 24
+        public static let recorderKeyRadius: CGFloat = 4
         /// 空状态 / 英雄位图标尺寸
         public static let emptyStateIcon = scaled(32)
+        /// 空状态占位区的最小高度（滚动容器里没有 `maxHeight: .infinity` 可用）
+        public static let emptyStateMinHeight = scaled(120)
         /// 列表顶部 / 底部渐隐带的高度
         ///
         /// 内容从 header 与底栏下面穿过，靠这条渐隐带淡出，而不是被硬切。
@@ -285,14 +369,14 @@ public enum DesignTokens {
 
         // MARK: 超级面板
 
-        /// 超级面板固定宽度（对齐 Fasty 390pt，**不跟** `panelScale`）
-        public static let superPanelWidth: CGFloat = 390
+        /// 超级面板固定宽度（紧凑竖向列表，**不跟** `panelScale`）
+        public static let superPanelWidth: CGFloat = 340
         /// 超级面板最矮高度（仅一行提示时）
-        public static let superPanelMinHeight: CGFloat = 120
+        public static let superPanelMinHeight: CGFloat = 96
         /// 超级面板最高高度（超出则内容区内部滚动）
         public static let superPanelMaxHeight: CGFloat = 620
-        /// 超级面板初始高度（内容量出来前的占位）
-        public static let superPanelInitialHeight: CGFloat = 320
+        /// 超级面板骨架高度：唤出后先以这个高度出现，内容识别完再收敛到真实高度
+        public static let superPanelSkeletonHeight: CGFloat = 176
 
         // MARK: AI 聚合标签栏
 
@@ -354,6 +438,49 @@ public enum DesignTokens {
         }
     }
 
+    // MARK: - 截图标注工具栏
+
+    /// 截图遮罩上的就地工具栏（AppKit 自绘，所以用 `CGFloat` / `Double` 而不是 SwiftUI 类型）
+    ///
+    /// 它是玻璃材质（`NSGlassEffectView`），颜色一律走语义色，**不在这里定义颜色**。
+    public enum ScreenshotToolbar {
+        /// 图标按钮尺寸（宽 × 高）
+        public static let buttonSize = CGSize(width: scaled(28), height: scaled(26))
+        /// 色块 / 线宽按钮的点击区域边长
+        public static let smallButton = scaled(22)
+        /// 色块圆的直径
+        public static let swatchDiameter = scaled(14)
+        /// 选中色块外环线宽
+        public static let swatchRingWidth: CGFloat = 1.5
+        /// 选中色块外环与色块之间的缝
+        public static let swatchRingGap = scaled(2)
+        /// 线宽圆点的直径（细 / 中 / 粗，与 `AnnotationDefaults.lineWidths` 一一对应）
+        public static let widthDotDiameters: [CGFloat] = [scaled(4), scaled(7), scaled(10)]
+        /// 选中态底板 / 悬停底板圆角
+        public static let pillRadius = scaled(8)
+        /// 图标字号（pt）
+        public static let iconPointSize = scaled(14)
+        /// 组内按钮间距
+        public static let itemSpacing = scaled(2)
+        /// 组间间距（含分隔线两侧）
+        public static let groupSpacing = scaled(8)
+        /// 工具栏内边距
+        public static let insets = NSEdgeInsets(
+            top: scaled(6), left: scaled(10), bottom: scaled(6), right: scaled(10))
+        /// 分隔线高度
+        public static let separatorHeight = scaled(16)
+        /// 与选区、画布边缘的最小间隙
+        public static let placementMargin = scaled(10)
+        /// 悬停底板的浓度（作用在 `labelColor` 上）
+        public static let hoverFill: CGFloat = 0.1
+        /// 按下底板的浓度
+        public static let pressedFill: CGFloat = 0.18
+        /// 色块描边浓度（白 / 黑色块在玻璃上需要一圈轮廓才不会消失）
+        public static let swatchStroke: CGFloat = 0.25
+        /// 不可用按钮（如无可撤销的标注）的整体浓度
+        public static let disabledAlpha: CGFloat = 0.35
+    }
+
     // MARK: - 阴影
 
     // 面板与 HUD 的投影没有令牌，因为**它们不是自绘的**：
@@ -361,6 +488,49 @@ public enum DesignTokens {
     // 形状取自窗口的 alpha 通道，所以圆角就是圆角。若改成 SwiftUI `.shadow`，
     // 阴影会被窗口边界裁切，在圆角外侧留下不透明的方形暗块。
     // 详见 PaletteBackground 的说明。
+
+    // MARK: - 不透明度（语义）
+
+    public enum Opacity {
+        /// 破坏性按钮的底色浓度
+        public static let destructiveFill: Double = 0.16
+        /// 分隔线的淡化程度（系统 `Divider` 在玻璃上偏重，统一压淡）
+        public static let divider: Double = 0.3
+        /// 强调色 / 进度色的浅色底（徽标、选中块、图标底）
+        public static let tint: Double = 0.12
+        /// 强调色的较重底色（拖拽高亮等需要更醒目的场景）
+        public static let tintStrong: Double = 0.2
+        /// 弹出层投影的浓度
+        public static let popoverShadow: Double = 0.15
+        /// 次要文字再淡一档
+        public static let dimmed: Double = 0.7
+        /// 卡片底色的淡化版（嵌在卡片里的次级区块）
+        public static let cardFillDim: Double = 0.35
+        /// 控件底色的淡化版
+        public static let controlSurfaceDim: Double = 0.4
+        /// 选中行（强调色底）上的次要文字
+        public static let onAccentSecondary: Double = 0.8
+        /// 强调色描边
+        public static let accentStroke: Double = 0.5
+        /// Diff 行底色
+        public static let diffBand: Double = 0.15
+        /// 发光投影
+        public static let glow: Double = 0.3
+        /// 录制快捷键里键帽的底色
+        public static let keyCapFill: Double = 0.08
+        /// 「今天」的强调色底（日历格子、日期圆点）
+        public static let todayFill: Double = 0.16
+        /// 小徽标 / 胶囊的浅色底（宜忌、休班角标、事件胶囊）
+        public static let badgeFill: Double = 0.14
+        /// 强调色的重描边（选中日期的轮廓）
+        public static let accentStrokeStrong: Double = 0.65
+        /// 选中格子的强调色底（年视图迷你月历）
+        public static let selectedFill: Double = 0.25
+        /// 非当月日期文字的淡化程度
+        public static let outsideMonthText: Double = 0.5
+        /// 最淡的强调色底（日历悬停 / 今天的占位底）
+        public static let faintTint: Double = 0.08
+    }
 
     // MARK: - 动画时长
 
@@ -377,6 +547,12 @@ public enum DesignTokens {
         public static let hover: TimeInterval = 0.12
         /// 复制反馈
         public static let copyFeedback: TimeInterval = 1.2
+        /// 行内提示的淡入淡出
+        public static let feedbackFade: TimeInterval = 0.2
+        /// 行内提示停留时长
+        public static let feedbackHold: TimeInterval = 1.8
+        /// 刷新图标转一圈
+        public static let spin: TimeInterval = 0.8
     }
 
     // MARK: - 字体
@@ -390,6 +566,11 @@ public enum DesignTokens {
         public static let headerIcon = Font.system(size: scaled(18), weight: .medium)
         /// 列表行标题
         public static let rowTitle = scaledStyle(.body)
+        /// 列表行里 SF Symbol 图标的字体
+        public static let rowSymbol = Font.system(size: scaled(13), weight: .medium)
+        /// 插件头部按钮图标
+        public static let headerButtonSemibold = Font.system(size: 14, weight: .semibold)
+        public static let headerButtonMedium = Font.system(size: 14, weight: .medium)
         /// 列表行右侧文本
         public static let rowTrailing = scaledStyle(.callout)
         /// 分组标题
@@ -491,11 +672,28 @@ public enum DesignTokens {
         }
 
         /// 透明度渐变（深色用白墨、浅色用黑墨）
+        ///
+        /// 开启「增强对比度」时系统会换成高对比外观（`accessibilityHighContrast*`），
+        /// 这里据此把不透明度整体抬高 —— 半透明的描边、分隔线、选中底色在默认下很淡，
+        /// 对低视力用户几乎看不见。见 `ContrastBoost`。
         public static func ramp(dark: Double, light: Double) -> Color {
-            adaptive(
-                dark: .srgbInk(1, alpha: dark),
-                light: .srgbInk(0, alpha: light)
-            )
+            Color(
+                nsColor: NSColor(name: nil) { appearance in
+                    resolveRamp(dark: dark, light: light, appearance: appearance)
+                })
+        }
+
+        /// `ramp` 在某个外观下的取值（单独拎出来，测试可以直接喂外观与系统开关）
+        ///
+        /// 高对比只认系统「增强对比度」开关。**不能靠外观名判断**：`bestMatch` 与 `NSAppearance.name`
+        /// 都会把高对比变体归并回基础外观（实测 `.accessibilityHighContrastAqua.name == .aqua`），永远认不出来。
+        static func resolveRamp(
+            dark: Double, light: Double, appearance: NSAppearance,
+            systemIncreaseContrast: Bool = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        ) -> NSColor {
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let alpha = ContrastBoost.alpha(isDark ? dark : light, highContrast: systemIncreaseContrast)
+            return .srgbInk(isDark ? 1 : 0, alpha: alpha)
         }
 
         /// 面板背景遮罩
@@ -528,6 +726,8 @@ public enum DesignTokens {
 
         /// 选中行背景
         public static let selection = ramp(dark: 0.10, light: 0.09)
+        /// 结果行 SF Symbol 图标的底块（比选中高亮淡，免得与选中态混淆）
+        public static let iconTile = ramp(dark: 0.08, light: 0.06)
 
         /// 设置侧栏选中高亮（中性浅灰，对齐 Raycast；不用系统强调蓝）
         public static let settingsSidebarSelection = ramp(dark: 0.16, light: 0.08)
@@ -581,6 +781,8 @@ public enum DesignTokens {
 
         /// 进度色
         public static let progress = Color.blue
+        /// 压在强调色填充上的前景（选中日期的数字）
+        public static let onAccent = Color.white
 
         /// 设置侧栏图标色块配色（对齐系统设置多彩瓷砖，深浅模式各一套）
         public enum SettingsIcon {

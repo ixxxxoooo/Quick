@@ -64,7 +64,7 @@ public struct SettingsTileIcon: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            tint.color.opacity(0.96),
+                            tint.color.opacity(0.96),  // ui-literal-ok: 渐变色标，只在这一处用
                             tint.color
                         ],
                         startPoint: .top,

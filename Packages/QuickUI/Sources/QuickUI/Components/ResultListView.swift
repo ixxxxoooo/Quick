@@ -4,6 +4,7 @@
 
 import AppKit
 import QuickCore
+import QuickPlatform
 import SwiftUI
 
 /// 统一搜索结果列表组件
@@ -27,6 +28,12 @@ public struct ResultListView: View {
     /// 关掉后结果行不画图标
     public var showsIcons: Bool
 
+    /// 当前查询：用来在标题里高亮命中的字
+    public var query: String
+
+    /// 前 9 行是否标出 ⌘1…⌘9（主搜索列表开，其余场景关）
+    public var showsQuickNumbers: Bool
+
     /// 悬停的结果 ID
     @State private var hoveredID: String?
 
@@ -39,12 +46,16 @@ public struct ResultListView: View {
         items: [SearchableItem],
         selectedIndex: Binding<Int>,
         selection: PaletteSelection? = nil,
-        showsIcons: Bool = true
+        showsIcons: Bool = true,
+        query: String = "",
+        showsQuickNumbers: Bool = false
     ) {
         self.items = items
         self._selectedIndex = selectedIndex
         self.selection = selection
         self.showsIcons = showsIcons
+        self.query = query
+        self.showsQuickNumbers = showsQuickNumbers
     }
 
     /// 结果集的指纹
@@ -59,15 +70,33 @@ public struct ResultListView: View {
     public var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                // 顶/底锚点在内边距之外：滚到两端时内边距跟着露出来，列表不会比静止时矮一截
+                ListTopMarker()
                 LazyVStack(spacing: DesignTokens.Spacing.xxs) {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         ResultRowView(
                             item: item,
                             isSelected: index == selectedIndex,
                             isHovered: hoveredID == item.id,
-                            showsIcon: showsIcons
+                            showsIcon: showsIcons,
+                            query: query,
+                            quickNumber: showsQuickNumbers && index < PaletteSelection.quickSelectLimit
+                                ? index + 1 : nil
                         )
+                        // 选中 / 悬停每动一下，列表都要重新求值；行相等就直接跳过它的 body，
+                        // 只有「旧选中」与「新选中」两行真正重算（标题高亮是其中最贵的一步）
+                        .equatable()
                         .id(item.id)
+                        // 读屏：一行一个按钮，念「标题，来源插件」，选中态要让 VoiceOver 知道
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(
+                            item.pluginName.map { "\(item.title)，\($0)" } ?? item.title
+                        )
+                        .accessibilityAddTraits(index == selectedIndex ? [.isButton, .isSelected] : .isButton)
+                        .accessibilityAction {
+                            selectedIndex = index
+                            item.action()
+                        }
                         .onHover { hovering in
                             if hovering {
                                 if let sel = selection {
@@ -92,14 +121,16 @@ public struct ResultListView: View {
                 }
                 .padding(.horizontal, DesignTokens.Spacing.md)
                 .padding(.vertical, DesignTokens.Spacing.sm)
+                ListBottomMarker()
             }
             // 系统滚动条和面板的玻璃语言冲突：它是为带标题栏的窗口设计的。
             // 面板高度固定、条目数有限，滚动位置靠键盘导航已经足够可感知。
             .scrollIndicators(.never)
             .onChange(of: resultSetFingerprint) { _, _ in
-                guard let first = items.first?.id else { return }
-                // 不加动画：换一批结果时从中间滑回顶部会让人以为列表在乱动
-                proxy.scrollTo(first, anchor: .top)
+                guard !items.isEmpty else { return }
+                // 不加动画：换一批结果时从中间滑回顶部会让人以为列表在乱动。
+                // 滚到「内容顶端」而不是「第一行」：后者会把顶部内边距滚掉，第一行就往上缩一截
+                proxy.scrollToTopEdge()
             }
             .onChange(of: selection?.hoverDisarmToken) { _, _ in
                 hoveredID = nil
@@ -116,10 +147,7 @@ public struct ResultListView: View {
                 guard let index = selection?.index,
                     index >= 0, index < items.count
                 else { return }
-                proxy.scrollTo(
-                    items[index].id,
-                    anchor: ListScrollFollow.anchor(for: index, count: items.count)
-                )
+                proxy.follow(index: index, count: items.count, itemID: items[index].id)
             }
         }
         .edgeDissolve()
@@ -133,11 +161,26 @@ public struct ResultListView: View {
 /// 单行布局：图标 · 标题 ·（弹性）· 右侧类型标签 / 键位提示。参考实现也是这个形状 ——
 /// **行内不放描述文字**，放标题下方还是右侧都不放：一屏能看到的条目数优先。
 /// 插件仍在 `SearchableItem.subtitle` 里提供描述，但面板没有它的渲染点。
-struct ResultRowView: View {
+struct ResultRowView: View, Equatable {
     let item: SearchableItem
     let isSelected: Bool
     let isHovered: Bool
     var showsIcon = true
+    /// 用来高亮标题命中字的查询
+    var query = ""
+    /// ⌘数字直达的序号（1…9）；`nil` 不显示
+    var quickNumber: Int?
+
+    /// 只比较**画得出来**的输入：`action` 是闭包，不参与（也无法比较）
+    nonisolated static func == (lhs: ResultRowView, rhs: ResultRowView) -> Bool {
+        lhs.item.id == rhs.item.id && lhs.item.title == rhs.item.title
+            && lhs.item.icon == rhs.item.icon && lhs.item.pluginName == rhs.item.pluginName
+            && lhs.item.shortcutHint == rhs.item.shortcutHint
+            && lhs.item.iconType == rhs.item.iconType
+            && lhs.isSelected == rhs.isSelected && lhs.isHovered == rhs.isHovered
+            && lhs.showsIcon == rhs.showsIcon && lhs.query == rhs.query
+            && lhs.quickNumber == rhs.quickNumber
+    }
 
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.lg) {
@@ -146,7 +189,7 @@ struct ResultRowView: View {
                     .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
             }
 
-            Text(item.title)
+            Text(HighlightCache.attributed(title: item.title, query: query))
                 .font(DesignTokens.Typography.rowTitle)
                 .foregroundStyle(DesignTokens.Colors.textPrimary)
                 .lineLimit(1)
@@ -177,6 +220,14 @@ struct ResultRowView: View {
                     .frame(maxWidth: DesignTokens.Size.SourceBadge.maxWidth, alignment: .trailing)
                     .help("来自插件：\(name)")
             }
+
+            if let quickNumber {
+                Text("⌘\(quickNumber)")
+                    .font(DesignTokens.Typography.rowTrailing)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .monospacedDigit()
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .padding(.vertical, DesignTokens.Spacing.md)
@@ -197,10 +248,10 @@ struct ResultRowView: View {
         switch item.iconType {
         case .symbol:
             ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.primary.opacity(0.08))
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.thumbnail, style: .continuous)
+                    .fill(DesignTokens.Colors.iconTile)
                 Image(systemName: item.icon)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(DesignTokens.Typography.rowSymbol)
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
             }
             .frame(width: DesignTokens.Size.rowIcon, height: DesignTokens.Size.rowIcon)
@@ -216,16 +267,17 @@ struct ResultRowView: View {
     }
 }
 
-/// 应用图标（内存缓存，保证即开即显零白屏）
+/// 应用图标
+///
+/// 图标统一走 `IconCache.shared`：全应用只有一份图标缓存，不再在这里另养一套。
+/// 命中时 `init` 里就拿到图片，保证即开即显零白屏；未命中的占位块只存在到后台读完磁盘为止（不占主线程）。
 private struct AppIconImage: View {
     let path: String
     @State private var image: NSImage?
 
-    private static let cache = NSCache<NSString, NSImage>()
-
     init(path: String) {
         self.path = path
-        _image = State(initialValue: Self.cache.object(forKey: path as NSString))
+        _image = State(initialValue: IconCache.shared.cachedIcon(forBundlePath: path))
     }
 
     var body: some View {
@@ -235,16 +287,38 @@ private struct AppIconImage: View {
                     .resizable()
                     .scaledToFit()
             } else {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.primary.opacity(0.08))
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.thumbnail, style: .continuous)
+                    .fill(DesignTokens.Colors.iconTile)
             }
         }
-        .onAppear {
+        // 未命中缓存时在后台读盘；滚动 / 换结果时视图消失会自动取消这个任务
+        .task(id: path) {
             guard image == nil else { return }
-            let icon = NSWorkspace.shared.icon(forFile: path)
-            icon.size = NSSize(width: 48, height: 48)
-            Self.cache.setObject(icon, forKey: path as NSString)
-            image = icon
+            image = await IconCache.shared.loadIcon(forBundlePath: path)
         }
     }
+}
+
+/// 标题高亮的缓存
+///
+/// 高亮要做不区分音标的子串搜索，对每一行都不便宜；而同一个「标题 + 查询」在退格、
+/// 回到上一个查询、列表重建时会反复出现。容量到顶就整体清空：条目便宜、命中集中在最近几次查询，
+/// 不值得为它写 LRU。
+@MainActor
+enum HighlightCache {
+    private static var storage: [String: AttributedString] = [:]
+    static let capacity = 400
+
+    static func attributed(title: String, query: String) -> AttributedString {
+        guard !query.isEmpty else { return AttributedString(title) }
+        let key = query + "\u{0}" + title
+        if let hit = storage[key] { return hit }
+        let value = MatchHighlighter.attributed(title: title, query: query)
+        if storage.count >= capacity { storage.removeAll(keepingCapacity: true) }
+        storage[key] = value
+        return value
+    }
+
+    static var count: Int { storage.count }
+    static func reset() { storage.removeAll() }
 }

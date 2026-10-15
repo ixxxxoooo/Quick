@@ -17,7 +17,7 @@
         ┌───────────────┼───────────────┐
         ▼               ▼               ▼
   ┌──────────┐   ┌───────────┐   ┌──────────────┐
-  │ Plugin*  │   │  QuickUI  │   │ QuickPlatform│   （25 个 / 1 个 / 1 个）
+  │ Plugin*  │   │  QuickUI  │   │ QuickPlatform│   （19 个 / 1 个 / 1 个）
   └────┬─────┘   └─────┬─────┘   └──────┬───────┘
        │               │                │
        └───────────────┴────────────────┘
@@ -36,7 +36,7 @@
   **插件之间永不互相依赖。**
 - `Quick/` 依赖全部。只有它能 import 各插件。
 
-**为什么插件间不能互相依赖：** 25 个插件两两依赖会变成一张网，任何改动都会波及全仓，
+**为什么插件间不能互相依赖：** 19 个插件两两依赖会变成一张网，任何改动都会波及全仓，
 且没法单独测试。需要协作时走 `EventBus`。
 
 ---
@@ -45,6 +45,22 @@
 
 [`Quick/AppCore.swift`](../Quick/AppCore.swift) 是 `@MainActor final class`，
 `static let shared`。整个应用只有它在持有长生命周期对象。
+
+**文件拆分是按职责切文件，不是拆所有者。** 状态（存储属性）与 `start()` / 退出清理留在
+`AppCore.swift`；行为按职责放进同名扩展文件，每个文件能一次读完：
+
+| 文件 | 内容 |
+| --- | --- |
+| `AppCore+Plugins.swift` | 插件分离、存储迁移、注册（**唯一 `plugins.append` 处**） |
+| `AppCore+EventBus.swift` | 事件总线接线 |
+| `AppCore+SuperPanel.swift` | 超级面板系统能力注入与鼠标触发 |
+| `AppCore+Commands.swift` | 自定义命令存储、快捷键恢复、命令目录 |
+| `AppCore+Paste.swift` | 粘贴回上一个应用 |
+| `AppCore+KeyboardLayout.swift` / `AppCore+Appearance.swift` | 键盘布局、外观 |
+
+跨文件的扩展访问不到 `private`，所以这些成员是 internal。`plugins` 因此无法再写成
+`private(set)` —— 「只有 `registerPlugins()` 写它」靠约定与 `Scripts/check-plugin-references.py` 守住。
+`SettingsBridge` 同理拆成 `+Launcher` / `+Plugins` / `+Host` / `+Backup`，协议一致性仍声明在主类上。
 
 ### 它拥有什么
 
@@ -63,30 +79,46 @@
 | `pluginPanelController` | `PluginPanelController` | 分离窗口管理（创建、单例、尺寸记忆） |
 | `launchAtLogin` | `LaunchAtLogin` | 登录项（`SMAppService`） |
 | `statusItemController` | `StatusItemController` | 菜单栏图标与菜单 |
-| `plugins` | `[any QuickPlugin]` | 全部 25 个插件实例 |
+| `plugins` | `[any QuickPlugin]` | 全部 19 个插件实例 |
 | `subscriptions` | `[EventSubscription]` | 事件订阅句柄（不持有就会被释放） |
 
 ### `start()` 的固定顺序
 
 顺序是有意的，改动前想清楚依赖：
 
-1. `AIConfig.migrateAPIKeyIfNeeded()` —— API Key 从 UserDefaults 迁入 Keychain（一次性）
-2. `migrateHostStorage()` —— 打开数据库、应用宿主 schema。**必须先于注册插件**：
+0. `launchGuard.begin(exempt:)` —— 崩溃自愈判定（见下节）。**必须先于注册插件**：
+   被隔离的插件要在注册时就读到「已停用」
+1. `migrateHostStorage()` —— 打开数据库、应用宿主 schema。**必须先于注册插件**：
    需要真表的插件在构造时就要拿到存储句柄
-3. `registerPlugins()` —— 组装插件（**唯一实例化插件的地方**）
-4. `paletteCoordinator.setPlugins(plugins)` —— 注入插件，接上「最近使用」与键盘布局回调
-5. `wireEventBus()` —— 订阅事件，把事件接到协调器/剪贴板/HUD
-6. 分离回调 `onDetach`
-7. 热键：设 `onCommand` 回调 → `hotKeyService.start()` → `wireSuperPanel()`（注入系统能力、
+2. `registerPlugins()` —— 组装插件（**唯一实例化插件的地方**）
+3. `paletteCoordinator.setPlugins(plugins)` —— 注入插件，接上「最近使用」与键盘布局回调
+4. `wireEventBus()` —— 订阅事件，把事件接到协调器/剪贴板/HUD
+5. 分离回调 `onDetach`
+6. 热键：设 `onCommand` 回调 → `hotKeyService.start()` → `wireSuperPanel()`（注入系统能力、
    起鼠标监听、补默认 ⌥C）→ `invokeCommand` / 搜索范围回调
-8. `statusItemController.install()` —— 菜单栏图标；onboarding 与外观随后接线
-9. `observeDebugWakeSignals()` —— 调试用分布式通知
-10. `Task { await appIndex.refresh(scopes:) }` —— **异步**扫描应用，不阻塞启动
-11. 对每个已启用插件调用 `activate()` → `rebuildCommandCatalog()`
-12. `applyLaunchArguments()` —— 开发启动参数（`-showPalette` 等验收开关统一在这里处理）
+7. `statusItemController.install()` —— 菜单栏图标；onboarding 与外观随后接线
+8. `observeDebugWakeSignals()` —— 调试用分布式通知
+9. `Task { await appIndex.refresh(scopes:) }` —— **异步**扫描应用，不阻塞启动
+10. 对每个已启用插件调用 `activate()` → `rebuildCommandCatalog()`
+11. `applyLaunchArguments()` —— 开发启动参数（`-showPalette` 等验收开关统一在这里处理）
 
-退出走 `prepareForTermination()`：停热键 → 摘菜单栏 → `deactivate()` 各插件 →
-`EventBus.shared.removeAll()`。
+退出走 `prepareForTermination()`：落盘 AI 对话 → 停热键 → 摘菜单栏 → `deactivate()` 各插件 →
+`EventBus.shared.removeAll()` → `launchGuard.markCleanExit()`。
+
+### 崩溃自愈（`LaunchGuard`）
+
+[`QuickPlatform/System/LaunchGuard.swift`](../Packages/QuickPlatform/Sources/QuickPlatform/System/LaunchGuard.swift)
+回答「上次是不是没退干净，死在谁手上」，状态存在 `Application Support/<bundle id>/launch-state.json`。
+
+- 启动时置 `running`，`prepareForTermination()` 里清掉；下次启动若 `running` 仍为真即异常退出。
+  SIGTERM 也经过 `prepareForTermination()`，所以 `restart.sh` 不会被误判成崩溃。
+- 每个插件的**构造**与 `activate()` 前后用 `guardStart(_:_:)` 包住，先落盘再执行。崩溃时磁盘上留着
+  嫌疑插件的 id。
+- **同一个插件连续两次死在启动里才自动停用**（`strikeLimit`）。一次可能是别处刚好崩在这个窗口，
+  贸然停用用户的功能比多崩一次更糟。启动器豁免。正常退出清零所有嫌疑；用户在设置里重新启用后重新计数。
+- 连续 3 次异常退出视为崩溃循环，HUD 提示去看日志。
+- **崩溃保护自己不能成为崩溃源**：状态文件读不出来就当全新状态，写失败只记日志。
+- 状态文件独立于数据库 —— 数据库本身就可能是崩溃的原因（见 `ResilientDatabase`）。
 
 ### 新增状态的规矩
 
@@ -185,6 +217,9 @@ public protocol PluginSettingsProviding { func makeSettingsView() -> AnyView? }
   参考 `NoteStore` / `ClipboardStore` 的 `searchSnapshot`。
 - **`dynamicSearch` 必须尊重取消。** 调用方（`PaletteSearchEngine`）并发且带超时，
   插件内部若有昂贵准备，要检查 `Task.isCancelled`。
+- **聚合搜索是增量交付的。** 动态来源逐个完成时，`PaletteSearchEngine.search(progress:)` 把
+  「静态结果 + 已返回来源」合并后先交给列表，慢来源（文件搜索、网络）不再扣住已经算好的结果；
+  增量与最终结果走同一个 `merged(...)`，视图侧按 id 保住用户已经移动过的选中项。
 - **`makeView()` 返回的视图不要持有 `AppCore`。** 需要能力就通过插件构造器注入。
 - **`activate()` / `deactivate()` 必须成对且幂等。** 插件可能被反复启停。
 - **`deactivate()` 里要落盘。** 未保存的运行时状态在退出时就丢了。
@@ -194,7 +229,7 @@ public protocol PluginSettingsProviding { func makeSettingsView() -> AnyView? }
 插件**不自注册**。加一个插件要做四件事：
 
 1. 写 `<Name>Plugin.swift` 实现协议。
-2. 在 `AppCore.registerPlugins()` 里 `plugins.append(...)`。
+2. 在 `AppCore+Plugins.swift` 的 `registerPlugins()` 里 `plugins.append(...)`。
 3. 在 `project.yml` 的 `packages:` 加路径、在 `Quick` target 的 `dependencies:` 加
    `- package: Plugin<Name>`，然后 `xcodegen generate`。
 4. 在 `docs/features.md` 写下这个插件的不变量。
@@ -213,7 +248,7 @@ public protocol PluginSettingsProviding { func makeSettingsView() -> AnyView? }
   以及去改这份文档里的自注册禁令 —— 那是一次架构变更，不要顺手做。
 
 一个插件应该大到什么程度才值得单独存在？`parse`/`format` 这类纯逻辑抽到 `Model/` 里
-能独立测，就够一格了 —— 10 个开发者工具就是这么从 `devtools` 容器里拆出来的。
+能独立测，就够一格了 —— 8 个开发者工具就是这么从 `devtools` 容器里拆出来的。
 
 ---
 
@@ -334,6 +369,14 @@ Debug（`.dev`）与 Release 互不污染。
 记**使用次数**（与时间无关，用于给搜索结果加权），`UsageHistory` 记**最后一次是什么时候**
 （昨天启动过 20 次的东西，不该排在刚刚用过的翻译前面）。
 
+#### 宿主库损坏时自愈，不让用户一直面对空白
+
+宿主库由 [`ResilientDatabase`](../Packages/QuickCore/Sources/QuickCore/Storage/ResilientDatabase.swift)
+打开：先 `PRAGMA integrity_check`；打不开或检查不过时，把坏文件（连同 `-wal` / `-shm`）改名为
+`<name>.corrupt-<时间戳>` 留作证据，再建一个新库继续跑；连新库都建不了就退到内存库。
+三种结果（`opened` / `recovered` / `inMemory`）由 `AppCore.databaseNotice` 转成启动后的 HUD
+提示 —— 用户看到的症状是「历史记不住」，根因必须说出来，而不是只写日志。
+
 #### 迁移按 id 记账，不用递增版本号
 
 迁移是一个 `(id, [SQL])`。id 形如 `clipboard.history`、`notes.items`，写在
@@ -417,6 +460,10 @@ Debug（`.dev`）与 Release 互不污染。
 图标缓存是唯一的例外：位图是按外观出图的，翻了面要让它重来（`IconCache.setDarkSurface`）。
 它挂在 `NSApp.effectiveAppearance` 上而不是 `applyAppearance()` 里 —— 「跟随系统」时我们
 从不赋值，那条路只有这里收得到。
+
+结果列表的应用图标（`ResultListView.AppIconImage`）也走这一份 `IconCache.shared`：先用
+`cachedIcon(forBundlePath:)` 在 `init` 里同步取命中的图标（零白屏），未命中才由 `loadIcon(forBundlePath:)` 在后台读盘（`.task`，不占主线程）。
+不要在视图里再养第二份 `NSCache`。
 
 ### 设置窗口
 

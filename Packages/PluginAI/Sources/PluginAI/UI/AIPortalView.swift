@@ -50,10 +50,10 @@ struct AIPortalView: View {
         HStack(spacing: DesignTokens.Spacing.md) {
             ZStack {
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.12))
-                    .frame(width: 40, height: 40)
+                    .fill(Color.accentColor.opacity(DesignTokens.Opacity.tint))
+                    .frame(width: DesignTokens.Size.heroTile, height: DesignTokens.Size.heroTile)
                 Image(systemName: "sparkles")
-                    .font(.system(size: 20))
+                    .font(.system(size: DesignTokens.Size.heroGlyph))
                     .foregroundStyle(Color.accentColor)
             }
             .help("AI 聚合门户")
@@ -67,7 +67,7 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.compactKeyCap).fontWeight(.medium)
                         .padding(.horizontal, DesignTokens.Spacing.sm)
                         .padding(.vertical, DesignTokens.Spacing.xxs)
-                        .background(Color.accentColor.opacity(0.12))
+                        .background(Color.accentColor.opacity(DesignTokens.Opacity.tint))
                         .foregroundStyle(Color.accentColor)
                         .clipShape(Capsule())
                 }
@@ -135,7 +135,7 @@ struct AIPortalView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl, style: .continuous)
                         .fill(accentColor.opacity(isEnabled ? 0.12 : 0.05))
-                        .frame(width: 32, height: 32)
+                        .frame(width: DesignTokens.Size.providerIcon, height: DesignTokens.Size.providerIcon)
                     Image(systemName: provider.icon)
                         .font(DesignTokens.Typography.iconGlyph)
                         .foregroundStyle(isEnabled ? accentColor : DesignTokens.Colors.textTertiary)
@@ -155,7 +155,7 @@ struct AIPortalView: View {
                             .background(
                                 Capsule().fill(
                                     isActive
-                                        ? DesignTokens.Colors.success.opacity(0.12)
+                                        ? DesignTokens.Colors.success.opacity(DesignTokens.Opacity.tint)
                                         : DesignTokens.Colors.controlSurface)
                             )
                             .foregroundStyle(
@@ -193,9 +193,9 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.bar)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 28)
+                    .frame(height: DesignTokens.Size.controlSquare)
                     .background(
-                        isEnabled ? accentColor.opacity(0.12) : DesignTokens.Colors.controlSurface)
+                        isEnabled ? accentColor.opacity(DesignTokens.Opacity.tint) : DesignTokens.Colors.controlSurface)
                     .foregroundStyle(isEnabled ? accentColor : DesignTokens.Colors.textTertiary)
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.barControl))
                 }
@@ -216,13 +216,16 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.inlineIcon)
                         .rotationEffect(reloadingID == provider.id ? .degrees(360) : .zero)
                         .animation(
-                            reloadingID == provider.id
-                                ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default,
+                            Motion.animation(
+                                reloadingID == provider.id
+                                    ? .linear(duration: DesignTokens.Duration.spin).repeatForever(
+                                        autoreverses: false) : .default),
                             value: reloadingID
                         )
                 }
                 .buttonStyle(.plain)
-                .frame(width: 28, height: 28)
+                .accessibilityLabel("刷新 \(provider.name)")
+                .frame(width: DesignTokens.Size.controlSquare, height: DesignTokens.Size.controlSquare)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .disabled(!isActive)
                 .help("刷新 \(provider.name) 页面")
@@ -235,7 +238,8 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.inlineIcon)
                 }
                 .buttonStyle(.plain)
-                .frame(width: 28, height: 28)
+                .accessibilityLabel("在浏览器中打开 \(provider.name)")
+                .frame(width: DesignTokens.Size.controlSquare, height: DesignTokens.Size.controlSquare)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .help("在浏览器中打开 \(provider.name)")
 
@@ -248,7 +252,8 @@ struct AIPortalView: View {
                         .font(DesignTokens.Typography.inlineIcon)
                 }
                 .buttonStyle(.plain)
-                .frame(width: 28, height: 28)
+                .accessibilityLabel("关闭 \(provider.name)")
+                .frame(width: DesignTokens.Size.controlSquare, height: DesignTokens.Size.controlSquare)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .disabled(!isActive)
                 .help("关闭 \(provider.name)")
@@ -259,23 +264,19 @@ struct AIPortalView: View {
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.card, style: .continuous)
-                .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: 0.5)
+                .strokeBorder(DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairlineThin)
         )
     }
 
     // MARK: - 底部
 
     private var footerSection: some View {
-        VStack(spacing: DesignTokens.Spacing.xs) {
-            Text("搜索 AI 名称可直接打开对应窗口")
-                .font(DesignTokens.Typography.inlineIcon)
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-            Text("关闭窗口后登录态仍然保持")
-                .font(DesignTokens.Typography.inlineIcon)
-                .foregroundStyle(DesignTokens.Colors.textTertiary.opacity(0.7))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, DesignTokens.Spacing.sm)
+        // 合并成一行：两行提示会把内容撑出 475 的面板高度，凭空多出一段滚动
+        Text("搜索 AI 名称可直接打开对应窗口 · 关闭窗口后登录态仍然保持")
+            .font(DesignTokens.Typography.inlineIcon)
+            .foregroundStyle(DesignTokens.Colors.textTertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, DesignTokens.Spacing.xs)
     }
 
     // MARK: - Toast
@@ -291,7 +292,7 @@ struct AIPortalView: View {
         .padding(.vertical, DesignTokens.Spacing.sm)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+        .shadow(color: .black.opacity(DesignTokens.Opacity.popoverShadow), radius: DesignTokens.Size.popoverShadowRadius, y: DesignTokens.Size.popoverShadowOffsetY)
         .padding(.bottom, DesignTokens.Spacing.lg)
     }
 
@@ -305,12 +306,12 @@ struct AIPortalView: View {
     }
 
     private func showFeedback(_ message: String) {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        Motion.withAnimation(.easeInOut(duration: DesignTokens.Duration.feedbackFade)) {
             feedbackMessage = message
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.8))
-            withAnimation(.easeInOut(duration: 0.2)) {
+            try? await Task.sleep(for: .seconds(DesignTokens.Duration.feedbackHold))
+            Motion.withAnimation(.easeInOut(duration: DesignTokens.Duration.feedbackFade)) {
                 feedbackMessage = nil
             }
         }

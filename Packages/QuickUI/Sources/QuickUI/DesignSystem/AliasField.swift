@@ -56,14 +56,15 @@ public struct AliasField: View {
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("清除别名")
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.sm)
-        .frame(width: DesignTokens.Size.shortcutRecorder, height: 24)
+        .frame(width: DesignTokens.Size.shortcutRecorder, height: DesignTokens.Size.recorderHeight)
         .background(shape.fill(DesignTokens.Colors.cardFill))
         .overlay(
             shape.strokeBorder(
-                focused ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: 1)
+                focused ? Color.accentColor : DesignTokens.Colors.cardStroke, lineWidth: DesignTokens.Size.hairline)
         )
         .clipShape(shape)
     }

@@ -135,6 +135,9 @@ struct ClipboardListView: View {
                 switchTab(direction: delta)
             case .submit:
                 confirmSelection()
+            case .cancel:
+                // 只有声明了 `wantsCancel` 的视图才会收到；这里没有模态层，忽略即可
+                break
             }
         }
         // 过滤词一变，结果集就换了一批，选中项回到第一条
@@ -194,8 +197,14 @@ struct ClipboardListView: View {
                 Image(systemName: "trash")
                     .font(DesignTokens.Typography.inlineIcon)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .frame(
+                        width: DesignTokens.Size.clipboardFavoriteButton,
+                        height: DesignTokens.Size.clipboardFavoriteButton
+                    )
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("清空历史")
             .help("清空历史（保留收藏）")
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
@@ -237,7 +246,7 @@ struct ClipboardListView: View {
                 if count > 0 {
                     Text("\(count)")
                         .font(DesignTokens.Typography.compactKeyCap)
-                        .foregroundStyle(isSelected ? .white.opacity(0.8) : DesignTokens.Colors.textTertiary)
+                        .foregroundStyle(isSelected ? .white.opacity(DesignTokens.Opacity.onAccentSecondary) : DesignTokens.Colors.textTertiary)
                 }
             }
             .padding(.horizontal, DesignTokens.Spacing.md)
@@ -253,6 +262,7 @@ struct ClipboardListView: View {
             .contentShape(Rectangle().inset(by: -DesignTokens.Spacing.xs / 2))
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - 列表
@@ -260,6 +270,7 @@ struct ClipboardListView: View {
     private var entryList: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                ListTopMarker()
                 LazyVStack(spacing: DesignTokens.Spacing.xxs) {
                     ForEach(Array(currentEntries.enumerated()), id: \.element.id) { index, entry in
                         ClipboardRowView(
@@ -290,6 +301,7 @@ struct ClipboardListView: View {
                 }
                 .padding(.horizontal, DesignTokens.Spacing.md)
                 .padding(.vertical, DesignTokens.Spacing.xs)
+                ListBottomMarker()
             }
             // 系统滚动条是为带标题栏的窗口设计的，和面板的玻璃语言冲突（见 docs/ui.md）。
             // 面板高度固定、条目数有限，滚动位置靠键盘导航足够可感。
@@ -299,10 +311,7 @@ struct ClipboardListView: View {
             .onChange(of: selectedIndex) { _, newIndex in
                 let entries = currentEntries
                 guard newIndex >= 0, newIndex < entries.count else { return }
-                proxy.scrollTo(
-                    entries[newIndex].id,
-                    anchor: ListScrollFollow.anchor(for: newIndex, count: entries.count)
-                )
+                proxy.follow(index: newIndex, count: entries.count, itemID: entries[newIndex].id)
             }
         }
     }
@@ -475,19 +484,20 @@ private struct ClipboardRowView: View {
             RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
                 .fill(
                     isSelected
-                        ? Color.accentColor.opacity(0.2)
+                        ? Color.accentColor.opacity(DesignTokens.Opacity.tintStrong)
                         : (hover.hoveredID == entry.id ? DesignTokens.Colors.rowHover : .clear)
                 )
         }
         .overlay {
             if isSelected {
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.row)
-                    .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
+                    .strokeBorder(Color.accentColor.opacity(DesignTokens.Opacity.accentStroke), lineWidth: DesignTokens.Size.hairline)
             }
         }
         .onHover(perform: onHoverChange)
-        .onTapGesture { onSelect() }
+        // contentShape 必须在手势之前：命中形状只对它之后添加的手势生效
         .contentShape(Rectangle())
+        .onTapGesture { onSelect() }
         .contextMenu {
             Button {
                 onSelect()

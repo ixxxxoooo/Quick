@@ -27,6 +27,9 @@ struct PluginHeaderView: View {
     /// 返回按钮回调
     let onBack: () -> Void
 
+    /// 是否显示分离按钮
+    var showsDetach = true
+
     /// 分离按钮回调
     let onDetach: () -> Void
 
@@ -56,7 +59,9 @@ struct PluginHeaderView: View {
                     .background(WindowDragArea())
             }
 
-            detachButton
+            if showsDetach {
+                detachButton
+            }
         }
         .padding(.leading, DesignTokens.Spacing.md + DesignTokens.Spacing.lg)
         .padding(.trailing, DesignTokens.Spacing.xl)
@@ -69,7 +74,7 @@ struct PluginHeaderView: View {
     private var backButton: some View {
         Button(action: onBack) {
             Image(systemName: "chevron.left")
-                .font(.system(size: 14, weight: .semibold))
+                .font(DesignTokens.Typography.headerButtonSemibold)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .frame(
                     width: DesignTokens.Size.pluginBackButton,
@@ -78,6 +83,9 @@ struct PluginHeaderView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // 不接收键盘焦点：插件视图一打开就被系统分配到第一个可聚焦控件，
+        // 返回按钮会顶着一圈蓝色焦点环；返回有 Esc，不需要靠 Tab 走到它
+        .focusable(false)
         .accessibilityLabel("返回搜索")
         .help("返回主搜索 (Esc)")
     }
@@ -100,7 +108,7 @@ struct PluginHeaderView: View {
     private var detachButton: some View {
         Button(action: onDetach) {
             Image(systemName: "rectangle.portrait.and.arrow.right")
-                .font(.system(size: 14, weight: .medium))
+                .font(DesignTokens.Typography.headerButtonMedium)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .frame(
                     width: DesignTokens.Size.pluginBackButton,
@@ -109,6 +117,7 @@ struct PluginHeaderView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusable(false)
         .accessibilityLabel("分离为独立窗口")
         .help("分离为独立窗口 (⌘D)")
     }

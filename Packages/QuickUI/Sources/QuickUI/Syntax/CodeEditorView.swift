@@ -486,20 +486,17 @@ final class LineNumberRulerView: NSRulerView {
 
     override var requiredThickness: CGFloat { DesignTokens.Size.codeEditorGutter }
 
-    /// 自定义绘制：不调用 `super.draw(_:)`，因为 `NSRulerView` 默认以非翻转坐标画边框竖线，
-    /// 在 `isFlipped = true` 时会导致竖线向上偏移超出 `NSScrollView` 捅穿顶部工具栏。
+    /// 只画行号与右缘发丝线：不调用 `super.draw(_:)`，因为系统会铺一层不随面板材质变的纯白底，
+    /// 且 `isFlipped = true` 时默认的边框竖线会向上偏移，捅穿顶部工具栏。
     override func draw(_ dirtyRect: NSRect) {
         drawHashMarksAndLabels(in: dirtyRect)
-
-        let hairline = DesignTokens.Size.hairline
-        let separatorRect = NSRect(
-            x: bounds.maxX - hairline,
+        NSColor(DesignTokens.Colors.cardStroke).setFill()
+        NSRect(
+            x: bounds.maxX - DesignTokens.Size.hairlineThin,
             y: bounds.minY,
-            width: hairline,
+            width: DesignTokens.Size.hairlineThin,
             height: bounds.height
-        )
-        NSColor(DesignTokens.Colors.separator).setFill()
-        separatorRect.fill()
+        ).fill()
     }
 
     override func drawHashMarksAndLabels(in rect: NSRect) {

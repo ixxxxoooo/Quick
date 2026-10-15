@@ -23,6 +23,6 @@ struct SuperPanelToastView: View {
         .background(
             Capsule().fill(DesignTokens.Colors.success)
         )
-        .shadow(color: DesignTokens.Colors.success.opacity(0.3), radius: 6, y: 2)
+        .shadow(color: DesignTokens.Colors.success.opacity(DesignTokens.Opacity.glow), radius: DesignTokens.Size.glowShadowRadius, y: DesignTokens.Size.glowShadowOffsetY)
     }
 }

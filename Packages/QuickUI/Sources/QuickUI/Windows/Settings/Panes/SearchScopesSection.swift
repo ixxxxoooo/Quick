@@ -35,20 +35,19 @@ struct SearchScopesSection: View {
             }
 
             HStack(spacing: DesignTokens.Spacing.lg) {
-                Button("Add…", action: addScopes)
-                    .help("Add folders or application bundles to search")
+                Button("添加…", action: addScopes)
+                    .help("添加要搜索的文件夹或应用程序包")
 
-                Button("Restore Defaults") {
+                Button("恢复默认") {
                     dataSource.restoreDefaultSearchScopes()
                     scopes = dataSource.searchScopes
                     refreshMissing()
                 }
             }
         } header: {
-            Text("Search Scopes")
+            Text("搜索范围")
         } footer: {
-            Text(
-                "Quick scans these directories for applications. Custom locations are indexed automatically.")
+            Text("Quick 会扫描这些目录里的应用程序；自定义的位置会自动建立索引。")
         }
         .onAppear(perform: refreshMissing)
     }

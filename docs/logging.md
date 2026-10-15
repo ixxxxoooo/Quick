@@ -135,8 +135,8 @@ log.info("面板已显示，耗时 " + String(elapsed) + " ms")
 - 完整的用户文件路径（记最后一段或数量即可，除非路径本身就是排错必需）。
 - 搜索结果的具体内容（记条数即可）。
 
-宿主 AI 的 API Key 存在 Keychain（`KeychainStore` / `AIConfig.saveAPIKey`），不进
-`UserDefaults`；启动时 `AIConfig.migrateAPIKeyIfNeeded()` 会把旧版偏好里的明文迁走。
+宿主 AI 的 API Key 按服务商分别存在 Keychain（账号 `ai.apiKey.<服务商 id>`，由 `AIProviderStore` 读写），
+不进 `UserDefaults`，也不进日志；对话内容同样不进日志，只记服务商主机名、字数与耗时。
 
 ---
 
