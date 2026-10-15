@@ -18,6 +18,8 @@ struct GeneralPane: View {
     private var autoPasteSeconds = PaletteAutoBehavior.defaultPasteWindow.rawValue
     @AppStorage(SettingsKey.paletteAutoClearMinutes)
     private var autoClearMinutes = PaletteAutoBehavior.defaultClearIdle.rawValue
+    @AppStorage(SettingsKey.paletteAutoReturnHomeSeconds)
+    private var autoReturnHomeSeconds = PaletteAutoBehavior.defaultReturnHome.rawValue
 
     /// 备份操作的结果提示（成功与失败都在页面里说，不弹 NSAlert）
     @State private var backupStatus: BackupStatus?
@@ -82,10 +84,22 @@ struct GeneralPane: View {
                         icon: { SettingsRowIcon(systemImage: "eraser") }
                     )
                 }
+
+                Picker(selection: $autoReturnHomeSeconds) {
+                    ForEach(PaletteAutoBehavior.AutoReturnHome.allCases) { idle in
+                        Text(idle.title).tag(idle.rawValue)
+                    }
+                } label: {
+                    SettingsRow(
+                        title: "自动回到主界面",
+                        subtitle: "面板隐藏超过这个时间后，下次唤出时从插件内退回主界面。",
+                        icon: { SettingsRowIcon(systemImage: "house") }
+                    )
+                }
             } header: {
                 Text("面板行为")
             } footer: {
-                Text("两项都只在打开面板的那一刻生效，不会打断你正在进行的输入。")
+                Text("这些设置都只在打开面板的那一刻生效，不会打断你正在进行的输入。")
             }
 
             keyboardLayoutSection

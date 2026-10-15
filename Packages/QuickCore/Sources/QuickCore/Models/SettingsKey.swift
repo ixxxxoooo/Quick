@@ -59,6 +59,9 @@ public enum SettingsKey {
     /// 搜索框内容自动清空的空闲时间（分钟；0 = 关闭）
     public static let paletteAutoClearMinutes = "quick.palette.autoClearMinutes"
 
+    /// 面板隐藏多久后，下次唤出自动回到主界面的时间（秒；0 = 关闭，保留上次所在界面）
+    public static let paletteAutoReturnHomeSeconds = "quick.palette.autoReturnHomeSeconds"
+
     /// 面板打开期间强制切换到的键盘布局 id（空 = 不切换）
     public static let paletteForceKeyboardLayout = "quick.palette.forceKeyboardLayout"
 

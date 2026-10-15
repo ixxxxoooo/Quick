@@ -5,7 +5,7 @@
 import Foundation
 import QuickCore
 
-/// 面板打开时的自动行为：自动粘贴剪贴板、自动清空旧查询
+/// 面板打开时的自动行为：自动粘贴剪贴板、自动清空旧查询、离开太久自动回主界面
 ///
 /// 判定逻辑抽成纯函数：它只比较几个时间点，不碰剪贴板、不碰窗口，所以能直接测 ——
 /// 而这几个「时间窗」的边界正是最容易写错的地方（`<` 还是 `<=`、没有记录时算不算）。
@@ -49,6 +49,29 @@ public enum PaletteAutoBehavior {
         }
     }
 
+    /// 自动回到主界面的隐藏时长选项
+    public enum AutoReturnHome: Int, CaseIterable, Identifiable, Sendable {
+        case off = 0
+        case fiveSeconds = 5
+        case fifteenSeconds = 15
+        case thirtySeconds = 30
+        case oneMinute = 60
+        case fiveMinutes = 300
+
+        public var id: Self { self }
+
+        public var title: String {
+            switch self {
+            case .off: "关闭"
+            case .fiveSeconds: "5 秒"
+            case .fifteenSeconds: "15 秒"
+            case .thirtySeconds: "30 秒"
+            case .oneMinute: "1 分钟"
+            case .fiveMinutes: "5 分钟"
+            }
+        }
+    }
+
     // MARK: - 出厂默认
 
     /// 出厂默认的自动粘贴时间窗
@@ -60,6 +83,9 @@ public enum PaletteAutoBehavior {
 
     /// 出厂默认的自动清空空闲时间
     public static let defaultClearIdle: AutoClearIdle = .threeMinutes
+
+    /// 出厂默认的自动回到主界面时长
+    public static let defaultReturnHome: AutoReturnHome = .fiveSeconds
 
     // MARK: - 读取设置
 
@@ -77,6 +103,14 @@ public enum PaletteAutoBehavior {
     /// - Returns: 用户选过的取值；没设置过、或存的取值认不出来时，返回默认值
     public static func clearIdle(from defaults: UserDefaults = .standard) -> AutoClearIdle {
         option(key: SettingsKey.paletteAutoClearMinutes, fallback: defaultClearIdle, from: defaults)
+    }
+
+    /// 当前设置下的自动回到主界面时长
+    ///
+    /// - Parameter defaults: 偏好域（测试传自己的 suite）
+    /// - Returns: 用户选过的取值；没设置过、或存的取值认不出来时，返回默认值
+    public static func returnHome(from defaults: UserDefaults = .standard) -> AutoReturnHome {
+        option(key: SettingsKey.paletteAutoReturnHomeSeconds, fallback: defaultReturnHome, from: defaults)
     }
 
     /// 读一个以整数为 `rawValue` 的选项
@@ -139,5 +173,25 @@ public enum PaletteAutoBehavior {
         // 没有时间戳（例如查询是启动参数预填的）不当作旧内容：宁可留着也不要莫名清掉
         guard let lastEditedAt else { return false }
         return now.timeIntervalSince(lastEditedAt) >= TimeInterval(idleMinutes) * 60
+    }
+
+    /// 打开面板时是否该先退回主界面
+    ///
+    /// - Parameters:
+    ///   - isInSubScreen: 当前是否停在某个插件 / AI 对话等二级界面
+    ///   - hiddenAt: 面板上次隐藏的时刻；从未隐藏过为 nil
+    ///   - now: 当前时刻
+    ///   - seconds: 隐藏多久算「离开过」（秒）；0 表示关闭
+    /// - Returns: 是否退回主界面
+    public static func shouldReturnHome(
+        isInSubScreen: Bool,
+        hiddenAt: Date?,
+        now: Date,
+        seconds: Int
+    ) -> Bool {
+        guard seconds > 0, isInSubScreen else { return false }
+        // 没有隐藏记录说明不是「离开后回来」（例如首次启动），不动当前界面
+        guard let hiddenAt else { return false }
+        return now.timeIntervalSince(hiddenAt) >= TimeInterval(seconds)
     }
 }

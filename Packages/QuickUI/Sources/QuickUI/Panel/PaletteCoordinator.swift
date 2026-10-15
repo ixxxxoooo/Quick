@@ -158,6 +158,9 @@ public final class PaletteCoordinator {
     /// 只用来让 `isVisible` 按逻辑状态回答，见它的说明。
     private var isHiding = false
 
+    /// 面板上次隐藏的时刻，供「离开太久自动回主界面」判定；nil 表示还没隐藏过
+    private var lastHiddenAt: Date?
+
     public init() {
         observeClipboardChanges()
     }
@@ -225,6 +228,8 @@ public final class PaletteCoordinator {
             activePluginID = pluginID
             pluginSearch.reset()
             syncPaletteMode(pluginID: pluginID)
+        } else {
+            returnHomeIfAwayTooLong()
         }
 
         let signpost = QuickLog.signposter(QuickLog.Category.palette)
@@ -290,6 +295,26 @@ public final class PaletteCoordinator {
             """)
 
         EventBus.shared.post(PaletteVisibilityChangedEvent(isVisible: true))
+    }
+
+    /// 离开太久就先退回主界面
+    ///
+    /// 必须在 `applyAutoBehavior()` 之前：退回主界面会清空搜索框，之后自动粘贴才有机会填入。
+    private func returnHomeIfAwayTooLong() {
+        let setting = PaletteAutoBehavior.returnHome()
+        guard
+            PaletteAutoBehavior.shouldReturnHome(
+                isInSubScreen: activePluginID != nil,
+                hiddenAt: lastHiddenAt,
+                now: Date(),
+                seconds: setting.rawValue)
+        else { return }
+        log.notice(
+            """
+            面板已隐藏超过 \(setting.rawValue, privacy: .public) 秒，\
+            自动退回主界面（原界面=\(self.activePluginID ?? "", privacy: .public)）
+            """)
+        popToRoot()
     }
 
     /// 打开面板时的自动行为
@@ -450,6 +475,7 @@ public final class PaletteCoordinator {
         let syncMS = started.duration(to: .now).ms
 
         if wasVisible {
+            lastHiddenAt = Date()
             isHiding = true
             let didHideCallback = onPanelDidHide
             let panelToTearDown = panel
@@ -539,6 +565,8 @@ public final class PaletteCoordinator {
         syncPaletteMode(pluginID: pluginID, context: context)
 
         if !isVisible {
+            // 明确要去某个插件：不能被「离开太久回主界面」顺手退掉
+            lastHiddenAt = nil
             show()
         } else {
             // 面板已开着切插件：新视图会 onAppear；同插件带新 context 时视图可能还在，

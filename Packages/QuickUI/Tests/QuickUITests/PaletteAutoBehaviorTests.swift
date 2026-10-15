@@ -127,6 +127,64 @@ struct PaletteAutoBehaviorTests {
                 lastEditedAt: nil, now: now, idleMinutes: 3, currentQuery: "预填内容"))
     }
 
+    // MARK: - 自动回到主界面
+
+    @Test("隐藏超过设定时间就退回主界面")
+    func returnsHomeAfterAwayTooLong() {
+        #expect(
+            PaletteAutoBehavior.shouldReturnHome(
+                isInSubScreen: true, hiddenAt: now.addingTimeInterval(-6), now: now, seconds: 5))
+    }
+
+    @Test("时间内再次唤出保留当前界面")
+    func staysWhenBackQuickly() {
+        #expect(
+            !PaletteAutoBehavior.shouldReturnHome(
+                isInSubScreen: true, hiddenAt: now.addingTimeInterval(-3), now: now, seconds: 5))
+    }
+
+    @Test("时长边界算「该退回」")
+    func returnHomeBoundaryReturns() {
+        #expect(
+            PaletteAutoBehavior.shouldReturnHome(
+                isInSubScreen: true, hiddenAt: now.addingTimeInterval(-5), now: now, seconds: 5))
+    }
+
+    @Test("本来就在主界面无事可做")
+    func nothingToDoAtHome() {
+        #expect(
+            !PaletteAutoBehavior.shouldReturnHome(
+                isInSubScreen: false, hiddenAt: now.addingTimeInterval(-600), now: now, seconds: 5))
+    }
+
+    @Test("关闭时永不退回")
+    func returnHomeOffNeverReturns() {
+        #expect(
+            !PaletteAutoBehavior.shouldReturnHome(
+                isInSubScreen: true, hiddenAt: now.addingTimeInterval(-600), now: now, seconds: 0))
+    }
+
+    @Test("没有隐藏记录时不退回")
+    func returnHomeWithoutTimestampStays() {
+        #expect(
+            !PaletteAutoBehavior.shouldReturnHome(
+                isInSubScreen: true, hiddenAt: nil, now: now, seconds: 5))
+    }
+
+    @Test("自动回到主界面：默认 5 秒，未设置读默认值，显式关闭读关闭")
+    func returnHomeSettingReading() throws {
+        #expect(PaletteAutoBehavior.defaultReturnHome.rawValue == 5)
+        try withIsolatedDefaults { defaults in
+            #expect(PaletteAutoBehavior.returnHome(from: defaults) == .fiveSeconds)
+            defaults.set(0, forKey: SettingsKey.paletteAutoReturnHomeSeconds)
+            #expect(PaletteAutoBehavior.returnHome(from: defaults) == .off)
+            defaults.set(60, forKey: SettingsKey.paletteAutoReturnHomeSeconds)
+            #expect(PaletteAutoBehavior.returnHome(from: defaults) == .oneMinute)
+            defaults.set(7, forKey: SettingsKey.paletteAutoReturnHomeSeconds)
+            #expect(PaletteAutoBehavior.returnHome(from: defaults) == PaletteAutoBehavior.defaultReturnHome)
+        }
+    }
+
     @Test("选项文案与取值一致")
     func optionTitles() {
         #expect(PaletteAutoBehavior.AutoPasteWindow.fiveSeconds.rawValue == 5)

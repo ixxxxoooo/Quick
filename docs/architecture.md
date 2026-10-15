@@ -430,8 +430,12 @@ Debug（`.dev`）与 Release 互不污染。
 - **刚复制过东西就填进搜索框**（时间窗 5 / 10 / 30 秒）。复制完立刻唤出面板，
   多半就是要拿这段内容去搜或去粘。
 - **上次的查询放太久就清掉**（空闲时间 1 / 3 / 10 分钟），否则每次打开都看到残留的关键词。
+- **离开太久就回主界面**（隐藏 5 秒 / 15 秒 / 30 秒 / 1 分钟 / 5 分钟，默认 5 秒）。停在插件或
+  AI 对话里关掉面板，隔了一会儿再唤出，多半是想重新开始；隔得很短才保留原界面。协调器在
+  `hide()` 里记 `lastHiddenAt`，`show()` 无显式目标时用 `shouldReturnHome` 判定并
+  `popToRoot()`；`navigate(to:)` 会清掉该时间点，明确要去某插件时不会被顺手退掉。
 
-两个设置都经 `PaletteAutoBehavior.pasteWindow(from:)` / `clearIdle(from:)` 读，
+三个设置都经 `PaletteAutoBehavior.pasteWindow(from:)` / `clearIdle(from:)` / `returnHome(from:)` 读，
 **出厂默认值定义在那里**，设置页的 `@AppStorage` 引用同一个常量。这不是洁癖：
 `@AppStorage` 的默认值只在键不存在时生效，而 `integer(forKey:)` 在键不存在时读到 0
 （＝关闭），两边各写各的就会出现「设置页写着 5 秒内、实际行为是关闭」。规则见
