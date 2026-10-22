@@ -23,6 +23,7 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private var navigationState = SettingsNavigationState()
     private var toolbarController: SettingsToolbarController?
+    private var sidebarController: SettingsSidebarController?
 
     /// 初始化
     /// - Parameter dataSource: 由组装层注入（AppCore 实现）
@@ -71,9 +72,11 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
             height: 480
         )
 
+        let sidebar = SettingsSidebarController(dataSource: dataSource, navigationState: navigationState)
+        sidebarController = sidebar
+        window.onFocusSearch = { [weak sidebar] in sidebar?.focusSearch() }
         let splitVC = SettingsSplitViewController(
-            sidebar: SettingsSidebarView(dataSource: dataSource, navigationState: navigationState)
-                .scrollContentBackground(.hidden),
+            sidebar: sidebar,
             detail: SettingsDetailView(dataSource: dataSource, navigationState: navigationState)
                 .scrollContentBackground(.hidden)
         )
@@ -102,7 +105,14 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
 
 /// 支持 ⌘W 快捷关闭的设置窗口
 private final class SettingsWindow: NSWindow {
+    /// ⌘F 聚焦侧栏搜索框
+    var onFocusSearch: (() -> Void)?
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "f" {
+            onFocusSearch?()
+            return true
+        }
         if event.modifierFlags.contains(.command),
             let chars = event.charactersIgnoringModifiers,
             chars.lowercased() == "w"

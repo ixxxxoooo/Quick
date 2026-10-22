@@ -13,12 +13,10 @@ import SwiftUI
 @MainActor
 final class SettingsSplitViewController: NSSplitViewController {
 
-    init(sidebar: some View, detail: some View) {
+    init(sidebar: NSViewController, detail: some View) {
         super.init(nibName: nil, bundle: nil)
 
-        let sidebarHosting = NSHostingController(rootView: sidebar)
-        sidebarHosting.sizingOptions = []
-        let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebarHosting)
+        let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
         sidebarItem.minimumThickness = DesignTokens.Size.settingsSidebar
         sidebarItem.maximumThickness = DesignTokens.Size.settingsSidebar
         sidebarItem.canCollapse = false
