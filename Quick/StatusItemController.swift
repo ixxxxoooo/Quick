@@ -53,6 +53,7 @@ final class StatusItemController {
         menu.addItem(makeItem(title: "显示 Quick", action: #selector(showPalette)))
         menu.addItem(.separator())
         menu.addItem(makeItem(title: "设置…", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(makeItem(title: "检查更新…", action: #selector(checkForUpdates)))
         menu.addItem(makeItem(title: "重启 Quick", action: #selector(restart)))
         menu.addItem(.separator())
         menu.addItem(makeItem(title: "退出 Quick", action: #selector(quit), keyEquivalent: "q"))
@@ -162,6 +163,10 @@ final class StatusItemController {
         }
 
         NSApp.terminate(nil)
+    }
+
+    @objc private func checkForUpdates() {
+        AppCore.shared.updateController.checkNow()
     }
 
     @objc private func quit() {

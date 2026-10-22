@@ -2,41 +2,33 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>zh-Hans</string>
-    <key>CFBundleDisplayName</key>
-    <string>$(PRODUCT_NAME)</string>
-    <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
-    <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.1.1</string>
-    <key>CFBundleVersion</key>
-    <string>3</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
-    <key>LSUIElement</key>
-    <true/>
-    <!-- 自动化用途说明。控制别的应用（System Events / Finder）要有这条，系统才会弹
-         「Quick 想要控制……」的授权框；缺了它不会询问，而是直接以 -1743
-         「未获得授权将 Apple 事件发送给 System Events」拒绝，用户查不到原因也没法授权。
-         触发点：切换深色模式、睡眠 / 重启 / 关机 / 退出登录、清空废纸篓、推出磁盘。 -->
-    <key>NSAppleEventsUsageDescription</key>
-    <string>Quick 用 AppleScript 执行你主动选择的系统操作：切换深色模式、睡眠、重启、关机、退出登录、清空废纸篓、推出磁盘。</string>
-    <!-- 日历用途说明。EventKit 的 requestFullAccessToEvents() 要求声明
-         NSCalendarsFullAccessUsageDescription，缺了系统会静默拒绝日历访问；
-         NSCalendarsUsageDescription 是旧键名，一并写上保持两套系统接口都能读到。
-         日历看板支持新建系统日程，所以文案要如实说明「读取 + 新建」。 -->
-    <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>Quick 在日历看板展示你的系统日程、识别会议链接并在开始前提醒；仅在你主动新建日程时才会写入，不会上传你的日历数据。</string>
-    <key>NSCalendarsUsageDescription</key>
-    <string>Quick 在日历看板展示你的系统日程、识别会议链接并在开始前提醒；仅在你主动新建日程时才会写入，不会上传你的日历数据。</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh-Hans</string>
+	<key>CFBundleDisplayName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.2.0</string>
+	<key>CFBundleVersion</key>
+	<string>4</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Quick 用 AppleScript 执行你主动选择的系统操作：切换深色模式、睡眠、重启、关机、退出登录、清空废纸篓、推出磁盘。</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Quick 在日历看板展示你的系统日程、识别会议链接并在开始前提醒；仅在你主动新建日程时才会写入，不会上传你的日历数据。</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Quick 在日历看板展示你的系统日程、识别会议链接并在开始前提醒；仅在你主动新建日程时才会写入，不会上传你的日历数据。</string>
 </dict>
 </plist>

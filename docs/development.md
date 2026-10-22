@@ -290,4 +290,12 @@ git push origin v1.1.0
   `xattr -dr com.apple.quarantine /Applications/Quick.app`
   （DMG 里的 `安装说明.txt` 有同款可复制命令）。
 
+### 自动更新
+
+不用 Sparkle（零第三方依赖）。`QuickPlatform/Update/UpdateService` 查询 GitHub
+`releases/latest`，下载 DMG，挂载后拷出 `Quick.app` 并 `codesign --verify`，再由脱离的
+shell 等本进程退出后替换 bundle 并重开。启动时每 24 小时静默检查一次，菜单栏
+「检查更新…」可手动触发。仅 Release 渠道（`com.ixxxxoooo.quick`）生效；
+下载地址必须是 `github.com` 的 `.dmg` 资源。新旧包同证书签名，TCC 授权不丢。
+
 公证（Notarization）与 Developer ID 是后续可选升级；当前直接分发走自签名 + 解隔离。

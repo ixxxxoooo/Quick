@@ -89,6 +89,7 @@ final class AppCore {
 
     /// 菜单栏状态项
     let statusItemController = StatusItemController()
+    let updateController = UpdateController()
 
     /// 用户设置存储（插件开关等）
     let settingsStore = SettingsStore()
@@ -304,6 +305,7 @@ final class AppCore {
 
         statusItemController.install()
         statusItemController.applyVisibility()
+        updateController.checkInBackground()
         onboardingController.isLaunchAtLoginEnabled = { [weak self] in
             self?.settingsBridge.isLaunchAtLoginEnabled ?? false
         }
